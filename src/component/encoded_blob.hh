@@ -1,10 +1,14 @@
+#pragma once
+
+#include <string>
+
 /**
  * ----
  *  Magic String
  * ----
- *  Name of ENCODE (32 bytes)
+ *  Name of ENCODE
  * ----
- *  Symbolic name of output (256 bytes)
+ *  Symbolic name of output
  * ----
  *  Output of the ENCODE
  * ----
@@ -13,21 +17,26 @@
 class EncodedBlob {
   private:
     // Name of the blob
-    char name[32];
+    std::string name_;
+    // Name of the Encode
+    std::string encode_name_;
+    // Symbolic name of output
+    std::string output_name_;
     // Content of the blob
-    byte *content;
-
-    bool Encode_completed;
+    std::string content_;
+    
   public: 
     // Constructor
-    EncodedBlob() {};
-    EncodedBlob(char name[32]) : name(name) {}; 
+    EncodedBlob() {}
+  
+    EncodedBlob( std::string encode_name, std::string output_name ) 
+      : encode_name_( encode_name ),
+        output_name_( output_name )
+    {
+      name_ = encode_name + "#" + output_name
+    }
 
-    // Destructor
-    ~EncodedBlob();
-
-    // Load the file into memory
-    void *generate_blob();
+    std::string_view content() { return content_; } 
 } 
 
 
