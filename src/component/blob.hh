@@ -12,13 +12,13 @@ class Blob {
 
   public: 
     // Construct from name and content
-    Blob( std::string&& name, std::string&& content ) 
-      : name_( std::move( name ) ),
+    Blob( std::string name, std::string && content ) 
+      : name_( name ),
         content_( std::move( content ) )
     {}
 
     // Construct from content of encoded_blob
-    Blob( std::string&& encoded_blob_content )
+    Blob( std::string && encoded_blob_content )
       : content_( std::move( encoded_blob_content ) )
     {
       name_ = sha256::encode( content_ );

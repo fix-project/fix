@@ -15,7 +15,7 @@ namespace util
     return ( s.st_size );
   }
 
-  std::string read_file( const std::string& name )
+  std::string read_file( const std::string & name )
   {
     int fd = open( name, O_RDONLY );
     FileDescriptor fd_wrapper( fd );
@@ -28,7 +28,7 @@ namespace util
     return res;
   }
 
-  void write_file( const std::string& name, string_span content )
+  void write_file( const std::string & name, string_span content )
   {
     int fd = open( name, O_WRONLY | O_CREAT );
     FileDescriptor fd_wrapper( fd );
