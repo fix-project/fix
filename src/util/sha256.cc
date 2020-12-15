@@ -24,8 +24,8 @@ bool sha256::verify( const string & ret, const string & input )
   SHA256 hash;
   bool verified;
 
-  hash.Update( reinterpret_cast<const byte*>( input.data() ), input.size() );
-  verified = hash.Verify( reinterpret_cast<const byte*>( digest.data() ) );
+  hash.Update( reinterpret_cast<const unsigned char*>( input.data() ), input.size() );
+  verified = hash.Verify( reinterpret_cast<const unsigned char*>( ret.data() ) );
 
   return verified;
 } 

@@ -29,7 +29,7 @@ namespace wasmcompiler
   
   MemoryStringStream::MemoryStringStream( Stream * log_stream ) : Stream( log_stream ) {}
 
-  string && MemoryStringStream::ReleaseStringBuffer 
+  string && MemoryStringStream::ReleaseStringBuf()
   {
     return move(buf_);
   }
@@ -43,7 +43,7 @@ namespace wasmcompiler
     if ( end > buf_.size() ) {
       buf_.resize( end );
     }
-    uint8_t* dst = &buf_[ dst_offset ];
+    char* dst = &buf_[ dst_offset ];
     memcpy( dst, src, size );
     return Result::Ok;
   }
@@ -60,8 +60,8 @@ namespace wasmcompiler
       buf_.resize( end );
     }
 
-    uint8_t* dst = &buf_[ dst_offset ];
-    uint8_t* src = &buf_[ src_offset ];
+    char* dst = &buf_[ dst_offset ];
+    char* src = &buf_[ src_offset ];
     memmove( dst, src, size );
     return Result::Ok;
   }
@@ -74,7 +74,7 @@ namespace wasmcompiler
     return Result::Ok;
   }
 
-  pair<string, string> wasm_to_c( const string & wasm_name, const string & wasm_content )
+  pair<string&&, string&&> wasm_to_c( const string & wasm_name, const string & wasm_content )
   {
     Result result;
 
@@ -87,6 +87,8 @@ namespace wasmcompiler
                                kFailOnCustomSectionError );
     result = ReadBinaryIr( wasm_name.c_str(), wasm_content.data(), wasm_content.size(),
                            options, &errors, &module );
+    MemoryStringStream c_stream;
+    MemoryStringStream h_stream;
     if ( Succeeded( result ) ) {
       if ( Succeeded( result ) ) {
         ValidateOptions options( s_features );
@@ -102,8 +104,6 @@ namespace wasmcompiler
       }
 
       if ( Succeeded( result ) ) {
-        MemoryStringStream c_stream();
-        MemoryStringStream h_stream();
         result = WriteC( &c_stream, &h_stream, "wasm.h", &module, s_write_c_options );
       }
     }
@@ -112,6 +112,7 @@ namespace wasmcompiler
     {
       //TODO: throw exception
     }
-    return { c_stream.Buf(), h_stream.Buf() } ;
+
+    return { c_stream.ReleaseStringBuf(), h_stream.ReleaseStringBuf() };
   }
 }
