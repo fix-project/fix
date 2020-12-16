@@ -9,7 +9,7 @@ namespace wasmcompiler
   class MemoryStringStream : public wabt::Stream
   {
     public:
-      WABT_DISALLOW_COPY_AND_ASSIGN( MemoryStringStream );
+      WABT_DISALLOW_COPY_AND_ASSIGN( MemoryStringStream )
       explicit MemoryStringStream( Stream* log_stream = nullptr );
 
       std::string && ReleaseStringBuf();
@@ -22,7 +22,7 @@ namespace wasmcompiler
       wabt::Result TruncateImpl(size_t size) override;
 
     private:
-      std::string buf_;
+      std::string buf_{};
   };
   
   std::pair<std::string&&, std::string&&> wasm_to_c( const std::string & wasm_name, const std::string & wasm_content );

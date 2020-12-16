@@ -19,7 +19,7 @@ using namespace wabt;
 namespace wasmcompiler 
 {
   
-  static int s_verbose;
+  //  static int s_verbose;
   static std::string s_infile;
   static std::string s_outfile;
   static Features s_features;
@@ -91,8 +91,8 @@ namespace wasmcompiler
     MemoryStringStream h_stream;
     if ( Succeeded( result ) ) {
       if ( Succeeded( result ) ) {
-        ValidateOptions options( s_features );
-        result = ValidateModule( &module, &errors, options );
+        ValidateOptions v_options( s_features );
+        result = ValidateModule( &module, &errors, v_options );
         result |= GenerateNames( &module );
       }
 
