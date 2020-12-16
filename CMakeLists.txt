@@ -9,22 +9,25 @@ include_directories ( ${CRYPT_INCLUDE_DIRS} )
 add_compile_options ( ${CRYPT_CFLAGS_OTHER} )
 
 find_package ( Clang REQUIRED )
-include_directories ( ${CLANG_INCLUDE_DIRS} )
+include_directories (SYSTEM ${CLANG_INCLUDE_DIRS})
 
-find_package ( LLVM REQUIRED )
-include_directories( ${LLVM_INCLUDE_DIRS} )
-
+include(FetchContent)
+set(FETCHCONTENT_QUIET OFF)
+FetchContent_Declare(
+  wabt
+  GIT_REPOSITORY https://github.com/WebAssembly/wabt
+  GIT_TAG        master
+  )
 set(BUILD_TESTS off)
-set(BUILD_TOOLS off)
 set(BUILD_LIBWASM off)
-add_subdirectory ("${PROJECT_SOURCE_DIR}/src/wabt")
-
-include_directories("${PROJECT_SOURCE_DIR}/src/wabt")
+FetchContent_MakeAvailable(wabt)
 
 include ( etc/build_type.cmake )
-#include ( etc/cflags.cmake )
-include ( etc/cflags_temp.cmake )
+include ( etc/cflags.cmake )
 include ( etc/clang_format.cmake )
+
+include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-src")
+include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-build")
 
 include_directories ("${PROJECT_SOURCE_DIR}/src/util")
 #include_directories ("${PROJECT_SOURCE_DIR}/src/runtime")
