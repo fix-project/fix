@@ -12,3 +12,8 @@ add_dependencies("compiler_tester" wasm2c)
 
 add_executable(vfs_tester "llvm_vfs_tester.cc")
 target_link_libraries("vfs_tester" ${llvm_libs})
+
+add_executable(c_to_elf_tester "c_to_elf_tester.cc")
+target_link_libraries("c_to_elf_tester" ${llvm_libs})
+target_link_libraries("c_to_elf_tester" ${CLANG_LIBS})
+target_link_libraries("c_to_elf_tester" compiler)
