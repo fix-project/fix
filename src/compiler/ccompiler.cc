@@ -17,17 +17,17 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
 {
   // Create compiler instance
   clang::CompilerInstance compilerInstance;
-  auto compilerInvocation = compilerInstance.getInvocation();
-  
+  auto& compilerInvocation = compilerInstance.getInvocation();
+ 
   // Create diagnostic engine
-  auto diagOpt = new DiagnosticOptions();
-  diagOpt->DiagnosticLogFile = "-";
+  auto& diagOpt = compilerInvocation.getDiagnosticOpts();
+  diagOpt.DiagnosticLogFile = "-";
 
   string diagOutput;
   raw_string_ostream diagOS ( diagOutput );
   auto diagPrinter = make_unique<TextDiagnosticPrinter>( diagOS, new DiagnosticOptions() );
 
-  IntrusiveRefCntPtr<DiagnosticsEngine> diagEngine = compilerInstance.createDiagnostics( diagOpt, diagPrinter.get(), false );
+  IntrusiveRefCntPtr<DiagnosticsEngine> diagEngine = compilerInstance.createDiagnostics( &diagOpt, diagPrinter.get(), false );
 
   // Create File System
   IntrusiveRefCntPtr<vfs::OverlayFileSystem> RealFS( new vfs::OverlayFileSystem( vfs::getRealFileSystem() ) );
@@ -40,10 +40,12 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   compilerInstance.setFileManager( new FileManager( FileSystemOptions{}, RealFS ) );
 
   // Create arguments
-  const char *Args[] = {"-c", ( wasm_name + ".c" ).c_str()};
-  CompilerInvocation::CreateFromArgs( compilerInvocation, Args, compilerInstance.getDiagnostics() );
+  const char *Args[] = { ( wasm_name + ".c" ).c_str() };
+  CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
 
   CodeGenAction *action = new EmitLLVMOnlyAction();
+  compilerInstance.createDiagnostics( diagPrinter.get(), false );
+  
   if ( !compilerInstance.ExecuteAction( *action ) )
   {
     cout << "Failed to execute action." << endl;
@@ -54,5 +56,11 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   {
     cout << "Failed to take module." << endl;
   }
+
+  for ( const auto& i : module->getFunctionList() ) 
+  {
+    printf("%s\n", i.getName().str().c_str() );
+  }
+
   return wasm_name + c_content + h_content + " ";
 }
