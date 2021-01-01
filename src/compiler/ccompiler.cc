@@ -1,11 +1,15 @@
+#include <bitset>
 #include <iostream>
 #include <memory>
 
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/TextDiagnosticPrinter.h>
 #include <clang/CodeGen/CodeGenAction.h>
+#include <clang/CodeGen/BackendUtil.h>
 #include <llvm/Support/VirtualFileSystem.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/TargetSelect.h>
 
 #include "ccompiler.hh"
 
@@ -15,6 +19,11 @@ using namespace llvm;
 
 string c_to_elf( const string & wasm_name, const string & c_content, const string & h_content ) 
 {
+  llvm::InitializeAllTargets();
+  llvm::InitializeAllTargetMCs();
+  llvm::InitializeAllAsmPrinters();
+  llvm::InitializeAllAsmParsers();
+
   // Create compiler instance
   clang::CompilerInstance compilerInstance;
   auto& compilerInvocation = compilerInstance.getInvocation();
@@ -40,10 +49,13 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   compilerInstance.setFileManager( new FileManager( FileSystemOptions{}, RealFS ) );
 
   // Create arguments
-  const char *Args[] = { ( wasm_name + ".c" ).c_str() };
+  const char *Args[] = { ( wasm_name + ".c" ).c_str(), "-O2" };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
 
-  CodeGenAction *action = new EmitLLVMOnlyAction();
+  LLVMContext context;
+  CodeGenAction *action = new EmitLLVMOnlyAction( &context );
+  auto &targetOptions = compilerInstance.getTargetOpts();
+  targetOptions.Triple = llvm::sys::getDefaultTargetTriple();
   compilerInstance.createDiagnostics( diagPrinter.get(), false );
   
   if ( !compilerInstance.ExecuteAction( *action ) )
@@ -57,10 +69,26 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
     cout << "Failed to take module." << endl;
   }
 
-  for ( const auto& i : module->getFunctionList() ) 
+  // set up llvm target machine
+  auto &CodeGenOpts = compilerInstance.getCodeGenOpts();
+  auto &Diagnostics = compilerInstance.getDiagnostics();
+
+  if ( module->getTargetTriple() != targetOptions.Triple ) 
   {
-    printf("%s\n", i.getName().str().c_str() );
+    cout << "Wrong target triple" << endl;
+    module->setTargetTriple( targetOptions.Triple );
   }
 
-  return wasm_name + c_content + h_content + " ";
+  std::string res;
+  raw_string_ostream Str_OS ( res );
+  auto OS = make_unique<buffer_ostream>( Str_OS );
+
+  EmitBackendOutput(Diagnostics, compilerInstance.getHeaderSearchOpts(), CodeGenOpts,
+                    targetOptions, compilerInstance.getLangOpts(),
+                    compilerInstance.getTarget().getDataLayout(), module.get(), Backend_EmitObj,
+                    std::move( OS ));
+  
+  cout << diagOutput << endl; 
+
+  return res;
 }
