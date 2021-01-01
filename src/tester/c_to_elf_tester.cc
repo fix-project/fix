@@ -14,7 +14,7 @@ int main( int argc, char* argv[] )
     return 1;
   } 
 
-  string res = c_to_elf( "test", "#include \"test.h\"\n int add( int a, int b ) { return a + b; }\n int direct( int a ) { return add( a, a) ; }", "int direct( int a );" );
+  string res = c_to_elf( "test", "#include \"test.h\"\n int add( int a, int b ) { return a + b; }\n int direct( int a ) { return add( a, a) ; }", "#include <string.h>\n int direct( int a );" );
   
   ofstream fout;
   fout.open( argv[1], ios_base::out | ios_base::binary | ios_base::trunc );

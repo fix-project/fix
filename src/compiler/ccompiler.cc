@@ -47,10 +47,26 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   InMemFS->addFile( "./" + wasm_name + ".h", 0, MemoryBuffer::getMemBuffer( h_content ) );
 
   compilerInstance.setFileManager( new FileManager( FileSystemOptions{}, RealFS ) );
+  
+  // auto diskFile = RealFS->openFileForRead( "/usr/include/string.h" );
+  // cout << ( string )( ( *( *diskFile )->getBuffer( "ignore" ) )->getBuffer() ) << endl;
 
   // Create arguments
-  const char *Args[] = { ( wasm_name + ".c" ).c_str(), "-O2" };
+  const char *Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", "-I/usr/include", "-I/usr/include/x86_64-linux-gnu", "-I/usr/lib/llvm-10/lib/clang/10.0.0/include" };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
+   
+  cout << diagOS.str() << endl; 
+  cout << sys::getDefaultTargetTriple() << endl;
+  auto &headerSearchOpts = compilerInvocation.getHeaderSearchOpts();
+  cout << "Sysroot: " << headerSearchOpts.Sysroot << endl;
+  for (const auto& entry : headerSearchOpts.UserEntries)
+  {
+    cout << "Entry path: " << entry.Path << " group: " << entry.Group << endl;
+  }
+  for (const auto& entry : headerSearchOpts.SystemHeaderPrefixes)
+  {
+    cout << "Header prefix: " << entry.Prefix << endl;
+  }
 
   LLVMContext context;
   CodeGenAction *action = new EmitLLVMOnlyAction( &context );
@@ -61,12 +77,14 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   if ( !compilerInstance.ExecuteAction( *action ) )
   {
     cout << "Failed to execute action." << endl;
+  cout << diagOS.str() << endl; 
   }
 
   unique_ptr<llvm::Module> module = action->takeModule() ;
   if ( !module )
   {
     cout << "Failed to take module." << endl;
+  cout << diagOS.str() << endl; 
   }
 
   // set up llvm target machine
@@ -88,7 +106,6 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
                     compilerInstance.getTarget().getDataLayout(), module.get(), Backend_EmitObj,
                     std::move( OS ));
   
-  cout << diagOutput << endl; 
 
   return res;
 }
