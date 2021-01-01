@@ -1,3 +1,4 @@
+#include <string>
 #include <bitset>
 #include <iostream>
 #include <memory>
@@ -11,14 +12,18 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Support/TargetSelect.h>
 
-#include "ccompiler.hh"
+#include "util.hh"
 
 using namespace std;
 using namespace clang;
 using namespace llvm;
 
-string c_to_elf( const string & wasm_name, const string & c_content, const string & h_content, const string & wasm_rt_content ) 
+int main( int argc, char * argv[] ) 
 {
+  cout << argc << endl;
+
+  string file_content = util::read_file( argv[1] ); 
+
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmPrinters();
@@ -43,9 +48,9 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   IntrusiveRefCntPtr<vfs::InMemoryFileSystem> InMemFS( new vfs::InMemoryFileSystem() );
   RealFS->pushOverlay( InMemFS );
 
-  InMemFS->addFile( "./" + wasm_name + ".c", 0, MemoryBuffer::getMemBuffer( c_content ) );
-  InMemFS->addFile( "./" + wasm_name + ".h", 0, MemoryBuffer::getMemBuffer( h_content ) );
-  InMemFS->addFile( "./wasm-rt.h", 0, MemoryBuffer::getMemBuffer( wasm_rt_content ) );
+  InMemFS->addFile( "./add-new.c", 0, MemoryBuffer::getMemBuffer( file_content ) );
+  // InMemFS->addFile( "./" + wasm_name + ".h", 0, MemoryBuffer::getMemBuffer( h_content ) );
+  // InMemFS->addFile( "./wasm_rt.h", 0, MemoryBuffer::getMemBuffer( wasm_rt_content ) );
 
   compilerInstance.setFileManager( new FileManager( FileSystemOptions{}, RealFS ) );
   
@@ -53,7 +58,7 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   // cout << ( string )( ( *( *diskFile )->getBuffer( "ignore" ) )->getBuffer() ) << endl;
 
   // Create arguments
-  const char *Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", "-I/usr/include", "-I/usr/include/x86_64-linux-gnu", "-I/usr/lib/llvm-10/lib/clang/10.0.0/include" };
+  const char *Args[] = { "add-new.c" , "-I/usr/include", "-I/usr/include/x86_64-linux-gnu", "-I/usr/lib/llvm-10/lib/clang/10.0.0/include" };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
    
   cout << diagOS.str() << endl; 
@@ -108,5 +113,5 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
                     std::move( OS ));
   
 
-  return res;
+  return 0;
 }

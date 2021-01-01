@@ -74,7 +74,7 @@ namespace wasmcompiler
     return Result::Ok;
   }
 
-  pair<string&&, string&&> wasm_to_c( const string & wasm_name, const string & wasm_content )
+  pair<string, string> wasm_to_c( const string & wasm_name, const string & wasm_content )
   {
     Result result;
 
@@ -104,7 +104,7 @@ namespace wasmcompiler
       }
 
       if ( Succeeded( result ) ) {
-        result = WriteC( &c_stream, &h_stream, "wasm.h", &module, s_write_c_options );
+        result = WriteC( &c_stream, &h_stream, (wasm_name + ".h").c_str() , &module, s_write_c_options );
       }
     }
     FormatErrorsToFile(errors, Location::Type::Binary);

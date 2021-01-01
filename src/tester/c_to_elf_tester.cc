@@ -10,7 +10,7 @@ int main( int argc, char* argv[] )
 {
   if ( argc != 2 )
   {
-    cerr << "Usage: " << argv[0] << "output_directory\n";
+    cerr << "Usage: " << argv[0] << " output_directory\n";
     return 1;
   } 
 
