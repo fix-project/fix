@@ -37,11 +37,11 @@ include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-build")
 
 include_directories ("${PROJECT_SOURCE_DIR}/src/util")
 #include_directories ("${PROJECT_SOURCE_DIR}/src/runtime")
-#include_directories ("${PROJECT_SOURCE_DIR}/src/component")
+include_directories ("${PROJECT_SOURCE_DIR}/src/component")
 include_directories ("${PROJECT_SOURCE_DIR}/src/compiler")
 
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/util")
 #add_subdirectory ("${PROJECT_SOURCE_DIR}/src/runtime")
-#add_subdirectory ("${PROJECT_SOURCE_DIR}/src/component")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/src/component")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/compiler")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/tester")

@@ -1,4 +1,5 @@
 #include <string>
+#include <memory>
 
 #include "parser.hh"
 #include "spans.hh"
@@ -17,38 +18,30 @@
  * --------------------------------
  */
 
-typedef struct input_entry {
-  char[256] symbol;
-} InputEntry;
-
-typedef struct output_entry {
-  char[256] symbol;
-} OutputEntry;
-
-typedef struct p_mem {
-  // Code section of the program
-  void *code;
-  // Data section of the program
-  void *data;
-  // Entry point of the program
-  void *entry_point;
-} ProgramMem;
-
 class Program {
   private:
     // Name of the program
     std::string name_;
     
     // List of named input symbols
-    span_view<InputEntry> inputs_;
+    span_view<std::string> inputs_;
     // List of named output symbols
-    span_view<OutputEntry> outputs_;
+    span_view<std::string> outputs_;
 
-    // memory instance of the program
-    ProgramMem memory_instance_;
+    // Code and data section of the program
+    std::shared_ptr<const char> code_;
+    // Entry point of init function
+    uint64_t init_entry_;
+    // Entry point of main function
+    uint64_t main_entry_;
 
   public:
-    // Default constructor
-    Program() {};
-    Program( string name ) : name_( name );
-}
+    Program( std::string name, span_view<std::string> inputs, span_view<std::string> outputs,
+             std::shared_ptr<const char> code, uint64_t init_entry, uint64_t main_entry ) 
+      : name_( name ),
+        inputs_( inputs ),
+        outputs_( outputs ),
+        code_( code ),
+        init_entry_( init_entry ),
+        main_entry_( main_entry ) {}
+};
