@@ -1,4 +1,5 @@
-using namespace std;
+#include <map>
+#include <string>
 
 /**
  * Structure of Encode:
@@ -14,41 +15,16 @@ using namespace std;
  *        Wasm module
  * --------------------------------
  */
-
-typedef struct encode_header {
-  char[32] program_name;
-  uint64_t num_input_entry;
-  uint64_t num_output_entry;
-} ProgFileHdr;
-
-typedef struct input_entry {
-  char[256] symbol;
-  char[32] blob_name;
-} InputEntry;
-
-typedef struct output_entry {
-  char[256] symbol;
-  char[32] blob_name;
-} OutputEntry;
-
 class Encode {
   private:
     // Name of the encode 
-    char name[32];
-    // Content of the program
-    byte *content;
+    std::string name_;
+    // Name of the program
+    std::string program_name_;
     // List of named input symbols
-    InputEntry * inputs;
+    std::map<std::string, std::string> input_to_blob_;
     // List of named output symbols
-    OutputEntry * outputs;
+    std::map<std::string, std::string> output_to_blob_;
     
-    bool encode_completed;
   public:
-    // Default constructor
-    Encode() {};
-
-    // Destructor
-    ~Encode();
-
-    void execute();
-}
+};

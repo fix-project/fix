@@ -10,9 +10,9 @@ class Invocation {
     std::map<std::string, std::string> input_to_blob_;
 
     // Map from output name to blob name
-    std::map<std::string, std::String> output_to_blob_;
+    std::map<std::string, std::string> output_to_blob_;
 
     // Corresponding memory instance
-    void *mem;
-}
+    uint8_t *mem;
+};
     
