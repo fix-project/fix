@@ -1,5 +1,6 @@
-#include <string>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "parser.hh"
 #include "spans.hh"
@@ -24,9 +25,9 @@ class Program {
     std::string name_;
     
     // List of named input symbols
-    span_view<std::string> inputs_;
+    std::vector<std::string> inputs_;
     // List of named output symbols
-    span_view<std::string> outputs_;
+    std::vector<std::string> outputs_;
 
     // Code and data section of the program
     std::shared_ptr<const char> code_;
@@ -34,14 +35,18 @@ class Program {
     uint64_t init_entry_;
     // Entry point of main function
     uint64_t main_entry_;
+    // Location of memory variable;
+    uint64_t mem_loc_;
 
   public:
-    Program( std::string name, span_view<std::string> inputs, span_view<std::string> outputs,
-             std::shared_ptr<const char> code, uint64_t init_entry, uint64_t main_entry ) 
+    Program( std::string name, std::vector<std::string> && inputs, std::vector<std::string> && outputs,
+             std::shared_ptr<const char> code, uint64_t init_entry, uint64_t main_entry, uint64_t mem_loc ) 
       : name_( name ),
-        inputs_( inputs ),
-        outputs_( outputs ),
+        inputs_( std::move( inputs ) ),
+        outputs_( std::move( outputs ) ),
         code_( code ),
         init_entry_( init_entry ),
-        main_entry_( main_entry ) {}
+        main_entry_( main_entry ),
+        mem_loc_( mem_loc )
+    {}
 };

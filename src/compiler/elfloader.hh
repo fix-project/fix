@@ -1,10 +1,16 @@
+#include <elf.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <string>
-#include <elf.h>
-#include <vector>
 #include <sys/mman.h>
+#include <unistd.h>
+
+#include <map>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "program.hh"
+#include "spans.hh"
 
 // Symbol Type 
 #define TEXT 0
@@ -14,23 +20,33 @@
 
 // Represents one object file
 struct Elf_Info {
-	// Code section of the object file
-	const char *code;
-	// BSS section of the object file
-	const char *bss;
-	
+	// Index of the code section
+  uint64_t text_idx;
+  // Code section 
+	std::string_view code;
+
+  // Index of the bss section
+  uint64_t bss_idx;
+  // Size of the bss section
+  uint64_t bss_size;
+  // Size of the com section
+  uint64_t com_size;
+
 	// String signs for symbol table
-	const char *symstrs;
+	std::string_view symstrs;
 	// String signs for section header 
-	const char *namestrs;
+	std::string_view namestrs;
 	// Symbol table
-	const Elf64_Sym *symtb;
-	// Number of relocation entries in relocation table
-	int reloctb_size;
+	span_view<Elf64_Sym> symtb;
 	// Relocation table
-	const Elf64_Rela *reloctb;
+	span_view<Elf64_Rela> reloctb;
 	// Section header
-	const Elf64_Shdr *sheader;
+	span_view<Elf64_Shdr> sheader;
+
+  Elf_Info() 
+    : text_idx( 0 ), code(), 
+      bss_idx( 0 ), bss_size( 0 ), com_size( 0 ),
+      symstrs(), namestrs(), symtb(), reloctb(), sheader() {}
 };
 
 // A function in a program
@@ -52,5 +68,3 @@ struct func {
 };
 
 Elf_Info load_progarm( const std::string & program_content );
-
-std::string link_program( std::string & program_content, Elf_Info elf_info );
