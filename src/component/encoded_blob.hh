@@ -34,7 +34,7 @@ class EncodedBlob {
         content_( "" )
     {}
 
-    std::string_view content() { return content_; } 
+    std::string & content() { return content_; } 
 }; 
 
 

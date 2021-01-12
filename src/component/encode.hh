@@ -1,3 +1,5 @@
+#pragma once
+
 #include <map>
 #include <string>
 
@@ -25,6 +27,8 @@ class Encode {
     std::map<std::string, std::string> input_to_blob_;
     // List of named output symbols
     std::map<std::string, std::string> output_to_blob_;
+
+    friend class Invocation;
     
   public:
 };
