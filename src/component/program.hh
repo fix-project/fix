@@ -30,7 +30,7 @@ class Program {
     std::vector<std::string> outputs_;
 
     // Code and data section of the program
-    std::shared_ptr<const char> code_;
+    std::shared_ptr<char> code_;
     // Entry point of init function
     uint64_t init_entry_;
     // Entry point of main function
@@ -40,7 +40,7 @@ class Program {
 
   public:
     Program( std::string name, std::vector<std::string> && inputs, std::vector<std::string> && outputs,
-             std::shared_ptr<const char> code, uint64_t init_entry, uint64_t main_entry, uint64_t mem_loc ) 
+             std::shared_ptr<char> code, uint64_t init_entry, uint64_t main_entry, uint64_t mem_loc ) 
       : name_( name ),
         inputs_( std::move( inputs ) ),
         outputs_( std::move( outputs ) ),
