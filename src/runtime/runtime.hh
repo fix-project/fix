@@ -18,6 +18,13 @@ class Runtime {
     // Map from name to program
     std::map<std::string, Program> name_to_program_;
 
+    Runtime ()
+      : name_to_blob_(),
+        name_to_encoded_blob_(),
+        name_to_encode_(),
+        name_to_program_() 
+    {}
+
   public:
     // Return reference to blob content
     std::string_view getBlob( const std::string & name );
@@ -25,4 +32,9 @@ class Runtime {
     // Return reference to encoded blob content
     std::string & getEncodedBlob( const std::string & name );
 
+    static Runtime & getInstance () 
+    {
+      static Runtime runtime_instance;
+      return runtime_instance;
+    }
 };

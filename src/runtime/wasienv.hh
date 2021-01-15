@@ -41,7 +41,6 @@ class WasiEnvironment
     // Next available fd id;
     uint64_t next_fd_id_;
 
-  public:
     WasiEnvironment( Runtime& runtime ) 
       : id_to_fd_(),
         id_to_inv_(),
@@ -49,11 +48,17 @@ class WasiEnvironment
         next_fd_id_( 0 )
     {}
 
-    int path_open( const std::string & varaible_name ); 
-    int fd_read( uint64_t fd_id, uint64_t ofst, uint64_t count );
-    int fd_write( uint64_t fd_id, uint64_t ofst, uint64_t count );
-};
+  public:
+    static WasiEnvironment & getInstance()
+    {
+      static WasiEnvironment wasi_instance ( Runtime::getInstance() );
+      return wasi_instance;
+    }
 
+    static int path_open( const std::string & varaible_name ); 
+    static int fd_read( uint64_t fd_id, uint64_t ofst, uint64_t count );
+    static int fd_write( uint64_t fd_id, uint64_t ofst, uint64_t count );
+};
 
 
 
