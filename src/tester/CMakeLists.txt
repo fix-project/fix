@@ -31,3 +31,8 @@ add_dependencies("wasm_to_elf_tester" wasm2c)
 
 add_executable(vfs_tester "llvm_vfs_tester.cc")
 target_link_libraries("vfs_tester" LLVM)
+
+add_executable(elf_linking_tester "elf_linking_tester.cc")
+target_link_libraries("elf_linking_tester" util)
+target_link_libraries("elf_linking_tester" compiler)
+target_link_libraries("elf_linking_tester" wasmrt)

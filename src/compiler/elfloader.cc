@@ -26,17 +26,18 @@ Elf_Info load_program( string & program_content )
 	
   int i = 0;
   for ( const auto & section : res.sheader ) {
-		printf("S[] sh_offset:%lx sh_name:%s sh_addralign:%lx\n", section.sh_offset, res.namestrs.data() + section.sh_name, section.sh_addralign);
+		printf("S[%d] sh_offset:%lx sh_name:%s sh_addralign:%lx\n", i, section.sh_offset, res.namestrs.data() + section.sh_name, section.sh_addralign);
 		
 		// Allocate code block for .text section
-		if ( strcmp( res.namestrs.data() + section.sh_name, ".text" ) != 0 )
+		if ( strcmp( res.namestrs.data() + section.sh_name, ".text" ) == 0 )
     {
-			res.text_idx = i;
+			cout << "Assigning text_idx to " << i << endl;
+      res.text_idx = i;
       res.code = string_view( program_content.data() + section.sh_offset, section.sh_size );
 		}
 
 		// Record size of .bss section
-		if ( strcmp( res.namestrs.data() + section.sh_name, ".bss" ) != 0 )
+		if ( strcmp( res.namestrs.data() + section.sh_name, ".bss" ) == 0 )
     {
 			res.bss_size = section.sh_size;
 			res.bss_idx = i;
@@ -62,6 +63,7 @@ Elf_Info load_program( string & program_content )
 					if ( symtb_entry.st_shndx == SHN_UNDEF ) 
           {
 						printf( "Function not defined\n" );
+            j++;
 						continue;
 					} 
 
@@ -96,7 +98,7 @@ Elf_Info load_program( string & program_content )
 		// Load relocation table
 		if ( section.sh_type == SHT_RELA || section.sh_type == SHT_REL ) 
     {
-			if( strcmp( res.namestrs.data() + section.sh_name, ".rela.text" ) != 0 )
+			if( strcmp( res.namestrs.data() + section.sh_name, ".rela.text" ) == 0 )
       {
 				res.reloctb = span_view<Elf64_Rela>( string_view( program_content.data() + section.sh_offset, section.sh_size ) ); 
 			}
@@ -112,10 +114,13 @@ Elf_Info load_program( string & program_content )
   
 	// Step 3: Update symbol table entry for *COM*
 	uint64_t com_base = res.bss_size;
-	for ( int com_sym_idx : res.com_symtb_entry) {
-    Elf64_Sym mutable_sym_entry = const_cast<Elf64_Sym &>( res.symtb[com_sym_idx] );
-		mutable_sym_entry.st_value = com_base;
-		com_base += mutable_sym_entry.st_size;
+	for ( int com_sym_idx : res.com_symtb_entry) 
+  {
+    cout << "Adjusting com_sym_idx " << com_sym_idx << " to com_base " << com_base << endl;
+    Elf64_Sym & mutable_symtb_entry = const_cast<Elf64_Sym &>( res.symtb[com_sym_idx] );
+    printf("Idx:%d Name:%s value:%lx size:%lx st_shndx:%x\n", com_sym_idx, res.symstrs.data() + mutable_symtb_entry.st_name, mutable_symtb_entry.st_value, mutable_symtb_entry.st_size, mutable_symtb_entry.st_shndx);
+		mutable_symtb_entry.st_value = com_base;
+		com_base += mutable_symtb_entry.st_size;
 	}
 
   return res;
@@ -195,5 +200,7 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
   uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("_start").idx ].st_value;
   uint64_t mem_loc = elf_info.code.size() + elf_info.symtb[ elf_info.func_map.at("memory").idx ].st_value;
 
+  cout << init_entry << " " << main_entry << endl;
+  cout << code.get() << endl;
   return Program( program_name, move(inputs), move(outputs), code, init_entry, main_entry, mem_loc ); 
 }

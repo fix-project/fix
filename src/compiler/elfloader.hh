@@ -75,5 +75,5 @@ struct Elf_Info {
 };
 
 
-Elf_Info load_progarm( const std::string & program_content );
+Elf_Info load_program( std::string & program_content );
 Program link_program( Elf_Info & elf_info, std::string & program_name, std::vector<std::string> && inputs, std::vector<std::string> && outputs );
