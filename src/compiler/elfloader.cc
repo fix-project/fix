@@ -144,7 +144,7 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
 	// Step 1: Add wasm-rt functions to func_map	
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_trap", func( (uint64_t)wasm_rt_trap ) ) );		
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_register_func_type", func( (uint64_t)wasm_rt_register_func_type ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_memory ", func( (uint64_t)wasm_rt_allocate_memory ) ) );		
+	elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_memory", func( (uint64_t)wasm_rt_allocate_memory ) ) );		
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );		
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );		
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );		
