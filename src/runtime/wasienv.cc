@@ -5,13 +5,13 @@ using namespace std;
 int WasiEnvironment::path_open( const string & variable_name )
 {
   auto & wasienv = WasiEnvironment::getInstance();
-  auto & invocation = wasienv.id_to_inv_.at( invocation_id );
+  auto & invocation = wasienv.id_to_inv_.at( invocation_id_ );
 
   if ( invocation.isInput( variable_name ) )
   {
-    wasienv.id_to_fd_.insert( pair<uint64_t, FileDescriptor>( wasienv.next_fd_id_, FileDescriptor( invocation.getInputBlobName( variable_name ), fd_mode::BLOB ) ) );
+    wasienv.id_to_fd_.insert( pair<uint64_t, WasmFileDescriptor>( wasienv.next_fd_id_, WasmFileDescriptor( invocation.getInputBlobName( variable_name ), fd_mode::BLOB ) ) );
   } else {
-    wasienv.id_to_fd_.insert( pair<uint64_t, FileDescriptor>( wasienv.next_fd_id_, FileDescriptor( invocation.getOutputBlobName( variable_name ), fd_mode::ENCODEDBLOB ) ) );
+    wasienv.id_to_fd_.insert( pair<uint64_t, WasmFileDescriptor>( wasienv.next_fd_id_, WasmFileDescriptor( invocation.getOutputBlobName( variable_name ), fd_mode::ENCODEDBLOB ) ) );
   }
 
   wasienv.next_fd_id_++;
@@ -22,7 +22,7 @@ int WasiEnvironment::fd_read( uint64_t fd_id, uint64_t ofst, uint64_t count )
 {
   auto & wasienv = WasiEnvironment::getInstance();
   auto & fd = wasienv.id_to_fd_.at( fd_id );
-  auto & invocation = wasienv.id_to_inv_.at( invocation_id );
+  auto & invocation = wasienv.id_to_inv_.at( invocation_id_ );
 
   switch ( fd.mode_ )
   {
@@ -43,7 +43,7 @@ int WasiEnvironment::fd_write( uint64_t fd_id, uint64_t ofst, uint64_t count )
 {
   auto & wasienv = WasiEnvironment::getInstance();
   auto & fd = wasienv.id_to_fd_.at( fd_id );
-  auto & invocation = wasienv.id_to_inv_.at( invocation_id );
+  auto & invocation = wasienv.id_to_inv_.at( invocation_id_ );
 
   switch ( fd.mode_ )
   {

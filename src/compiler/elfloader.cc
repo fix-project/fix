@@ -148,9 +148,9 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );		
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );		
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );		
-	// elf_info.func_map.insert( pair<string, func>( "path_open", func( (uint64_t)path_open ) );		
-	// elf_info.func_map.insert( pair<string, func>( "fd_read", func( (uint64_t)fd_read ) );		
-	// elf_info.func_map.insert( pair<string, func>( "fd_write", func( (uint64_t)fd_write ) );		
+	elf_info.func_map.insert( pair<string, func>( "path_open", func( (uint64_t)WasiEnvironment::path_open ) ) );		
+	elf_info.func_map.insert( pair<string, func>( "fd_read", func( (uint64_t)WasiEnvironment::fd_read ) ) );		
+	elf_info.func_map.insert( pair<string, func>( "fd_write", func( (uint64_t)WasiEnvironment::fd_write ) ) );		
  
   for (const auto & reloc_entry : elf_info.reloctb ){
     printf("offset:%lx index:%lx type:%lx addend:%ld\n", reloc_entry.r_offset, ELF64_R_SYM( reloc_entry.r_info ), ELF64_R_TYPE( reloc_entry.r_info ), reloc_entry.r_addend);

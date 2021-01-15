@@ -28,10 +28,10 @@ int main( int argc, char * argv[] )
     cout << pair.first << endl;
   }
 
-  // vector<string> inputs;
-  // vector<string> outputs;
-  // string name ("test");
-  // link_program( elf_info, name, move(inputs), move(outputs) );
+  vector<string> inputs;
+  vector<string> outputs;
+  string name ("test");
+  link_program( elf_info, name, move(inputs), move(outputs) );
  
   return 0;
 }

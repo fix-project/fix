@@ -11,7 +11,9 @@
 
 #include "program.hh"
 #include "spans.hh"
+#include "wasienv.hh"
 #include "wasm-rt.h"
+
 
 // Symbol Type 
 #define TEXT 0
