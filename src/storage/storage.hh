@@ -11,7 +11,7 @@ class Storage
   public:
     virtual const T& get( const std::string & name ) = 0;
     virtual T& getMutable( const std::string & name ) = 0;
-    virtual void put( const std::string & name, std::string && content ) = 0;
+    virtual void put( const std::string & name, T && content ) = 0;
     virtual ~Storage() {};
 };
 
@@ -36,9 +36,9 @@ class InMemoryStorage : public Storage<T>
       return const_cast<T &>( get( name ) );
     }
 
-    void put( const std::string& name, std::string&& content )
+    void put( const std::string& name, T && content )
     {
-      name_to_object_.insert( std::pair<std::string,T>( name, T( name, std::move(content) ) ) );
+      name_to_object_.insert( std::pair<std::string,T>( name, std::move( content ) ) );
       return;
     }
 };
