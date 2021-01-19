@@ -1,5 +1,5 @@
-#include "storage.hh"
 #include "wasienv.hh"
+#include "runtimestorage.hh"
 
 using namespace std;
 
@@ -19,11 +19,11 @@ namespace wasi
     switch ( fd.mode_ )
     {
       case fd_mode::BLOB :
-        memcpy( &invocation.getMem()->data[ ofst ], &Storage::getInstance().getBlob( fd.blob_name_ )[ fd.loc_ ], count );
+        memcpy( &invocation.getMem()->data[ ofst ], &RuntimeStorage::getInstance().getBlob( fd.blob_name_ )[ fd.loc_ ], count );
         break;
 
       case fd_mode::ENCODEDBLOB :
-        memcpy( &invocation.getMem()->data[ ofst ], &Storage::getInstance().getEncodedBlob( fd.blob_name_ )[ fd.loc_ ], count );
+        memcpy( &invocation.getMem()->data[ ofst ], &RuntimeStorage::getInstance().getEncodedBlob( fd.blob_name_ )[ fd.loc_ ], count );
         break;
     }
 
@@ -43,7 +43,7 @@ namespace wasi
         break;
 
       case fd_mode::ENCODEDBLOB :
-        Storage::getInstance().getEncodedBlob( fd.blob_name_ ).append( reinterpret_cast<const char *>( &invocation.getMem()->data[ ofst ] ), count );
+        RuntimeStorage::getInstance().getEncodedBlob( fd.blob_name_ ).append( reinterpret_cast<const char *>( &invocation.getMem()->data[ ofst ] ), count );
         fd.loc_ += count;
         break;
     }

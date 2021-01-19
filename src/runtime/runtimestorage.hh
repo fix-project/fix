@@ -8,19 +8,20 @@
 #include "encoded_blob.hh"
 #include "encode.hh"
 #include "program.hh"
+#include "storage.hh"
 
-class Storage {
+class RuntimeStorage {
   private:
     // Map from name to content (blob / encoded blob)
-    std::map<std::string, Blob> name_to_blob_;
+    InMemoryStorage<Blob> name_to_blob_;
     // Map from name to content of encoded blob
-    std::map<std::string, EncodedBlob> name_to_encoded_blob_;
+    InMemoryStorage<EncodedBlob> name_to_encoded_blob_;
     // Map from name to encode
     std::map<std::string, Encode> name_to_encode_;
     // Map from name to program
     std::map<std::string, Program> name_to_program_;
 
-    Storage ()
+    RuntimeStorage ()
       : name_to_blob_(),
         name_to_encoded_blob_(),
         name_to_encode_(),
@@ -34,9 +35,11 @@ class Storage {
     // Return reference to encoded blob content
     std::string & getEncodedBlob( const std::string & name );
 
-    static Storage & getInstance () 
+    static RuntimeStorage & getInstance () 
     {
-      static Storage runtime_instance;
+      static RuntimeStorage runtime_instance;
       return runtime_instance;
     }
+
+    // add
 };

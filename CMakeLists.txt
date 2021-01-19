@@ -40,6 +40,7 @@ include_directories ("${PROJECT_SOURCE_DIR}/src/runtime")
 include_directories ("${PROJECT_SOURCE_DIR}/src/component")
 include_directories ("${PROJECT_SOURCE_DIR}/src/compiler")
 include_directories ("${PROJECT_SOURCE_DIR}/src/wasm-rt")
+include_directories ("${PROJECT_SOURCE_DIR}/src/storage")
 
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/util")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/wasm-rt")

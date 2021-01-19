@@ -9,7 +9,7 @@
 
 namespace util
 {
-  std::string read_file( const std::string & name )
+  inline std::string read_file( const std::string & name )
   {
     std::ifstream inFile( name );
     std::stringstream inString;

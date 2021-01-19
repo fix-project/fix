@@ -6,30 +6,39 @@
 #include <util.hh>
 
 template<typename T>
-class storage
+class Storage
 {
-  private: 
-    std::map<std::string, T> name_to_object_;
-
   public:
-    const T& get( std::string& name )
+    virtual const T& get( const std::string & name ) = 0;
+    virtual T& getMutable( const std::string & name ) = 0;
+    virtual void put( const std::string & name, std::string && content ) = 0;
+    virtual ~Storage() {};
+};
+
+template<typename T>
+class InMemoryStorage : public Storage<T>
+{
+  private:
+    std::map<std::string, T> name_to_object_;
+  
+  public:
+    InMemoryStorage()
+    : name_to_object_()
+    {}
+
+    const T& get( const std::string & name )
     {
-      auto it = name_to_object.find( name );
-      if ( it != name_to_object.end() )
-      {
-        return name_to_object[ name ];
-      }
-    
-      std::string content = util::read_file( name );
-      name_to_object.insert( { name, { name, content } } );
-      
-      return name_to_object[ name ];
+      return name_to_object_.at( name );
     }
 
-    void put( std::string& name, std::string&& content )
+    T& getMutable( const std::string & name )
     {
-      util::write_file( name, { content } );
-      name_to_object.insert( { name, { name, content } } );
+      return const_cast<T &>( get( name ) );
+    }
+
+    void put( const std::string& name, std::string&& content )
+    {
+      name_to_object_.insert( std::pair<std::string,T>( name, T( name, std::move(content) ) ) );
       return;
     }
-}
+};
