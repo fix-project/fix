@@ -51,4 +51,15 @@ class Program {
         main_entry_( main_entry ),
         mem_loc_( mem_loc )
     {}
+
+    void execute ()
+    { 
+      // int register rax asm("rax") = init_entry_;
+      asm("call *%0"
+           :
+           : "r" (init_entry_));
+      asm("call *%0"
+           :
+           : "r" (main_entry_));
+    }
 };
