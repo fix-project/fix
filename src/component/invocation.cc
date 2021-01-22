@@ -49,3 +49,5 @@ uint64_t Invocation::openVariable( const string & variable_name )
   next_fd_id_++;
   return next_fd_id_ - 1;
 }
+
+uint64_t Invocation::next_invocation_id_ = 0;

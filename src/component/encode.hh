@@ -36,5 +36,7 @@ class Encode {
 
     std::string name() { return name_; }
 
-    const std::map<std::string, std::string> & getOutputBlobNames() { return output_to_blob_; }
+    const std::map<std::string, std::string> & getOutputBlobNames() const { return output_to_blob_; }
+
+    const std::string & getProgramName() const { return program_name_; }
 };

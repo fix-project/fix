@@ -45,6 +45,7 @@ class Invocation {
 
     // Next available fd id;
     uint64_t next_fd_id_;
+  
 
   public:
     Invocation( const Encode & encode, wasm_rt_memory_t *mem ) 
@@ -82,5 +83,7 @@ class Invocation {
 
     // Open blob corresponding to variable name
     uint64_t openVariable( const std::string & variable_name );
+    
+    static uint64_t next_invocation_id_;
 };
     

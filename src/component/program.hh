@@ -65,4 +65,5 @@ class Program {
 
     const std::vector<std::string> & getInputSymbols() const { return inputs_; } 
     const std::vector<std::string> & getOutputSymbols() const { return outputs_; } 
+    char * getMemLoc() const { return code_.get() + mem_loc_; }
 };

@@ -55,4 +55,25 @@ void RuntimeStorage::addEncode( const string & program_name, const vector<string
 
   name_to_encode_.put( encode.name(), move( encode ) );
 }
+
+void RuntimeStorage::executeEncode( const string & encode_name )
+{
+  auto & encode = name_to_encode_.get( encode_name );
+  auto & program = name_to_program_.getMutable( encode.getProgramName() );
+
+  // Construct invocation
+  uint64_t curr_inv_id = Invocation::next_invocation_id_;
+  Invocation::next_invocation_id_++;
+  wasi::id_to_inv_.insert( pair<uint64_t, Invocation>( curr_inv_id, Invocation( encode, reinterpret_cast<wasm_rt_memory_t *>( program.getMemLoc() ) ) ) );
+
+  // Set invocation id
+  wasi::invocation_id_ = curr_inv_id;
+  
+  // Execute program
+  program.execute();
+
+  // Update encoded_blob to blob
+
+}
+
   

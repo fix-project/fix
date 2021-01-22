@@ -10,6 +10,8 @@
 #include "program.hh"
 #include "storage.hh"
 
+#include "wasienv.hh"
+
 class RuntimeStorage {
   private:
     // Map from name to content (blob / encoded blob)
@@ -50,4 +52,7 @@ class RuntimeStorage {
 
     // add encode
     void addEncode( const std::string & program_name, const std::vector<std::string> & input_blobs );
+
+    // execute encode
+    void executeEncode( const std::string & encode_name );
 };
