@@ -44,14 +44,21 @@ class RuntimeStorage {
     }
 
     // add blob
-    template<class T>
-    void addBlob( T&& content );
+    template<typename T>
+    std::string addBlob( T&& content )
+    {
+      std::string blob_content ( reinterpret_cast<char *>( &content ), sizeof( T ) );
+      Blob blob ( move( blob_content ) );
+      std::string name = blob.name();
+      name_to_blob_.put( name, std::move( blob ) );
+      return name;
+    }
 
     // add elf program
     void addProgram( std::string & name, std::vector<std::string> && inputs, std::vector<std::string> && outputs, std::string & program_content );
 
     // add encode
-    void addEncode( const std::string & program_name, const std::vector<std::string> & input_blobs );
+    std::string addEncode( const std::string & program_name, const std::vector<std::string> & input_blobs );
 
     // execute encode
     void executeEncode( const std::string & encode_name );

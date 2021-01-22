@@ -16,21 +16,13 @@ string & RuntimeStorage::getEncodedBlob( const string & name )
   return name_to_encoded_blob_.getMutable( name ).content();
 }
 
-template<class T>
-void RuntimeStorage::addBlob( T&& content )
-{
-  string blob_content ( reinterpret_cast<char *>( content ), sizeof( T ) );
-  Blob blob ( move( blob_content ) );
-  name_to_blob_.put( blob.name(), move( blob ) );
-}
-
 void RuntimeStorage::addProgram( string& name, vector<string>&& inputs, vector<string>&& outputs, string & program_content )
 {
   auto elf_info = load_program( program_content );
   name_to_program_.put( name, link_program( elf_info, name, move( inputs ), move( outputs ) ) );
 }
 
-void RuntimeStorage::addEncode( const string & program_name, const vector<string> & input_blobs )
+string RuntimeStorage::addEncode( const string & program_name, const vector<string> & input_blobs )
 {
   const auto & program = name_to_program_.get( program_name );
   const auto & input_symbols = program.getInputSymbols();
@@ -53,7 +45,10 @@ void RuntimeStorage::addEncode( const string & program_name, const vector<string
     name_to_encoded_blob_.put( encode.name() + "#" + symbol, EncodedBlob( encode.name(), symbol ) ); 
   }
 
-  name_to_encode_.put( encode.name(), move( encode ) );
+  string name = encode.name();
+  name_to_encode_.put( name, move( encode ) );
+
+  return name;
 }
 
 void RuntimeStorage::executeEncode( const string & encode_name )
