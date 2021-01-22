@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 /**
  * Structure of Encode:
@@ -31,4 +32,9 @@ class Encode {
     friend class Invocation;
     
   public:
+    Encode( const std::string & program_name, std::map<std::string, std::string> && input_to_blob, const std::vector<std::string> & output_symbols );
+
+    std::string name() { return name_; }
+
+    const std::map<std::string, std::string> & getOutputBlobNames() { return output_to_blob_; }
 };

@@ -27,12 +27,14 @@ class EncodedBlob {
     
   public: 
     // Constructor
-    EncodedBlob( std::string encode_name, std::string output_name ) 
+    EncodedBlob( const std::string & encode_name, const std::string & output_name ) 
       : name_( encode_name + "#" + output_name ),
         encode_name_( encode_name ),
         output_name_( output_name ),
         content_( "" )
     {}
+
+    std::string name() { return name_; }
 
     std::string & content() { return content_; } 
 }; 

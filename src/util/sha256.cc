@@ -19,6 +19,19 @@ string sha256::encode( const string & input )
   return ret;
 }
 
+string sha256::encode( string_view input )
+{
+  SHA256 hash;
+  string ret;
+
+  StringSource s( reinterpret_cast<const unsigned char *>( input.data() ), input.size(), true,
+                  new HashFilter( hash, 
+                    new HexEncoder( new StringSink( ret ) ) ) );
+
+  return ret;
+}
+
+
 bool sha256::verify( const string & ret, const string & input )
 {
   SHA256 hash;

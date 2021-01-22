@@ -17,7 +17,7 @@ class RuntimeStorage {
     // Map from name to content of encoded blob
     InMemoryStorage<EncodedBlob> name_to_encoded_blob_;
     // Map from name to encode
-    std::map<std::string, Encode> name_to_encode_;
+    InMemoryStorage<Encode> name_to_encode_;
     // Map from name to program
     InMemoryStorage<Program> name_to_program_;
 
@@ -43,8 +43,11 @@ class RuntimeStorage {
 
     // add blob
     template<class T>
-    void addBlob( T content );
+    void addBlob( T&& content );
 
     // add elf program
     void addProgram( std::string & name, std::vector<std::string> && inputs, std::vector<std::string> && outputs, std::string & program_content );
+
+    // add encode
+    void addEncode( const std::string & program_name, const std::vector<std::string> & input_blobs );
 };

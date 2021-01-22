@@ -62,4 +62,7 @@ class Program {
            :
            : "r" (main_entry_));
     }
+
+    const std::vector<std::string> & getInputSymbols() const { return inputs_; } 
+    const std::vector<std::string> & getOutputSymbols() const { return outputs_; } 
 };

@@ -26,6 +26,8 @@ class Blob {
     {}
                                                          
     std::string_view content() const { return content_; } 
+
+    std::string name() const { return name_; }
 }; 
 
 
