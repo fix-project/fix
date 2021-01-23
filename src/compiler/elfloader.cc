@@ -180,6 +180,7 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
       func dest = elf_info.func_map.at(name);
       switch ( dest.type ) {
         case LIB:
+          printf("Location is %ld\n", dest.lib_addr);
           rel_offset += (int64_t)(dest.lib_addr);
           break;
         case TEXT:

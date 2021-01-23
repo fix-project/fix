@@ -165,12 +165,12 @@ static wasm_rt_memory_t memory;
 static wasm_rt_table_t T0;
 
 static u32 _start(u32 p0, u32 p1) {
-  FUNC_PROLOGUE;
+  FUNC_PROLOGUE; 
   u32 i0, i1;
   i0 = p1;
   i1 = p0;
   i0 += i1;
-  FUNC_EPILOGUE;
+  // FUNC_EPILOGUE;
   return i0;
 }
 

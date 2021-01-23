@@ -1,11 +1,13 @@
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "parser.hh"
 #include "spans.hh"
+#include "wasm-rt.h"
 
 /**
  * Structure of program files:
@@ -57,10 +59,15 @@ class Program {
       // int register rax asm("rax") = init_entry_;
       asm("call *%0"
            :
-           : "r" (init_entry_));
+           : "r" ( (uint64_t)( code_.get() + init_entry_ ) ) );
+      
+
+      int register esi asm("esi") = 13;
+      int register edi asm("edi") = 20;
+      std::cout << "esi is " << esi << " edi is " << edi << std::endl;
       asm("call *%0"
            :
-           : "r" (main_entry_));
+           : "r" ( (uint64_t)( code_.get() + main_entry_ ) ) );
     }
 
     const std::vector<std::string> & getInputSymbols() const { return inputs_; } 
