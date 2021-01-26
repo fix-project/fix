@@ -57,17 +57,13 @@ class Program {
     void execute ()
     { 
       // int register rax asm("rax") = init_entry_;
-      asm("call *%0"
+      asm("call *%0 \n mov %1, %%edi \n mov %2, %%esi \n  call *%3 \n"
            :
-           : "r" ( (uint64_t)( code_.get() + init_entry_ ) ) );
-      
-
-      int register esi asm("esi") = 13;
-      int register edi asm("edi") = 20;
-      std::cout << "esi is " << esi << " edi is " << edi << std::endl;
-      asm("call *%0"
-           :
-           : "r" ( (uint64_t)( code_.get() + main_entry_ ) ) );
+           : "r" ( (uint64_t)( code_.get() + init_entry_ ) ),
+             "r" ( 13 ),
+             "r" ( 20 ),
+             "r" ( (uint64_t)( code_.get() + main_entry_ ) )
+           : "r10", "r11", "edi", "esi", "edx", "ecx", "r8", "r9" );
     }
 
     const std::vector<std::string> & getInputSymbols() const { return inputs_; } 
