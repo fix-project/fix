@@ -41,10 +41,10 @@ class Invocation {
     wasm_rt_memory_t *mem_;
 
     // Map from fd id to actual fd
-    std::map<uint64_t, WasmFileDescriptor> id_to_fd_;
+    std::map<int, WasmFileDescriptor> id_to_fd_;
 
     // Next available fd id;
-    uint64_t next_fd_id_;
+    int next_fd_id_;
   
 
   public:
@@ -76,13 +76,13 @@ class Invocation {
     wasm_rt_memory_t * getMem() { return mem_; }
 
     // Return file descriptor corresponding to fd_id
-    WasmFileDescriptor & getFd( uint64_t fd_id );
+    WasmFileDescriptor & getFd( int fd_id );
 
     // Add file descriptor, return corresponding fd_id
-    uint64_t addFd( WasmFileDescriptor fd );
+    int addFd( WasmFileDescriptor fd );
 
     // Open blob corresponding to variable name
-    uint64_t openVariable( const std::string & variable_name );
+    int openVariable( const std::string & variable_name );
     
     static uint64_t next_invocation_id_;
 };

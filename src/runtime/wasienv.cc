@@ -5,13 +5,14 @@ using namespace std;
 
 namespace wasi
 {
-  int path_open( const string & variable_name )
+  int path_open( uint32_t ofst )
   {
     auto & invocation = id_to_inv_.at( invocation_id_ );
+    string variable_name = string( reinterpret_cast<char *>( &invocation.getMem()->data[ ofst ] ) );
     return invocation.openVariable( variable_name );
   }
 
-  int fd_read( uint64_t fd_id, uint64_t ofst, uint64_t count )
+  int fd_read( int fd_id, uint32_t ofst, uint32_t count )
   {
     auto & invocation = id_to_inv_.at( invocation_id_ );
     auto & fd = invocation.getFd( fd_id ); 
@@ -31,7 +32,7 @@ namespace wasi
     return count;
   }
 
-  int fd_write( uint64_t fd_id, uint64_t ofst, uint64_t count )
+  int fd_write( int fd_id, uint32_t ofst, uint32_t count )
   {
     auto & invocation = id_to_inv_.at( invocation_id_ );
     auto & fd = invocation.getFd( fd_id ); 

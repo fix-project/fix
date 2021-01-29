@@ -24,26 +24,26 @@ string Invocation::getOutputBlobName( const string & variable_name )
   return output_to_blob_.at( variable_name );
 }
 
-WasmFileDescriptor & Invocation::getFd( uint64_t fd_id )
+WasmFileDescriptor & Invocation::getFd( int fd_id )
 {
   return id_to_fd_.at( fd_id );
 }
 
-uint64_t Invocation::addFd( WasmFileDescriptor fd )
+int Invocation::addFd( WasmFileDescriptor fd )
 {
-  id_to_fd_.insert( pair<uint64_t, WasmFileDescriptor>( next_fd_id_, fd ) );
+  id_to_fd_.insert( pair<int, WasmFileDescriptor>( next_fd_id_, fd ) );
   next_fd_id_++;
   return next_fd_id_ - 1;
 }
 
-uint64_t Invocation::openVariable( const string & variable_name )
+int Invocation::openVariable( const string & variable_name )
 {
   if ( isInput( variable_name ) )
   {
-    id_to_fd_.insert( pair<uint64_t, WasmFileDescriptor>( next_fd_id_, WasmFileDescriptor( getInputBlobName( variable_name ), fd_mode::BLOB ) ) );
+    id_to_fd_.insert( pair<int, WasmFileDescriptor>( next_fd_id_, WasmFileDescriptor( getInputBlobName( variable_name ), fd_mode::BLOB ) ) );
   } 
   else if ( isOutput( variable_name ) ) {
-    id_to_fd_.insert( pair<uint64_t, WasmFileDescriptor>( next_fd_id_, WasmFileDescriptor( getOutputBlobName( variable_name ), fd_mode::ENCODEDBLOB ) ) );
+    id_to_fd_.insert( pair<int, WasmFileDescriptor>( next_fd_id_, WasmFileDescriptor( getOutputBlobName( variable_name ), fd_mode::ENCODEDBLOB ) ) );
   }
 
   next_fd_id_++;
