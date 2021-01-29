@@ -3,7 +3,12 @@
 #include "elfloader.hh" 
 #include "spans.hh"
 
+
 using namespace std;
+
+void __stack_chk_fail(void) {
+  cerr << "stack smashing detected." << endl;
+}
 
 Elf_Info load_program( string & program_content )
 {
@@ -41,6 +46,12 @@ Elf_Info load_program( string & program_content )
     {
 			res.bss_size = section.sh_size;
 			res.bss_idx = i;
+		}
+
+		if ( strcmp( res.namestrs.data() + section.sh_name, ".rodata" ) == 0 )
+    {
+      res.rodata_idx = i;
+      res.rodata = string_view( program_content.data() + section.sh_offset, section.sh_size );
 		}
 
 		// Process symbol table
@@ -89,6 +100,11 @@ Elf_Info load_program( string & program_content )
 						res.com_size += symtb_entry.st_size;
 						res.com_symtb_entry.push_back( j );
 					}
+          else if ( symtb_entry.st_shndx == res.rodata_idx )
+          {
+            res.func_map.insert( pair<string, func>( name, func( j, RODATA ) ) );
+            printf("Added rodata:%s at idx %d\n", name.c_str(), j);
+          }
 				}
         j++;
 			}
@@ -113,7 +129,7 @@ Elf_Info load_program( string & program_content )
   }  
   
 	// Step 3: Update symbol table entry for *COM*
-	uint64_t com_base = res.bss_size;
+	uint64_t com_base = res.rodata.size() + res.bss_size;
 	for ( int com_sym_idx : res.com_symtb_entry) 
   {
     cout << "Adjusting com_sym_idx " << com_sym_idx << " to com_base " << com_base << endl;
@@ -129,7 +145,7 @@ Elf_Info load_program( string & program_content )
 Program link_program( Elf_Info & elf_info, string & program_name, vector<string> && inputs, vector<string> && outputs )
 {
 	// Step 0: allocate memory for data and text
-  size_t mem_size = elf_info.code.size() + elf_info.bss_size + elf_info.com_size;
+  size_t mem_size = elf_info.code.size() + elf_info.rodata.size() + elf_info.bss_size + elf_info.com_size;
   void *program_mem = 0;
   if ( posix_memalign( &program_mem, getpagesize(), mem_size ) )
   {
@@ -140,6 +156,7 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
     cerr << "Failed to set code buffer executable.\n";
   }
   memcpy( program_mem, elf_info.code.data(), elf_info.code.size() );
+  memcpy( (char *)program_mem + elf_info.code.size(), elf_info.rodata.data(), elf_info.rodata.size() );
 
 	// Step 1: Add wasm-rt functions to func_map	
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_trap", func( (uint64_t)wasm_rt_trap ) ) );		
@@ -148,10 +165,11 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );		
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );		
 	elf_info.func_map.insert( pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "path_open", func( (uint64_t)wasi::path_open ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "fd_read", func( (uint64_t)wasi::fd_read ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "fd_write", func( (uint64_t)wasi::fd_write ) ) );		
- 
+	elf_info.func_map.insert( pair<string, func>( "Z_envZ_path_openZ_ii", func( (uint64_t)&wasi::Z_envZ_path_openZ_ii ) ) );		
+	elf_info.func_map.insert( pair<string, func>( "Z_envZ_fd_readZ_iiii", func( (uint64_t)&wasi::Z_envZ_fd_readZ_iiii ) ) );		
+	elf_info.func_map.insert( pair<string, func>( "Z_envZ_fd_writeZ_iiii", func( (uint64_t)&wasi::Z_envZ_fd_writeZ_iiii ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "__stack_chk_fail", func( (uint64_t)__stack_chk_fail ) ) );
+
   for (const auto & reloc_entry : elf_info.reloctb ){
     printf("offset:%lx index:%lx type:%lx addend:%ld\n", reloc_entry.r_offset, ELF64_R_SYM( reloc_entry.r_info ), ELF64_R_TYPE( reloc_entry.r_info ), reloc_entry.r_addend);
     int idx = ELF64_R_SYM( reloc_entry.r_info );
@@ -164,10 +182,15 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
       {
         rel_offset += (int64_t)(program_mem);
         printf("Reloced .text section\n");
-      } 
+      }
+      else if ( sec_name == ".rodata" )
+      {
+        rel_offset += (int64_t)(program_mem) + elf_info.rodata.size();
+        printf("Reloced .rodata section\n");
+      }
       else if ( sec_name == ".bss" ) 
       {
-        rel_offset += (int64_t)(program_mem) + elf_info.code.size();
+        rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.rodata.size();
         printf("Reloced .bss section\n");
       } 
       else if ( sec_name == ".data" ) 
@@ -186,9 +209,12 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
         case TEXT:
           rel_offset += (int64_t)(program_mem) + elf_info.symtb[dest.idx].st_value;
           break;	     
+        case RODATA:
+          rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.symtb[dest.idx].st_value;
+          break;
         case BSS:
         case COM:
-          rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.symtb[dest.idx].st_value;
+          rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[dest.idx].st_value;
           break;
       }
     }	
@@ -199,7 +225,7 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
   shared_ptr<char> code ( reinterpret_cast<char *>(program_mem) );
   uint64_t init_entry = elf_info.symtb[ elf_info.func_map.at("init").idx ].st_value;
   uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("_start").idx ].st_value;
-  uint64_t mem_loc = elf_info.code.size() + elf_info.symtb[ elf_info.func_map.at("memory").idx ].st_value;
+  uint64_t mem_loc = elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[ elf_info.func_map.at("memory").idx ].st_value;
 
   cout << init_entry << " " << main_entry << endl;
   cout << code.get() << endl;

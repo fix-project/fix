@@ -20,6 +20,7 @@
 #define BSS 1
 #define COM 2
 #define LIB 3
+#define RODATA 4
 
 // A function in a program
 struct func {
@@ -46,6 +47,11 @@ struct Elf_Info {
   // Code section 
 	std::string_view code;
 
+  // Index of the rodata section
+  uint64_t rodata_idx;
+  // Rodata section
+  std::string_view rodata;
+
   // Index of the bss section
   uint64_t bss_idx;
   // Size of the bss section
@@ -71,6 +77,7 @@ struct Elf_Info {
   
   Elf_Info() 
     : text_idx( 0 ), code(), 
+      rodata_idx( 0 ), rodata(),
       bss_idx( 0 ), bss_size( 0 ), com_size( 0 ),
       symstrs(), namestrs(), symtb(), reloctb(), sheader(),
       com_symtb_entry(), func_map() {}
