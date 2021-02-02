@@ -23,11 +23,15 @@ class RuntimeStorage {
     // Map from name to program
     InMemoryStorage<Program> name_to_program_;
 
+    // Map from encoded blob name to blob name
+    std::map<std::string, std::string> encoded_blob_to_blob_;
+
     RuntimeStorage ()
       : name_to_blob_(),
         name_to_encoded_blob_(),
         name_to_encode_(),
-        name_to_program_() 
+        name_to_program_(),
+        encoded_blob_to_blob_()
     {}
 
   public:

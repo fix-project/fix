@@ -8,7 +8,13 @@ using namespace std;
 
 string_view RuntimeStorage::getBlob( const string & name )
 {
-  return name_to_blob_.get( name ).content();
+  if ( encoded_blob_to_blob_.find( name ) != encoded_blob_to_blob_.end() )
+  {
+    string blob_name = encoded_blob_to_blob_.at( name );
+    return name_to_blob_.get( blob_name ).content();
+  } else {
+    return name_to_blob_.get( name ).content();
+  }
 }
 
 string & RuntimeStorage::getEncodedBlob( const string & name )
@@ -68,7 +74,14 @@ void RuntimeStorage::executeEncode( const string & encode_name )
   program.execute();
 
   // Update encoded_blob to blob
-
+  for ( const auto & [ varaible, encoded_blob_name ] : encode.getOutputBlobNames() )
+  {
+    string encoded_blob_content = name_to_encoded_blob_.getMutable( encoded_blob_name ).content();
+    Blob output ( move( encoded_blob_content ) );
+    string output_blob_name = output.name();
+    encoded_blob_to_blob_.insert( pair<string, string>( encoded_blob_name, output_blob_name ) );
+    name_to_blob_.put( output_blob_name, move( output ) );
+  }
 }
 
   

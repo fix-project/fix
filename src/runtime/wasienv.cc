@@ -9,14 +9,9 @@ namespace wasi
 {
   int path_open( uint32_t ofst )
   {
-    cout << "path_open called " << ofst << " with invocation_id " << invocation_id_ << endl;
-    cout << "id_to_inv_ has " << id_to_inv_.size() << " entries " << endl;
-    for ( const auto & entry : id_to_inv_ )
-    {
-      cout << "Key is " << entry.first << endl;
-    }
     auto & invocation = id_to_inv_.at( invocation_id_ );
     string variable_name = string( reinterpret_cast<char *>( &invocation.getMem()->data[ ofst ] ) );
+    cout << "Opening " << variable_name << endl;
     return invocation.openVariable( variable_name );
   }
 
