@@ -44,6 +44,8 @@ int Invocation::openVariable( const string & variable_name )
   } 
   else if ( isOutput( variable_name ) ) {
     id_to_fd_.insert( pair<int, WasmFileDescriptor>( next_fd_id_, WasmFileDescriptor( getOutputBlobName( variable_name ), fd_mode::ENCODEDBLOB ) ) );
+  } else {
+    throw out_of_range ( variable_name + " not an input or output." );
   }
 
   next_fd_id_++;

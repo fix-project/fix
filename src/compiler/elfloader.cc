@@ -185,7 +185,7 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
       }
       else if ( sec_name == ".rodata" )
       {
-        rel_offset += (int64_t)(program_mem) + elf_info.rodata.size();
+        rel_offset += (int64_t)(program_mem) + elf_info.code.size();
         printf("Reloced .rodata section\n");
       }
       else if ( sec_name == ".bss" ) 
