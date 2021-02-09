@@ -31,12 +31,10 @@ Elf_Info load_program( string & program_content )
 	
   int i = 0;
   for ( const auto & section : res.sheader ) {
-		printf("S[%d] sh_offset:%lx sh_name:%s sh_addralign:%lx\n", i, section.sh_offset, res.namestrs.data() + section.sh_name, section.sh_addralign);
 		
 		// Allocate code block for .text section
 		if ( strcmp( res.namestrs.data() + section.sh_name, ".text" ) == 0 )
     {
-			cout << "Assigning text_idx to " << i << endl;
       res.text_idx = i;
       res.code = string_view( program_content.data() + section.sh_offset, section.sh_size );
 		}
@@ -69,11 +67,9 @@ Elf_Info load_program( string & program_content )
       {
 				if ( symtb_entry.st_name != 0 ) 
         {
-					printf("Idx:%d Name:%s value:%lx size:%lx st_shndx:%x\n", j, res.symstrs.data() + symtb_entry.st_name, symtb_entry.st_value, symtb_entry.st_size, symtb_entry.st_shndx);
 					// Funtion/Variable not defined
 					if ( symtb_entry.st_shndx == SHN_UNDEF ) 
           {
-						printf( "Function not defined\n" );
             j++;
 						continue;
 					} 
@@ -84,26 +80,22 @@ Elf_Info load_program( string & program_content )
 					if ( symtb_entry.st_shndx == res.text_idx ) 
           {
             res.func_map.insert( pair<string, func>( name, func( j, TEXT ) ) );
-						printf("Added function:%s at idx%d\n", name.c_str(), j);
 					}
 					// An .bss variable
 					else if ( symtb_entry.st_shndx == res.bss_idx ) 
           {
             res.func_map.insert( pair<string, func>( name, func( j, BSS ) ) );
-						printf("Added bss variable:%s at idx%d\n", name.c_str(), j);
 					}
 					// An COM variable
 					else if ( symtb_entry.st_shndx == SHN_COMMON ) 
           {
             res.func_map.insert( pair<string, func>( name, func( j, COM ) ) );
-						printf("Added *COM* variable:%s at idx%d\n", name.c_str(), j);
 						res.com_size += symtb_entry.st_size;
 						res.com_symtb_entry.push_back( j );
 					}
           else if ( symtb_entry.st_shndx == res.rodata_idx )
           {
             res.func_map.insert( pair<string, func>( name, func( j, RODATA ) ) );
-            printf("Added rodata:%s at idx %d\n", name.c_str(), j);
           }
 				}
         j++;
@@ -132,10 +124,8 @@ Elf_Info load_program( string & program_content )
 	uint64_t com_base = res.rodata.size() + res.bss_size;
 	for ( int com_sym_idx : res.com_symtb_entry) 
   {
-    cout << "Adjusting com_sym_idx " << com_sym_idx << " to com_base " << com_base << endl;
     Elf64_Sym & mutable_symtb_entry = const_cast<Elf64_Sym &>( res.symtb[com_sym_idx] );
 		mutable_symtb_entry.st_value = com_base;
-    printf("Idx:%d Name:%s value:%lx size:%lx st_shndx:%x\n", com_sym_idx, res.symstrs.data() + mutable_symtb_entry.st_name, mutable_symtb_entry.st_value, mutable_symtb_entry.st_size, mutable_symtb_entry.st_shndx);
 		com_base += mutable_symtb_entry.st_size;
 	}
 
@@ -179,7 +169,6 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
   elf_info.func_map.insert( pair<string, func>( "__stack_chk_fail", func( (uint64_t)__stack_chk_fail ) ) );
 
   for (const auto & reloc_entry : elf_info.reloctb ){
-    printf("offset:%lx index:%lx type:%lx addend:%ld\n", reloc_entry.r_offset, ELF64_R_SYM( reloc_entry.r_info ), ELF64_R_TYPE( reloc_entry.r_info ), reloc_entry.r_addend);
     int idx = ELF64_R_SYM( reloc_entry.r_info );
 
     int32_t rel_offset;
@@ -199,17 +188,14 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
       if ( sec_name == ".text" ) 
       {
         rel_offset += (int64_t)(program_mem);
-        printf("Reloced .text section\n");
       }
       else if ( sec_name == ".rodata" || sec_name == ".rodata.str1.1" )
       {
         rel_offset += (int64_t)(program_mem) + elf_info.code.size();
-        printf("Reloced .rodata section\n");
       }
       else if ( sec_name == ".bss" ) 
       {
         rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.rodata.size();
-        printf("Reloced .bss section\n");
       } 
       else if ( sec_name == ".data" ) 
       {
@@ -217,11 +203,9 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
       }
     } else {		
       string name = string( elf_info.symstrs.data() + elf_info.symtb[idx].st_name );
-      printf( "Name is %s\n", name.c_str() );
 
       if ( ELF64_R_TYPE( reloc_entry.r_info ) == 9 )
       {
-        printf( "Relocating a global function\n" );
         if ( name == "wasm_rt_call_stack_depth" ) 
         {
           rel_offset += (int64_t)&global_offset_table[0];
@@ -246,7 +230,6 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
         func dest = elf_info.func_map.at(name);
         switch ( dest.type ) {
           case LIB:
-            printf("Location is %ld\n", dest.lib_addr);
             rel_offset += (int64_t)(dest.lib_addr);
             break;
           case TEXT:
@@ -257,24 +240,19 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
             break;
           case BSS:
           case COM:
-            printf("Adding %lx %lx %lx %lx\n", (int64_t)(program_mem), elf_info.code.size(), elf_info.rodata.size(), elf_info.symtb[dest.idx].st_value );
             rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[dest.idx].st_value;
             break;
         }
       }
     }	
     *((int32_t *)( reinterpret_cast<char *>(program_mem) + reloc_entry.r_offset) ) = rel_offset; 
-    printf( "Value is %d\n", rel_offset );
   }	
 
-  cout << mem_size << endl;
   shared_ptr<char> code ( reinterpret_cast<char *>(program_mem) );
   uint64_t init_entry = elf_info.symtb[ elf_info.func_map.at("init").idx ].st_value;
   // uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("_start").idx ].st_value;
   uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("w2c__start").idx ].st_value;
   uint64_t mem_loc = elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[ elf_info.func_map.at("w2c_memory").idx ].st_value;
 
-  cout << init_entry << " " << main_entry << endl;
-  cout << (void *)code.get() << endl;
   return Program( program_name, move(inputs), move(outputs), code, init_entry, main_entry, mem_loc ); 
 }
