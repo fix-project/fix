@@ -5,8 +5,13 @@ set_source_files_properties(
 )
 
 add_executable(compiler_tester "compiler_tester.cc" "${CMAKE_BINARY_DIR}/_deps/wabt-build/CMakeFiles/wasm2c.dir/src/c-writer.cc.o")
+target_link_libraries("compiler_tester" runtime compiler runtime compiler)
+target_link_libraries("compiler_tester" component)
 target_link_libraries("compiler_tester" util)
-target_link_libraries("compiler_tester" compiler)
+target_link_libraries("compiler_tester" cryptopp)
+target_link_libraries("compiler_tester" wasmrt)
+target_link_libraries("compiler_tester" ${CLANG_LIBS})
+target_link_libraries("compiler_tester" LLVM)
 target_link_libraries("compiler_tester" wabt)
 add_dependencies("compiler_tester" wasm2c)
 
