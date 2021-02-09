@@ -53,7 +53,7 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   // cout << ( string )( ( *( *diskFile )->getBuffer( "ignore" ) )->getBuffer() ) << endl;
 
   // Create arguments
-  const char *Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", "-I/usr/include", "-I/usr/include/x86_64-linux-gnu", "-I/usr/lib/llvm-10/lib/clang/10.0.0/include" };
+  const char *Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", "-pic-is-pie", "-I/usr/include", "-I/usr/include/x86_64-linux-gnu", "-I/usr/lib/llvm-10/lib/clang/10.0.0/include" };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
    
   cout << diagOS.str() << endl; 
