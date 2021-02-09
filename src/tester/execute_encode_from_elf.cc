@@ -29,7 +29,7 @@ int main( int argc, char* argv[] )
     
     // Add encode
     auto encode_name = runtime.addEncode( program_name, vector<string>() );
-    runtime.executeEncode( encode_name );
+    runtime.executeEncode( encode_name, 13, 20 );
 
     int output_content;
     memcpy(&output_content, runtime.getBlob( encode_name + "#" + "output" ).data(), sizeof( int ) );

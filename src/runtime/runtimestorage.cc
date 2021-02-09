@@ -57,7 +57,7 @@ string RuntimeStorage::addEncode( const string & program_name, const vector<stri
   return name;
 }
 
-void RuntimeStorage::executeEncode( const string & encode_name )
+void RuntimeStorage::executeEncode( const string & encode_name, int arg1, int arg2 )
 {
   auto & encode = name_to_encode_.get( encode_name );
   auto & program = name_to_program_.getMutable( encode.getProgramName() );
@@ -71,7 +71,7 @@ void RuntimeStorage::executeEncode( const string & encode_name )
   wasi::invocation_id_ = curr_inv_id;
   
   // Execute program
-  program.execute();
+  program.execute( arg1, arg2 );
 
   // Update encoded_blob to blob
   for ( const auto & [ varaible, encoded_blob_name ] : encode.getOutputBlobNames() )

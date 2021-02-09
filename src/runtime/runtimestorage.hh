@@ -66,5 +66,5 @@ class RuntimeStorage {
     std::string addEncode( const std::string & program_name, const std::vector<std::string> & input_blobs );
 
     // execute encode
-    void executeEncode( const std::string & encode_name );
+    void executeEncode( const std::string & encode_name, int arg1, int arg2 );
 };
