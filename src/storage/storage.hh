@@ -1,6 +1,8 @@
 #pragma once
 
+#include <iostream>
 #include <map>
+#include <unordered_map>
 #include <string>
 
 #include <util.hh>
@@ -19,7 +21,7 @@ template<typename T>
 class InMemoryStorage : public Storage<T>
 {
   private:
-    std::map<std::string, T> name_to_object_;
+    std::unordered_map<std::string, T> name_to_object_;
   
   public:
     InMemoryStorage()

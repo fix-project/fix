@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 #include "blob.hh"
 #include "encoded_blob.hh"
@@ -24,7 +25,7 @@ class RuntimeStorage {
     InMemoryStorage<Program> name_to_program_;
 
     // Map from encoded blob name to blob name
-    std::map<std::string, std::string> encoded_blob_to_blob_;
+    std::unordered_map<std::string, std::string> encoded_blob_to_blob_;
 
     RuntimeStorage ()
       : name_to_blob_(),
