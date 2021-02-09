@@ -4,37 +4,35 @@
 
 #include "sha256.hh"
 
-using namespace CryptoPP;
 using namespace std;
+namespace CryptoPP {
+  using byte = unsigned char;
+}
 
 string sha256::encode( const string & input )
 {
-  SHA256 hash;
-  string ret;
+  CryptoPP::SHA256 hash;
 
-  StringSource s( input, true,
-                  new HashFilter( hash, 
-                    new HexEncoder( new StringSink( ret ) ) ) );
+  CryptoPP::byte digest[CryptoPP::SHA256::DIGESTSIZE];
+  hash.CalculateDigest(digest, (const CryptoPP::byte *)input.c_str(), input.length() );
 
-  return ret;
+  return string((char*)digest, CryptoPP::SHA256::DIGESTSIZE);
 }
 
 string sha256::encode( string_view input )
 {
-  SHA256 hash;
-  string ret;
+  CryptoPP::SHA256 hash;
 
-  StringSource s( reinterpret_cast<const unsigned char *>( input.data() ), input.size(), true,
-                  new HashFilter( hash, 
-                    new HexEncoder( new StringSink( ret ) ) ) );
+  CryptoPP::byte digest[CryptoPP::SHA256::DIGESTSIZE];
+  hash.CalculateDigest(digest, (const CryptoPP::byte *)input.data(), input.size() );
 
-  return ret;
+  return string((char*)digest, CryptoPP::SHA256::DIGESTSIZE);
 }
 
 
 bool sha256::verify( const string & ret, const string & input )
 {
-  SHA256 hash;
+  CryptoPP::SHA256 hash;
   bool verified;
 
   hash.Update( reinterpret_cast<const unsigned char*>( input.data() ), input.size() );
