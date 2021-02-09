@@ -48,7 +48,7 @@ Elf_Info load_program( string & program_content )
 			res.bss_idx = i;
 		}
 
-		if ( strcmp( res.namestrs.data() + section.sh_name, ".rodata" ) == 0 )
+		if ( strcmp( res.namestrs.data() + section.sh_name, ".rodata" ) == 0 || strcmp( res.namestrs.data() + section.sh_name, ".rodata.str1.1" ) == 0 )
     {
       res.rodata_idx = i;
       res.rodata = string_view( program_content.data() + section.sh_offset, section.sh_size );
@@ -134,8 +134,8 @@ Elf_Info load_program( string & program_content )
   {
     cout << "Adjusting com_sym_idx " << com_sym_idx << " to com_base " << com_base << endl;
     Elf64_Sym & mutable_symtb_entry = const_cast<Elf64_Sym &>( res.symtb[com_sym_idx] );
-    printf("Idx:%d Name:%s value:%lx size:%lx st_shndx:%x\n", com_sym_idx, res.symstrs.data() + mutable_symtb_entry.st_name, mutable_symtb_entry.st_value, mutable_symtb_entry.st_size, mutable_symtb_entry.st_shndx);
 		mutable_symtb_entry.st_value = com_base;
+    printf("Idx:%d Name:%s value:%lx size:%lx st_shndx:%x\n", com_sym_idx, res.symstrs.data() + mutable_symtb_entry.st_name, mutable_symtb_entry.st_value, mutable_symtb_entry.st_size, mutable_symtb_entry.st_shndx);
 		com_base += mutable_symtb_entry.st_size;
 	}
 
@@ -144,7 +144,15 @@ Elf_Info load_program( string & program_content )
 
 Program link_program( Elf_Info & elf_info, string & program_name, vector<string> && inputs, vector<string> && outputs )
 {
-	// Step 0: allocate memory for data and text
+  static Elf64_Addr global_offset_table [4] = 
+  {
+    reinterpret_cast<Elf64_Addr>( &wasm_rt_call_stack_depth ),
+    reinterpret_cast<Elf64_Addr>( &wasi::Z_envZ_path_openZ_ii ),
+    reinterpret_cast<Elf64_Addr>( &wasi::Z_envZ_fd_readZ_iiii ),
+    reinterpret_cast<Elf64_Addr>( &wasi::Z_envZ_fd_writeZ_iiii ) 
+  };
+	
+  // Step 0: allocate memory for data and text
   size_t mem_size = elf_info.code.size() + elf_info.rodata.size() + elf_info.bss_size + elf_info.com_size;
   void *program_mem = 0;
   if ( posix_memalign( &program_mem, getpagesize(), mem_size ) )
@@ -173,8 +181,18 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
   for (const auto & reloc_entry : elf_info.reloctb ){
     printf("offset:%lx index:%lx type:%lx addend:%ld\n", reloc_entry.r_offset, ELF64_R_SYM( reloc_entry.r_info ), ELF64_R_TYPE( reloc_entry.r_info ), reloc_entry.r_addend);
     int idx = ELF64_R_SYM( reloc_entry.r_info );
-    int32_t rel_offset = reloc_entry.r_addend - (int64_t)program_mem - reloc_entry.r_offset;
-			// Check whether is a section
+
+    int32_t rel_offset;
+    if ( ELF64_R_TYPE( reloc_entry.r_info ) == 2 || ELF64_R_TYPE( reloc_entry.r_info ) == 4 || ELF64_R_TYPE( reloc_entry.r_info ) == 9 )
+    {
+      rel_offset = reloc_entry.r_addend - (int64_t)program_mem - reloc_entry.r_offset;
+	  } else if ( ELF64_R_TYPE( reloc_entry.r_info ) == 10 || ELF64_R_TYPE( reloc_entry.r_info ) == 11 ) 
+    {
+      rel_offset = reloc_entry.r_addend;
+    } else {
+      throw out_of_range ( "Relocation type not supported." );
+    }
+      // Check whether is a section
     if ( ELF64_ST_TYPE( elf_info.symtb[idx].st_info ) == STT_SECTION) 
     {
       string sec_name = string( elf_info.namestrs.data() + elf_info.sheader[elf_info.symtb[idx].st_shndx].sh_name );
@@ -183,7 +201,7 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
         rel_offset += (int64_t)(program_mem);
         printf("Reloced .text section\n");
       }
-      else if ( sec_name == ".rodata" )
+      else if ( sec_name == ".rodata" || sec_name == ".rodata.str1.1" )
       {
         rel_offset += (int64_t)(program_mem) + elf_info.code.size();
         printf("Reloced .rodata section\n");
@@ -200,34 +218,63 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
     } else {		
       string name = string( elf_info.symstrs.data() + elf_info.symtb[idx].st_name );
       printf( "Name is %s\n", name.c_str() );
-      func dest = elf_info.func_map.at(name);
-      switch ( dest.type ) {
-        case LIB:
-          printf("Location is %ld\n", dest.lib_addr);
-          rel_offset += (int64_t)(dest.lib_addr);
-          break;
-        case TEXT:
-          rel_offset += (int64_t)(program_mem) + elf_info.symtb[dest.idx].st_value;
-          break;	     
-        case RODATA:
-          rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.symtb[dest.idx].st_value;
-          break;
-        case BSS:
-        case COM:
-          rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[dest.idx].st_value;
-          break;
+
+      if ( ELF64_R_TYPE( reloc_entry.r_info ) == 9 )
+      {
+        printf( "Relocating a global function\n" );
+        if ( name == "wasm_rt_call_stack_depth" ) 
+        {
+          rel_offset += (int64_t)&global_offset_table[0];
+        } 
+        else if ( name == "Z_envZ_path_openZ_ii" ) 
+        {
+          rel_offset += (int64_t)&global_offset_table[1];
+        } 
+        else if ( name == "Z_envZ_fd_readZ_iiii" ) 
+        {
+          rel_offset += (int64_t)&global_offset_table[2];
+        } 
+        else if ( name == "Z_envZ_fd_writeZ_iiii" ) 
+        {
+          rel_offset += (int64_t)&global_offset_table[3];
+        } 
+        else
+        {
+          throw out_of_range("Global function does not exist.");
+        }
+      } else {
+        func dest = elf_info.func_map.at(name);
+        switch ( dest.type ) {
+          case LIB:
+            printf("Location is %ld\n", dest.lib_addr);
+            rel_offset += (int64_t)(dest.lib_addr);
+            break;
+          case TEXT:
+            rel_offset += (int64_t)(program_mem) + elf_info.symtb[dest.idx].st_value;
+            break;	     
+          case RODATA:
+            rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.symtb[dest.idx].st_value;
+            break;
+          case BSS:
+          case COM:
+            printf("Adding %lx %lx %lx %lx\n", (int64_t)(program_mem), elf_info.code.size(), elf_info.rodata.size(), elf_info.symtb[dest.idx].st_value );
+            rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[dest.idx].st_value;
+            break;
+        }
       }
     }	
     *((int32_t *)( reinterpret_cast<char *>(program_mem) + reloc_entry.r_offset) ) = rel_offset; 
     printf( "Value is %d\n", rel_offset );
   }	
 
+  cout << mem_size << endl;
   shared_ptr<char> code ( reinterpret_cast<char *>(program_mem) );
   uint64_t init_entry = elf_info.symtb[ elf_info.func_map.at("init").idx ].st_value;
-  uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("_start").idx ].st_value;
-  uint64_t mem_loc = elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[ elf_info.func_map.at("memory").idx ].st_value;
+  // uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("_start").idx ].st_value;
+  uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("w2c__start").idx ].st_value;
+  uint64_t mem_loc = elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[ elf_info.func_map.at("w2c_memory").idx ].st_value;
 
   cout << init_entry << " " << main_entry << endl;
-  cout << code.get() << endl;
+  cout << (void *)code.get() << endl;
   return Program( program_name, move(inputs), move(outputs), code, init_entry, main_entry, mem_loc ); 
 }
