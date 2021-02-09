@@ -13,7 +13,6 @@
     i32.const 1024
     call $path_open
     i32.const 0
-    i32.load
     i32.const 4
     call $fd_write
     drop)
