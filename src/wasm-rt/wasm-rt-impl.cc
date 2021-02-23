@@ -30,6 +30,8 @@
 #include <unistd.h>
 #endif
 
+#include "timer.hh"
+
 #define PAGE_SIZE 65536
 
 typedef struct FuncType {
@@ -59,7 +61,7 @@ void wasm_rt_trap(wasm_rt_trap_t code) {
 static bool func_types_are_equal(FuncType* a, FuncType* b) {
   if (a->param_count != b->param_count || a->result_count != b->result_count)
     return 0;
-  int i;
+  size_t i;
   for (i = 0; i < a->param_count; ++i)
     if (a->params[i] != b->params[i])
       return 0;
@@ -74,18 +76,18 @@ uint32_t wasm_rt_register_func_type(uint32_t param_count,
                                     ...) {
   FuncType func_type;
   func_type.param_count = param_count;
-  func_type.params = malloc(param_count * sizeof(wasm_rt_type_t));
+  func_type.params = reinterpret_cast<wasm_rt_type_t*>(malloc(param_count * sizeof(wasm_rt_type_t)));
   func_type.result_count = result_count;
-  func_type.results = malloc(result_count * sizeof(wasm_rt_type_t));
+  func_type.results = reinterpret_cast<wasm_rt_type_t*>(malloc(result_count * sizeof(wasm_rt_type_t)));
 
   va_list args;
   va_start(args, result_count);
 
   uint32_t i;
   for (i = 0; i < param_count; ++i)
-    func_type.params[i] = va_arg(args, wasm_rt_type_t);
+    func_type.params[i] = (wasm_rt_type_t)va_arg(args, int);
   for (i = 0; i < result_count; ++i)
-    func_type.results[i] = va_arg(args, wasm_rt_type_t);
+    func_type.results[i] = (wasm_rt_type_t)va_arg(args, int);
   va_end(args);
 
   for (i = 0; i < g_func_type_count; ++i) {
@@ -97,14 +99,20 @@ uint32_t wasm_rt_register_func_type(uint32_t param_count,
   }
 
   uint32_t idx = g_func_type_count++;
-  g_func_types = realloc(g_func_types, g_func_type_count * sizeof(FuncType));
+  g_func_types = reinterpret_cast<FuncType*>(realloc(g_func_types, g_func_type_count * sizeof(FuncType)));
   g_func_types[idx] = func_type;
   return idx + 1;
 }
 
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
 static void signal_handler(int sig, siginfo_t* si, void* unused) {
-  wasm_rt_trap(WASM_RT_TRAP_OOB);
+  if ( sig == si->si_signo && unused == NULL )
+  {
+    wasm_rt_trap(WASM_RT_TRAP_OOB);
+  } else
+  {
+    throw std::runtime_error ( "Unmatched signo" );
+  }
 }
 #endif
 
@@ -136,7 +144,7 @@ void wasm_rt_allocate_memory(wasm_rt_memory_t* memory,
     abort();
   }
   mprotect(addr, byte_length, PROT_READ | PROT_WRITE);
-  memory->data = addr;
+  memory->data = reinterpret_cast<unsigned char *>( addr );
 #else
   memory->data = calloc(byte_length, 1);
 #endif
@@ -178,5 +186,5 @@ void wasm_rt_allocate_table(wasm_rt_table_t* table,
                             uint32_t max_elements) {
   table->size = elements;
   table->max_size = max_elements;
-  table->data = calloc(table->size, sizeof(wasm_rt_elem_t));
+  table->data = reinterpret_cast<wasm_rt_elem_t*>(calloc(table->size, sizeof(wasm_rt_elem_t)));
 }
