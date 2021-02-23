@@ -39,9 +39,9 @@ public:
 
   struct Record
   {
-    uint64_t count;
-    uint64_t total_ns;
-    uint64_t max_ns;
+    uint64_t count = 0;
+    uint64_t total_ns = 0;
+    uint64_t max_ns = 0;
     uint64_t min_ns = std::numeric_limits<uint64_t>::max();
 
     void log( const uint64_t time_ns )

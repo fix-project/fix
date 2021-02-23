@@ -5,8 +5,9 @@
 
 #include "ccompiler.hh"
 #include "runtimestorage.hh"
-#include "wasmcompiler.hh"
+#include "timing_helper.hh"
 #include "util.hh"
+#include "wasmcompiler.hh"
 
 using namespace std;
 
@@ -29,8 +30,8 @@ int main( int argc, char * argv[] )
 
   int num_execution = atoi( argv[4] );
 
-  auto start = chrono::high_resolution_clock::now();
-
+  auto compile_start = chrono::high_resolution_clock::now();
+  
   string wasm_content = util::read_file( argv[2] );
   auto [ c_header, h_header ] = wasmcompiler::wasm_to_c( argv[1], wasm_content );
 
@@ -45,15 +46,21 @@ int main( int argc, char * argv[] )
   runtime.addProgram( program_name, vector<string>(), move( outputsymbols ), elf_content );
   auto encode_name = runtime.addEncode( program_name, vector<string>() );
   
+  auto start = chrono::high_resolution_clock::now();
+  
   for ( int i = 0; i < num_execution; i++ )
   {
     runtime.executeEncode( encode_name, arg1, arg2 );
   }
  
   auto stop = chrono::high_resolution_clock::now();
-  auto duration = chrono::duration_cast<chrono::milliseconds>( stop - start );
-  cout << duration.count() << " milliseconds" << endl; 
+  
+  auto compile_duration = chrono::duration_cast<chrono::microseconds>( start - compile_start );
+  auto execution_duration = chrono::duration_cast<chrono::microseconds>( stop - start );
+  cout << "Executing " << num_execution << " times takes " << compile_duration.count() << " microseconds to compile "
+	 <<  execution_duration.count() << " microseconds to execute " << endl; 
 
+  print_timer( cout, "_mmap ", _mmap );
   return 0;
 }
      

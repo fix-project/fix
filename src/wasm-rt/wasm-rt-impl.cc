@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "wasm-rt-impl.h"
+#include "wasm-rt-impl.hh"
 
 #include <assert.h>
 #include <stdarg.h>
@@ -31,6 +31,7 @@
 #endif
 
 #include "timer.hh"
+#include "timing_helper.hh"
 
 #define PAGE_SIZE 65536
 
@@ -120,6 +121,7 @@ void wasm_rt_allocate_memory(wasm_rt_memory_t* memory,
                              uint32_t initial_pages,
                              uint32_t max_pages) {
   uint32_t byte_length = initial_pages * PAGE_SIZE;
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _mmap };
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
   if (!g_signal_handler_installed) {
     g_signal_handler_installed = true;
@@ -135,7 +137,7 @@ void wasm_rt_allocate_memory(wasm_rt_memory_t* memory,
       abort();
     }
   }
-
+  
   /* Reserve 8GiB. */
   void* addr =
       mmap(NULL, 0x200000000ul, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
