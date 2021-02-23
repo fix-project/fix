@@ -37,7 +37,7 @@ string RuntimeStorage::addEncode( const string & program_name, const vector<stri
   assert( input_symbols.size() == input_blobs.size() );
   
   // Construct encode
-  map<string, string> input_to_blob;
+  unordered_map<string, string> input_to_blob;
   for ( size_t i = 0; i < input_symbols.size(); i++ )
   {
     input_to_blob.insert( pair<string, string>( input_symbols[i], input_blobs[i] ));

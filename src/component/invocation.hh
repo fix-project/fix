@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <map>
+#include <unordered_map>
 
 #include "encode.hh"
 #include "wasm-rt.h"
@@ -32,16 +32,16 @@ class Invocation {
     std::string program_name_;
 
     // Map from input name to blob name
-    std::map<std::string, std::string> input_to_blob_;
+    std::unordered_map<std::string, std::string> input_to_blob_;
 
     // Map from output name to blob name
-    std::map<std::string, std::string> output_to_blob_;
+    std::unordered_map<std::string, std::string> output_to_blob_;
 
     // Corresponding memory instance
     wasm_rt_memory_t *mem_;
 
     // Map from fd id to actual fd
-    std::map<int, WasmFileDescriptor> id_to_fd_;
+    std::unordered_map<int, WasmFileDescriptor> id_to_fd_;
 
     // Next available fd id;
     int next_fd_id_;

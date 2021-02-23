@@ -11,8 +11,21 @@ namespace wasi
   {
     auto & invocation = id_to_inv_.at( invocation_id_ );
     string variable_name = string( reinterpret_cast<char *>( &invocation.getMem()->data[ ofst ] ) );
-    cout << "Opening " << variable_name << endl;
-    return invocation.openVariable( variable_name );
+    int fd_id = invocation.openVariable( variable_name );
+    auto & fd = invocation.getFd( fd_id );
+
+     
+    switch ( fd.mode_ )
+    {
+      case fd_mode::BLOB :
+        break;
+
+      case fd_mode::ENCODEDBLOB :
+        RuntimeStorage::getInstance().getEncodedBlob( fd.blob_name_ ) = "";
+        break;
+    }
+
+    return fd_id;
   }
 
   int fd_read( int fd_id, uint32_t ofst, uint32_t count )
