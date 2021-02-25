@@ -29,12 +29,22 @@ set(BUILD_TESTS off)
 set(BUILD_LIBWASM off)
 FetchContent_MakeAvailable(wabt)
 
+FetchContent_Declare(
+  absl
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG        master
+  )
+FetchContent_MakeAvailable(absl)
+
 include ( etc/build_type.cmake )
 include ( etc/cflags.cmake )
 include ( etc/clang_format.cmake )
 
 include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-src")
 include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-build")
+
+include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-src")
+include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-build")
 
 include_directories ("${PROJECT_SOURCE_DIR}/src/util")
 include_directories ("${PROJECT_SOURCE_DIR}/src/runtime")
