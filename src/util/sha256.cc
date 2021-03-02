@@ -3,6 +3,7 @@
 #include <crypto++/sha.h>
 
 #include "sha256.hh"
+#include "timing_helper.hh"
 
 using namespace std;
 namespace CryptoPP {
@@ -11,6 +12,8 @@ namespace CryptoPP {
 
 string sha256::encode( const string & input )
 {
+  
+//  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _hash };
   CryptoPP::SHA256 hash;
 
   CryptoPP::byte digest[CryptoPP::SHA256::DIGESTSIZE];
@@ -21,6 +24,7 @@ string sha256::encode( const string & input )
 
 string sha256::encode( string_view input )
 {
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _hash };
   CryptoPP::SHA256 hash;
 
   CryptoPP::byte digest[CryptoPP::SHA256::DIGESTSIZE];

@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <string>
 
+#include "absl/container/flat_hash_map.h"
 #include <util.hh>
 
 template<typename T>
@@ -21,7 +22,7 @@ template<typename T>
 class InMemoryStorage : public Storage<T>
 {
   private:
-    std::unordered_map<std::string, T> name_to_object_;
+    absl::flat_hash_map<std::string, T> name_to_object_;
   
   public:
     InMemoryStorage()
@@ -40,7 +41,12 @@ class InMemoryStorage : public Storage<T>
 
     void put( const std::string& name, T && content )
     {
-      name_to_object_.insert( std::pair<std::string,T>( name, std::move( content ) ) );
+      name_to_object_.try_emplace( name, std::move( content ) );
       return;
+    }
+
+    size_t size()
+    {
+      return name_to_object_.size();
     }
 };

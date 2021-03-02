@@ -3,12 +3,13 @@
 #include "elfloader.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
+#include "timing_helper.hh"
 
 using namespace std;
 
 string_view RuntimeStorage::getBlob( const string & name )
 {
-  if ( encoded_blob_to_blob_.find( name ) != encoded_blob_to_blob_.end() )
+  if ( encoded_blob_to_blob_.contains( name ) )
   {
     string blob_name = encoded_blob_to_blob_.at( name );
     return name_to_blob_.get( blob_name ).content();
@@ -37,13 +38,13 @@ string RuntimeStorage::addEncode( const string & program_name, const vector<stri
   assert( input_symbols.size() == input_blobs.size() );
   
   // Construct encode
-  unordered_map<string, string> input_to_blob;
+  absl::flat_hash_map<string, string> input_to_blob;
   for ( size_t i = 0; i < input_symbols.size(); i++ )
   {
-    input_to_blob.insert( pair<string, string>( input_symbols[i], input_blobs[i] ));
+    input_to_blob.try_emplace( input_symbols[i], input_blobs[i] );
   }
 
-  Encode encode ( program_name, move( input_to_blob ), output_symbols );
+  Encode encode ( program_name, std::move( input_to_blob ), output_symbols );
   
   // Construct encoded blobs
   for ( const auto & symbol : output_symbols )
@@ -61,27 +62,34 @@ void RuntimeStorage::executeEncode( const string & encode_name, int arg1, int ar
 {
   auto & encode = name_to_encode_.get( encode_name );
   auto & program = name_to_program_.getMutable( encode.getProgramName() );
-
+   
   // Construct invocation
-  uint64_t curr_inv_id = Invocation::next_invocation_id_;
-  Invocation::next_invocation_id_++;
-  wasi::id_to_inv_.insert( pair<uint64_t, Invocation>( curr_inv_id, Invocation( encode, reinterpret_cast<wasm_rt_memory_t *>( program.getMemLoc() ) ) ) );
+ 
+  uint64_t curr_inv_id = 0; 
+  {
+    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _pre_execution };
+    curr_inv_id = Invocation::next_invocation_id_;
+    Invocation::next_invocation_id_++;
+    wasi::id_to_inv_.try_emplace( curr_inv_id, Invocation( encode, reinterpret_cast<wasm_rt_memory_t *>( program.getMemLoc() ) ) );
 
-  // Set invocation id
-  wasi::invocation_id_ = curr_inv_id;
-  
+    // Set invocation id
+    wasi::invocation_id_ = curr_inv_id;
+  }
+
   // Execute program
   program.execute( arg1, arg2 );
 
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _post_execution };
   // Update encoded_blob to blob
   for ( const auto & [ varaible, encoded_blob_name ] : encode.getOutputBlobNames() )
   {
-    string encoded_blob_content = name_to_encoded_blob_.getMutable( encoded_blob_name ).content();
-    Blob output ( move( encoded_blob_content ) );
-    string output_blob_name = output.name();
-    encoded_blob_to_blob_.insert( pair<string, string>( encoded_blob_name, output_blob_name ) );
-    name_to_blob_.put( output_blob_name, move( output ) );
+    Blob output ( move( name_to_encoded_blob_.getMutable( encoded_blob_name ).content()) );
+    encoded_blob_to_blob_.try_emplace( encoded_blob_name, output.name() );
+    name_to_blob_.put( output.name() , move( output ) );
   }
+
+  wasi::id_to_inv_.erase( curr_inv_id );
+
 }
 
   

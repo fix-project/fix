@@ -61,6 +61,12 @@ int main( int argc, char * argv[] )
 	 <<  execution_duration.count() << " microseconds to execute " << endl; 
 
   print_timer( cout, "_mmap ", _mmap );
+  print_timer( cout, "_mprotect", _mprotect );
+  print_timer( cout, "_path_open ", _path_open );
+  print_timer( cout, "_fd_write ", _fd_write );
+  print_timer( cout, "_post_execution ", _post_execution );
+  print_timer( cout, "_pre_execution ", _pre_execution );
+  print_timer( cout, "_hash ", _hash);
   return 0;
 }
      

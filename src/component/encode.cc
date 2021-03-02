@@ -6,10 +6,10 @@
 
 using namespace std;
 
-Encode::Encode( const string & program_name, unordered_map<string, string> && input_to_blob, const vector<string> & output_symbols ) 
+Encode::Encode( const string & program_name, absl::flat_hash_map<string, string> && input_to_blob, const vector<string> & output_symbols ) 
   : name_(),
     program_name_( program_name ),
-    input_to_blob_( move( input_to_blob ) ),
+    input_to_blob_( std::move( input_to_blob ) ),
     output_to_blob_()
 {
   string_view encode ( reinterpret_cast<const char *>( this ), sizeof( Encode ) );

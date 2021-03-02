@@ -11,6 +11,7 @@
 #include "program.hh"
 #include "storage.hh"
 
+#include "absl/container/flat_hash_map.h"
 #include "wasienv.hh"
 
 class RuntimeStorage {
@@ -25,7 +26,7 @@ class RuntimeStorage {
     InMemoryStorage<Program> name_to_program_;
 
     // Map from encoded blob name to blob name
-    std::unordered_map<std::string, std::string> encoded_blob_to_blob_;
+    absl::flat_hash_map<std::string, std::string> encoded_blob_to_blob_;
 
     RuntimeStorage ()
       : name_to_blob_(),
@@ -47,6 +48,8 @@ class RuntimeStorage {
       static RuntimeStorage runtime_instance;
       return runtime_instance;
     }
+
+    const Encode & getEncode( const std::string & name ) { return name_to_encode_.get( name ); }
 
     // add blob
     template<typename T>

@@ -2,6 +2,8 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include "absl/container/flat_hash_map.h"
 
 #include "encode.hh"
 #include "wasm-rt.h"
@@ -31,30 +33,21 @@ class Invocation {
     // Name of the program
     std::string program_name_;
 
-    // Map from input name to blob name
-    std::unordered_map<std::string, std::string> input_to_blob_;
-
-    // Map from output name to blob name
-    std::unordered_map<std::string, std::string> output_to_blob_;
+    // Name of encode
+    std::string encode_name_;
 
     // Corresponding memory instance
     wasm_rt_memory_t *mem_;
 
     // Map from fd id to actual fd
-    std::unordered_map<int, WasmFileDescriptor> id_to_fd_;
-
-    // Next available fd id;
-    int next_fd_id_;
-  
+    std::vector<WasmFileDescriptor> id_to_fd_;
 
   public:
     Invocation( const Encode & encode, wasm_rt_memory_t *mem ) 
       : program_name_( encode.program_name_ ),
-        input_to_blob_( encode.input_to_blob_ ),
-        output_to_blob_( encode.output_to_blob_ ),
+        encode_name_( encode.name_ ),
         mem_( mem ),
-        id_to_fd_(),
-        next_fd_id_( 0 )
+        id_to_fd_()
     {}
     
     Invocation( const Invocation & ) = default;
