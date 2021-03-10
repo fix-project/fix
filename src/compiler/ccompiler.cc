@@ -53,8 +53,13 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   // cout << ( string )( ( *( *diskFile )->getBuffer( "ignore" ) )->getBuffer() ) << endl;
 
   // Create arguments
-  const char *Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", "-pic-is-pie", "-I/usr/include", "-I/usr/include/x86_64-linux-gnu", "-I/usr/lib/llvm-10/lib/clang/10.0.0/include" };
+  const char *Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", "-I/usr/include", "-I/usr/include/x86_64-linux-gnu", "-I/usr/lib/llvm-10/lib/clang/10.0.0/include" };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
+
+  // Setup mcmodel
+  auto &codegenOptions = compilerInstance.getCodeGenOpts();
+  codegenOptions.CodeModel = "medium";
+  codegenOptions.RelocationModel = llvm::Reloc::Model::Static;
 
   LLVMContext context;
   CodeGenAction *action = new EmitLLVMOnlyAction( &context );
@@ -79,18 +84,18 @@ string c_to_elf( const string & wasm_name, const string & c_content, const strin
   auto &CodeGenOpts = compilerInstance.getCodeGenOpts();
   auto &Diagnostics = compilerInstance.getDiagnostics();
 
-  if ( module->getTargetTriple() != targetOptions.Triple ) 
-  {
-    cout << "Wrong target triple" << endl;
-    module->setTargetTriple( targetOptions.Triple );
-  }
+  //if ( module->getTargetTriple() != targetOptions.Triple ) 
+  //{
+   // cout << "Wrong target triple" << endl;
+   // module->setTargetTriple( targetOptions.Triple );
+  // }
 
   std::string res;
   raw_string_ostream Str_OS ( res );
   auto OS = make_unique<buffer_ostream>( Str_OS );
 
   EmitBackendOutput(Diagnostics, compilerInstance.getHeaderSearchOpts(), CodeGenOpts,
-                    targetOptions, compilerInstance.getLangOpts(),
+                    compilerInstance.getTargetOpts(), compilerInstance.getLangOpts(),
                     compilerInstance.getTarget().getDataLayout(), module.get(), Backend_EmitObj,
                     std::move( OS ));
   

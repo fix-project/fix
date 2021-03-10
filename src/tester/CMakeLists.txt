@@ -29,6 +29,7 @@ target_link_libraries("compiler_timing" wabt)
 add_dependencies("compiler_timing" wasm2c)
 
 add_executable(c_to_elf_tester "c_to_elf_tester.cc")
+target_link_libraries("c_to_elf_tester" util)
 target_link_libraries("c_to_elf_tester" compiler)
 target_link_libraries("c_to_elf_tester" ${CLANG_LIBS})
 target_link_libraries("c_to_elf_tester" LLVM)

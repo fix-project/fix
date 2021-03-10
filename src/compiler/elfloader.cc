@@ -156,32 +156,34 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
   memcpy( program_mem, elf_info.code.data(), elf_info.code.size() );
   memcpy( (char *)program_mem + elf_info.code.size(), elf_info.rodata.data(), elf_info.rodata.size() );
 
-	// Step 1: Add wasm-rt functions to func_map	
-	elf_info.func_map.insert( pair<string, func>( "wasm_rt_trap", func( (uint64_t)wasm_rt_trap ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "wasm_rt_register_func_type", func( (uint64_t)wasm_rt_register_func_type ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_memory", func( (uint64_t)wasm_rt_allocate_memory ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "Z_envZ_path_openZ_ii", func( (uint64_t)&wasi::Z_envZ_path_openZ_ii ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "Z_envZ_fd_readZ_iiii", func( (uint64_t)&wasi::Z_envZ_fd_readZ_iiii ) ) );		
-	elf_info.func_map.insert( pair<string, func>( "Z_envZ_fd_writeZ_iiii", func( (uint64_t)&wasi::Z_envZ_fd_writeZ_iiii ) ) );		
+  // Step 1: Add wasm-rt functions to func_map	
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_trap", func( (uint64_t)wasm_rt_trap ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_register_func_type", func( (uint64_t)wasm_rt_register_func_type ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_memory", func( (uint64_t)wasm_rt_allocate_memory ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "Z_envZ_path_openZ_ii", func( (uint64_t)&wasi::Z_envZ_path_openZ_ii ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "Z_envZ_fd_readZ_iiii", func( (uint64_t)&wasi::Z_envZ_fd_readZ_iiii ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "Z_envZ_fd_writeZ_iiii", func( (uint64_t)&wasi::Z_envZ_fd_writeZ_iiii ) ) );		
   elf_info.func_map.insert( pair<string, func>( "__stack_chk_fail", func( (uint64_t)__stack_chk_fail ) ) );
 
   for (const auto & reloc_entry : elf_info.reloctb ){
     int idx = ELF64_R_SYM( reloc_entry.r_info );
 
-    int32_t rel_offset;
-    if ( ELF64_R_TYPE( reloc_entry.r_info ) == 2 || ELF64_R_TYPE( reloc_entry.r_info ) == 4 || ELF64_R_TYPE( reloc_entry.r_info ) == 9 )
+    int64_t rel_offset;
+    if ( ELF64_R_TYPE( reloc_entry.r_info ) == 2 || ELF64_R_TYPE( reloc_entry.r_info ) == 4 )
     {
       rel_offset = reloc_entry.r_addend - (int64_t)program_mem - reloc_entry.r_offset;
-	  } else if ( ELF64_R_TYPE( reloc_entry.r_info ) == 10 || ELF64_R_TYPE( reloc_entry.r_info ) == 11 ) 
+    } 
+    else if ( ELF64_R_TYPE( reloc_entry.r_info ) == 1 || ELF64_R_TYPE( reloc_entry.r_info ) == 10 ) 
     {
       rel_offset = reloc_entry.r_addend;
-    } else {
+    } 
+    else {
       throw out_of_range ( "Relocation type not supported." );
     }
-      // Check whether is a section
+    // Check whether is a section
     if ( ELF64_ST_TYPE( elf_info.symtb[idx].st_info ) == STT_SECTION) 
     {
       string sec_name = string( elf_info.namestrs.data() + elf_info.sheader[elf_info.symtb[idx].st_shndx].sh_name );
@@ -245,14 +247,20 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
         }
       }
     }	
-    *((int32_t *)( reinterpret_cast<char *>(program_mem) + reloc_entry.r_offset) ) = rel_offset; 
+    
+    if ( ELF64_R_TYPE( reloc_entry.r_info ) == 1 )
+    {
+      *((int64_t *)( reinterpret_cast<char *>(program_mem) + reloc_entry.r_offset) ) = rel_offset; 
+    } 
+    else 
+    {
+      *((int32_t *)( reinterpret_cast<char *>(program_mem) + reloc_entry.r_offset) ) = (int32_t)rel_offset; 
+    } 
   }	
-
   shared_ptr<char> code ( reinterpret_cast<char *>(program_mem) );
   uint64_t init_entry = elf_info.symtb[ elf_info.func_map.at("init").idx ].st_value;
   // uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("_start").idx ].st_value;
   uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("w2c__start").idx ].st_value;
   uint64_t mem_loc = elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[ elf_info.func_map.at("w2c_memory").idx ].st_value;
-
   return Program( program_name, move(inputs), move(outputs), code, init_entry, main_entry, mem_loc ); 
 }
