@@ -17,9 +17,20 @@ using namespace std;
 using namespace clang;
 using namespace llvm;
 
-string c_to_elf( const string & wasm_name, const string & c_content, const string & h_content, const string & wasm_rt_content ) 
+string c_to_elf( const string & wasm_name, string & c_content, const string & h_content, const string & wasm_rt_content ) 
 {
-  llvm::InitializeAllTargets();
+  // Set wasm_rt_memory_t to thread local
+  size_t pos = 0;
+  pos = c_content.find("static wasm_rt_memory_t");
+  if ( pos != string::npos )
+  {
+    cout << " static wasm_rt_memory_t found " << endl;
+    // string origin ( "static" );
+    string replace ( "__thread" );
+    c_content.replace( pos, 6u, replace );
+  }
+	
+	llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmPrinters();
   llvm::InitializeAllAsmParsers();

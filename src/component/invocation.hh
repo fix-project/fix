@@ -5,26 +5,26 @@
 #include <vector>
 #include "absl/container/flat_hash_map.h"
 
-#include "encode.hh"
+#include "name.hh"
 #include "wasm-rt.h"
-
-enum class fd_mode
-{
-  BLOB,
-  ENCODEDBLOB
-};
 
 struct WasmFileDescriptor 
 {
-  std::string blob_name_;
+  Name blob_name_;
   uint64_t loc_;
-  fd_mode mode_;
+  std::string buffer;
 
-  WasmFileDescriptor( std::string blob_name, fd_mode mode )
+  WasmFileDescriptor( Name blob_name )
     : blob_name_( blob_name ),
       loc_( 0 ),
-      mode_( mode )
+      buffer( "" )
   {}
+
+  WasmFileDescriptor()
+    : blob_name_(),
+      loc_( 0 ),
+      buffer( "" )
+  {} 
 
 };
 
@@ -34,36 +34,44 @@ class Invocation {
     std::string program_name_;
 
     // Name of encode
-    std::string encode_name_;
+    Name encode_name_;
 
     // Corresponding memory instance
     wasm_rt_memory_t *mem_;
 
     // Map from fd id to actual fd
-    std::vector<WasmFileDescriptor> id_to_fd_;
+    absl::flat_hash_map<int, WasmFileDescriptor> id_to_fd_;
+
+    // vector of the number of strict inputs/lazy inputs
+    std::vector<size_t> num_inputs_;
+
+    // The number of all inputs
+    size_t input_count_;
 
   public:
-    Invocation( const Encode & encode, wasm_rt_memory_t *mem ) 
-      : program_name_( encode.program_name_ ),
-        encode_name_( encode.name_ ),
+    Invocation( std::string program_name, Name encode_name, wasm_rt_memory_t *mem ) 
+      : program_name_( program_name ),
+        encode_name_( encode_name ),
         mem_( mem ),
-        id_to_fd_()
+        id_to_fd_(),
+        num_inputs_(),
+        input_count_( 0 )
+    {}
+
+    Invocation( Name encode_name )
+      : program_name_( "" ),
+        encode_name_( encode_name ),
+        mem_( 0 ),
+        id_to_fd_(),
+        num_inputs_(),
+        input_count_( 0 )
     {}
     
     Invocation( const Invocation & ) = default;
     Invocation& operator=( const Invocation & ) = default; 
 
-    // Return whether the varaible is an input
-    bool isInput( const std::string & varaible_name );
-
-    // Return whether the varaible is an output
-    bool isOutput( const std::string & varaible_name );
-
-    // Return blob name corresponds to an input
-    std::string getInputBlobName( const std::string & variable_name );
-
-    // Return encoded blob name corresponds to an output
-    std::string getOutputBlobName( const std::string & variable_name );
+    // Wet pointer to wasm memory
+    void setMem( wasm_rt_memory_t * mem ) { mem_ = mem; }
 
     // Return pointer to wasm memory
     wasm_rt_memory_t * getMem() { return mem_; }
@@ -72,11 +80,22 @@ class Invocation {
     WasmFileDescriptor & getFd( int fd_id );
 
     // Add file descriptor, return corresponding fd_id
-    int addFd( WasmFileDescriptor fd );
+    int addFd( int fd_id, WasmFileDescriptor fd );
 
     // Open blob corresponding to variable name
-    int openVariable( const std::string & variable_name );
+    int openVariable( const size_t & index );
     
     static uint64_t next_invocation_id_;
+
+    // Set program name
+    void setProgramName( const std::string & program_name ) { program_name_ = program_name; }
+
+    // Return program name
+    const std::string & getProgramName() const { return program_name_; }
+    
+    // Return Name given encode and index of the Name in input Tree
+    Name getInputName( const size_t & index );
+
+    size_t getInputCount() const { return input_count_; }
 };
     

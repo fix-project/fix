@@ -7,89 +7,139 @@
 
 using namespace std;
 
-string_view RuntimeStorage::getBlob( const string & name )
+string_view RuntimeStorage::getBlob( const Name & name )
 {
-  if ( encoded_blob_to_blob_.contains( name ) )
+  switch ( name.getType() )
   {
-    string blob_name = encoded_blob_to_blob_.at( name );
-    return name_to_blob_.get( blob_name ).content();
-  } else {
-    return name_to_blob_.get( name ).content();
+    case NameType::Literal :
+      return name.getContent();
+
+    case NameType::Canonical :
+      return name_to_blob_.get( name.getContent() ).content();
+    
+    default:
+      throw out_of_range( "Blob does not exist." );
   }
 }
 
-string & RuntimeStorage::getEncodedBlob( const string & name )
+const Tree & RuntimeStorage::getTree( const Name & name )
 {
-  return name_to_encoded_blob_.getMutable( name ).content();
+  switch ( name.getType() )
+  {
+    case NameType::Literal :
+      return reinterpret_cast<const Tree &>( name.getContent() );
+
+    case NameType::Canonical :
+      return name_to_tree_.get( name.getContent() );
+
+    default:
+      throw out_of_range( "Tree does not exist." );
+  }
 }
 
-void RuntimeStorage::addProgram( string& name, vector<string>&& inputs, vector<string>&& outputs, string & program_content )
+void RuntimeStorage::addWasm( const string & name, const string & wasm_content )
+{
+  auto [ c_header, h_header ] = wasmcompiler::wasm_to_c( name, wasm_content );
+
+  string wasm_rt_content = "";
+  string elf_content = c_to_elf( name, c_header, h_header, wasm_rt_content );
+
+  addProgram( name, vector<string>(), vector<string>(), elf_content );
+}
+  
+void RuntimeStorage::addProgram( const string& name, vector<string>&& inputs, vector<string>&& outputs, string & program_content )
 {
   auto elf_info = load_program( program_content );
   name_to_program_.put( name, link_program( elf_info, name, move( inputs ), move( outputs ) ) );
 }
 
-string RuntimeStorage::addEncode( const string & program_name, const vector<string> & input_blobs )
+void RuntimeStorage::force( const Name & name )
 {
-  const auto & program = name_to_program_.get( program_name );
-  const auto & input_symbols = program.getInputSymbols();
-  const auto & output_symbols = program.getOutputSymbols(); 
-
-  assert( input_symbols.size() == input_blobs.size() );
-  
-  // Construct encode
-  absl::flat_hash_map<string, string> input_to_blob;
-  for ( size_t i = 0; i < input_symbols.size(); i++ )
+  switch( name.getContentType() )
   {
-    input_to_blob.try_emplace( input_symbols[i], input_blobs[i] );
+    case ContentType::Blob :
+     return;
+
+    case ContentType::Tree : 
+     this->forceTree( name );
+     return;
+
+    case ContentType::Thunk : 
+     switch( name.getType() )
+     {
+       case NameType::Literal :
+         this->forceThunk( reinterpret_cast<const Thunk &>( name.getContent() ) );
+         return;
+         
+       case NameType::Canonical : 
+         this->forceThunk( name_to_thunk_.get( name.getContent() ) );
+         return;
+
+       default:
+         return;
+     } 
+
+    default:
+     return;
   }
-
-  Encode encode ( program_name, std::move( input_to_blob ), output_symbols );
-  
-  // Construct encoded blobs
-  for ( const auto & symbol : output_symbols )
-  {
-    name_to_encoded_blob_.put( encode.name() + "#" + symbol, EncodedBlob( encode.name(), symbol ) ); 
-  }
-
-  string name = encode.name();
-  name_to_encode_.put( name, move( encode ) );
-
-  return name;
 }
 
-void RuntimeStorage::executeEncode( const string & encode_name, int arg1, int arg2 )
+void RuntimeStorage::forceTree( const Name & tree_name )
 {
-  auto & encode = name_to_encode_.get( encode_name );
-  auto & program = name_to_program_.getMutable( encode.getProgramName() );
-   
-  // Construct invocation
- 
+  const Tree & tree = this->getTree( tree_name );
+  for ( const auto & name : tree )
+  {
+    this->force( name );
+  }
+}
+
+void RuntimeStorage::forceThunk( const Thunk & thunk )
+{
+  this->evaluateEncode( thunk.getEncode() );   
+}
+
+void RuntimeStorage::prepareEncode( const Tree & encode, Invocation & invocation )
+{
+  this->forceTree( encode.at( 1 ) );
+  Name function_name = encode.at( 0 );
+
+  switch ( function_name.getContentType() ) 
+  {
+    case ContentType::Blob :
+      invocation.setProgramName( function_name.getContent() );
+      return;
+
+    case ContentType::Tree :
+      this->prepareEncode( this->getTree( function_name ), invocation );
+      return;
+
+    default :
+      throw runtime_error ( "Invalid encode!" );
+  }
+}
+
+void RuntimeStorage::evaluateEncode( const Name & encode_name )
+{
+  if ( this->getTree( encode_name ).size() != 3 )
+  { 
+    throw runtime_error ( "Invalid encode!" );
+  }
+
   uint64_t curr_inv_id = 0; 
-  {
-    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _pre_execution };
-    curr_inv_id = Invocation::next_invocation_id_;
-    Invocation::next_invocation_id_++;
-    wasi::id_to_inv_.try_emplace( curr_inv_id, Invocation( encode, reinterpret_cast<wasm_rt_memory_t *>( program.getMemLoc() ) ) );
+  curr_inv_id = Invocation::next_invocation_id_;
+  Invocation::next_invocation_id_++;
+  Invocation invocation ( encode_name );
 
-    // Set invocation id
-    wasi::invocation_id_ = curr_inv_id;
-  }
+  this->prepareEncode( this->getTree( encode_name ), invocation );
 
-  // Execute program
-  program.execute( arg1, arg2 );
+  const auto & program = name_to_program_.get( invocation.getProgramName() );
+  invocation.setMem( reinterpret_cast<wasm_rt_memory_t *>( program.getMemLoc() ) );
 
-  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _post_execution };
-  // Update encoded_blob to blob
-  for ( const auto & [ varaible, encoded_blob_name ] : encode.getOutputBlobNames() )
-  {
-    Blob output ( move( name_to_encoded_blob_.getMutable( encoded_blob_name ).content()) );
-    encoded_blob_to_blob_.try_emplace( encoded_blob_name, output.name() );
-    name_to_blob_.put( output.name() , move( output ) );
-  }
+  wasi::id_to_inv_.try_emplace( curr_inv_id, invocation );
+  wasi::invocation_id_ = curr_inv_id;
+  wasi::buf.size = 0;
+
+  program.execute();
 
   wasi::id_to_inv_.erase( curr_inv_id );
-
 }
-
-  

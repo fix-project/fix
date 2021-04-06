@@ -4,51 +4,30 @@
 
 using namespace std;
 
-bool Invocation::isInput( const string & variable_name )
-{
-  return RuntimeStorage::getInstance().getEncode( encode_name_ ).input_to_blob_.contains( variable_name );
-}
-
-bool Invocation::isOutput( const string & variable_name )
-{
-  return RuntimeStorage::getInstance().getEncode( encode_name_ ).output_to_blob_.contains( variable_name );
-}
-
-string Invocation::getInputBlobName( const string & variable_name )
-{
-  return RuntimeStorage::getInstance().getEncode( encode_name_ ).input_to_blob_.at( variable_name );
-}
-
-string Invocation::getOutputBlobName( const string & variable_name )
-{
-  return RuntimeStorage::getInstance().getEncode( encode_name_ ).output_to_blob_.at( variable_name );
-}
-
 WasmFileDescriptor & Invocation::getFd( int fd_id )
 {
   return id_to_fd_.at( fd_id );
 }
 
-int Invocation::addFd( WasmFileDescriptor fd )
+int Invocation::addFd( int fd_id, WasmFileDescriptor fd )
 {
-  id_to_fd_.push_back( fd );
-  return id_to_fd_.size() - 1;
+  id_to_fd_.try_emplace( fd_id, fd );
+  return fd_id;
 }
 
-int Invocation::openVariable( const string & variable_name )
+int Invocation::openVariable( const size_t & index )
 {
-  if ( isInput( variable_name ) )
+  // If the index is greater than the range of inputs
+  if ( index >= input_count_ )
   {
-    id_to_fd_.push_back( WasmFileDescriptor( getInputBlobName( variable_name ), fd_mode::BLOB ) );
-  } 
-  else if ( isOutput( variable_name ) ) {
-    id_to_fd_.push_back( WasmFileDescriptor( getOutputBlobName( variable_name ), fd_mode::ENCODEDBLOB ) );
-    RuntimeStorage::getInstance().getEncodedBlob( getOutputBlobName( variable_name ) ) = "";
-  } else {
-    throw out_of_range ( variable_name + " not an input or output." );
+    id_to_fd_.try_emplace( index, WasmFileDescriptor() );
   }
-
-  return id_to_fd_.size() - 1;
+  else 
+  {
+    // TODO: look for the input in input lists
+    id_to_fd_.try_emplace( index, WasmFileDescriptor( getInputName( index ) ) ); 
+  }
+  return index;
 }
 
 uint64_t Invocation::next_invocation_id_ = 0;

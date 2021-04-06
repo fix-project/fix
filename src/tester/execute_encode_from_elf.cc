@@ -22,7 +22,7 @@ int main( int argc, char* argv[] )
   { 
     // Add program
     string program_name = string( argv[1] );
-    auto elf_content = util::read_file( argv[1] );
+    auto elf_content = util::read_file( argv[2] );
     vector<string> outputsymbols;
     outputsymbols.push_back( "output" );
     runtime.addProgram( program_name, vector<string>(), move( outputsymbols ), elf_content );

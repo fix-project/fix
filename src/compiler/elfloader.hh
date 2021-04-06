@@ -24,28 +24,28 @@
 
 // A function in a program
 struct func {
-	// Idx of the function in the program's symbol table
-	uint64_t idx;
-	// Type of the function
+  // Idx of the function in the program's symbol table
+  uint64_t idx;
+  // Type of the function
   int type;
-	// Address of the function if it's a library function
-	uint64_t lib_addr;
+  // Address of the function if it's a library function
+  uint64_t lib_addr;
 
-	func( uint64_t idx_, int type_ ) : idx( idx_ ),
-                                     type( type_ ),
-                                     lib_addr( 0 ) {}
+  func( uint64_t idx_, int type_ ) : idx( idx_ ),
+  type( type_ ),
+  lib_addr( 0 ) {}
 
-	func( uint64_t lib_addr_ ) : idx( 0 ),
-				                       type( LIB ),
-                               lib_addr( lib_addr_ ) {}
+  func( uint64_t lib_addr_ ) : idx( 0 ),
+  type( LIB ),
+  lib_addr( lib_addr_ ) {}
 };
 
 // Represents one object file
 struct Elf_Info {
-	// Index of the code section
+  // Index of the code section
   uint64_t text_idx;
   // Code section 
-	std::string_view code;
+  std::string_view code;
 
   // Index of the rodata section
   uint64_t rodata_idx;
@@ -59,30 +59,30 @@ struct Elf_Info {
   // Size of the com section
   uint64_t com_size;
 
-	// String signs for symbol table
-	std::string_view symstrs;
-	// String signs for section header 
-	std::string_view namestrs;
-	// Symbol table
-	span_view<Elf64_Sym> symtb;
-	// Relocation table
-	span_view<Elf64_Rela> reloctb;
-	// Section header
-	span_view<Elf64_Shdr> sheader;
+  // String signs for symbol table
+  std::string_view symstrs;
+  // String signs for section header 
+  std::string_view namestrs;
+  // Symbol table
+  span_view<Elf64_Sym> symtb;
+  // Relocation table
+  span_view<Elf64_Rela> reloctb;
+  // Section header
+  span_view<Elf64_Shdr> sheader;
 
   // COM variable waiting for an address
-	std::vector<int> com_symtb_entry;
+  std::vector<int> com_symtb_entry;
   // Map from function/variable name to func entry
-	std::map<std::string, func> func_map;	
-  
+  std::map<std::string, func> func_map;	
+
   Elf_Info() 
     : text_idx( 0 ), code(), 
-      rodata_idx( 0 ), rodata(),
-      bss_idx( 0 ), bss_size( 0 ), com_size( 0 ),
-      symstrs(), namestrs(), symtb(), reloctb(), sheader(),
-      com_symtb_entry(), func_map() {}
+    rodata_idx( 0 ), rodata(),
+    bss_idx( 0 ), bss_size( 0 ), com_size( 0 ),
+    symstrs(), namestrs(), symtb(), reloctb(), sheader(),
+    com_symtb_entry(), func_map() {}
 };
 
 
 Elf_Info load_program( std::string & program_content );
-Program link_program( Elf_Info & elf_info, std::string & program_name, std::vector<std::string> && inputs, std::vector<std::string> && outputs );
+Program link_program( Elf_Info & elf_info, const std::string & program_name, std::vector<std::string> && inputs, std::vector<std::string> && outputs );

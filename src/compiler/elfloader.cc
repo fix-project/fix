@@ -132,7 +132,7 @@ Elf_Info load_program( string & program_content )
   return res;
 }
 
-Program link_program( Elf_Info & elf_info, string & program_name, vector<string> && inputs, vector<string> && outputs )
+Program link_program( Elf_Info & elf_info, const string & program_name, vector<string> && inputs, vector<string> && outputs )
 {
   static Elf64_Addr global_offset_table [4] = 
   {
@@ -170,6 +170,13 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
 
   for (const auto & reloc_entry : elf_info.reloctb ){
     int idx = ELF64_R_SYM( reloc_entry.r_info );
+
+    // Do nothing for w2c_memory
+    if ( ELF64_R_TYPE( reloc_entry.r_info ) == 23 )
+    {
+      *((int32_t *)( reinterpret_cast<char *>(program_mem) + reloc_entry.r_offset) ) = (int32_t)(-40); 
+      continue;
+    }
 
     int64_t rel_offset;
     if ( ELF64_R_TYPE( reloc_entry.r_info ) == 2 || ELF64_R_TYPE( reloc_entry.r_info ) == 4 )
@@ -256,11 +263,17 @@ Program link_program( Elf_Info & elf_info, string & program_name, vector<string>
     {
       *((int32_t *)( reinterpret_cast<char *>(program_mem) + reloc_entry.r_offset) ) = (int32_t)rel_offset; 
     } 
-  }	
+  }
+
+  // cout << "Program mem at " << program_mem << endl;
+  // for (size_t i = 0; i < elf_info.code.size(); i++ )
+  // {
+    // printf(" %02x", ((unsigned char *)program_mem)[i]);
+  // }
+  // cout << endl;
+
   shared_ptr<char> code ( reinterpret_cast<char *>(program_mem) );
   uint64_t init_entry = elf_info.symtb[ elf_info.func_map.at("init").idx ].st_value;
-  // uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("_start").idx ].st_value;
   uint64_t main_entry = elf_info.symtb[ elf_info.func_map.at("w2c__start").idx ].st_value;
-  uint64_t mem_loc = elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[ elf_info.func_map.at("w2c_memory").idx ].st_value;
-  return Program( program_name, move(inputs), move(outputs), code, init_entry, main_entry, mem_loc ); 
+  return Program( program_name, move(inputs), move(outputs), code, init_entry, main_entry, 0 ); 
 }

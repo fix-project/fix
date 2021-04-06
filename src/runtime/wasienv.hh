@@ -6,11 +6,13 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "invocation.hh"
+#include "wasm-rt.h"
 
 // ID of the current invocation
 namespace wasi 
 {
   inline thread_local uint64_t invocation_id_ = -1;
+  inline thread_local wasm_rt_memory_t buf;
   inline absl::flat_hash_map<uint64_t, Invocation> id_to_inv_;
 
   int path_open( uint32_t ofst ); 

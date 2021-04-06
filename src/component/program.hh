@@ -54,15 +54,15 @@ class Program {
         mem_loc_( mem_loc )
     {}
 
-    void execute ( int arg1, int arg2 )
+    void execute () const
     { 
       void (*init)();
       init = reinterpret_cast<void (*) ()>(code_.get() + init_entry_);
       init();
 
-      void (*main_func)( int, int );
-      main_func = reinterpret_cast<void (*) (int, int)>(code_.get() + main_entry_);
-      main_func( arg1, arg2 );
+      void (*main_func)();
+      main_func = reinterpret_cast<void (*) ()>(code_.get() + main_entry_);
+      main_func();
     }
 
     const std::vector<std::string> & getInputSymbols() const { return inputs_; } 
