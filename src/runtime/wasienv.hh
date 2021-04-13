@@ -15,11 +15,13 @@ namespace wasi
   inline thread_local wasm_rt_memory_t buf;
   inline absl::flat_hash_map<uint64_t, Invocation> id_to_inv_;
 
-  int path_open( uint32_t ofst ); 
-  int fd_read( int fd_id, uint32_t ofst, uint32_t count );
-  int fd_write( int fd_id, uint32_t ofst, uint32_t count );
+  void attach_input( uint32_t input_index, uint32_t mem_index );
+  void attach_output( uint32_t output_index, uint32_t mem_index );
+   
+  uint32_t get_i32( uint32_t mem_index, uint32_t ofst );
+  void write_i32( uint32_t mem_index, uint32_t ofst );
 
-  inline int (*Z_envZ_path_openZ_ii)( uint32_t ){ &path_open };
-  inline int (*Z_envZ_fd_readZ_iiii)( int, uint32_t, uint32_t ){ &fd_read };
-  inline int (*Z_envZ_fd_writeZ_iiii)( int, uint32_t, uint32_t ){ &fd_write };
+  // TODO: tree operations
+  void attach_tree_child_input( uint32_t parent_mem_index, uint32_t child_index, uint32_t mem_index );
+
 }
