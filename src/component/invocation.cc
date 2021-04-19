@@ -16,16 +16,16 @@ void Invocation::attach_input( uint32_t input_index, uint32_t mem_index )
   Name strict_input = RuntimeStorage::getInstance().getTree( encode_name_ ).at(1);
   Name input_name = RuntimeStorage::getInstance().getTree( strict_input ).at( input_index );
 
-  input_mems.insert_or_assign( mem_index, InputMem( input_name ) );
+  input_mems[mem_index] = input_name;
 }
 
 template<typename T>
 uint32_t Invocation::get_i32( uint32_t mem_index, uint32_t ofst )
 {
-  switch ( input_mems.at( mem_index ).name_.getContentType() )
+  switch ( input_mems[mem_index].getContentType() )
   {
     case ContentType::Blob :
-     uint32_t res = *( T* )RuntimeStorage::getInstance().getBlob( input_mems.at( mem_index ).name_ )[ ofst ];
+     uint32_t res = *( T* )RuntimeStorage::getInstance().getBlob( input_mems[mem_index] )[ ofst ];
      return res;
 
     default :
@@ -35,51 +35,51 @@ uint32_t Invocation::get_i32( uint32_t mem_index, uint32_t ofst )
 
 void Invocation::attach_output( uint32_t output_index, uint32_t mem_index, uint32_t output_type )
 {
-  if ( output_index >= output_tree_.childs.size() )
+  if ( output_index >= output_count_ )
   {
-    output_tree_.childs.resize( output_index + 1 );
+    output_count_ = output_index + 1; 
   }
 
-  output_tree_.childs.emplace( output_tree_.childs.begin() + ouptut_index, output_type );
-  output_mems.insert_or_assign( mem_index, &output_tree_.childs.at( output_index ) );
+  outputs.emplace_back( output_index, output_type );
+  output_mems[ mem_index ] = &outputs.back(); 
 
   return;
 }
 
 void Invocation::attach_output_child( uint32_t parent_mem_index, uint32_t child_index, uint32_t child_mem_index, uint32_t output_type )
 { 
-  OutputTemp * parent_mem = output_mems.at( parent_mem_index );
+  OutputTemp * parent_mem = output_mems[parent_mem_index];
   
-  switch ( parent_mem->name_.getContentType() )
+  switch ( parent_mem->content_type_ )
   {
-    case ContentType::Blob :
-    case ContentType::Thunk :
+    case BLOB :
+    case THUNK :
       throw runtime_error ( "Cannot add child to non-Tree output." );
 
     default :
-      continue;
+      break;
   }
   
-  if ( child_index >= parent_mem->childs.size() )
+  if ( child_index >= get<InProgressTree>( parent_mem->content_ ) )
   {
-    parent_mem->childs.resize( child_index + 1 );
+    parent_mem->content_.emplace<InProgressTree>( child_index + 1 );
   }
 
-  parent_mem->childs.emplace( parent_mem->childs.begin + child_index, output_type );
-  output_mems.insert_or_assign( child_mem_index, parent_mem->childs.at( child_index ));
+  outputs.emplace_back( parent_mem->path_, child_index, output_type );
+  output_mems[ child_mem_index ] = &outputs.back();
 
   return;
 }
 
 template<typename T>
-uint32_t Invocation::store_i32( uint32_t mem_index, uint32_t content )
+void Invocation::store_i32( uint32_t mem_index, uint32_t content )
 {
-  OutputTemp * output_mem = output_mems.at( mem_index );
-  switch ( output_mem->name_.getContentType() )
+  OutputTemp * output_mem = output_mems[mem_index];
+  switch ( output_mem->content_type_ )
   {
-    case ContentType::Blob :
+    case BLOB :
      T content_T = ( T )content; 
-     ouptut_mem.buffer.append( (char *)&content_T, sizeof( T )  );
+     get<InProgressBlob>( output_mem->content_ ).append( (char *)&content_T, sizeof( T )  );
      return;
 
     default:
@@ -89,46 +89,37 @@ uint32_t Invocation::store_i32( uint32_t mem_index, uint32_t content )
 
 void Invocation::set_encode( uint32_t mem_index, uint32_t encode_mem_index )
 {
-  OutputTemp * output_mem = output_mems.at( mem_index );
+  OutputTemp * output_mem = output_mems[mem_index];
   
-  switch ( output_mem->name_.getContentType() )
-  {
-    case ContentType::Blob :
-    case ContentType::Tree :
+  switch ( output_mem->content_type_ )
+  { 
+    case THUNK :
+      break;
+
+    default :
       throw runtime_error ( "Cannot set encode to a non-Thunk output." );
-      
-    default :
-      continue;
   }
 
-  OutputTemp * encode_mem = output_mems.at( encode_mem_index );
+  OutputTemp * encode_mem = output_mems[encode_mem_index];
+  get<InProgressThunk>( output_mem->content_ ).encode_path_ = encode_mem->path_;
 
-  switch ( encode_mem_index->name_.getContentType() )
-  {
-    case ContentType::Tree :
-      output_mem->encode = encode_mem;
-      return;
-
-    default :
-      throw runtime_error ( "Cannot set Blob or Thunk output as encode." );
-  }
+  return;
 }
 
-void Invocation::add_path( uint32_t mem_index, uint32_t path )
+void Invocation::add_path( uint32_t mem_index, uint32_t path_index )
 {
-  OutputTemp * output_mem = output_mems.at( mem_index );
+  OutputTemp * output_mem = output_mems[mem_index];
   
-  switch ( output_mem->name_.getContentType() )
+  switch ( output_mem->content_type_ )
   {
-    case ContentType::Blob :
-    case ContentType::Tree :
-      throw runtime_error ( "Cannot set encode to a non-Thunk output." );
-      
+    case THUNK :
+      break;
+
     default :
-      continue;
+      throw runtime_error ( "Cannot set encode to a non-Thunk output." );
   }
 
-  output_mem->path.push_back( static_cast<int>( path ) );
+  get<InProgressThunk>( output_mem->content_ ).path_.push_back( path_index );
   return;
 }
   

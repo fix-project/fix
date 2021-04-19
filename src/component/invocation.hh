@@ -12,72 +12,73 @@
 #define TREE 1
 #define THUNK 2
 
-struct InputMem
-{
-  Name name_;
+#define MEM_CAPACITY 256
 
-  InputMem( Name name )
-    : name_( name )
+using InputMem = Name;
+
+using InProgressBlob = std::string;
+
+using InProgressTree = size_t;
+
+struct InProgressThunk 
+{
+  std::vector<size_t> encode_path_;
+  std::vector<size_t> path_;
+
+  InProgressThunk()
+  : encode_path_(),
+    path_()
   {}
 };
 
 struct OutputTemp
 {
-  Name name_;
-  
-  std::vector<OutputTemp> childs;
-  std::string buffer;
-  OutputTemp* encode;
-  std::vector<int> path;
- 
-  OutputTemp( Name name )
-    : name_( name ),
-      childs(),
-      buffer( "" ),
-      encode(),
-      path()
-  {}
+  std::vector<size_t> path_;
+  int content_type_; 
+  std::variant<InProgressBlob, InProgressTree, InProgressThunk> content_;
 
-  OutputTemp( ContentType content_type )
-    : name_( content_type ),
-      childs(),
-      buffer( "" ),
-      encode(),
-      path()
-  {}
-
-  OutputTemp( uint32_t content_type )
-    : name_(),
-      childs(),
-      buffer( "" ),
-      encode(),
-      path()
+  OutputTemp( size_t output_index, int output_type ) 
+  : path_( { output_index } ),
+    content_type_( output_type ),
+    content_()
   {
-    switch ( content_type ) 
+    switch ( output_type )
     {
-      case BLOB : 
-        name_ = Name ( ContentType::Blob );
+      case BLOB :
+        content_.emplace<InProgressBlob>();
+        break;
 
       case TREE :
-        name_ = Name ( ContentType::Tree );
+        content_.emplace<InProgressTree>( 0 );
+        break;
 
       case THUNK :
-        name_ = Name ( ContentType::Thunk );
-        
-      default :
-        throw std::runtime_error ( "Invalid argument." );
-    }
+        content_.emplace<InProgressThunk>();
+        break;
+    } 
   }
 
-  OutputTemp( const OutputTemp & temp )
-    : name_( temp.name_ ),
-      childs( temp.childs ),
-      buffer( temp.buffer ),
-      encode( temp.encode ),
-      path( temp.path )
-  {}
+  OutputTemp( std::vector<size_t> path, size_t output_index, int output_type )
+  : path_( path ),
+    content_type_( output_type ),
+    content_()
+  {
+    path.push_back( output_index );
+    switch ( output_type )
+    {
+      case BLOB :
+        content_.emplace<InProgressBlob>();
+        break;
 
-  OutputTemp& operator=( const OutputTemp& temp ) = default;
+      case TREE :
+        content_.emplace<InProgressTree>( 0 );
+        break;
+
+      case THUNK :
+        content_.emplace<InProgressThunk>();
+        break;
+    }
+  } 
 };
 
 class Invocation {
@@ -92,13 +93,12 @@ class Invocation {
     wasm_rt_memory_t *mem_;
 
     // Map from id to input mem
-    absl::flat_hash_map<uint32_t, InputMem> input_mems;
-
-    // Temporary output tree
-    OutputTemp output_tree_;
+    InputMem input_mems [MEM_CAPACITY];
 
     // Map from id to output mems
-    absl::flat_hash_map<uint32_t, OutputTemp*> output_mems;
+    OutputTemp* output_mems [MEM_CAPACITY];
+
+    std::vector<OutputTemp> outputs;
 
     // vector of the number of strict inputs/lazy inputs
     std::vector<size_t> num_inputs_;
@@ -106,16 +106,20 @@ class Invocation {
     // The number of all inputs
     size_t input_count_;
 
+    // The number of depth 0 outputs
+    size_t output_count_;
+
   public:
     Invocation( std::string program_name, Name encode_name, wasm_rt_memory_t *mem ) 
       : program_name_( program_name ),
         encode_name_( encode_name ),
         mem_( mem ),
         input_mems(),
-        output_tree_( ContentType::Tree ),
         output_mems(),
+        outputs(),
         num_inputs_(),
-        input_count_( 0 )
+        input_count_( 0 ),
+        output_count_( 0 )
     {}
 
     Invocation( Name encode_name )
@@ -123,10 +127,11 @@ class Invocation {
         encode_name_( encode_name ),
         mem_( 0 ),
         input_mems(),
-        output_tree_( ContentType::Tree ),
         output_mems(),
+        outputs(),
         num_inputs_(),
-        input_count_( 0 )
+        input_count_( 0 ),
+        output_count_( 0 )
     {}
     
     Invocation( const Invocation & ) = default;
@@ -161,7 +166,7 @@ class Invocation {
     void attach_output_child ( uint32_t parent_mem_index, uint32_t child_index, uint32_t child_mem_index, uint32_t output_type );
 
     template<typename T>
-    uint32_t store_i32( uint32_t mem_index, uint32_t content );
+    void store_i32( uint32_t mem_index, uint32_t content );
 
     void set_encode( uint32_t mem_index, uint32_t encode_index );
 

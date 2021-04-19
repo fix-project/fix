@@ -1,11 +1,15 @@
 #pragma once
 
 #include <string>
+#include <variant>
+#include <vector>
 
 enum class NameType 
 {
   Literal,
-  Canonical
+  Canonical,
+  Thunk,
+  Null
 };
 
 enum class ContentType
@@ -15,11 +19,17 @@ enum class ContentType
   Thunk
 };
 
+struct ThunkRep
+{
+  std::string content_;
+  std::vector<int> path_;
+};
+
 class Name
 {
   private:
     // Content of the name
-    std::string content_;
+    std::variant<std::string, ThunkRep> content_;
     // Type of the name
     NameType type_;
     // Type that the name points to
@@ -41,11 +51,26 @@ class Name
 
     Name()
       : content_( "" ),
-        type_( NameType::Literal ),
+        type_( NameType::Null ),
         content_type_( ContentType::Blob )
     {}
 
-    const std::string & getContent() const { return content_; }
+    Name( ContentType content_type )
+      : content_( "" ),
+        type_( NameType::Null ),
+        content_type_( content_type )
+    {}
+
+    const std::string & getContent() const 
+    { 
+      if ( std::holds_alternative<std::string>( content_ ) )
+      {
+        return std::get<std::string>( content_ );
+      } else
+      {
+        return std::get<ThunkRep>( content_ ).content_; 
+      }
+    }
     const NameType & getType() const { return type_; }
     const ContentType & getContentType() const { return content_type_; }
 };
