@@ -11,6 +11,7 @@
 #define BLOB 0
 #define TREE 1
 #define THUNK 2
+#define NAME 3
 
 #define MEM_CAPACITY 256
 
@@ -35,7 +36,7 @@ struct OutputTemp
 {
   std::vector<size_t> path_;
   int content_type_; 
-  std::variant<InProgressBlob, InProgressTree, InProgressThunk> content_;
+  std::variant<InProgressBlob, InProgressTree, InProgressThunk, Name> content_;
 
   OutputTemp( size_t output_index, int output_type ) 
   : path_( { output_index } ),
@@ -63,7 +64,7 @@ struct OutputTemp
     content_type_( output_type ),
     content_()
   {
-    path.push_back( output_index );
+    path_.push_back( output_index );
     switch ( output_type )
     {
       case BLOB :
@@ -79,6 +80,20 @@ struct OutputTemp
         break;
     }
   } 
+
+  OutputTemp( size_t output_index, Name name )
+  : path_( { output_index } ),
+    content_type_( NAME ),
+    content_( name )
+  {}
+
+  OutputTemp( std::vector<size_t> path, size_t output_index, Name name )
+  : path_( path ),
+    content_type_( NAME ),
+    content_( name )
+  {
+    path_.push_back( output_index );
+  }
 };
 
 class Invocation {
@@ -171,5 +186,7 @@ class Invocation {
     void set_encode( uint32_t mem_index, uint32_t encode_index );
 
     void add_path( uint32_t mem_index, uint32_t path );
+
+    void move_lazy_input( uint32_t mem_index, uint32_t child_index, uint32_t lazy_input_index );
 };
     

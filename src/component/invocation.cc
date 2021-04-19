@@ -51,13 +51,12 @@ void Invocation::attach_output_child( uint32_t parent_mem_index, uint32_t child_
   OutputTemp * parent_mem = output_mems[parent_mem_index];
   
   switch ( parent_mem->content_type_ )
-  {
-    case BLOB :
-    case THUNK :
-      throw runtime_error ( "Cannot add child to non-Tree output." );
+  { 
+    case TREE :
+      break;
 
     default :
-      break;
+      throw runtime_error ( "Cannot add child to non-Tree output." );
   }
   
   if ( child_index >= get<InProgressTree>( parent_mem->content_ ) )
@@ -122,6 +121,32 @@ void Invocation::add_path( uint32_t mem_index, uint32_t path_index )
   get<InProgressThunk>( output_mem->content_ ).path_.push_back( path_index );
   return;
 }
+
+void Invocation::move_lazy_input( uint32_t mem_index, uint32_t child_index, uint32_t lazy_input_index )
+{
+  OutputTemp * output_mem = output_mems[mem_index];
+
+  switch ( output_mem->content_type_ )
+  {
+    case TREE :
+      break;
+    
+    default :
+      throw runtime_error ( "Cannot move lazy input to non-Tree output." );
+  }
+
+      
+  if ( child_index >= get<InProgressTree>( output_mem->content_ ) )
+  {
+    output_mem->content_.emplace<InProgressTree>( child_index + 1 );
+  }
   
+  Name lazy_input = RuntimeStorage::getInstance().getTree( encode_name_ ).at( 2 );
+  Name input_name = RuntimeStorage::getInstance().getTree( lazy_input ).at( lazy_input_index );
+
+  outputs.emplace_back( output_mem->path_, child_index, input_name );
+  
+  return;
+}  
 
       
