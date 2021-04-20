@@ -147,6 +147,50 @@ void Invocation::move_lazy_input( uint32_t mem_index, uint32_t child_index, uint
   outputs.emplace_back( output_mem->path_, child_index, input_name );
   
   return;
-}  
+} 
+
+void Invocation::add_to_storage()
+{
+  for ( auto & output : outputs )
+  {
+    switch ( output.content_type_ )
+    {
+      case BLOB :
+        {
+          RuntimeStorage::getInstance().name_to_blob_.put( Name( encode_name_, output.path_, ContentType::Blob ), 
+                                                         Blob( "", move( get<InProgressBlob>( output.content_ ) ) ) );
+        }
+        break;
+      
+      case TREE :
+        {
+          Tree tree_res;
+          for ( size_t i = 0; i < get<InProgressTree>( output.content_ ); i++ )
+          {
+            vector<size_t> child_path = output.path_;
+            child_path.push_back( i );
+            tree_res.push_back( Name( encode_name_, child_path, ContentType::Thunk ) );
+          }
+          RuntimeStorage::getInstance().name_to_tree_.put( Name( encode_name_, output.path_, ContentType::Tree ),
+                                                           move( tree_res ) );
+        }
+        break;
+
+      case THUNK :
+        {
+          Thunk res ( Name( encode_name_, get<InProgressThunk>( output.content_ ).encode_path_, ContentType::Tree ), get<InProgressThunk>( output.content_ ).path_ );
+          RuntimeStorage::getInstance().name_to_thunk_.put( Name ( encode_name_, output.path_, ContentType::Thunk ),
+                                                            move( res ) );
+        }
+        break;
+
+      case NAME : 
+        RuntimeStorage::getInstance().thunk_to_blob_.insert_or_assign( Name ( encode_name_, output.path_, ContentType::Thunk ),
+                                                                       get<Name>( output.content_ ) );
+        break;
+    }
+  }
+  return;
+}
 
       
