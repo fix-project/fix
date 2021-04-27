@@ -13,135 +13,127 @@ void __stack_chk_fail(void) {
 Elf_Info load_program( string & program_content )
 {
   Elf_Info res;
-  
-	// Step 0: Read Elf header
-	const Elf64_Ehdr *header = reinterpret_cast<const Elf64_Ehdr *>( program_content.data() );
 
-	// Step 1: Read program headers (should be empty for .o files)
+  // Step 0: Read Elf header
+  const Elf64_Ehdr *header = reinterpret_cast<const Elf64_Ehdr *>( program_content.data() );
+
+  // Step 1: Read program headers (should be empty for .o files)
   if ( header->e_phnum != 0 )
   {
     cerr << "Elf64_Phdr should be empty." << endl;
   }
 
-	// Step 2: Read section headers
-	res.sheader = span_view<Elf64_Shdr>( reinterpret_cast<const Elf64_Shdr *>( program_content.data() + header->e_shoff ), static_cast<size_t>( header->e_shnum ) );
+  // Step 2: Read section headers
+  res.sheader = span_view<Elf64_Shdr>( reinterpret_cast<const Elf64_Shdr *>( program_content.data() + header->e_shoff ), static_cast<size_t>( header->e_shnum ) );
 
-	// Step 2.1: Read section header string table
-	res.namestrs = string_view( program_content.data() + res.sheader[ header->e_shstrndx ].sh_offset, res.sheader[ header->e_shstrndx ].sh_size); 
-	
+  // Step 2.1: Read section header string table
+  res.namestrs = string_view( program_content.data() + res.sheader[ header->e_shstrndx ].sh_offset, res.sheader[ header->e_shstrndx ].sh_size); 
+
   int i = 0;
   for ( const auto & section : res.sheader ) {
-		
-		// Allocate code block for .text section
-		if ( strcmp( res.namestrs.data() + section.sh_name, ".text" ) == 0 )
+
+    // Allocate code block for .text section
+    if ( strcmp( res.namestrs.data() + section.sh_name, ".text" ) == 0 )
     {
       res.text_idx = i;
       res.code = string_view( program_content.data() + section.sh_offset, section.sh_size );
-		}
+    }
 
-		// Record size of .bss section
-		if ( strcmp( res.namestrs.data() + section.sh_name, ".bss" ) == 0 )
+    // Record size of .bss section
+    if ( strcmp( res.namestrs.data() + section.sh_name, ".bss" ) == 0 )
     {
-			res.bss_size = section.sh_size;
-			res.bss_idx = i;
-		}
+      res.bss_size = section.sh_size;
+      res.bss_idx = i;
+    }
 
-		if ( strcmp( res.namestrs.data() + section.sh_name, ".rodata" ) == 0 || strcmp( res.namestrs.data() + section.sh_name, ".rodata.str1.1" ) == 0 )
+    if ( strcmp( res.namestrs.data() + section.sh_name, ".rodata" ) == 0 || strcmp( res.namestrs.data() + section.sh_name, ".rodata.str1.1" ) == 0 )
     {
       res.rodata_idx = i;
       res.rodata = string_view( program_content.data() + section.sh_offset, section.sh_size );
-		}
+    }
 
-		// Process symbol table
-		if( section.sh_type == SHT_SYMTAB ) 
+    // Process symbol table
+    if( section.sh_type == SHT_SYMTAB ) 
     {
-			// Load symbol table
+      // Load symbol table
       res.symtb = span_view<Elf64_Sym>( string_view( program_content.data() + section.sh_offset, section.sh_size ) );
-			
-			// Load symbol table string
-			int symbstrs_idx = section.sh_link;
+
+      // Load symbol table string
+      int symbstrs_idx = section.sh_link;
       res.symstrs = string_view( program_content.data() + res.sheader[ symbstrs_idx ].sh_offset, res.sheader[ symbstrs_idx ].sh_size );
-		  
+
       int j = 0;
-			for ( const auto & symtb_entry : res.symtb ) 
+      for ( const auto & symtb_entry : res.symtb ) 
       {
-				if ( symtb_entry.st_name != 0 ) 
+        if ( symtb_entry.st_name != 0 ) 
         {
-					// Funtion/Variable not defined
-					if ( symtb_entry.st_shndx == SHN_UNDEF ) 
+          // Funtion/Variable not defined
+          if ( symtb_entry.st_shndx == SHN_UNDEF ) 
           {
             j++;
-						continue;
-					} 
+            continue;
+          } 
 
-				 	string name = string( res.symstrs.data() + symtb_entry.st_name );
+          string name = string( res.symstrs.data() + symtb_entry.st_name );
 
-					// A function
-					if ( symtb_entry.st_shndx == res.text_idx ) 
+          // A function
+          if ( symtb_entry.st_shndx == res.text_idx ) 
           {
             res.func_map.insert( pair<string, func>( name, func( j, TEXT ) ) );
-					}
-					// An .bss variable
-					else if ( symtb_entry.st_shndx == res.bss_idx ) 
+          }
+          // An .bss variable
+          else if ( symtb_entry.st_shndx == res.bss_idx ) 
           {
             res.func_map.insert( pair<string, func>( name, func( j, BSS ) ) );
-					}
-					// An COM variable
-					else if ( symtb_entry.st_shndx == SHN_COMMON ) 
+          }
+          // An COM variable
+          else if ( symtb_entry.st_shndx == SHN_COMMON ) 
           {
             res.func_map.insert( pair<string, func>( name, func( j, COM ) ) );
-						res.com_size += symtb_entry.st_size;
-						res.com_symtb_entry.push_back( j );
-					}
+            res.com_size += symtb_entry.st_size;
+            res.com_symtb_entry.push_back( j );
+          }
           else if ( symtb_entry.st_shndx == res.rodata_idx )
           {
             res.func_map.insert( pair<string, func>( name, func( j, RODATA ) ) );
           }
-				}
+        }
         j++;
-			}
-		}
+      }
+    }
 
-    
-		// Load relocation table
-		if ( section.sh_type == SHT_RELA || section.sh_type == SHT_REL ) 
+
+    // Load relocation table
+    if ( section.sh_type == SHT_RELA || section.sh_type == SHT_REL ) 
     {
-			if( strcmp( res.namestrs.data() + section.sh_name, ".rela.text" ) == 0 )
+      if( strcmp( res.namestrs.data() + section.sh_name, ".rela.text" ) == 0 )
       {
-				res.reloctb = span_view<Elf64_Rela>( string_view( program_content.data() + section.sh_offset, section.sh_size ) ); 
-			}
-		}
+        res.reloctb = span_view<Elf64_Rela>( string_view( program_content.data() + section.sh_offset, section.sh_size ) ); 
+      }
+    }
 
 
-		if( section.sh_type == SHT_DYNAMIC ) 
+    if( section.sh_type == SHT_DYNAMIC ) 
     {
-			cerr << "This is a dynamic linking table.\n";
-		}
+      cerr << "This is a dynamic linking table.\n";
+    }
     i++;
   }  
-  
-	// Step 3: Update symbol table entry for *COM*
-	uint64_t com_base = res.rodata.size() + res.bss_size;
-	for ( int com_sym_idx : res.com_symtb_entry) 
+
+  // Step 3: Update symbol table entry for *COM*
+  uint64_t com_base = res.rodata.size() + res.bss_size;
+  for ( int com_sym_idx : res.com_symtb_entry) 
   {
     Elf64_Sym & mutable_symtb_entry = const_cast<Elf64_Sym &>( res.symtb[com_sym_idx] );
-		mutable_symtb_entry.st_value = com_base;
-		com_base += mutable_symtb_entry.st_size;
-	}
+    mutable_symtb_entry.st_value = com_base;
+    com_base += mutable_symtb_entry.st_size;
+  }
 
   return res;
 }
 
 Program link_program( Elf_Info & elf_info, const string & program_name, vector<string> && inputs, vector<string> && outputs )
 {
-  static Elf64_Addr global_offset_table [4] = 
-  {
-    reinterpret_cast<Elf64_Addr>( &wasm_rt_call_stack_depth ),
-    reinterpret_cast<Elf64_Addr>( &wasi::Z_envZ_path_openZ_ii ),
-    reinterpret_cast<Elf64_Addr>( &wasi::Z_envZ_fd_readZ_iiii ),
-    reinterpret_cast<Elf64_Addr>( &wasi::Z_envZ_fd_writeZ_iiii ) 
-  };
-	
   // Step 0: allocate memory for data and text
   size_t mem_size = elf_info.code.size() + elf_info.rodata.size() + elf_info.bss_size + elf_info.com_size;
   void *program_mem = 0;
@@ -163,9 +155,10 @@ Program link_program( Elf_Info & elf_info, const string & program_name, vector<s
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );		
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );		
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );		
-  elf_info.func_map.insert( pair<string, func>( "Z_envZ_path_openZ_ii", func( (uint64_t)&wasi::Z_envZ_path_openZ_ii ) ) );		
-  elf_info.func_map.insert( pair<string, func>( "Z_envZ_fd_readZ_iiii", func( (uint64_t)&wasi::Z_envZ_fd_readZ_iiii ) ) );		
-  elf_info.func_map.insert( pair<string, func>( "Z_envZ_fd_writeZ_iiii", func( (uint64_t)&wasi::Z_envZ_fd_writeZ_iiii ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "Z_envZ_attach_inputZ_vii", func( (uint64_t)&wasi::Z_envZ_attach_inputZ_vii ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "Z_envZ_attach_outputZ_viii", func( (uint64_t)&wasi::Z_envZ_attach_outputZ_viii ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "Z_envZ_get_intZ_iii", func( (uint64_t)&wasi::Z_envZ_get_intZ_iii ) ) );		
+  elf_info.func_map.insert( pair<string, func>( "Z_envZ_store_intZ_vii", func( (uint64_t)&wasi::Z_envZ_store_intZ_vii ) ) );		
   elf_info.func_map.insert( pair<string, func>( "__stack_chk_fail", func( (uint64_t)__stack_chk_fail ) ) );
 
   for (const auto & reloc_entry : elf_info.reloctb ){
@@ -212,49 +205,24 @@ Program link_program( Elf_Info & elf_info, const string & program_name, vector<s
       }
     } else {		
       string name = string( elf_info.symstrs.data() + elf_info.symtb[idx].st_name );
-
-      if ( ELF64_R_TYPE( reloc_entry.r_info ) == 9 )
-      {
-        if ( name == "wasm_rt_call_stack_depth" ) 
-        {
-          rel_offset += (int64_t)&global_offset_table[0];
-        } 
-        else if ( name == "Z_envZ_path_openZ_ii" ) 
-        {
-          rel_offset += (int64_t)&global_offset_table[1];
-        } 
-        else if ( name == "Z_envZ_fd_readZ_iiii" ) 
-        {
-          rel_offset += (int64_t)&global_offset_table[2];
-        } 
-        else if ( name == "Z_envZ_fd_writeZ_iiii" ) 
-        {
-          rel_offset += (int64_t)&global_offset_table[3];
-        } 
-        else
-        {
-          throw out_of_range("Global function does not exist.");
-        }
-      } else {
-        func dest = elf_info.func_map.at(name);
-        switch ( dest.type ) {
-          case LIB:
-            rel_offset += (int64_t)(dest.lib_addr);
-            break;
-          case TEXT:
-            rel_offset += (int64_t)(program_mem) + elf_info.symtb[dest.idx].st_value;
-            break;	     
-          case RODATA:
-            rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.symtb[dest.idx].st_value;
-            break;
-          case BSS:
-          case COM:
-            rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[dest.idx].st_value;
-            break;
-        }
+      func dest = elf_info.func_map.at(name);
+      switch ( dest.type ) {
+        case LIB:
+          rel_offset += (int64_t)(dest.lib_addr);
+          break;
+        case TEXT:
+          rel_offset += (int64_t)(program_mem) + elf_info.symtb[dest.idx].st_value;
+          break;	     
+        case RODATA:
+          rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.symtb[dest.idx].st_value;
+          break;
+        case BSS:
+        case COM:
+          rel_offset += (int64_t)(program_mem) + elf_info.code.size() + elf_info.rodata.size() + elf_info.symtb[dest.idx].st_value;
+          break;
       }
     }	
-    
+
     if ( ELF64_R_TYPE( reloc_entry.r_info ) == 1 )
     {
       *((int64_t *)( reinterpret_cast<char *>(program_mem) + reloc_entry.r_offset) ) = rel_offset; 
@@ -268,7 +236,7 @@ Program link_program( Elf_Info & elf_info, const string & program_name, vector<s
   // cout << "Program mem at " << program_mem << endl;
   // for (size_t i = 0; i < elf_info.code.size(); i++ )
   // {
-    // printf(" %02x", ((unsigned char *)program_mem)[i]);
+  // printf(" %02x", ((unsigned char *)program_mem)[i]);
   // }
   // cout << endl;
 

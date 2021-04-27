@@ -23,7 +23,7 @@ set(FETCHCONTENT_QUIET OFF)
 FetchContent_Declare(
   wabt
   GIT_REPOSITORY https://github.com/WebAssembly/wabt
-  GIT_TAG        master
+  GIT_TAG        main
   )
 set(BUILD_TESTS off)
 set(BUILD_LIBWASM off)
@@ -58,4 +58,4 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/runtime")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/component")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/compiler")
-# add_subdirectory ("${PROJECT_SOURCE_DIR}/src/tester")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/src/tester")

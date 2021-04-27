@@ -15,7 +15,10 @@ string_view RuntimeStorage::getBlob( const Name & name )
       return name.getContent();
 
     case NameType::Canonical :
-      return name_to_blob_.get( name.getContent() ).content();
+      return name_to_blob_.get( name ).content();
+
+    case NameType::Thunk :
+      return name_to_blob_.get( name ).content();
     
     default:
       throw out_of_range( "Blob does not exist." );
@@ -30,18 +33,20 @@ const Tree & RuntimeStorage::getTree( const Name & name )
       return reinterpret_cast<const Tree &>( name.getContent() );
 
     case NameType::Canonical :
-      return name_to_tree_.get( name.getContent() );
+      return name_to_tree_.get( name );
+
+    case NameType::Thunk :
+      return name_to_tree_.get( name );
 
     default:
       throw out_of_range( "Tree does not exist." );
   }
 }
 
-void RuntimeStorage::addWasm( const string & name, const string & wasm_content )
+void RuntimeStorage::addWasm( const string & name, const string & wasm_content, const string & wasm_rt_content )
 {
   auto [ c_header, h_header ] = wasmcompiler::wasm_to_c( name, wasm_content );
 
-  string wasm_rt_content = "";
   string elf_content = c_to_elf( name, c_header, h_header, wasm_rt_content );
 
   addProgram( name, vector<string>(), vector<string>(), elf_content );
@@ -50,7 +55,7 @@ void RuntimeStorage::addWasm( const string & name, const string & wasm_content )
 void RuntimeStorage::addProgram( const string& name, vector<string>&& inputs, vector<string>&& outputs, string & program_content )
 {
   auto elf_info = load_program( program_content );
-  name_to_program_.put( name, link_program( elf_info, name, move( inputs ), move( outputs ) ) );
+  name_to_program_.insert_or_assign( name, link_program( elf_info, name, move( inputs ), move( outputs ) ) );
 }
 
 void RuntimeStorage::force( const Name & name )
@@ -72,7 +77,7 @@ void RuntimeStorage::force( const Name & name )
          return;
          
        case NameType::Canonical : 
-         this->forceThunk( name_to_thunk_.get( name.getContent() ) );
+         this->forceThunk( name_to_thunk_.get( name ) );
          return;
 
        default:
@@ -132,7 +137,7 @@ void RuntimeStorage::evaluateEncode( const Name & encode_name )
 
   this->prepareEncode( this->getTree( encode_name ), invocation );
 
-  const auto & program = name_to_program_.get( invocation.getProgramName() );
+  const auto & program = name_to_program_.at( invocation.getProgramName() );
   invocation.setMem( reinterpret_cast<wasm_rt_memory_t *>( program.getMemLoc() ) );
 
   wasi::id_to_inv_.try_emplace( curr_inv_id, invocation );

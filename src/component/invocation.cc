@@ -25,8 +25,10 @@ uint32_t Invocation::get_i32( uint32_t mem_index, uint32_t ofst )
   switch ( input_mems[mem_index].getContentType() )
   {
     case ContentType::Blob :
-     uint32_t res = *( T* )RuntimeStorage::getInstance().getBlob( input_mems[mem_index] )[ ofst ];
-     return res;
+      {
+        uint32_t res = *( const T* )(&RuntimeStorage::getInstance().getBlob( input_mems[mem_index] )[ ofst ]);
+        return res;
+      }
 
     default :
      throw runtime_error ( "No write access." );
@@ -77,9 +79,11 @@ void Invocation::store_i32( uint32_t mem_index, uint32_t content )
   switch ( output_mem->content_type_ )
   {
     case BLOB :
-     T content_T = ( T )content; 
-     get<InProgressBlob>( output_mem->content_ ).append( (char *)&content_T, sizeof( T )  );
-     return;
+      {
+        T content_T = ( T )content; 
+        get<InProgressBlob>( output_mem->content_ ).append( (char *)&content_T, sizeof( T )  );
+        return;
+      }
 
     default:
      throw runtime_error ( "Cannot write to non-Blob output." ); 
@@ -191,6 +195,16 @@ void Invocation::add_to_storage()
     }
   }
   return;
+}
+
+uint32_t Invocation::get_int( uint32_t mem_index, uint32_t ofst )
+{
+  return get_i32<int>( mem_index, ofst );
+}
+
+void Invocation::store_int( uint32_t mem_index, uint32_t content )
+{
+  return store_i32<int>( mem_index, content );
 }
 
       

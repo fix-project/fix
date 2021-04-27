@@ -19,17 +19,19 @@
 
 class RuntimeStorage {
   private:
+    friend class Invocation;
+
     // Map from name to Blob
     InMemoryStorage<Blob> name_to_blob_;
     // Map from name to Tree
     InMemoryStorage<Tree> name_to_tree_;
     // Map from name to Thunk
     InMemoryStorage<Thunk> name_to_thunk_;
+    
     // Map from name to program
-    InMemoryStorage<Program> name_to_program_;
-
+    absl::flat_hash_map<std::string, Program> name_to_program_;
     // Map from thunk name to blob name
-    absl::flat_hash_map<std::string, std::string> thunk_to_blob_;
+    absl::flat_hash_map<Name, Name> thunk_to_blob_;
 
     RuntimeStorage ()
       : name_to_blob_(),
@@ -60,12 +62,12 @@ class RuntimeStorage {
       std::string blob_content ( reinterpret_cast<char *>( &content ), sizeof( T ) );
       Blob blob ( move( blob_content ) );
       std::string name = blob.name();
-      name_to_blob_.put( name, std::move( blob ) );
+      name_to_blob_.put( Name( name, NameType::Canonical, ContentType::Blob ) , std::move( blob ) );
       return name;
     }
 
     // add wasm module
-    void addWasm( const std::string & name, const std::string & wasm_content );
+    void addWasm( const std::string & name, const std::string & wasm_content, const std::string & wasm_rt_content );
 
     // add elf program
     void addProgram( const std::string & name, std::vector<std::string> && inputs, std::vector<std::string> && outputs, std::string & program_content );

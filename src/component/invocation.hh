@@ -190,5 +190,8 @@ class Invocation {
     void move_lazy_input( uint32_t mem_index, uint32_t child_index, uint32_t lazy_input_index );
 
     void add_to_storage();
+
+    uint32_t get_int( uint32_t mem_index, uint32_t ofst );
+    void store_int( uint32_t mem_index, uint32_t content );
 };
     

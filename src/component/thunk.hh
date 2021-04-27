@@ -10,11 +10,11 @@ class Thunk {
     // Name of the Encode
     Name encode_name_;
     // Path of the Thunk in the output Tree
-    std::vector<int> path_;
+    std::vector<size_t> path_;
     
   public: 
     // Constructor
-    Thunk( const Name & encode_name, const std::vector<int> path )
+    Thunk( const Name & encode_name, const std::vector<size_t> path )
       : encode_name_( encode_name ),
         path_( path )
     {}
