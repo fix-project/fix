@@ -36,53 +36,54 @@ class Name
 {
   private:
     // Content of the name
-    std::variant<std::string, ThunkRep> content_;
+    std::string content_;
     // Type of the name
     NameType type_;
     // Type that the name points to
     ContentType content_type_;
 
+    std::vector<size_t> path_;
+
   public:
     Name( const std::string & content, NameType type, ContentType content_type ) 
       : content_( content ),
         type_( type ),
-        content_type_( content_type )
+        content_type_( content_type ),
+	path_()
         
     {}
 
     Name( std::string && content, NameType type, ContentType content_type ) 
       : content_( std::move( content ) ),
         type_( type ),
-        content_type_( content_type )
+        content_type_( content_type ),
+	path_()
     {}
 
     Name()
       : content_( "" ),
         type_( NameType::Null ),
-        content_type_( ContentType::Blob )
+        content_type_( ContentType::Blob ),
+	path_()
     {}
 
     Name( ContentType content_type )
       : content_( "" ),
         type_( NameType::Null ),
-        content_type_( content_type )
+        content_type_( content_type ),
+	path_()
     {}
 
     Name ( const Name & encode_name, std::vector<size_t> path, ContentType content_type )
-    : content_( ThunkRep( encode_name.getContent(), path ) ),
+    : content_( encode_name.getContent() ),
       type_( NameType::Thunk ),
-      content_type_( content_type )
+      content_type_( content_type ),
+      path_( path )
     {}
 
     const std::string & getContent() const 
     { 
-      if ( std::holds_alternative<std::string>( content_ ) )
-      {
-        return std::get<std::string>( content_ );
-      } else
-      {
-        return std::get<ThunkRep>( content_ ).content_; 
-      }
+      return content_;
     }
     const NameType & getType() const { return type_; }
     const ContentType & getContentType() const { return content_type_; }

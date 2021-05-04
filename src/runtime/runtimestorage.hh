@@ -9,6 +9,7 @@
 #include "ccompiler.hh"
 #include "name.hh"
 #include "program.hh"
+#include "spans.hh"
 #include "storage.hh"
 #include "thunk.hh"
 #include "tree.hh"
@@ -53,18 +54,16 @@ class RuntimeStorage {
     }
 
     // Return reference to Tree
-    const Tree & getTree ( const Name & name );
+    span<Name> getTree ( const Name & name );
 
     // add blob
-    template<typename T>
-    std::string addBlob( T&& content )
-    {
-      std::string blob_content ( reinterpret_cast<char *>( &content ), sizeof( T ) );
-      Blob blob ( move( blob_content ) );
-      std::string name = blob.name();
-      name_to_blob_.put( Name( name, NameType::Canonical, ContentType::Blob ) , std::move( blob ) );
-      return name;
-    }
+    Name addBlob( std::string && content );
+
+    // add Tree
+    Name addTree( std::vector<Name> && content );
+
+    // add Encode
+    Name addEncode( const Name & program_name, const Name & strict_input, const Name & lazy_input );
 
     // add wasm module
     void addWasm( const std::string & name, const std::string & wasm_content, const std::string & wasm_rt_content );
@@ -82,7 +81,7 @@ class RuntimeStorage {
     void forceThunk( const Thunk & thunk ); 
    
     // Force all strict inputs, return the blob name of the wasm module
-    void prepareEncode( const Tree & encode, Invocation & invocation );
+    void prepareEncode( span<Name> encode, Invocation & invocation );
 
     // Evaluate an encode
     void evaluateEncode( const Name & encode_name );

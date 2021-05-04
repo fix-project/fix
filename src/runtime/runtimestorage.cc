@@ -1,4 +1,5 @@
 #include <cassert> 
+#include <iostream>
 
 #include "elfloader.hh"
 #include "runtimestorage.hh"
@@ -25,18 +26,19 @@ string_view RuntimeStorage::getBlob( const Name & name )
   }
 }
 
-const Tree & RuntimeStorage::getTree( const Name & name )
+span<Name> RuntimeStorage::getTree( const Name & name )
 {
   switch ( name.getType() )
   {
     case NameType::Literal :
-      return reinterpret_cast<const Tree &>( name.getContent() );
+      return span<Name>( string_view( name.getContent() ) );
 
     case NameType::Canonical :
-      return name_to_tree_.get( name );
-
     case NameType::Thunk :
-      return name_to_tree_.get( name );
+      {
+        const auto & tree = name_to_tree_.get( name );
+        return span<Name>( tree.data(), tree.size() ); 
+      }
 
     default:
       throw out_of_range( "Tree does not exist." );
@@ -91,7 +93,7 @@ void RuntimeStorage::force( const Name & name )
 
 void RuntimeStorage::forceTree( const Name & tree_name )
 {
-  const Tree & tree = this->getTree( tree_name );
+  span<Name> tree = this->getTree( tree_name );
   for ( const auto & name : tree )
   {
     this->force( name );
@@ -103,7 +105,7 @@ void RuntimeStorage::forceThunk( const Thunk & thunk )
   this->evaluateEncode( thunk.getEncode() );   
 }
 
-void RuntimeStorage::prepareEncode( const Tree & encode, Invocation & invocation )
+void RuntimeStorage::prepareEncode( span<Name> encode, Invocation & invocation )
 {
   this->forceTree( encode.at( 1 ) );
   Name function_name = encode.at( 0 );
@@ -148,3 +150,43 @@ void RuntimeStorage::evaluateEncode( const Name & encode_name )
 
   wasi::id_to_inv_.erase( curr_inv_id );
 }
+
+Name RuntimeStorage::addBlob( string && blob_content )
+{
+  if ( blob_content.length() > 32 )
+  {
+    throw runtime_error ( "Not implemented yet." );
+  }
+
+  Name name ( move( blob_content ), NameType::Literal, ContentType::Blob );
+
+  return name;
+}
+
+Name RuntimeStorage::addTree( vector<Name> && tree_content )
+{
+  if ( tree_content.size() > 32 )
+  {
+    throw runtime_error ( "Not implemetned yet." );
+  }
+
+// Without reinterpret_cast first
+  string tree ( reinterpret_cast <char *>( tree_content.data() ), tree_content.size() * sizeof( Name ) );
+  cout << "tree size is " << tree.length() << " " << tree_content.size() << endl;
+  Name name ( move( tree ) , NameType::Literal, ContentType::Tree );
+
+  return name;
+}
+
+Name RuntimeStorage::addEncode( const Name & program_name, const Name & strict_input, const Name & lazy_input )
+{
+  Tree encode;
+  
+  encode.push_back( program_name );
+  encode.push_back( strict_input );
+  encode.push_back( lazy_input );
+
+  return this->addTree( move( encode ) );
+}  
+
+

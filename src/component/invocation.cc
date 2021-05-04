@@ -162,7 +162,7 @@ void Invocation::add_to_storage()
       case BLOB :
         {
           RuntimeStorage::getInstance().name_to_blob_.put( Name( encode_name_, output.path_, ContentType::Blob ), 
-                                                         Blob( "", move( get<InProgressBlob>( output.content_ ) ) ) );
+                                                         Blob( move( get<InProgressBlob>( output.content_ ) ) ) );
         }
         break;
       
