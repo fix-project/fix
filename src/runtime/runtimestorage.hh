@@ -33,13 +33,16 @@ class RuntimeStorage {
     absl::flat_hash_map<std::string, Program> name_to_program_;
     // Map from thunk name to blob name
     absl::flat_hash_map<Name, Name> thunk_to_blob_;
+    
+    std::vector<std::string> literal_name_store;
 
     RuntimeStorage ()
       : name_to_blob_(),
         name_to_tree_(),
         name_to_thunk_(),
         name_to_program_(),
-        thunk_to_blob_()
+        thunk_to_blob_(),
+        literal_name_store()
     {}
 
   public:
@@ -54,7 +57,7 @@ class RuntimeStorage {
     }
 
     // Return reference to Tree
-    span<Name> getTree ( const Name & name );
+    const Tree & getTree ( const Name & name );
 
     // add blob
     Name addBlob( std::string && content );
@@ -66,7 +69,7 @@ class RuntimeStorage {
     Name addEncode( const Name & program_name, const Name & strict_input, const Name & lazy_input );
 
     // add wasm module
-    void addWasm( const std::string & name, const std::string & wasm_content, const std::string & wasm_rt_content );
+    void addWasm( const std::string & name, const std::string & wasm_content );
 
     // add elf program
     void addProgram( const std::string & name, std::vector<std::string> && inputs, std::vector<std::string> && outputs, std::string & program_content );
@@ -81,13 +84,10 @@ class RuntimeStorage {
     void forceThunk( const Thunk & thunk ); 
    
     // Force all strict inputs, return the blob name of the wasm module
-    void prepareEncode( span<Name> encode, Invocation & invocation );
+    void prepareEncode( const Tree & encode, Invocation & invocation );
 
     // Evaluate an encode
     void evaluateEncode( const Name & encode_name );
-
-    // add encode
-    // std::string addEncode( const std::string & program_name, const std::vector<std::string> & input_blobs );
 
     // execute encode
     // void executeEncode( const std::string & encode_name, int arg1, int arg2 );

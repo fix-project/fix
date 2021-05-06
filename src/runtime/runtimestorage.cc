@@ -5,6 +5,7 @@
 #include "runtimestorage.hh"
 #include "sha256.hh"
 #include "timing_helper.hh"
+#include "wasm-rt-content.h"
 
 using namespace std;
 
@@ -26,26 +27,23 @@ string_view RuntimeStorage::getBlob( const Name & name )
   }
 }
 
-span<Name> RuntimeStorage::getTree( const Name & name )
+const Tree & RuntimeStorage::getTree( const Name & name )
 {
   switch ( name.getType() )
   {
     case NameType::Literal :
-      return span<Name>( string_view( name.getContent() ) );
+      return name.getTreeContent(); 
 
     case NameType::Canonical :
     case NameType::Thunk :
-      {
-        const auto & tree = name_to_tree_.get( name );
-        return span<Name>( tree.data(), tree.size() ); 
-      }
+      return name_to_tree_.get( name );
 
     default:
       throw out_of_range( "Tree does not exist." );
   }
 }
 
-void RuntimeStorage::addWasm( const string & name, const string & wasm_content, const string & wasm_rt_content )
+void RuntimeStorage::addWasm( const string & name, const string & wasm_content )
 {
   auto [ c_header, h_header ] = wasmcompiler::wasm_to_c( name, wasm_content );
 
@@ -93,7 +91,7 @@ void RuntimeStorage::force( const Name & name )
 
 void RuntimeStorage::forceTree( const Name & tree_name )
 {
-  span<Name> tree = this->getTree( tree_name );
+  const auto & tree = this->getTree( tree_name );
   for ( const auto & name : tree )
   {
     this->force( name );
@@ -105,7 +103,7 @@ void RuntimeStorage::forceThunk( const Thunk & thunk )
   this->evaluateEncode( thunk.getEncode() );   
 }
 
-void RuntimeStorage::prepareEncode( span<Name> encode, Invocation & invocation )
+void RuntimeStorage::prepareEncode( const Tree & encode, Invocation & invocation )
 {
   this->forceTree( encode.at( 1 ) );
   Name function_name = encode.at( 0 );
@@ -145,7 +143,7 @@ void RuntimeStorage::evaluateEncode( const Name & encode_name )
   wasi::id_to_inv_.try_emplace( curr_inv_id, invocation );
   wasi::invocation_id_ = curr_inv_id;
   wasi::buf.size = 0;
-
+  
   program.execute();
 
   wasi::id_to_inv_.erase( curr_inv_id );
@@ -171,9 +169,9 @@ Name RuntimeStorage::addTree( vector<Name> && tree_content )
   }
 
 // Without reinterpret_cast first
-  string tree ( reinterpret_cast <char *>( tree_content.data() ), tree_content.size() * sizeof( Name ) );
-  cout << "tree size is " << tree.length() << " " << tree_content.size() << endl;
-  Name name ( move( tree ) , NameType::Literal, ContentType::Tree );
+  // string tree ( reinterpret_cast <char *>( tree_content.data() ), tree_content.size() * sizeof( Name ) );
+  // cout << "tree size is " << tree.length() << " " << tree_content.size() << endl;
+  Name name ( tree_content );
 
   return name;
 }
@@ -186,7 +184,12 @@ Name RuntimeStorage::addEncode( const Name & program_name, const Name & strict_i
   encode.push_back( strict_input );
   encode.push_back( lazy_input );
 
-  return this->addTree( move( encode ) );
+  // return this->addTree( move( encode ) );
+  Name res = this->addTree( move( encode ) );
+
+  int arg1 = *( const int* )(getBlob( this->getTree( this->getTree( res )[1] )[0] ).data());
+  cout << " arg 1 is " << arg1 << endl;
+  return res;
 }  
 
 
