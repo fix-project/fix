@@ -20,6 +20,7 @@ class Thunk {
     {}
 
     const Name & getEncode() const { return encode_name_; }
+    const std::vector<size_t> & getPath() const { return path_; }
 }; 
 
 

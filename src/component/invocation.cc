@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "runtimestorage.hh"
 
 #include "invocation.hh"
@@ -7,11 +9,11 @@ using namespace std;
 uint64_t Invocation::next_invocation_id_ = 0;
 
 void Invocation::attach_input( uint32_t input_index, uint32_t mem_index )
-{
-  if ( input_index >= input_count_ )
-  {
-    throw out_of_range ( "Input does not exist." );
-  }
+{ 
+  // if ( input_index >= input_count_ )
+  // {
+    // throw out_of_range ( "Input does not exist." );
+  // }
 
   Name strict_input = RuntimeStorage::getInstance().getTree( encode_name_ ).at(1);
   Name input_name = RuntimeStorage::getInstance().getTree( strict_input ).at( input_index );
@@ -26,7 +28,7 @@ uint32_t Invocation::get_i32( uint32_t mem_index, uint32_t ofst )
   {
     case ContentType::Blob :
       {
-        uint32_t res = *( const T* )(&RuntimeStorage::getInstance().getBlob( input_mems[mem_index] )[ ofst ]);
+        uint32_t res = *( const T* )(RuntimeStorage::getInstance().getBlob( input_mems[mem_index] ).data() + ofst );
         return res;
       }
 
@@ -198,7 +200,7 @@ void Invocation::add_to_storage()
 }
 
 uint32_t Invocation::get_int( uint32_t mem_index, uint32_t ofst )
-{
+{ 
   return get_i32<int>( mem_index, ofst );
 }
 

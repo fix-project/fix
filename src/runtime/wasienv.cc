@@ -8,21 +8,6 @@ using namespace std;
 
 namespace wasi
 {
-  // int fd_write( int fd_id, uint32_t ofst, uint32_t count )
-  // {
-  //   auto & invocation = id_to_inv_.at( invocation_id_ );
-  //   auto & fd = invocation.getFd( fd_id ); 
-
-  //   if ( (size_t)( fd_id ) < invocation.getInputCount() )
-  //   {
-  //     throw runtime_error ( "No write access." );
-  //   } else {
-  //     fd.buffer.append( reinterpret_cast<const char *>( &buf.data[ ofst ] ), count );
-  //     fd.loc_ += count;
-  //   }
-
-  //   return count;
-  // }
   void attach_input( uint32_t input_index, uint32_t mem_index )
   {
     auto & invocation = id_to_inv_.at( invocation_id_ );

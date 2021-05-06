@@ -100,7 +100,7 @@ void RuntimeStorage::forceTree( const Name & tree_name )
 
 void RuntimeStorage::forceThunk( const Thunk & thunk )
 {
-  this->evaluateEncode( thunk.getEncode() );   
+  this->evaluateEncode( thunk.getEncode() );  
 }
 
 void RuntimeStorage::prepareEncode( const Tree & encode, Invocation & invocation )
@@ -146,6 +146,8 @@ void RuntimeStorage::evaluateEncode( const Name & encode_name )
   
   program.execute();
 
+  wasi::id_to_inv_.at( curr_inv_id ).add_to_storage();
+
   wasi::id_to_inv_.erase( curr_inv_id );
 }
 
@@ -168,9 +170,6 @@ Name RuntimeStorage::addTree( vector<Name> && tree_content )
     throw runtime_error ( "Not implemetned yet." );
   }
 
-// Without reinterpret_cast first
-  // string tree ( reinterpret_cast <char *>( tree_content.data() ), tree_content.size() * sizeof( Name ) );
-  // cout << "tree size is " << tree.length() << " " << tree_content.size() << endl;
   Name name ( tree_content );
 
   return name;
@@ -184,12 +183,7 @@ Name RuntimeStorage::addEncode( const Name & program_name, const Name & strict_i
   encode.push_back( strict_input );
   encode.push_back( lazy_input );
 
-  // return this->addTree( move( encode ) );
-  Name res = this->addTree( move( encode ) );
-
-  int arg1 = *( const int* )(getBlob( this->getTree( this->getTree( res )[1] )[0] ).data());
-  cout << " arg 1 is " << arg1 << endl;
-  return res;
+  return this->addTree( move( encode ) );
 }  
 
 

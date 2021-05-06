@@ -75,7 +75,6 @@ static bool func_types_are_equal(FuncType* a, FuncType* b) {
 uint32_t wasm_rt_register_func_type(uint32_t param_count,
                                     uint32_t result_count,
                                     ...) {
-  std::cout << "param_count " << param_count << " " << result_count << std::endl;
   FuncType func_type;
   func_type.param_count = param_count;
   func_type.params = reinterpret_cast<wasm_rt_type_t*>(malloc(param_count * sizeof(wasm_rt_type_t)));
@@ -121,7 +120,6 @@ static void signal_handler(int sig, siginfo_t* si, void* unused) {
 void wasm_rt_allocate_memory(wasm_rt_memory_t* memory,
                              uint32_t initial_pages,
                              uint32_t max_pages) {
-  std::cout << "param " << initial_pages << " " << max_pages << std::endl;
   uint32_t byte_length = initial_pages * PAGE_SIZE;
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
   if (!g_signal_handler_installed) {
@@ -155,7 +153,6 @@ void wasm_rt_allocate_memory(wasm_rt_memory_t* memory,
     RecordScopeTimer<Timer::Category::Nonblock> record_timer { _mprotect };
     mprotect(addr, byte_length, PROT_READ | PROT_WRITE);
   }
-  std::cout << "At memory " << memory << std::endl;
   memory->data = reinterpret_cast<unsigned char *>( addr );
 #else
   memory->data = calloc(byte_length, 1);
