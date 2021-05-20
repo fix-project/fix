@@ -19,7 +19,7 @@ int main( int argc, char * argv[] )
   
   auto & runtime = RuntimeStorage::getInstance();
 
-  runtime.addWasm( "add", wasm_content );
+  runtime.addWasm( "add", wasm_content, vector<string>() );
 
   int arg1 = atoi( argv[2] );
   int arg2 = atoi( argv[3] );

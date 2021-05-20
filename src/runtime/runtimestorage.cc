@@ -10,7 +10,20 @@
 using namespace std;
 
 string_view RuntimeStorage::getBlob( const Name & name )
-{
+{ 
+  if ( name_to_thunk_.contains( name ) )
+  {
+    Name temp_name = name;
+
+    while ( name_to_thunk_.contains( temp_name ) ) 
+    {
+      const auto & thunk = name_to_thunk_.get( temp_name );
+      temp_name = Name( thunk.getEncode(), thunk.getPath(), ContentType::Unknown );
+    }
+
+    return name_to_blob_.get( temp_name ).content();
+  }
+
   switch ( name.getType() )
   {
     case NameType::Literal :
@@ -43,13 +56,14 @@ const Tree & RuntimeStorage::getTree( const Name & name )
   }
 }
 
-void RuntimeStorage::addWasm( const string & name, const string & wasm_content )
+void RuntimeStorage::addWasm( const string & name, const string & wasm_content, const vector<string> & deps )
 {
   auto [ c_header, h_header ] = wasmcompiler::wasm_to_c( name, wasm_content );
 
   string elf_content = c_to_elf( name, c_header, h_header, wasm_rt_content );
 
   addProgram( name, vector<string>(), vector<string>(), elf_content );
+  name_to_program_.at( name ).setDeps( deps );
 }
   
 void RuntimeStorage::addProgram( const string& name, vector<string>&& inputs, vector<string>&& outputs, string & program_content )
@@ -80,9 +94,25 @@ void RuntimeStorage::force( const Name & name )
          this->forceThunk( name_to_thunk_.get( name ) );
          return;
 
+       case NameType::Thunk :
+         this->forceThunk( name_to_thunk_.get( name ) );
+         return;
+
        default:
          return;
      } 
+
+    case ContentType::Unknown :
+     if ( name_to_tree_.contains( name ) )
+     {
+       this->forceTree( name_to_tree_.get( name ) );
+     } else if ( name_to_blob_.contains( name ) )
+     {
+     } else if ( name_to_thunk_.contains( name ) )
+     {
+       this->forceThunk( name_to_thunk_.get( name ) );
+     }
+     return;
 
     default:
      return;
@@ -91,8 +121,7 @@ void RuntimeStorage::force( const Name & name )
 
 void RuntimeStorage::forceTree( const Name & tree_name )
 {
-  const auto & tree = this->getTree( tree_name );
-  for ( const auto & name : tree )
+  for ( const auto & name : this->getTree( tree_name ) )
   {
     this->force( name );
   }
@@ -100,13 +129,37 @@ void RuntimeStorage::forceTree( const Name & tree_name )
 
 void RuntimeStorage::forceThunk( const Thunk & thunk )
 {
+  vector<size_t> path = { 0 };
+  Name res_name ( thunk.getEncode(), path, ContentType::Thunk );
+  
   this->evaluateEncode( thunk.getEncode() );  
+
+  if ( name_to_thunk_.contains( res_name ) )
+  { 
+    const Thunk & sub_thunk = name_to_thunk_.get( res_name );
+    this->forceThunk( sub_thunk );
+  } else if ( !name_to_blob_.contains( res_name ) )
+  {
+    if ( name_to_tree_.contains( res_name ) )
+    {
+      cout << "A tree" << endl;
+    }
+    if ( thunk_to_blob_.contains( res_name ) )
+    {
+      cout << "A name" << endl;
+    }
+
+  }
 }
 
 void RuntimeStorage::prepareEncode( const Tree & encode, Invocation & invocation )
 {
-  this->forceTree( encode.at( 1 ) );
   Name function_name = encode.at( 0 );
+  this->forceTree( encode.at( 1 ) );
+  if ( function_name.getType() == NameType::Thunk )
+  {
+    function_name = thunk_to_blob_.at( function_name );
+  }
 
   switch ( function_name.getContentType() ) 
   {
@@ -125,7 +178,7 @@ void RuntimeStorage::prepareEncode( const Tree & encode, Invocation & invocation
 
 void RuntimeStorage::evaluateEncode( const Name & encode_name )
 {
-  if ( this->getTree( encode_name ).size() != 3 )
+  if ( this->getTree( encode_name ).size() > 3 )
   { 
     throw runtime_error ( "Invalid encode!" );
   }
@@ -135,7 +188,13 @@ void RuntimeStorage::evaluateEncode( const Name & encode_name )
   Invocation::next_invocation_id_++;
   Invocation invocation ( encode_name );
 
-  this->prepareEncode( this->getTree( encode_name ), invocation );
+  // Name temp_name = encode_name;
+
+  // cout << "here " << encode_name << endl;
+  const Tree & encode = this->getTree( encode_name );
+  // cout << "Encode of size " << encode.size() << endl;
+  this->prepareEncode( encode, invocation );
+  // cout << "hhere " << encode_name << endl;
 
   const auto & program = name_to_program_.at( invocation.getProgramName() );
   invocation.setMem( reinterpret_cast<wasm_rt_memory_t *>( program.getMemLoc() ) );
@@ -143,7 +202,16 @@ void RuntimeStorage::evaluateEncode( const Name & encode_name )
   wasi::id_to_inv_.try_emplace( curr_inv_id, invocation );
   wasi::invocation_id_ = curr_inv_id;
   wasi::buf.size = 0;
-  
+ 
+  //cout << "Executing " << invocation.getProgramName() << " on " << endl;
+  //cout << encode_name << endl;
+  //cout << temp_name << endl;
+  //const auto & temp_encode = this->getTree( encode_name );
+  //const Name & strict_input = temp_encode.at( 1 ); 
+  //for ( const auto & name : this->getTree( strict_input ) )
+  //{
+   // cout << name;
+  //}
   program.execute();
 
   wasi::id_to_inv_.at( curr_inv_id ).add_to_storage();

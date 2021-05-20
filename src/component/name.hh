@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <string>
 #include <variant>
 #include <vector>
@@ -18,7 +19,8 @@ enum class ContentType
 {
   Blob,
   Tree,
-  Thunk
+  Thunk,
+  Unknown
 };
 
 class Name
@@ -54,7 +56,7 @@ class Name
     Name()
       : content_( "" ),
         type_( NameType::Null ),
-        content_type_( ContentType::Blob ),
+        content_type_( ContentType::Unknown ),
         path_(),
         tree_content_()
     {}
@@ -105,3 +107,4 @@ class Name
 };
 
 bool operator==( const Name & lhs, const Name & rhs );
+std::ostream &operator<<( std::ostream &s, const Name & name ); 

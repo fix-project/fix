@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <memory>
 #include "absl/container/flat_hash_map.h"
 
 #include "name.hh"
@@ -111,9 +112,9 @@ class Invocation {
     InputMem input_mems [MEM_CAPACITY];
 
     // Map from id to output mems
-    OutputTemp* output_mems [MEM_CAPACITY];
+    std::shared_ptr<OutputTemp> output_mems [MEM_CAPACITY];
 
-    std::vector<OutputTemp> outputs;
+    std::vector<std::shared_ptr<OutputTemp>> outputs;
 
     // vector of the number of strict inputs/lazy inputs
     std::vector<size_t> num_inputs_;

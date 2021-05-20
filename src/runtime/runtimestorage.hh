@@ -69,7 +69,7 @@ class RuntimeStorage {
     Name addEncode( const Name & program_name, const Name & strict_input, const Name & lazy_input );
 
     // add wasm module
-    void addWasm( const std::string & name, const std::string & wasm_content );
+    void addWasm( const std::string & name, const std::string & wasm_content, const std::vector<std::string> & deps );
 
     // add elf program
     void addProgram( const std::string & name, std::vector<std::string> && inputs, std::vector<std::string> && outputs, std::string & program_content );

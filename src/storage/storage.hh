@@ -50,4 +50,9 @@ class InMemoryStorage : public Storage<T>
     {
       return name_to_object_.size();
     }
+
+    bool contains( const Name & name )
+    {
+      return name_to_object_.contains( name );
+    }
 };
