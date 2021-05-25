@@ -2,12 +2,15 @@
 #include <iostream>
 #include <memory>
 
+#include <clang/Basic/FileManager.h>
+#include <clang/Basic/TargetInfo.h>
 #include <clang/CodeGen/BackendUtil.h>
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/TextDiagnosticPrinter.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/VirtualFileSystem.h>
 
