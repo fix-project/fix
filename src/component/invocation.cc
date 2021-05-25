@@ -170,8 +170,8 @@ void Invocation::add_to_storage()
       case BLOB :
         { 
           // cout << "Adding blob at " << Name( encode_name_, output->path_, ContentType::Blob ) << endl;
-          RuntimeStorage::getInstance().name_to_blob_.put( Name( encode_name_, output->path_, ContentType::Blob ), 
-                                                         Blob( move( get<InProgressBlob>( output->content_ ) ) ) );
+          RuntimeStorage::getInstance().thunk_to_blob_.insert_or_assign( Name( encode_name_, output->path_, ContentType::Blob ), 
+                                                                         RuntimeStorage::getInstance().addBlob( move( get<InProgressBlob>( output->content_ ) ) ) );
         }
         break;
       
@@ -201,7 +201,7 @@ void Invocation::add_to_storage()
 
       case NAME : 
         // cout << "Adding name at " << Name ( encode_name_, output->path_, ContentType::Blob ) << endl;
-        RuntimeStorage::getInstance().thunk_to_blob_.insert_or_assign( Name ( encode_name_, output->path_, ContentType::Thunk ),
+        RuntimeStorage::getInstance().thunk_to_blob_.insert_or_assign( Name ( encode_name_, output->path_, ContentType::Blob ),
                                                                        get<Name>( output->content_ ) );
         break;
     }

@@ -75,19 +75,16 @@ class RuntimeStorage {
     void addProgram( const std::string & name, std::vector<std::string> && inputs, std::vector<std::string> && outputs, std::string & program_content );
 
     // force the object refered to by a name
-    void force( const Name & name );
+    Name force( Name name );
 
     // force a Tree
-    void forceTree( const Name & tree_name );
+    Name forceTree( Name tree_name );
 
     // force a Thunk
-    void forceThunk( const Thunk & thunk ); 
-   
-    // Force all strict inputs, return the blob name of the wasm module
-    void prepareEncode( const Tree & encode, Invocation & invocation );
+    Name forceThunk( const Thunk & thunk ); 
 
     // Evaluate an encode
-    void evaluateEncode( const Name & encode_name );
+    void evaluateEncode( Name encode_name );
 
     // execute encode
     // void executeEncode( const std::string & encode_name, int arg1, int arg2 );

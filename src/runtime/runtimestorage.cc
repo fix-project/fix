@@ -72,129 +72,108 @@ void RuntimeStorage::addProgram( const string& name, vector<string>&& inputs, ve
   name_to_program_.insert_or_assign( name, link_program( elf_info, name, move( inputs ), move( outputs ) ) );
 }
 
-void RuntimeStorage::force( const Name & name )
+Name RuntimeStorage::force( Name name )
 {
   switch( name.getContentType() )
   {
     case ContentType::Blob :
-     return;
+     return name;
 
     case ContentType::Tree : 
-     this->forceTree( name );
-     return;
+     return this->forceTree( name );
 
     case ContentType::Thunk : 
      switch( name.getType() )
      {
        case NameType::Literal :
-         this->forceThunk( reinterpret_cast<const Thunk &>( name.getContent() ) );
-         return;
+         return this->forceThunk( reinterpret_cast<const Thunk &>( name.getContent() ) );
          
        case NameType::Canonical : 
-         this->forceThunk( name_to_thunk_.get( name ) );
-         return;
+         return this->forceThunk( name_to_thunk_.get( name ) );
 
        case NameType::Thunk :
-         this->forceThunk( name_to_thunk_.get( name ) );
-         return;
+         return this->forceThunk( name_to_thunk_.get( name ) );
 
        default:
-         return;
+         throw runtime_error ( "Invalid name type." );
      } 
 
     case ContentType::Unknown :
      if ( name_to_tree_.contains( name ) )
      {
-       this->forceTree( name_to_tree_.get( name ) );
-     } else if ( name_to_blob_.contains( name ) )
+       return this->forceTree( name_to_tree_.get( name ) );
+     } else if ( thunk_to_blob_.contains( name ) )
      {
+       return thunk_to_blob_.at( name );
      } else if ( name_to_thunk_.contains( name ) )
      {
-       this->forceThunk( name_to_thunk_.get( name ) );
+       return this->forceThunk( name_to_thunk_.get( name ) );
      }
-     return;
+     throw runtime_error ( "Invalid unknown content." );
 
     default:
-     return;
+     throw runtime_error( "Invalid content type." );
   }
 }
 
-void RuntimeStorage::forceTree( const Name & tree_name )
-{
+Name RuntimeStorage::forceTree( Name tree_name )
+{ 
+  vector<Name> tree_content;
   for ( const auto & name : this->getTree( tree_name ) )
   {
-    this->force( name );
+    tree_content.push_back( this->force( name ) );
   }
+  return this->addTree( move( tree_content ) );
 }
 
-void RuntimeStorage::forceThunk( const Thunk & thunk )
+Name RuntimeStorage::forceThunk( const Thunk & thunk )
 {
   vector<size_t> path = { 0 };
-  Name res_name ( thunk.getEncode(), path, ContentType::Thunk );
+  Name forced_encode = this->forceTree( thunk.getEncode() );
+  Name res_name ( forced_encode, path, ContentType::Thunk );
   
-  this->evaluateEncode( thunk.getEncode() );  
+  if ( thunk_to_blob_.contains( res_name ) )
+  {
+    return thunk_to_blob_.at( res_name );
+  }
+
+  this->evaluateEncode( forced_encode );  
 
   if ( name_to_thunk_.contains( res_name ) )
   { 
     const Thunk & sub_thunk = name_to_thunk_.get( res_name );
-    this->forceThunk( sub_thunk );
-  } else if ( !name_to_blob_.contains( res_name ) )
+    Name res = this->forceThunk( sub_thunk );
+    thunk_to_blob_.insert_or_assign( res_name, res );
+    return res;
+  } else 
   {
-    if ( name_to_tree_.contains( res_name ) )
-    {
-      cout << "A tree" << endl;
-    }
-    if ( thunk_to_blob_.contains( res_name ) )
-    {
-      cout << "A name" << endl;
-    }
-
+    return thunk_to_blob_.at( res_name );
   }
 }
 
-void RuntimeStorage::prepareEncode( const Tree & encode, Invocation & invocation )
-{
-  Name function_name = encode.at( 0 );
-  this->forceTree( encode.at( 1 ) );
-  if ( function_name.getType() == NameType::Thunk )
-  {
-    function_name = thunk_to_blob_.at( function_name );
-  }
-
-  switch ( function_name.getContentType() ) 
-  {
-    case ContentType::Blob :
-      invocation.setProgramName( function_name.getContent() );
-      return;
-
-    case ContentType::Tree :
-      this->prepareEncode( this->getTree( function_name ), invocation );
-      return;
-
-    default :
-      throw runtime_error ( "Invalid encode!" );
-  }
-}
-
-void RuntimeStorage::evaluateEncode( const Name & encode_name )
+void RuntimeStorage::evaluateEncode( Name encode_name )
 {
   if ( this->getTree( encode_name ).size() > 3 )
   { 
     throw runtime_error ( "Invalid encode!" );
   }
 
+  Name forced_encode = this->forceTree( encode_name );
+  
   uint64_t curr_inv_id = 0; 
   curr_inv_id = Invocation::next_invocation_id_;
   Invocation::next_invocation_id_++;
-  Invocation invocation ( encode_name );
+  Invocation invocation ( forced_encode );
 
   // Name temp_name = encode_name;
 
   // cout << "here " << encode_name << endl;
-  const Tree & encode = this->getTree( encode_name );
   // cout << "Encode of size " << encode.size() << endl;
-  this->prepareEncode( encode, invocation );
+  //this->prepareEncode( encode_name, invocation );
   // cout << "hhere " << encode_name << endl;
+  Name function_name = this->getTree( forced_encode ).at( 0 );
+  invocation.setProgramName( function_name.getContent() );
+  cout << "Evaluating " << forced_encode << endl;
 
   const auto & program = name_to_program_.at( invocation.getProgramName() );
   invocation.setMem( reinterpret_cast<wasm_rt_memory_t *>( program.getMemLoc() ) );

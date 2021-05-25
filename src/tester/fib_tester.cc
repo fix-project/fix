@@ -39,10 +39,9 @@ int main( int argc, char * argv[] )
   vector<size_t> path = { 0 };
   
   Thunk res ( encode_name, path );
-  runtime.forceThunk( res );
+  Name res_name = runtime.forceThunk( res );
   
-  Name res_name ( encode_name, path, ContentType::Blob );
-  cout << "The result is " << *( (const int *)runtime.getBlob( res_name ).data() ) << endl;
+  cout << "The result is " << dec << *( (const int *)runtime.getBlob( res_name ).data() ) << endl;
 
   return 0;
 }
