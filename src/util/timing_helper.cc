@@ -2,10 +2,9 @@
 
 using namespace std;
 
-void print_timer ( ostream& out, const string_view name, const Timer::Record timer )
+void print_timer( ostream& out, const string_view name, const Timer::Record timer )
 {
-  if ( timer.count == 0 ) 
-  {
+  if ( timer.count == 0 ) {
     return;
   }
 
