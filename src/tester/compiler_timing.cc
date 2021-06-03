@@ -1,6 +1,6 @@
 #include <chrono>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <string>
 
 #include "ccompiler.hh"
@@ -11,13 +11,12 @@
 
 using namespace std;
 
-int main( int argc, char * argv[] ) 
-{ 
-  if ( argc < 5 ) 
-  {
+int main( int argc, char* argv[] )
+{
+  if ( argc < 5 ) {
     cerr << "Usage: " << argv[0] << " wasm_name path_to_wasm_file path_to_wasm_rt #_executions [arg1] [arg2]\n";
   }
-  
+
   int arg1 = 0;
   int arg2 = 0;
 
@@ -31,34 +30,33 @@ int main( int argc, char * argv[] )
   int num_execution = atoi( argv[4] );
 
   auto compile_start = chrono::high_resolution_clock::now();
-  
+
   string wasm_content = util::read_file( argv[2] );
-  auto [ c_header, h_header ] = wasmcompiler::wasm_to_c( argv[1], wasm_content );
+  auto [c_header, h_header] = wasmcompiler::wasm_to_c( argv[1], wasm_content );
 
   string wasm_rt_content = util::read_file( argv[3] );
   string elf_content = c_to_elf( argv[1], c_header, h_header, wasm_rt_content );
-  
-  auto & runtime = RuntimeStorage::getInstance();
+
+  auto& runtime = RuntimeStorage::getInstance();
   string program_name = argv[1];
 
   vector<string> outputsymbols;
   outputsymbols.push_back( "output" );
   runtime.addProgram( program_name, vector<string>(), move( outputsymbols ), elf_content );
   auto encode_name = runtime.addEncode( program_name, vector<string>() );
-  
+
   auto start = chrono::high_resolution_clock::now();
-  
-  for ( int i = 0; i < num_execution; i++ )
-  {
+
+  for ( int i = 0; i < num_execution; i++ ) {
     runtime.executeEncode( encode_name, arg1, arg2 );
   }
- 
+
   auto stop = chrono::high_resolution_clock::now();
-  
+
   auto compile_duration = chrono::duration_cast<chrono::microseconds>( start - compile_start );
   auto execution_duration = chrono::duration_cast<chrono::microseconds>( stop - start );
-  cout << "Executing " << num_execution << " times takes " << compile_duration.count() << " microseconds to compile "
-	 <<  execution_duration.count() << " microseconds to execute " << endl; 
+  cout << "Executing " << num_execution << " times takes " << compile_duration.count()
+       << " microseconds to compile " << execution_duration.count() << " microseconds to execute " << endl;
 
   print_timer( cout, "_mmap ", _mmap );
   print_timer( cout, "_mprotect", _mprotect );
@@ -66,7 +64,6 @@ int main( int argc, char * argv[] )
   print_timer( cout, "_fd_write ", _fd_write );
   print_timer( cout, "_post_execution ", _post_execution );
   print_timer( cout, "_pre_execution ", _pre_execution );
-  print_timer( cout, "_hash ", _hash);
+  print_timer( cout, "_hash ", _hash );
   return 0;
 }
-     
