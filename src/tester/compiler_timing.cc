@@ -3,67 +3,48 @@
 #include <iostream>
 #include <string>
 
-#include "ccompiler.hh"
+#include "name.hh"
 #include "runtimestorage.hh"
 #include "timing_helper.hh"
 #include "util.hh"
-#include "wasmcompiler.hh"
 
 using namespace std;
 
 int main( int argc, char* argv[] )
 {
-  if ( argc < 5 ) {
-    cerr << "Usage: " << argv[0] << " wasm_name path_to_wasm_file path_to_wasm_rt #_executions [arg1] [arg2]\n";
+  if ( argc != 3 ) {
+    cerr << "Usage: " << argv[0] << " path_to_add_wasm_file num_of_iterations\n";
   }
 
-  int arg1 = 0;
-  int arg2 = 0;
-
-  if ( argc == 6 ) {
-    arg1 = atoi( argv[5] );
-  } else if ( argc == 7 ) {
-    arg1 = atoi( argv[5] );
-    arg2 = atoi( argv[6] );
-  }
-
-  int num_execution = atoi( argv[4] );
-
-  auto compile_start = chrono::high_resolution_clock::now();
-
-  string wasm_content = util::read_file( argv[2] );
-  auto [c_header, h_header] = wasmcompiler::wasm_to_c( argv[1], wasm_content );
-
-  string wasm_rt_content = util::read_file( argv[3] );
-  string elf_content = c_to_elf( argv[1], c_header, h_header, wasm_rt_content );
+  string wasm_content = util::read_file( argv[1] );
 
   auto& runtime = RuntimeStorage::getInstance();
-  string program_name = argv[1];
 
-  vector<string> outputsymbols;
-  outputsymbols.push_back( "output" );
-  runtime.addProgram( program_name, vector<string>(), move( outputsymbols ), elf_content );
-  auto encode_name = runtime.addEncode( program_name, vector<string>() );
+  runtime.addWasm( "add", wasm_content, vector<string>() );
 
-  auto start = chrono::high_resolution_clock::now();
+  int iterations = atoi( argv[2] );
+  for ( int i = 0; i < iterations; i++ )
+  {
+    int arg1 = i;
+    int arg2 = i + 1;
+    Name arg1_name = runtime.addBlob( move( string( reinterpret_cast<char*>( &arg1 ), sizeof( int ) ) ) );
+    Name arg2_name = runtime.addBlob( move( string( reinterpret_cast<char*>( &arg2 ), sizeof( int ) ) ) );
 
-  for ( int i = 0; i < num_execution; i++ ) {
-    runtime.executeEncode( encode_name, arg1, arg2 );
+    vector<Name> inputs;
+    inputs.push_back( arg1_name );
+    inputs.push_back( arg2_name );
+    Name strict_input = runtime.addTree( move( inputs ) );
+
+    Name encode_name
+      = runtime.addEncode( Name( "add", NameType::Canonical, ContentType::Blob ), strict_input );
+    vector<size_t> path = { 0 };
+
+    Thunk res( encode_name, path );
+    runtime.forceThunk( res );
   }
 
-  auto stop = chrono::high_resolution_clock::now();
-
-  auto compile_duration = chrono::duration_cast<chrono::microseconds>( start - compile_start );
-  auto execution_duration = chrono::duration_cast<chrono::microseconds>( stop - start );
-  cout << "Executing " << num_execution << " times takes " << compile_duration.count()
-       << " microseconds to compile " << execution_duration.count() << " microseconds to execute " << endl;
-
-  print_timer( cout, "_mmap ", _mmap );
-  print_timer( cout, "_mprotect", _mprotect );
-  print_timer( cout, "_path_open ", _path_open );
-  print_timer( cout, "_fd_write ", _fd_write );
-  print_timer( cout, "_post_execution ", _post_execution );
-  print_timer( cout, "_pre_execution ", _pre_execution );
-  print_timer( cout, "_hash ", _hash );
+  cout << dec;
+  print_timer( cout, "_invocation_init", _invocation_init );
+  print_timer( cout, "_memory_init_cheap", _memory_init_cheap );
   return 0;
 }

@@ -68,6 +68,7 @@ public:
 
   // add Encode
   Name addEncode( const Name& program_name, const Name& strict_input, const Name& lazy_input );
+  Name addEncode( const Name& program_name, const Name& strict_input );
 
   // add wasm module
   void addWasm( const std::string& name, const std::string& wasm_content, const std::vector<std::string>& deps );

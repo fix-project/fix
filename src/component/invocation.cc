@@ -191,6 +191,7 @@ void Invocation::add_to_storage()
         break;
     }
   }
+  outputs = vector<shared_ptr<OutputTemp>>();
   return;
 }
 

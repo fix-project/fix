@@ -4,8 +4,9 @@
 
 #include "timer.hh"
 
-inline Timer::Record _mmap;
-inline Timer::Record _mprotect;
+inline Timer::Record _invocation_init;
+inline Timer::Record _memory_init_cheap;
+inline Timer::Record _memory_init_expensive;
 inline Timer::Record _path_open;
 inline Timer::Record _fd_write;
 inline Timer::Record _post_execution;

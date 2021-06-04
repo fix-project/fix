@@ -119,7 +119,13 @@ static void signal_handler( int sig, siginfo_t* si, void* unused )
 #endif
 
 void wasm_rt_allocate_memory( wasm_rt_memory_t* memory, uint32_t initial_pages, uint32_t max_pages )
-{
+{ 
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _memory_init_cheap };
+  if ( memory->pages != 0 ) {
+    // memset( memory->data, 0, memory->pages * PAGE_SIZE );
+    return;
+  } 
+	
   uint32_t byte_length = initial_pages * PAGE_SIZE;
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
   if ( !g_signal_handler_installed ) {
@@ -139,19 +145,13 @@ void wasm_rt_allocate_memory( wasm_rt_memory_t* memory, uint32_t initial_pages, 
   /* Reserve 8GiB. */
   void* addr;
 
-  {
-    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _mmap };
-    addr = mmap( NULL, 0x200000000ul, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
-    if ( addr == (void*)-1 ) {
-      perror( "mmap failed" );
-      abort();
-    }
+  addr = mmap( NULL, 0x200000000ul, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
+  if ( addr == (void*)-1 ) {
+    perror( "mmap failed" );
+    abort();
   }
 
-  {
-    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _mprotect };
-    mprotect( addr, byte_length, PROT_READ | PROT_WRITE );
-  }
+  mprotect( addr, byte_length, PROT_READ | PROT_WRITE );
   memory->data = reinterpret_cast<unsigned char*>( addr );
 #else
   memory->data = calloc( byte_length, 1 );

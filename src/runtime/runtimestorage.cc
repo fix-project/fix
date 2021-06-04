@@ -147,44 +147,20 @@ void RuntimeStorage::evaluateEncode( Name encode_name )
     throw runtime_error( "Invalid encode!" );
   }
 
-  Name forced_encode = this->forceTree( encode_name );
+  string program_name;
+  // cout << "Evaluating " << encode_name << endl;
+  {
+    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _invocation_init };
+    Name function_name = this->getTree( encode_name ).at( 0 );
+    wasi::invoc_ptr.setProgramName( function_name.getContent() );
+    program_name = function_name.getContent();
+    wasi::invoc_ptr.resetInvocation( move( encode_name ) );
+    wasi::buf.size = 0;
+  }
 
-  uint64_t curr_inv_id = 0;
-  curr_inv_id = Invocation::next_invocation_id_;
-  Invocation::next_invocation_id_++;
-  Invocation invocation( forced_encode );
+  name_to_program_.at( program_name ).execute();
 
-  // Name temp_name = encode_name;
-
-  // cout << "here " << encode_name << endl;
-  // cout << "Encode of size " << encode.size() << endl;
-  // this->prepareEncode( encode_name, invocation );
-  // cout << "hhere " << encode_name << endl;
-  Name function_name = this->getTree( forced_encode ).at( 0 );
-  invocation.setProgramName( function_name.getContent() );
-  cout << "Evaluating " << forced_encode << endl;
-
-  const auto& program = name_to_program_.at( invocation.getProgramName() );
-  invocation.setMem( reinterpret_cast<wasm_rt_memory_t*>( program.getMemLoc() ) );
-
-  wasi::id_to_inv_.try_emplace( curr_inv_id, invocation );
-  wasi::invocation_id_ = curr_inv_id;
-  wasi::buf.size = 0;
-
-  // cout << "Executing " << invocation.getProgramName() << " on " << endl;
-  // cout << encode_name << endl;
-  // cout << temp_name << endl;
-  // const auto & temp_encode = this->getTree( encode_name );
-  // const Name & strict_input = temp_encode.at( 1 );
-  // for ( const auto & name : this->getTree( strict_input ) )
-  //{
-  // cout << name;
-  //}
-  program.execute();
-
-  wasi::id_to_inv_.at( curr_inv_id ).add_to_storage();
-
-  wasi::id_to_inv_.erase( curr_inv_id );
+  wasi::invoc_ptr.add_to_storage();
 }
 
 Name RuntimeStorage::addBlob( string&& blob_content )
@@ -216,6 +192,16 @@ Name RuntimeStorage::addEncode( const Name& program_name, const Name& strict_inp
   encode.push_back( program_name );
   encode.push_back( strict_input );
   encode.push_back( lazy_input );
+
+  return this->addTree( move( encode ) );
+}
+
+Name RuntimeStorage::addEncode( const Name& program_name, const Name& strict_input )
+{
+  Tree encode;
+
+  encode.push_back( program_name );
+  encode.push_back( strict_input );
 
   return this->addTree( move( encode ) );
 }

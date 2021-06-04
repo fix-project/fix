@@ -4,15 +4,14 @@
 #include <string>
 #include <unordered_map>
 
+#include "absl/container/btree_map.h"
 #include "absl/container/flat_hash_map.h"
 #include "invocation.hh"
 #include "wasm-rt.h"
 
-// ID of the current invocation
 namespace wasi {
-inline thread_local uint64_t invocation_id_ = -1;
+inline Invocation invoc_ptr;
 inline thread_local wasm_rt_memory_t buf;
-inline absl::flat_hash_map<uint64_t, Invocation> id_to_inv_;
 
 void attach_input( uint32_t input_index, uint32_t mem_index );
 void attach_output( uint32_t output_index, uint32_t mem_index, uint32_t output_type );

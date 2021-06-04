@@ -148,6 +148,18 @@ public:
     , input_count_( 0 )
     , output_count_( 0 )
   {}
+  
+  Invocation()
+    : program_name_( "" )
+    , encode_name_( Name() )
+    , mem_( 0 )
+    , input_mems()
+    , output_mems()
+    , outputs()
+    , num_inputs_()
+    , input_count_( 0 )
+    , output_count_( 0 )
+  {}
 
   Invocation( const Invocation& ) = default;
   Invocation& operator=( const Invocation& ) = default;
@@ -159,6 +171,11 @@ public:
   wasm_rt_memory_t* getMem() { return mem_; }
 
   static uint64_t next_invocation_id_;
+
+  void resetInvocation( Name && encode_name )
+  {
+    encode_name_ = std::move( encode_name );
+  }
 
   // Set program name
   void setProgramName( const std::string& program_name ) { program_name_ = program_name; }

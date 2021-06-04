@@ -31,13 +31,13 @@ int main( int argc, char* argv[] )
   Name strict_input = runtime.addTree( move( inputs ) );
 
   Name encode_name
-    = runtime.addEncode( Name( "add", NameType::Canonical, ContentType::Blob ), strict_input, Name() );
+    = runtime.addEncode( Name( "add", NameType::Canonical, ContentType::Blob ), strict_input );
   vector<size_t> path = { 0 };
 
   Thunk res( encode_name, path );
-  runtime.forceThunk( res );
+  Name res_name = runtime.forceThunk( res );
 
-  Name res_name( encode_name, path, ContentType::Blob );
+  cout << dec;
   cout << "The result is " << *( (const int*)runtime.getBlob( res_name ).data() ) << endl;
 
   return 0;
