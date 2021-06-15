@@ -15,6 +15,7 @@
 #include <llvm/Support/VirtualFileSystem.h>
 
 #include "ccompiler.hh"
+#include "include-path.hh"
 
 using namespace std;
 using namespace clang;
@@ -69,11 +70,7 @@ string c_to_elf( const string& wasm_name,
   // cout << ( string )( ( *( *diskFile )->getBuffer( "ignore" ) )->getBuffer() ) << endl;
 
   // Create arguments
-  const char* Args[] = { ( wasm_name + ".c" ).c_str(),
-                         "-O2",
-                         "-I/usr/include",
-                         "-I/usr/include/x86_64-linux-gnu",
-                         "-I/usr/lib/llvm-10/lib/clang/10.0.0/include" };
+  const char* Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", FIXPOINT_C_INCLUDE_PATH };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
 
   // Setup mcmodel

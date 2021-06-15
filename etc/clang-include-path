@@ -1,0 +1,19 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+my @paths;
+
+open CLANG, q{clang -E -v - <&- 2>&1 |} or die qq{Can't execute clang};
+
+while (<CLANG>) {
+  chomp;
+  next unless m{^ /};
+  s{\s*}{}g;
+  push @paths, $_;
+}
+
+print join q{,}, map qq{"-I$_"}, @paths;
+print qq{\n};
+
+close CLANG or die qq{Can't close clang};
