@@ -8,8 +8,10 @@ extern void attach_input(uint32_t input_index, uint32_t mem_index);
 extern uint32_t get_int(uint32_t mem_index, uint32_t ofst);
 extern uint8_t get_int8(uint32_t mem_index, uint32_t ofst);
 
-extern uint8_t mem_store(uint32_t offset, uint8_t content);
-extern uint8_t mem_load(uint32_t offset, uint8_t content);
+extern void mem_store(uint32_t offset, uint32_t content);
+extern uint32_t mem_load(uint32_t offset);
+extern void mem_store8(uint32_t offset, uint8_t content);
+extern uint8_t mem_load8(uint32_t offset);
 
 uint32_t fd_ofst [5];
 uint32_t next_fd_idx = 0;
@@ -73,5 +75,9 @@ __wasi_errno_t __my_wasi_fd_read(
 
 int main() 
 {
+  mem_store(0,0);
+  mem_load(0);
+  mem_store8(0,0);
+  mem_load8(0);
   return 0;
 }
