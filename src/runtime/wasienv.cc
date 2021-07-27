@@ -49,4 +49,13 @@ void move_lazy_input( uint32_t mem_index, uint32_t child_index, uint32_t lazy_in
 {
   invoc_ptr.move_lazy_input( mem_index, child_index, lazy_input_index );
 }
+
+uint32_t mem_copy( uint32_t mem_index, uint32_t ofst, uint32_t linear_mem_ofst, uint32_t iovs_len )
+{
+  if ( linear_mem_ofst + iovs_len > buf.size )
+  {
+    wasm_rt_trap( WASM_RT_TRAP_OOBX );
+  }
+  invoc_ptr.mem_copy( mem_index, ofst, &buf.data + linear_mem_ofst, iovs_len ); 
+}
 }

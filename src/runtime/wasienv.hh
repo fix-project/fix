@@ -26,6 +26,8 @@ void move_lazy_input( uint32_t mem_index, uint32_t child_index, uint32_t lazy_in
 uint32_t get_int( uint32_t mem_index, uint32_t ofst );
 void store_int( uint32_t mem_index, uint32_t ofst );
 
+uint32_t mem_copy( uint32_t mem_index, uint32_t ofst, uint32_t linear_mem_ofst, uint32_t iovs_len );
+
 inline void ( *Z_envZ_attach_inputZ_vii )( uint32_t, uint32_t ) { &attach_input };
 inline void ( *Z_envZ_attach_outputZ_viii )( uint32_t, uint32_t, uint32_t ) { &attach_output };
 inline void ( *Z_envZ_move_lazy_inputZ_viii )( uint32_t, uint32_t, uint32_t ) { &move_lazy_input };

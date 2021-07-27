@@ -213,4 +213,6 @@ public:
 
   uint32_t get_int( uint32_t mem_index, uint32_t ofst );
   void store_int( uint32_t mem_index, uint32_t content );
+
+  uint32_t mem_copy( uint32_t mem_index, uint32_t ofst, uint8_t * mem_dest, uint32_t iovs_len );
 };

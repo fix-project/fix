@@ -204,3 +204,19 @@ void Invocation::store_int( uint32_t mem_index, uint32_t content )
 {
   return store_i32<int>( mem_index, content );
 }
+
+void Invocation::mem_copy( uint32_t mem_index, uint32_t ofst, uint8_t * mem_loc, uint32_t iovs_len )
+{
+  switch ( input_mems[mem_index].getContentType() ) {
+    case ContentType::Blob:
+    case ContentType::Unknown: {
+      uint32_t len = max( RuntimeStorage::getInstance().getBlob( input_mems[mem_index] ).data().size() - ofst, iovs_len);
+      memcpy( mem_loc, RuntimeStorage::getInstance().getBlob( input_mems[mem_index] ).data() + ofst, len );
+      return len;
+    }
+
+    default:
+      throw runtime_error( "No write access." );
+  }
+}
+

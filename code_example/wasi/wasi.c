@@ -13,6 +13,8 @@ extern uint32_t mem_load(uint32_t offset);
 extern void mem_store8(uint32_t offset, uint8_t content);
 extern uint8_t mem_load8(uint32_t offset);
 
+extern uint32_t mem_copy(uint32_t mem_index, uint32_t ofst, uint8_t * iov_buf, size_t iovs_len );
+
 uint32_t fd_ofst [5];
 uint32_t next_fd_idx = 0;
 
@@ -65,12 +67,9 @@ __wasi_errno_t __my_wasi_fd_read(
     __wasi_size_t *retptr0
 )__attribute__((export_name("my_wasi_fd_read")))
 {
-  for( int i = 0; i < iovs_len; i++ )
-  {
-    iovs->buf[i] = get_int8(fd, fd_ofst[fd]);
-    fd_ofst[fd]++;
-  }
-  return iovs_len;  
+  size_t length_read = mem_copy( fd, fd_ofst[fd], iovs->buf, iovs_len );
+  fd_ofst[fd] += length_read;
+  return length_read;
 }
 
 int main() 
