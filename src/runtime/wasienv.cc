@@ -54,8 +54,8 @@ uint32_t mem_copy( uint32_t mem_index, uint32_t ofst, uint32_t linear_mem_ofst, 
 {
   if ( linear_mem_ofst + iovs_len > buf.size )
   {
-    wasm_rt_trap( WASM_RT_TRAP_OOBX );
+    wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
-  invoc_ptr.mem_copy( mem_index, ofst, &buf.data + linear_mem_ofst, iovs_len ); 
+  return invoc_ptr.mem_copy( mem_index, ofst, buf.data + linear_mem_ofst, iovs_len ); 
 }
 }
