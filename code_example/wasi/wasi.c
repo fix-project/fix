@@ -133,6 +133,23 @@ __wasi_errno_t __wasi_fd_pwrite(
   return length_write;
 }
 
+__wasi_errno_t __wasi_fd_seek(
+    __wasi_fd_t fd,
+    /**
+     * The number of bytes to move.
+     */
+    __wasi_filedelta_t offset,
+    /**
+     * The base from which the offset is relative.
+     */
+    __wasi_whence_t whence,
+    __wasi_filesize_t *retptr0
+) __attribute__((export_name("my_wasi_fd_pwrite")))
+{
+  fd_ofst[fd] = offset;
+  return offset;
+} 
+
 int main() 
 {
   mem_store(0,0);
