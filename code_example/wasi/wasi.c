@@ -13,7 +13,8 @@ extern uint32_t mem_load(uint32_t offset);
 extern void mem_store8(uint32_t offset, uint8_t content);
 extern uint8_t mem_load8(uint32_t offset);
 
-extern uint32_t mem_copy(uint32_t mem_index, uint32_t ofst, uint8_t * iov_buf, size_t iovs_len );
+extern uint32_t mem_copy_read(uint32_t mem_index, uint32_t ofst, uint8_t * iov_buf, size_t iovs_len );
+extern uint32_t mem_copy_write(uint32_t mem_index, uint32_t ofst, uint8_t * iov_buf, size_t iovs_len );
 
 uint32_t fd_ofst [5];
 uint32_t next_fd_idx = 0;
@@ -46,7 +47,7 @@ __wasi_errno_t __my_wasi_path_open(
     __wasi_rights_t fs_rights_inheriting,
     __wasi_fdflags_t fdflags,
     __wasi_fd_t *retptr0
-) 
+)__attribute__((export_name("my_wasi_path_open")))
 {
   uint32_t input_index = (uint32_t)(atoi(path));
   attach_input(input_index, next_fd_idx);
@@ -67,9 +68,69 @@ __wasi_errno_t __my_wasi_fd_read(
     __wasi_size_t *retptr0
 )__attribute__((export_name("my_wasi_fd_read")))
 {
-  size_t length_read = mem_copy( fd, fd_ofst[fd], iovs->buf, iovs_len );
+  size_t length_read = mem_copy_read( fd, fd_ofst[fd], iovs->buf, iovs_len );
   fd_ofst[fd] += length_read;
   return length_read;
+}
+
+__wasi_errno_t __my_wasi_fd_pread(
+    __wasi_fd_t fd,
+    /**
+     * List of scatter/gather vectors in which to store data.
+     */
+    const __wasi_iovec_t *iovs,
+    /**
+     * The length of the array pointed to by `iovs`.
+     */
+    size_t iovs_len,
+    /**
+     * The offset within the file at which to read.
+     */
+    __wasi_filesize_t offset,
+    __wasi_size_t *retptr0
+) __attribute__((export_name("my_wasi_fd_pread")))
+{
+  size_t length_read = mem_copy_read( fd, fd_ofst[fd], iovs->buf, iovs_len );
+  return length_read;
+}
+
+__wasi_errno_t __my_wasi_fd_write(
+    __wasi_fd_t fd,
+    /**
+     * List of scatter/gather vectors from which to retrieve data.
+     */
+    const __wasi_ciovec_t *iovs,
+    /**
+     * The length of the array pointed to by `iovs`.
+     */
+    size_t iovs_len,
+    __wasi_size_t *retptr0
+) __attribute__((export_name("my_wasi_fd_write")))
+{
+  size_t length_write = mem_copy_write( fd, fd_ofst[fd], iovs->buf, iovs_len );
+  fd_ofst[fd] += length_write;
+  return length_write;
+}
+
+__wasi_errno_t __wasi_fd_pwrite(
+    __wasi_fd_t fd,
+    /**
+     * List of scatter/gather vectors from which to retrieve data.
+     */
+    const __wasi_ciovec_t *iovs,
+    /**
+     * The length of the array pointed to by `iovs`.
+     */
+    size_t iovs_len,
+    /**
+     * The offset within the file at which to write.
+     */
+    __wasi_filesize_t offset,
+    __wasi_size_t *retptr0
+) __attribute__((export_name("my_wasi_fd_pwrite")))
+{
+  size_t length_write = mem_copy_write( fd, fd_ofst[fd], iovs->buf, iovs_len );
+  return length_write;
 }
 
 int main() 
