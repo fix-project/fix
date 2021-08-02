@@ -124,6 +124,9 @@ private:
   // The number of depth 0 outputs
   size_t output_count_;
 
+  // Memory buffer for wasi
+  uint8_t * wasi_buf;
+
 public:
   Invocation( std::string program_name, Name encode_name, wasm_rt_memory_t* mem )
     : program_name_( program_name )
@@ -135,6 +138,7 @@ public:
     , num_inputs_()
     , input_count_( 0 )
     , output_count_( 0 )
+    , wasi_buf( 0 )
   {}
 
   Invocation( Name encode_name )
@@ -147,6 +151,7 @@ public:
     , num_inputs_()
     , input_count_( 0 )
     , output_count_( 0 )
+    , wasi_buf( 0 )
   {}
   
   Invocation()
@@ -159,6 +164,7 @@ public:
     , num_inputs_()
     , input_count_( 0 )
     , output_count_( 0 )
+    , wasi_buf( 0 )
   {}
 
   Invocation( const Invocation& ) = default;
@@ -215,4 +221,6 @@ public:
   void store_int( uint32_t mem_index, uint32_t content );
 
   uint32_t mem_copy( uint32_t mem_index, uint32_t ofst, uint8_t * mem_dest, uint32_t iovs_len );
+
+  void wasi_mem_prep();
 };

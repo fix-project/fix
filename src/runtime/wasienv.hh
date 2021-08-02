@@ -12,6 +12,7 @@
 namespace wasi {
 inline Invocation invoc_ptr;
 inline thread_local wasm_rt_memory_t buf;
+inline thread_local wasm_rt_memory_t wasi_buf;
 
 void attach_input( uint32_t input_index, uint32_t mem_index );
 void attach_output( uint32_t output_index, uint32_t mem_index, uint32_t output_type );
@@ -38,4 +39,9 @@ inline void ( *Z_envZ_add_pathZ_vii )( uint32_t, uint32_t ) { &add_path };
 inline void ( *Z_envZ_attach_output_childZ_viiii )( uint32_t, uint32_t, uint32_t, uint32_t ) {
   &attach_output_child
 };
+
+uint32_t wasi_mem_load32( uint32_t offset );
+void wasi_mem_store32( uint32_t offset, uint32_t content );
+uint8_t wasi_mem_load8( uint32_t offset );
+void wasi_mem_store8( uint32_t offset, uint8_t content );
 }

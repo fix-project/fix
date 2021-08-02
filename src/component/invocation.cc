@@ -219,4 +219,3 @@ uint32_t Invocation::mem_copy( uint32_t mem_index, uint32_t ofst, uint8_t * mem_
       throw runtime_error( "No write access." );
   }
 }
-

@@ -58,4 +58,24 @@ uint32_t mem_copy( uint32_t mem_index, uint32_t ofst, uint32_t linear_mem_ofst, 
   }
   return invoc_ptr.mem_copy( mem_index, ofst, buf.data + linear_mem_ofst, iovs_len ); 
 }
+
+uint32_t wasm_mem_load32( uint32_t offset )
+{
+  return ((uint32_t *)wasi_buf.data)[offset];
+}
+
+void wasm_mem_store32( uint32_t offset, uint32_t content )
+{
+  ((uint32_t *)wasi_buf.data)[offset] = content;
+}
+
+uint8_t wasm_mem_load8( uint32_t offset )
+{
+  return wasi_buf.data[offset];
+}
+
+void wasm_mem_store8( uint32_t offset, uint8_t content )
+{
+  wasi_buf.data[offset] = content;
+}
 }
