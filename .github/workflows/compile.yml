@@ -9,6 +9,6 @@ jobs:
       steps:
       - uses: actions/checkout@v1
       - name: configure
-        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config zlib1g-dev cmake clang-12 libclang-12-dev libcrypto++-dev && mkdir build && cd build && cmake ..
+        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config zlib1g-dev cmake clang libclang-dev libcrypto++-dev && mkdir build && cd build && cmake ..
       - name: build
         run: cd build && make -j2
