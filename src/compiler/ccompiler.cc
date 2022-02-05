@@ -114,7 +114,7 @@ string c_to_elf( const string& wasm_name,
                      CodeGenOpts,
                      compilerInstance.getTargetOpts(),
                      compilerInstance.getLangOpts(),
-                     compilerInstance.getTarget().getDataLayout(),
+                     compilerInstance.getTarget().getDataLayoutString(),
                      module.get(),
                      Backend_EmitObj,
                      std::move( OS ) );
