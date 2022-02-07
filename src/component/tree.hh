@@ -4,19 +4,30 @@
 
 #include "name.hh"
 
-using Tree = std::vector<Name>;
-// class Tree
-// {
-//   private:
-//     // Content of the Tree
-//     std::vector<Name> content_;
-//
-//   public:
-//     Tree()
-//      : content_()
-//     {}
-//
-//     Tree( std::vector<Name> && content )
-//      : content_( content )
-//     {}
-// };
+enum class Laziness
+{
+  Strict,
+  Lazy
+};
+
+struct TreeEntry
+{
+  Name name_;
+  Laziness laziness_;
+};
+
+class Tree
+{
+private:
+  // Content of the Tree
+  std::vector<TreeEntry> content_;
+
+public:
+  Tree()
+    : content_()
+  {}
+
+  Tree( std::vector<TreeEntry>&& content )
+    : content_( content )
+  {}
+};

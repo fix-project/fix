@@ -6,11 +6,11 @@
 
 #include "absl/container/btree_map.h"
 #include "absl/container/flat_hash_map.h"
-#include "invocation.hh"
+#include "instance.hh"
 #include "wasm-rt.h"
 
 namespace wasi {
-inline Invocation invoc_ptr;
+inline Instance invoc_ptr;
 inline thread_local wasm_rt_memory_t buf;
 inline thread_local wasm_rt_memory_t wasi_buf;
 

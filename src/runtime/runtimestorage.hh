@@ -21,8 +21,6 @@
 class RuntimeStorage
 {
 private:
-  friend class Invocation;
-
   // Map from name to Blob
   InMemoryStorage<Blob> name_to_blob_;
   // Map from name to Tree

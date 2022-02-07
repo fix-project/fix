@@ -9,20 +9,6 @@
 #include "spans.hh"
 #include "wasm-rt.h"
 
-/**
- * Structure of program files:
- * --------------------------------
- *  header:number of input entries
- *         number of output entries
- * --------------------------------
- *        Input entries
- * --------------------------------
- *        Output entries
- * --------------------------------
- *        Wasm module
- * --------------------------------
- */
-
 class Program
 {
 private:

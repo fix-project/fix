@@ -4,8 +4,7 @@ using namespace std;
 
 bool operator==( const Name& lhs, const Name& rhs )
 {
-  return ( lhs.getType() == rhs.getType() && lhs.getContent() == rhs.getContent()
-           && lhs.getTreeContent() == rhs.getTreeContent() && lhs.getPath() == rhs.getPath() );
+  return ( lhs.getType() == rhs.getType() && lhs.getContent() == rhs.getContent() );
 }
 
 ostream& operator<<( ostream& s, const Name& name )
@@ -34,17 +33,6 @@ ostream& operator<<( ostream& s, const Name& name )
   s << name.getContent() << " ";
   for ( const auto& ch : name.getContent() ) {
     s << hex << (int)ch;
-  }
-
-  s << " Path:";
-
-  for ( const auto& p : name.getPath() ) {
-    s << p << " ";
-  }
-
-  s << " TreeContent:";
-  for ( const auto& tn : name.getTreeContent() ) {
-    s << "--" << tn;
   }
 
   s << endl;
