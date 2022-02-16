@@ -5,14 +5,12 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "blob.hh"
 #include "ccompiler.hh"
 #include "name.hh"
+#include "object.hh"
 #include "program.hh"
 #include "spans.hh"
 #include "storage.hh"
-#include "thunk.hh"
-#include "tree.hh"
 #include "wasmcompiler.hh"
 
 #include "absl/container/flat_hash_map.h"
@@ -21,33 +19,26 @@
 class RuntimeStorage
 {
 private:
-  // Map from name to Blob
-  InMemoryStorage<Blob> name_to_blob_;
-  // Map from name to Tree
-  InMemoryStorage<Tree> name_to_tree_;
-  // Map from name to Thunk
-  InMemoryStorage<Thunk> name_to_thunk_;
+  // Storage: maps a Name to the contents of the corresponding Object
+  InMemoryStorage<Object> storage;
 
-  // Map from name to program
+  // Memorization Cache: maps a Thunk to the Name of a reduction of the original Thunk
+  absl::flat_hash_map<Name, Name> memorization_cache;
+
+  // Trace Cache: maps a Name to a human-readable string
+  absl::flat_hash_map<Name, std::string> trace_cache;
+
+  // Maps a string name to corresponding program
   absl::flat_hash_map<std::string, Program> name_to_program_;
-  // Map from thunk name to blob name
-  absl::flat_hash_map<Name, Name> thunk_to_blob_;
-
-  std::vector<std::string> literal_name_store;
 
   RuntimeStorage()
-    : name_to_blob_()
-    , name_to_tree_()
-    , name_to_thunk_()
+    : storage()
+    , memorization_cache()
+    , trace_cache()
     , name_to_program_()
-    , thunk_to_blob_()
-    , literal_name_store()
   {}
 
 public:
-  // Return reference to blob content
-  std::string_view getBlob( const Name& name );
-
   // Return reference to static runtime storage
   static RuntimeStorage& getInstance()
   {
@@ -55,14 +46,17 @@ public:
     return runtime_instance;
   }
 
-  // Return reference to Tree
-  const Tree& getTree( const Name& name );
-
   // add blob
   Name addBlob( std::string&& content );
 
+  // Return reference to blob content
+  std::string_view getBlob( const Name& name );
+
   // add Tree
-  Name addTree( std::vector<Name>&& content );
+  Name addTree( std::vector<TreeEntry>&& content );
+
+  // Return reference to Tree
+  span_view<TreeEntry> getTree( const Name& name );
 
   // add Encode
   Name addEncode( const Name& program_name, const Name& strict_input, const Name& lazy_input );

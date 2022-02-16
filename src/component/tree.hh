@@ -1,8 +1,10 @@
 #pragma once
 
+#include <utility>
 #include <vector>
 
 #include "name.hh"
+#include "spans.hh"
 
 enum class Laziness
 {
@@ -10,11 +12,7 @@ enum class Laziness
   Lazy
 };
 
-struct TreeEntry
-{
-  Name name_;
-  Laziness laziness_;
-};
+using TreeEntry = std::pair<Name, Laziness>;
 
 class Tree
 {
@@ -28,6 +26,8 @@ public:
   {}
 
   Tree( std::vector<TreeEntry>&& content )
-    : content_( content )
+    : content_( std::move( content ) )
   {}
+
+  span_view<TreeEntry> content() const { return span_view<TreeEntry>( content_.data(), content_.size() ); }
 };
