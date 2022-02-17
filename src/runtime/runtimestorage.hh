@@ -58,6 +58,9 @@ public:
   // Return reference to Tree
   span_view<TreeEntry> getTree( const Name& name );
 
+  // Return encode name referred to by thunk
+  Name getThunkEncodeName( const Name& thunk_name );
+
   // add Encode
   Name addEncode( const Name& program_name, const Name& strict_input, const Name& lazy_input );
   Name addEncode( const Name& program_name, const Name& strict_input );
@@ -78,10 +81,13 @@ public:
   Name forceTree( Name tree_name );
 
   // force a Thunk
-  Name forceThunk( const Thunk& thunk );
+  Name forceThunk( Name thunk_name );
+
+  // Reduce a Thunk by one step
+  Name reduceThunk( Name thunk_name );
 
   // Evaluate an encode
-  void evaluateEncode( Name encode_name );
+  Name evaluateEncode( Name encode_name );
 
   // execute encode
   // void executeEncode( const std::string & encode_name, int arg1, int arg2 );

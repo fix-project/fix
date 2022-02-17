@@ -70,6 +70,85 @@ span_view<TreeEntry> RuntimeStorage::getTree( const Name& name )
   throw out_of_range( "Tree does not exist." );
 }
 
+Name RuntimeStorage::getThunkEncodeName( const Name& name )
+{
+  switch ( name.getType() ) {
+    case NameType::Literal:
+      if ( name.getContentType() == ContentType::Thunk ) {
+        return ( (const Thunk*)( name.getContent().data() ) )->getEncode();
+      }
+      break;
+
+    default:
+      const Object& obj = storage.get( name );
+      if ( holds_alternative<Thunk>( obj ) ) {
+        return get<Thunk>( obj ).getEncode();
+      }
+      break;
+  }
+
+  throw out_of_range( "Thunk does not exist." );
+}
+
+Name RuntimeStorage::force( Name name )
+{
+  switch ( name.getContentType() ) {
+    case ContentType::Blob:
+      return name;
+
+    case ContentType::Tree:
+      return this->forceTree( name );
+
+    case ContentType::Thunk:
+      return this->forceThunk( name );
+
+    case ContentType::Unknown:
+      throw runtime_error( "Unimplemented." );
+
+    default:
+      throw runtime_error( "Invalid content type." );
+  }
+}
+
+Name RuntimeStorage::forceTree( Name name )
+{
+  vector<TreeEntry> tree_content;
+  for ( const auto& entry : getTree( name ) ) {
+    if ( entry.second == Laziness::Strict ) {
+      tree_content.push_back( TreeEntry( this->force( entry.first ), entry.second ) );
+    } else {
+      tree_content.push_back( entry );
+    }
+  }
+
+  return this->addTree( move( tree_content ) );
+}
+
+Name RuntimeStorage::forceThunk( Name name )
+{
+  while ( true ) {
+    Name new_name = this->reduceThunk( name );
+    switch ( new_name.getContentType() ) {
+      case ContentType::Blob:
+      case ContentType::Tree:
+        return new_name;
+
+      default:
+        name = new_name;
+    }
+  }
+}
+
+Name RuntimeStorage::reduceThunk( Name name )
+{
+  if ( memorization_cache.contains( name ) ) {
+    return memorization_cache.at( name );
+  } else {
+    Name encode_name = this->getThunkEncodeName( name );
+    return this->evaluateEncode( encode_name );
+  }
+}
+
 void RuntimeStorage::addWasm( const string& name, const string& wasm_content, const vector<string>& deps )
 {
   auto [c_header, h_header] = wasmcompiler::wasm_to_c( name, wasm_content );
