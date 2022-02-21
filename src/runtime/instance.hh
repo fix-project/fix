@@ -18,12 +18,12 @@ private:
 
   // Name of encode
   Name encode_name_;
-  
+
   // Read-only handles
-  ObjectReference ro_handle [16];
+  ObjectReference ro_handle[16];
 
   // Read-write handles
-  MutableValueReference rw_handle [16];
+  MutableValueReference rw_handle[16];
 
 public:
   Instance( std::string program_name, Name encode_name )

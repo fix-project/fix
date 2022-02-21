@@ -149,6 +149,26 @@ Name RuntimeStorage::reduceThunk( Name name )
   }
 }
 
+Name RuntimeStorage::evaluateEncode( Name encode_name )
+{
+  if ( this->getTree( encode_name ).size() == 1 ) {
+    throw runtime_error( "Invalid encode!" );
+  }
+
+  Name forced_encode = this->forceTree( encode_name );
+  Name res_name( forced_encode.getContent(), NameType::Canonical, ContentType::Thunk );
+  if ( memorization_cache.contains( res_name ) ) {
+    return memorization_cache.at( res_name );
+  }
+
+  Name function_name = this->getTree( encode_name ).at( 1 ).first;
+  string program_name = function_name.getContent();
+  name_to_program_.at( program_name ).execute();
+
+  // TODO
+  return encode_name;
+}
+
 void RuntimeStorage::addWasm( const string& name, const string& wasm_content, const vector<string>& deps )
 {
   auto [c_header, h_header] = wasmcompiler::wasm_to_c( name, wasm_content );

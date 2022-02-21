@@ -88,7 +88,4 @@ public:
 
   // Evaluate an encode
   Name evaluateEncode( Name encode_name );
-
-  // execute encode
-  // void executeEncode( const std::string & encode_name, int arg1, int arg2 );
 };

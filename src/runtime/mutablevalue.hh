@@ -2,7 +2,7 @@
 
 #include "name.hh"
 
-struct MutableValueMeta 
+struct MutableValueMeta
 {
   // The number of all MTrees/handles/memories that refer the mutable value
   // Is it possible to replace this with shared_ptr?
@@ -24,14 +24,16 @@ class MutableValue
 {
 private:
   // Metadata for the memory region is stored at (data - sizeof(MutableValueMeta))
-  uint8_t * data;
+  uint8_t* data;
 
 public:
   ~MutableValue();
 };
 
-class MBlob : MutableValue {};
-class MTree : MutableValue {};
+class MBlob : MutableValue
+{};
+class MTree : MutableValue
+{};
 
 struct ObjectReference
 {
@@ -44,7 +46,7 @@ struct ObjectReference
   {}
 };
 
-using MutableValueReference = MutableValue *;
+using MutableValueReference = MutableValue*;
 
 using RuntimeReference = std::variant<ObjectReference, MutableValueReference>;
 

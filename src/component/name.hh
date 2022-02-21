@@ -61,10 +61,10 @@ public:
     , content_type_( content_type )
   {}
 
-  //Name( const Name& encode_name, ContentType content_type )
-  //  : content_( "" )
-  //  , type_( NameType::Thunk )
-  //  , content_type_( content_type )
+  // Name( const Name& encode_name, ContentType content_type )
+  //   : content_( "" )
+  //   , type_( NameType::Thunk )
+  //   , content_type_( content_type )
   //{}
 
   const std::string& getContent() const { return content_; }
