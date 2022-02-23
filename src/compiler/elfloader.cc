@@ -146,8 +146,8 @@ Program link_program( Elf_Info& elf_info,
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );
+  // elf_info.func_map.insert(
+  // pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "Z_envZ_attach_inputZ_vii", func( (uint64_t)&wasi::Z_envZ_attach_inputZ_vii ) ) );
   elf_info.func_map.insert(
