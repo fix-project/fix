@@ -84,6 +84,9 @@ pair<string, string> wasm_to_c( const string& wasm_name, const string& wasm_cont
   Module module;
   const bool kStopOnFirstError = true;
   const bool kFailOnCustomSectionError = true;
+
+  s_features.enable_multi_memory();
+
   ReadBinaryOptions options(
     s_features, s_log_stream.get(), s_read_debug_names, kStopOnFirstError, kFailOnCustomSectionError );
   result = ReadBinaryIr( wasm_name.c_str(), wasm_content.data(), wasm_content.size(), options, &errors, &module );
