@@ -24,17 +24,9 @@ using namespace llvm;
 string c_to_elf( const string& wasm_name,
                  string& c_content,
                  const string& h_content,
+                 const string& init,
                  const string& wasm_rt_content )
 {
-  // Set wasm_rt_memory_t to thread local
-  size_t pos = 0;
-  pos = c_content.find( "static wasm_rt_memory_t" );
-  if ( pos != string::npos ) {
-    // string origin ( "static" );
-    string replace( "__thread" );
-    c_content.replace( pos, 6u, replace );
-  }
-
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmPrinters();
@@ -62,6 +54,7 @@ string c_to_elf( const string& wasm_name,
 
   InMemFS->addFile( "./" + wasm_name + ".c", 0, MemoryBuffer::getMemBuffer( c_content ) );
   InMemFS->addFile( "./" + wasm_name + ".h", 0, MemoryBuffer::getMemBuffer( h_content ) );
+  InMemFS->addFile( "./" + wasm_name + "_init.c", 0, MemoryBuffer::getMemBuffer( init ) );
   InMemFS->addFile( "./wasm-rt.h", 0, MemoryBuffer::getMemBuffer( wasm_rt_content ) );
 
   compilerInstance.setFileManager( new FileManager( FileSystemOptions {}, RealFS ) );
@@ -70,7 +63,7 @@ string c_to_elf( const string& wasm_name,
   // cout << ( string )( ( *( *diskFile )->getBuffer( "ignore" ) )->getBuffer() ) << endl;
 
   // Create arguments
-  const char* Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", FIXPOINT_C_INCLUDE_PATH };
+  const char* Args[] = { ( wasm_name + ".c" ).c_str(), ( wasm_name + "_init.c" ).c_str() ,"-O2", FIXPOINT_C_INCLUDE_PATH };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
 
   // Setup mcmodel
