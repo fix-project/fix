@@ -31,7 +31,7 @@ string MangleStateInfoTypeName( const string& wasm_name )
   return MangleName( wasm_name ) + "_module_instance_t";
 }
 
-string compose_init( const string& wasm_name, const string& start_function, const string& arg )
+string compose_init( const string& wasm_name )
 {
   ostringstream result;
 
@@ -68,11 +68,7 @@ string compose_init( const string& wasm_name, const string& start_function, cons
   result << "void executeProgram() {" << endl;
   result << "  " << module_instance_type << " instance;" << endl;
   result << "  init(&instance);" << endl;
-  if ( arg.length() > 0 ) {
-    result << "  " << start_function << "(&instance, " << arg << ");" << endl;
-  } else {
-    result << "  " << start_function << "(&instance);" << endl;
-  }
+  result << "  _fixpoint_apply(&instance);" << endl;
   result << "}" << endl;
 
   return result.str();
