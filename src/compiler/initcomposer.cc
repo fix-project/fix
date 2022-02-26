@@ -3,25 +3,62 @@
 #include <sstream>
 
 #include "src/c-writer.h"
+
 using namespace std;
 
-std::string compose_init( const std::string& wasm_name, const std::string& h_content )
+namespace initcomposer {
+string MangleName( string_view name )
 {
-  std::ostringstream result;
+  const char kPrefix = 'Z';
+  std::string result = "Z_";
 
-  // #include "wasm_name.h"
-  result << "#include \"" << wasm_name << ".h\"\n";
-
-  // get name of module_instance_t from header
-  istringstream lines( h_content );
-  string line;
-  string module_instance_type;
-  while ( getline( lines, line )  ) {
-    if ( line.find( "_module_instance_t" ) != string::npos ) {
-      module_instance_type = line.substr(2, line.length() - 1);
-      break;
+  if ( !name.empty() ) {
+    for ( char c : name ) {
+      if ( ( isalnum( c ) && c != kPrefix ) || c == '_' ) {
+        result += c;
+      } else {
+        result += kPrefix;
+        result += wabt::StringPrintf( "%02X", static_cast<uint8_t>( c ) );
+      }
     }
   }
+
+  return result;
+}
+
+string MangleStateInfoTypeName( const string& wasm_name )
+{
+  return MangleName( wasm_name ) + "_module_instance_t";
+}
+
+string compose_init( const string& wasm_name, const string& start_function, const string& arg )
+{
+  ostringstream result;
+
+  // #include "wasm_name.h"
+  result << "#include \"" << wasm_name << ".h\"" << endl;
+  result << endl;
+
+  //#include <stdint.h>
+  //#include <stddef.h>
+  result << "#include <stdint.h>" << endl;
+  result << "#include <stddef.h>" << endl;
+  result << endl;
+
+  // get name of module_instance_t
+  string module_instance_type = MangleStateInfoTypeName( wasm_name );
+
+  // static size_t memory_offset;
+  result << "static size_t memory_offset;" << endl;
+  result << endl;
+
+  // void initializeOffset() {
+  //   memory_offset = offsetof(_module_instance_t, w2c_M0);
+  // }
+  result << "void initializeOffset() {" << endl;
+  result << "  memory_offset = offsetof(" << module_instance_type << ", w2c_M0);" << endl;
+  result << "}" << endl;
+  result << endl;
 
   // void executeProgram() {
   //   module_instance_t instance;
@@ -31,8 +68,13 @@ std::string compose_init( const std::string& wasm_name, const std::string& h_con
   result << "void executeProgram() {" << endl;
   result << "  " << module_instance_type << " instance;" << endl;
   result << "  init(&instance);" << endl;
-  result << "  start(&instance);" << endl;
+  if ( arg.length() > 0 ) {
+    result << "  " << start_function << "(&instance, " << arg << ");" << endl;
+  } else {
+    result << "  " << start_function << "(&instance);" << endl;
+  }
   result << "}" << endl;
 
   return result.str();
+}
 }
