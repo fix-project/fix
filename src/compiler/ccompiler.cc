@@ -63,7 +63,8 @@ string c_to_elf( const string& wasm_name,
   // cout << ( string )( ( *( *diskFile )->getBuffer( "ignore" ) )->getBuffer() ) << endl;
 
   // Create arguments
-  const char* Args[] = { ( wasm_name + ".c" ).c_str(), ( wasm_name + "_init.c" ).c_str() ,"-O2", FIXPOINT_C_INCLUDE_PATH };
+  const char* Args[]
+    = { ( wasm_name + ".c" ).c_str(), ( wasm_name + "_init.c" ).c_str(), "-O2", FIXPOINT_C_INCLUDE_PATH };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
 
   // Setup mcmodel

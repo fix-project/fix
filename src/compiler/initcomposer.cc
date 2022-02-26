@@ -68,7 +68,7 @@ string compose_init( const string& wasm_name )
   result << "void executeProgram() {" << endl;
   result << "  " << module_instance_type << " instance;" << endl;
   result << "  init(&instance);" << endl;
-  result << "  _fixpoint_apply(&instance);" << endl;
+  result << "  Z__fixpoint_applyZ_vv(&instance);" << endl;
   result << "}" << endl;
 
   return result.str();
