@@ -16,8 +16,8 @@
     i32.const 1
     call $get_tree_entry
     i32.const 0
-    i32.const 2
     i32.const 3
+    i32.const 2
     call $get_tree_entry
     i32.const 1
     i32.const 0
@@ -39,7 +39,7 @@
     i32.const 0
     call $detach_mem
     i32.const 0
-    i32.const 2
+    i32.const 4
     i32.const 0
     call $freeze_blob
     i32.const 0

@@ -232,8 +232,8 @@ static void w2c__fixpoint_apply(Z_addblob_module_instance_t *module_instance) {
   w2c_i2 = 1u;
   (*WASM_RT_ADD_PREFIX(Z_envZ_get_tree_entryZ_viii))(module_instance, w2c_i0, w2c_i1, w2c_i2);
   w2c_i0 = 0u;
-  w2c_i1 = 2u;
-  w2c_i2 = 3u;
+  w2c_i1 = 3u;
+  w2c_i2 = 2u;
   (*WASM_RT_ADD_PREFIX(Z_envZ_get_tree_entryZ_viii))(module_instance, w2c_i0, w2c_i1, w2c_i2);
   w2c_i0 = 1u;
   w2c_i1 = 0u;
@@ -254,7 +254,7 @@ static void w2c__fixpoint_apply(Z_addblob_module_instance_t *module_instance) {
   w2c_i1 = 0u;
   (*WASM_RT_ADD_PREFIX(Z_envZ_detach_memZ_vii))(module_instance, w2c_i0, w2c_i1);
   w2c_i0 = 0u;
-  w2c_i1 = 2u;
+  w2c_i1 = 4u;
   w2c_i2 = 0u;
   (*WASM_RT_ADD_PREFIX(Z_envZ_freeze_blobZ_viii))(module_instance, w2c_i0, w2c_i1, w2c_i2);
   w2c_i0 = 0u;

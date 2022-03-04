@@ -138,33 +138,6 @@ Program link_program( Elf_Info& elf_info,
   memcpy( (char*)program_mem + elf_info.code.size(), elf_info.rodata.data(), elf_info.rodata.size() );
 
   // Step 1: Add wasm-rt functions to func_map
-  elf_info.func_map.insert( pair<string, func>( "wasm_rt_trap", func( (uint64_t)wasm_rt_trap ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_register_func_type", func( (uint64_t)wasm_rt_register_func_type ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_allocate_memory", func( (uint64_t)wasm_rt_allocate_memory ) ) );
-  elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );
-  // elf_info.func_map.insert(
-  // pair<string, func>( "wasm_rt_call_stack_depth", func( (uint64_t)&wasm_rt_call_stack_depth ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "Z_envZ_attach_inputZ_vii", func( (uint64_t)&wasi::Z_envZ_attach_inputZ_vii ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "Z_envZ_attach_outputZ_viii", func( (uint64_t)&wasi::Z_envZ_attach_outputZ_viii ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "Z_envZ_move_lazy_inputZ_viii", func( (uint64_t)&wasi::Z_envZ_move_lazy_inputZ_viii ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "Z_envZ_get_intZ_iii", func( (uint64_t)&wasi::Z_envZ_get_intZ_iii ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "Z_envZ_store_intZ_vii", func( (uint64_t)&wasi::Z_envZ_store_intZ_vii ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "Z_envZ_set_encodeZ_vii", func( (uint64_t)&wasi::Z_envZ_set_encodeZ_vii ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "Z_envZ_add_pathZ_vii", func( (uint64_t)&wasi::Z_envZ_add_pathZ_vii ) ) );
-  elf_info.func_map.insert( pair<string, func>( "Z_envZ_attach_output_childZ_viiii",
-                                                func( (uint64_t)&wasi::Z_envZ_attach_output_childZ_viiii ) ) );
-  elf_info.func_map.insert( pair<string, func>( "__stack_chk_fail", func( (uint64_t)__stack_chk_fail ) ) );
 
   for ( const auto& reloc_entry : elf_info.reloctb ) {
     int idx = ELF64_R_SYM( reloc_entry.r_info );

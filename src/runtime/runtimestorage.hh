@@ -14,7 +14,6 @@
 #include "wasmcompiler.hh"
 
 #include "absl/container/flat_hash_map.h"
-#include "wasienv.hh"
 
 class RuntimeStorage
 {
