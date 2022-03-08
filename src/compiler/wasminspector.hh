@@ -1,5 +1,7 @@
 #pragma once
 
+#include <set>
+
 #include "src/cast.h"
 #include "src/common.h"
 #include "src/error.h"
@@ -17,7 +19,7 @@ public:
   WasmInspector& operator=( const WasmInspector& ) = default;
 
   wabt::Result ValidateMemAccess();
-  std::vector<std::string> GetImportedFunctions();
+  const std::set<std::string>& GetImportedFunctions();
   std::vector<uint32_t> GetExportedRO();
   std::vector<uint32_t> GetExportedRW();
 
@@ -44,7 +46,7 @@ private:
   wabt::ExprVisitor visitor_;
   wabt::Result result_ = wabt::Result::Ok;
 
-  std::vector<std::string> imported_functions_;
+  std::set<std::string> imported_functions_;
   std::vector<wabt::Index> exported_ro_;
   std::vector<wabt::Index> exported_rw_;
 };

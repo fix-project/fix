@@ -28,7 +28,7 @@ WasmInspector::WasmInspector( Module* module, Errors* errors )
   }
 
   for ( Import* import_ : module->imports ) {
-    imported_functions_.push_back( import_->field_name );
+    imported_functions_.insert( import_->field_name );
   }
 }
 
@@ -112,7 +112,7 @@ Result WasmInspector::CheckMemoryAccess( Var* memidx )
   }
 }
 
-vector<string> WasmInspector::GetImportedFunctions()
+const set<string>& WasmInspector::GetImportedFunctions()
 {
   return imported_functions_;
 }
