@@ -13,6 +13,8 @@
 
 #include "src/c-writer.h"
 
+#include "initcomposer.hh"
+
 using namespace std;
 using namespace wabt;
 
@@ -76,7 +78,7 @@ Result MemoryStringStream::TruncateImpl( size_t size )
   return Result::Ok;
 }
 
-pair<string, string> wasm_to_c( const string& wasm_name, const string& wasm_content )
+tuple<string, string, string> wasm_to_c( const string& wasm_name, const string& wasm_content )
 {
   Result result;
 
@@ -92,6 +94,7 @@ pair<string, string> wasm_to_c( const string& wasm_name, const string& wasm_cont
   result = ReadBinaryIr( wasm_name.c_str(), wasm_content.data(), wasm_content.size(), options, &errors, &module );
   MemoryStringStream c_stream;
   MemoryStringStream h_stream;
+  string fixpoint_header;
   if ( Succeeded( result ) ) {
     if ( Succeeded( result ) ) {
       ValidateOptions v_options( s_features );
@@ -109,12 +112,16 @@ pair<string, string> wasm_to_c( const string& wasm_name, const string& wasm_cont
     if ( Succeeded( result ) ) {
       result = WriteC( &c_stream, &h_stream, ( wasm_name + ".h" ).c_str(), &module, s_write_c_options );
     }
+
+    if ( Succeeded( result ) ) {
+      fixpoint_header = initcomposer::compose_header( wasm_name, &module, &errors );
+    }
   }
   FormatErrorsToFile( errors, Location::Type::Binary );
   if ( result != Result::Ok ) {
-    // TODO: throw exception
+    throw runtime_error( "WasmToC fails." );
   }
 
-  return { c_stream.ReleaseStringBuf(), h_stream.ReleaseStringBuf() };
+  return { c_stream.ReleaseStringBuf(), h_stream.ReleaseStringBuf(), fixpoint_header };
 }
 }

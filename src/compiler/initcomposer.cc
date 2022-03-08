@@ -49,7 +49,6 @@ public:
   InitComposer( const InitComposer& ) = default;
   InitComposer& operator=( const InitComposer& ) = default;
 
-  string compose_init();
   string compose_header();
 
 private:
@@ -76,7 +75,10 @@ void InitComposer::write_get_tree_entry()
             << "* module_instance, uint32_t src_ro_handle, uint32_t entry_num, uint32_t target_ro_handle) {"
             << endl;
     result_ << "  fixpoint_get_tree_entry(module_instance, src_ro_handle, entry_num, target_ro_handle);" << endl;
-    result_ << "}\n" << endl;
+    result_ << "}" << endl;
+    result_ << "void (*WASM_RT_ADD_PREFIX(Z_envZ_get_tree_entryZ_viii))(Z_addblob_module_instance_t *, u32, u32, "
+               "u32) = &get_tree_entry;\n"
+            << endl;
   }
 }
 
@@ -105,7 +107,10 @@ void InitComposer::write_attach_blob()
       result_ << "  }" << endl;
     }
     result_ << "  wasm_rt_trap(WASM_RT_TRAP_OOB);" << endl;
-    result_ << "}\n" << endl;
+    result_ << "}" << endl;
+    result_ << "void (*WASM_RT_ADD_PREFIX(Z_envZ_attach_blobZ_vii))(Z_addblob_module_instance_t *, u32, u32) = "
+               "&attach_blob;\n"
+            << endl;
   }
 }
 
@@ -134,7 +139,10 @@ void InitComposer::write_detach_mem()
       result_ << "  }" << endl;
     }
     result_ << "  wasm_rt_trap(WASM_RT_TRAP_OOB);" << endl;
-    result_ << "}\n" << endl;
+    result_ << "}" << endl;
+    result_ << "void (*WASM_RT_ADD_PREFIX(Z_envZ_detach_memZ_vii))(Z_addblob_module_instance_t *, u32, u32) = "
+               "&detach_mem;\n"
+            << endl;
   }
 }
 
@@ -146,7 +154,10 @@ void InitComposer::write_freeze_blob()
     result_ << "void freeze_blob(" << state_info_type_name_
             << "* module_instance, uint32_t rw_handle, uint32_t size, uint32_t ro_handle) {" << endl;
     result_ << "  fixpoint_freeze_blob(module_instance, rw_handle, size, ro_handle);" << endl;
-    result_ << "}\n" << endl;
+    result_ << "}" << endl;
+    result_ << "void (*WASM_RT_ADD_PREFIX(Z_envZ_freeze_blobZ_viii))(Z_addblob_module_instance_t *, u32, u32, u32) "
+               "= &freeze_blob;\n"
+            << endl;
   }
 }
 
@@ -158,50 +169,47 @@ void InitComposer::write_designate_output()
     result_ << "void designate_output(" << state_info_type_name_ << "* module_instance, uint32_t ro_handle) {"
             << endl;
     result_ << "  fixpoint_designate_output(module_instance, ro_handle);" << endl;
-    result_ << "}\n" << endl;
+    result_ << "}" << endl;
+    result_ << "void (*WASM_RT_ADD_PREFIX(Z_envZ_designate_outputZ_vi))(Z_addblob_module_instance_t *, u32) = "
+               "&designate_output;\n"
+            << endl;
   }
 }
 
-string compose_init( const string& wasm_name )
+string InitComposer::compose_header()
 {
-  ostringstream result;
+  Result memcheck = inspector_.ValidateMemAccess();
+  if ( memcheck != Result::Ok ) {
+    throw runtime_error( "Invalid mem access." );
+  }
 
-  // #include "wasm_name.h"
-  result << "#include \"" << wasm_name << ".h\"" << endl;
-  result << endl;
+  result_ = ostringstream();
+  result_ << "#include \"" << wasm_name_ << "_fixpoint.h\"" << endl;
+  result_ << endl;
 
-  //#include <stdint.h>
-  //#include <stddef.h>
-  result << "#include <stdint.h>" << endl;
-  result << "#include <stddef.h>" << endl;
-  result << endl;
-
-  // get name of module_instance_t
-  string module_instance_type = MangleStateInfoTypeName( wasm_name );
-
-  // static size_t memory_offset;
-  result << "static size_t memory_offset;" << endl;
-  result << endl;
-
-  // void initializeOffset() {
-  //   memory_offset = offsetof(_module_instance_t, w2c_M0);
-  // }
-  result << "void initializeOffset() {" << endl;
-  result << "  memory_offset = offsetof(" << module_instance_type << ", w2c_M0);" << endl;
-  result << "}" << endl;
-  result << endl;
+  write_get_tree_entry();
+  write_attach_blob();
+  write_detach_mem();
+  write_freeze_blob();
+  write_designate_output();
 
   // void executeProgram() {
   //   module_instance_t instance;
   //   init(&instance);
   //   start(&instance);
   // }
-  result << "void executeProgram() {" << endl;
-  result << "  " << module_instance_type << " instance;" << endl;
-  result << "  init(&instance);" << endl;
-  result << "  Z__fixpoint_applyZ_vv(&instance);" << endl;
-  result << "}" << endl;
+  result_ << "void executeProgram() {" << endl;
+  result_ << "  " << state_info_type_name_ << " instance;" << endl;
+  result_ << "  init(&instance);" << endl;
+  result_ << "  Z__fixpoint_applyZ_vv(&instance);" << endl;
+  result_ << "}" << endl;
 
-  return result.str();
+  return result_.str();
+}
+
+string compose_header( string wasm_name, Module* module, Errors* error )
+{
+  InitComposer composer( wasm_name, module, error );
+  return composer.compose_header();
 }
 }

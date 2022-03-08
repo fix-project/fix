@@ -12,13 +12,11 @@ using namespace std;
 int main( int argc, char* argv[] )
 {
   if ( argc != 6 ) {
-    cerr << "Usage: " << argv[0] << " wasm_name path_to_wasm_file path_to_c path_to_h path_to_init\n";
+    cerr << "Usage: " << argv[0] << " wasm_name path_to_wasm_file path_to_c path_to_h path_to_fixpoint_header\n";
   }
 
   string wasm_content = util::read_file( argv[2] );
-  auto [c_header, h_header] = wasmcompiler::wasm_to_c( argv[1], wasm_content );
-  string init;
-  init = initcomposer::compose_init( argv[1] );
+  auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( argv[1], wasm_content );
 
   ofstream fout_c( argv[3] );
   fout_c << c_header;
@@ -28,9 +26,9 @@ int main( int argc, char* argv[] )
   fout_h << h_header;
   fout_h.close();
 
-  ofstream fout_init( argv[5] );
-  fout_init << init;
-  fout_init.close();
+  ofstream fout_fixpoint( argv[5] );
+  fout_fixpoint << fixpoint_header;
+  fout_fixpoint.close();
 
   return 0;
 }
