@@ -19,6 +19,7 @@ public:
   WasmInspector& operator=( const WasmInspector& ) = default;
 
   wabt::Result ValidateMemAccess();
+  wabt::Result ValidateImports();
   const std::set<std::string>& GetImportedFunctions();
   std::vector<uint32_t> GetExportedRO();
   std::vector<uint32_t> GetExportedRW();

@@ -17,6 +17,7 @@
 #include "wasm-rt-impl.hh"
 
 #include <assert.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -26,12 +27,14 @@
 
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
 #include <signal.h>
-#include <sys/mman.h>
 #include <unistd.h>
 #endif
 
-#include "timer.hh"
-#include "timing_helper.hh"
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/mman.h>
+#endif
 
 #define PAGE_SIZE 65536
 
@@ -63,7 +66,7 @@ static bool func_types_are_equal( FuncType* a, FuncType* b )
 {
   if ( a->param_count != b->param_count || a->result_count != b->result_count )
     return 0;
-  size_t i;
+  uint32_t i;
   for ( i = 0; i < a->param_count; ++i )
     if ( a->params[i] != b->params[i] )
       return 0;
@@ -77,9 +80,9 @@ uint32_t wasm_rt_register_func_type( uint32_t param_count, uint32_t result_count
 {
   FuncType func_type;
   func_type.param_count = param_count;
-  func_type.params = reinterpret_cast<wasm_rt_type_t*>( malloc( param_count * sizeof( wasm_rt_type_t ) ) );
+  func_type.params = (wasm_rt_type_t*)malloc( param_count * sizeof( wasm_rt_type_t ) );
   func_type.result_count = result_count;
-  func_type.results = reinterpret_cast<wasm_rt_type_t*>( malloc( result_count * sizeof( wasm_rt_type_t ) ) );
+  func_type.results = (wasm_rt_type_t*)malloc( result_count * sizeof( wasm_rt_type_t ) );
 
   va_list args;
   va_start( args, result_count );
@@ -100,7 +103,7 @@ uint32_t wasm_rt_register_func_type( uint32_t param_count, uint32_t result_count
   }
 
   uint32_t idx = g_func_type_count++;
-  g_func_types = reinterpret_cast<FuncType*>( realloc( g_func_types, g_func_type_count * sizeof( FuncType ) ) );
+  g_func_types = (FuncType*)realloc( g_func_types, g_func_type_count * sizeof( FuncType ) );
   g_func_types[idx] = func_type;
   return idx + 1;
 }
@@ -108,22 +111,82 @@ uint32_t wasm_rt_register_func_type( uint32_t param_count, uint32_t result_count
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
 static void signal_handler( int sig, siginfo_t* si, void* unused )
 {
-  if ( sig == si->si_signo && unused == NULL ) {
-    wasm_rt_trap( WASM_RT_TRAP_OOB );
+  (void)sig;
+  (void)si;
+  (void)unused;
+  wasm_rt_trap( WASM_RT_TRAP_OOB );
+}
+#endif
+
+#ifdef _WIN32
+static void* os_mmap( size_t size )
+{
+  return VirtualAlloc( NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_NOACCESS );
+}
+
+static int os_munmap( void* addr, size_t size )
+{
+  BOOL succeeded = VirtualFree( addr, size, MEM_RELEASE );
+  return succeeded ? 0 : -1;
+}
+
+static int os_mprotect( void* addr, size_t size )
+{
+  DWORD old;
+  BOOL succeeded = VirtualProtect( (LPVOID)addr, size, PAGE_READWRITE, &old );
+  return succeeded ? 0 : -1;
+}
+
+static void os_print_last_error( const char* msg )
+{
+  DWORD errorMessageID = GetLastError();
+  if ( errorMessageID != 0 ) {
+    LPSTR messageBuffer = 0;
+    // The api creates the buffer that holds the message
+    size_t size
+      = FormatMessageA( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                        NULL,
+                        errorMessageID,
+                        MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
+                        (LPSTR)&messageBuffer,
+                        0,
+                        NULL );
+    (void)size;
+    printf( "%s. %s\n", msg, messageBuffer );
+    LocalFree( messageBuffer );
   } else {
-    throw std::runtime_error( "Unmatched signo" );
+    printf( "%s. No error code.\n", msg );
   }
+}
+#else
+static void* os_mmap( size_t size )
+{
+  int map_prot = PROT_NONE;
+  int map_flags = MAP_ANONYMOUS | MAP_PRIVATE;
+  uint8_t* addr = (uint8_t*)mmap( NULL, size, map_prot, map_flags, -1, 0 );
+  if ( addr == MAP_FAILED )
+    return NULL;
+  return addr;
+}
+
+static int os_munmap( void* addr, size_t size )
+{
+  return munmap( addr, size );
+}
+
+static int os_mprotect( void* addr, size_t size )
+{
+  return mprotect( addr, size, PROT_READ | PROT_WRITE );
+}
+
+static void os_print_last_error( const char* msg )
+{
+  perror( msg );
 }
 #endif
 
 void wasm_rt_allocate_memory( wasm_rt_memory_t* memory, uint32_t initial_pages, uint32_t max_pages )
-{ 
-  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _memory_init_cheap };
-  if ( memory->pages != 0 ) {
-    // memset( memory->data, 0, memory->pages * PAGE_SIZE );
-    return;
-  } 
-	
+{
   uint32_t byte_length = initial_pages * PAGE_SIZE;
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
   if ( !g_signal_handler_installed ) {
@@ -141,16 +204,18 @@ void wasm_rt_allocate_memory( wasm_rt_memory_t* memory, uint32_t initial_pages, 
   }
 
   /* Reserve 8GiB. */
-  void* addr;
+  void* addr = os_mmap( 0x200000000ul );
 
-  addr = mmap( NULL, 0x200000000ul, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 );
   if ( addr == (void*)-1 ) {
-    perror( "mmap failed" );
+    os_print_last_error( "os_mmap failed." );
     abort();
   }
-
-  mprotect( addr, byte_length, PROT_READ | PROT_WRITE );
-  memory->data = reinterpret_cast<unsigned char*>( addr );
+  int ret = os_mprotect( addr, byte_length );
+  if ( ret != 0 ) {
+    os_print_last_error( "os_mprotect failed." );
+    abort();
+  }
+  memory->data = (uint8_t*)addr;
 #else
   memory->data = calloc( byte_length, 1 );
 #endif
@@ -174,13 +239,22 @@ uint32_t wasm_rt_grow_memory( wasm_rt_memory_t* memory, uint32_t delta )
   uint32_t delta_size = delta * PAGE_SIZE;
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
   uint8_t* new_data = memory->data;
-  mprotect( new_data + old_size, delta_size, PROT_READ | PROT_WRITE );
+  int ret = os_mprotect( new_data + old_size, delta_size );
+  if ( ret != 0 ) {
+    return (uint32_t)-1;
+  }
 #else
   uint8_t* new_data = realloc( memory->data, new_size );
   if ( new_data == NULL ) {
     return (uint32_t)-1;
   }
+#if !WABT_BIG_ENDIAN
   memset( new_data + old_size, 0, delta_size );
+#endif
+#endif
+#if WABT_BIG_ENDIAN
+  memmove( new_data + new_size - old_size, new_data, old_size );
+  memset( new_data, 0, delta_size );
 #endif
   memory->pages = new_pages;
   memory->size = new_size;
@@ -188,9 +262,122 @@ uint32_t wasm_rt_grow_memory( wasm_rt_memory_t* memory, uint32_t delta )
   return old_pages;
 }
 
+void wasm_rt_free_memory( wasm_rt_memory_t* memory )
+{
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
+  os_munmap( memory->data, memory->size ); // ignore error?
+#else
+  free( memory->data );
+#endif
+}
+
+#ifdef _WIN32
+static float quiet_nanf( float x )
+{
+  uint32_t tmp;
+  memcpy( &tmp, &x, 4 );
+  tmp |= 0x7fc00000lu;
+  memcpy( &x, &tmp, 4 );
+  return x;
+}
+
+static double quiet_nan( double x )
+{
+  uint64_t tmp;
+  memcpy( &tmp, &x, 8 );
+  tmp |= 0x7ff8000000000000llu;
+  memcpy( &x, &tmp, 8 );
+  return x;
+}
+
+double wasm_rt_trunc( double x )
+{
+  if ( isnan( x ) ) {
+    return quiet_nan( x );
+  }
+  return trunc( x );
+}
+
+float wasm_rt_truncf( float x )
+{
+  if ( isnan( x ) ) {
+    return quiet_nanf( x );
+  }
+  return truncf( x );
+}
+
+float wasm_rt_nearbyintf( float x )
+{
+  if ( isnan( x ) ) {
+    return quiet_nanf( x );
+  }
+  return nearbyintf( x );
+}
+
+double wasm_rt_nearbyint( double x )
+{
+  if ( isnan( x ) ) {
+    return quiet_nan( x );
+  }
+  return nearbyint( x );
+}
+
+float wasm_rt_fabsf( float x )
+{
+  if ( isnan( x ) ) {
+    uint32_t tmp;
+    memcpy( &tmp, &x, 4 );
+    tmp = tmp & ~( 1 << 31 );
+    memcpy( &x, &tmp, 4 );
+    return x;
+  }
+  return fabsf( x );
+}
+
+double wasm_rt_fabs( double x )
+{
+  if ( isnan( x ) ) {
+    uint64_t tmp;
+    memcpy( &tmp, &x, 8 );
+    tmp = tmp & ~( 1ll << 63 );
+    memcpy( &x, &tmp, 8 );
+    return x;
+  }
+  return fabs( x );
+}
+#endif
+
 void wasm_rt_allocate_table( wasm_rt_table_t* table, uint32_t elements, uint32_t max_elements )
 {
   table->size = elements;
   table->max_size = max_elements;
-  table->data = reinterpret_cast<wasm_rt_elem_t*>( calloc( table->size, sizeof( wasm_rt_elem_t ) ) );
+  table->data = (wasm_rt_elem_t*)calloc( table->size, sizeof( wasm_rt_elem_t ) );
+}
+
+void wasm_rt_free_table( wasm_rt_table_t* table )
+{
+  free( table->data );
+}
+
+const char* wasm_rt_strerror( wasm_rt_trap_t trap )
+{
+  switch ( trap ) {
+    case WASM_RT_TRAP_NONE:
+      return "No error";
+    case WASM_RT_TRAP_OOB:
+      return "Out-of-bounds access in linear memory";
+    case WASM_RT_TRAP_INT_OVERFLOW:
+      return "Integer overflow on divide or truncation";
+    case WASM_RT_TRAP_DIV_BY_ZERO:
+      return "Integer divide by zero";
+    case WASM_RT_TRAP_INVALID_CONVERSION:
+      return "Conversion from NaN to integer";
+    case WASM_RT_TRAP_UNREACHABLE:
+      return "Unreachable instruction executed";
+    case WASM_RT_TRAP_CALL_INDIRECT:
+      return "Invalid call_indirect";
+    case WASM_RT_TRAP_EXHAUSTION:
+      return "Call stack exhausted";
+  }
+  return "invalid trap code";
 }

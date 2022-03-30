@@ -61,4 +61,4 @@ extern "C"
 }
 #endif
 
-#endif // WASM_RT_IMPL_H_
+#endif /* WASM_RT_IMPL_H_ */

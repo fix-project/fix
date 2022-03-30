@@ -9,15 +9,9 @@ extern "C" {
 
 #include "wasm-rt.h"
 
-#ifndef WASM_RT_MODULE_PREFIX
-#define WASM_RT_MODULE_PREFIX
-#endif
-
-#define WASM_RT_PASTE_(x, y) x ## y
-#define WASM_RT_PASTE(x, y) WASM_RT_PASTE_(x, y)
-#define WASM_RT_ADD_PREFIX(x) WASM_RT_PASTE(WASM_RT_MODULE_PREFIX, x)
-
 /* TODO(binji): only use stdint.h types in header */
+#ifndef WASM_RT_CORE_TYPES_DEFINED
+#define WASM_RT_CORE_TYPES_DEFINED
 typedef uint8_t u8;
 typedef int8_t s8;
 typedef uint16_t u16;
@@ -28,8 +22,12 @@ typedef uint64_t u64;
 typedef int64_t s64;
 typedef float f32;
 typedef double f64;
+#endif
 
-typedef struct {
+struct Z_env_module_instance_t;
+
+typedef struct Z_addblob_module_instance_t {
+  struct Z_env_module_instance_t* Z_env_module_instance;
   wasm_rt_memory_t w2c_ro_mem_0;
   wasm_rt_memory_t w2c_ro_mem_1;
   wasm_rt_memory_t w2c_rw_mem_0;
@@ -37,26 +35,29 @@ typedef struct {
   uint32_t wasm_rt_call_stack_depth;
 } Z_addblob_module_instance_t;
 
-extern void WASM_RT_ADD_PREFIX(init)(Z_addblob_module_instance_t *);
+extern void Z_addblob_init_module();
+extern void Z_addblob_init(Z_addblob_module_instance_t*, struct Z_env_module_instance_t*);
+extern void Z_addblob_free(Z_addblob_module_instance_t*);
 
-/* import: 'env' 'get_tree_entry' */
-extern void (*WASM_RT_ADD_PREFIX(Z_envZ_get_tree_entryZ_viii))(Z_addblob_module_instance_t *, u32, u32, u32);
 /* import: 'env' 'attach_blob' */
-extern void (*WASM_RT_ADD_PREFIX(Z_envZ_attach_blobZ_vii))(Z_addblob_module_instance_t *, u32, u32);
-/* import: 'env' 'detach_mem' */
-extern void (*WASM_RT_ADD_PREFIX(Z_envZ_detach_memZ_vii))(Z_addblob_module_instance_t *, u32, u32);
-/* import: 'env' 'freeze_blob' */
-extern void (*WASM_RT_ADD_PREFIX(Z_envZ_freeze_blobZ_viii))(Z_addblob_module_instance_t *, u32, u32, u32);
+extern void Z_addblob_Z_env_Z_attach_blob(struct Z_env_module_instance_t*, u32, u32);
 /* import: 'env' 'designate_output' */
-extern void (*WASM_RT_ADD_PREFIX(Z_envZ_designate_outputZ_vi))(Z_addblob_module_instance_t *, u32);
+extern void Z_addblob_Z_env_Z_designate_output(struct Z_env_module_instance_t*, u32);
+/* import: 'env' 'detach_mem' */
+extern void Z_addblob_Z_env_Z_detach_mem(struct Z_env_module_instance_t*, u32, u32);
+/* import: 'env' 'freeze_blob' */
+extern void Z_addblob_Z_env_Z_freeze_blob(struct Z_env_module_instance_t*, u32, u32, u32);
+/* import: 'env' 'get_tree_entry' */
+extern void Z_addblob_Z_env_Z_get_tree_entry(struct Z_env_module_instance_t*, u32, u32, u32);
+
 /* export: '_fixpoint_apply' */
-extern void (*WASM_RT_ADD_PREFIX(Z__fixpoint_applyZ_vv))(Z_addblob_module_instance_t *);
+extern void Z_addblob_Z__fixpoint_apply(Z_addblob_module_instance_t*);
 /* export: 'ro_mem_0' */
-extern wasm_rt_memory_t* WASM_RT_ADD_PREFIX(Z_ro_mem_0)(Z_addblob_module_instance_t *module_instance);
+extern wasm_rt_memory_t* Z_addblob_Z_ro_mem_0(Z_addblob_module_instance_t* module_instance);
 /* export: 'ro_mem_1' */
-extern wasm_rt_memory_t* WASM_RT_ADD_PREFIX(Z_ro_mem_1)(Z_addblob_module_instance_t *module_instance);
+extern wasm_rt_memory_t* Z_addblob_Z_ro_mem_1(Z_addblob_module_instance_t* module_instance);
 /* export: 'rw_mem_0' */
-extern wasm_rt_memory_t* WASM_RT_ADD_PREFIX(Z_rw_mem_0)(Z_addblob_module_instance_t *module_instance);
+extern wasm_rt_memory_t* Z_addblob_Z_rw_mem_0(Z_addblob_module_instance_t* module_instance);
 #ifdef __cplusplus
 }
 #endif

@@ -102,6 +102,30 @@ Result WasmInspector::ValidateMemAccess()
   return result_;
 }
 
+Result WasmInspector::ValidateImports()
+{
+  for ( Import* import : current_module_->imports ) {
+    switch ( import->kind() ) {
+      case ExternalKind::Global:
+      case ExternalKind::Memory:
+      case ExternalKind::Table: {
+        break;
+      }
+
+      case ExternalKind::Func: {
+        if ( import->module_name != "env" ) {
+          return Result::Error;
+        }
+        break;
+      }
+
+      default:
+        return Result::Error;
+    }
+  }
+  return Result::Ok;
+}
+
 Result WasmInspector::CheckMemoryAccess( Var* memidx )
 {
   if ( find( exported_ro_.begin(), exported_ro_.end(), current_module_->GetMemoryIndex( *memidx ) )

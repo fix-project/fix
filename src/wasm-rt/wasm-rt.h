@@ -17,10 +17,30 @@
 #ifndef WASM_RT_H_
 #define WASM_RT_H_
 
+#include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef __has_builtin
+#define __has_builtin(x) 0  // Compatibility with non-clang compilers.
+#endif
+
+#if __has_builtin(__builtin_expect)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#else
+#define UNLIKELY(x) (x)
+#define LIKELY(x) (x)
+#endif
+
+#if __has_builtin(__builtin_memcpy)
+#define wasm_rt_memcpy __builtin_memcpy
+#else
+#define wasm_rt_memcpy memcpy
 #endif
 
 /** Maximum stack depth before trapping. This can be configured by defining
@@ -68,6 +88,12 @@ extern "C" {
 
 #endif
 
+#if defined(_MSC_VER)
+#define WASM_RT_NO_RETURN __declspec(noreturn)
+#else
+#define WASM_RT_NO_RETURN __attribute__((noreturn))
+#endif
+
 /** Reason a trap occurred. Provide this to `wasm_rt_trap`. */
 typedef enum {
   WASM_RT_TRAP_NONE,         /** No error. */
@@ -91,7 +117,7 @@ typedef enum {
 /** A function type for all `funcref` functions in a Table. All functions are
  * stored in this canonical form, but must be cast to their proper signature to
  * call. */
-typedef void ( *wasm_rt_funcref_t )( void );
+typedef void (*wasm_rt_funcref_t)(void);
 
 /** A single element of a Table. */
 typedef struct {
@@ -100,6 +126,9 @@ typedef struct {
   /** The function. The embedder must know the actual C signature of the
    * function and cast to it before calling. */
   wasm_rt_funcref_t func;
+  /** The module instance. The pointer to the module instance that should
+   * be passed into the function. */
+  void* module_instance;
 } wasm_rt_elem_t;
 
 /** A Memory object. */
@@ -128,7 +157,12 @@ typedef struct {
  *  The result of `wasm_rt_try` will be the provided trap reason.
  *
  *  This is typically called by the generated code, and not the embedder. */
-extern void wasm_rt_trap(wasm_rt_trap_t) __attribute__((noreturn));
+WASM_RT_NO_RETURN void wasm_rt_trap(wasm_rt_trap_t);
+
+/**
+ * Return a human readable error string based on a trap type.
+ */
+const char* wasm_rt_strerror(wasm_rt_trap_t trap);
 
 /** Register a function type with the given signature. The returned function
  * index is guaranteed to be the same for all calls with the same signature.
@@ -179,6 +213,11 @@ extern void wasm_rt_allocate_memory(wasm_rt_memory_t*,
  *  ``` */
 extern uint32_t wasm_rt_grow_memory(wasm_rt_memory_t*, uint32_t pages);
 
+/**
+ * Free a Memory object.
+ */
+extern void wasm_rt_free_memory(wasm_rt_memory_t*);
+
 /** Initialize a Table object with an element count of `elements` and a maximum
  * page size of `max_elements`.
  *
@@ -190,6 +229,27 @@ extern uint32_t wasm_rt_grow_memory(wasm_rt_memory_t*, uint32_t pages);
 extern void wasm_rt_allocate_table(wasm_rt_table_t*,
                                    uint32_t elements,
                                    uint32_t max_elements);
+
+/**
+ * Free a Table object.
+ */
+extern void wasm_rt_free_table(wasm_rt_table_t*);
+
+#ifdef _WIN32
+float wasm_rt_truncf(float x);
+double wasm_rt_trunc(double x);
+float wasm_rt_nearbyintf(float x);
+double wasm_rt_nearbyint(double x);
+float wasm_rt_fabsf(float x);
+double wasm_rt_fabs(double x);
+#else
+#define wasm_rt_truncf(x) truncf(x)
+#define wasm_rt_trunc(x) trunc(x)
+#define wasm_rt_nearbyintf(x) nearbyintf(x)
+#define wasm_rt_nearbyint(x) nearbyint(x)
+#define wasm_rt_fabsf(x) fabsf(x)
+#define wasm_rt_fabs(x) fabs(x)
+#endif
 
 #ifdef __cplusplus
 }
