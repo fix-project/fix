@@ -211,10 +211,10 @@ string InitComposer::compose_header()
   write_freeze_blob();
   write_designate_output();
 
-  result_ << "extern void* init_module_instance(size_t);" << endl;
+  result_ << "extern void* fixpoint_init_module_instance(size_t);" << endl;
   result_ << "void executeProgram() {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_
-          << "*)init_module_instance(sizeof(" << state_info_type_name_ << "));" << endl;
+          << "*)fixpoint_init_module_instance(sizeof(" << state_info_type_name_ << "));" << endl;
   result_ << "  Z_env_module_instance_t env_module_instance;" << endl;
   result_ << "  env_module_instance.module_instance = instance;" << endl;
   result_ << "  " << module_prefix_ << "init(instance, &env_module_instance);" << endl;

@@ -138,15 +138,34 @@ Program link_program( Elf_Info& elf_info,
   memcpy( (char*)program_mem + elf_info.code.size(), elf_info.rodata.data(), elf_info.rodata.size() );
 
   // Step 1: Add wasm-rt functions to func_map
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_trap", func( (uint64_t)wasm_rt_trap ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "wasm_rt_register_func_type", func( (uint64_t)wasm_rt_register_func_type ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "wasm_rt_allocate_memory", func( (uint64_t)wasm_rt_allocate_memory ) ) );
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_free_memory", func( (uint64_t)wasm_rt_free_memory ) ) );
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_free_table", func( (uint64_t)wasm_rt_free_table ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "fixpoint_get_tree_entry", func( (uint64_t)fixpoint::get_tree_entry ) ) );
+  elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_blob", func( (uint64_t)fixpoint::attach_blob ) ) );
+  elf_info.func_map.insert( pair<string, func>( "fixpoint_detach_mem", func( (uint64_t)fixpoint::detach_mem ) ) );
+  elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_blob", func( (uint64_t)fixpoint::freeze_blob ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "fixpoint_designate_output", func( (uint64_t)fixpoint::designate_output ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "fixpoint_init_module_instance", func( (uint64_t)fixpoint::init_module_instance ) ) );
 
   for ( const auto& reloc_entry : elf_info.reloctb ) {
     int idx = ELF64_R_SYM( reloc_entry.r_info );
 
     // Do nothing for w2c_memory
-    if ( ELF64_R_TYPE( reloc_entry.r_info ) == 23 ) {
-      *( (int32_t*)( reinterpret_cast<char*>( program_mem ) + reloc_entry.r_offset ) ) = (int32_t)( -40 );
-      continue;
-    }
+    // if ( ELF64_R_TYPE( reloc_entry.r_info ) == 23 ) {
+    //  *( (int32_t*)( reinterpret_cast<char*>( program_mem ) + reloc_entry.r_offset ) ) = (int32_t)( -40 );
+    //  continue;
+    //}
 
     int64_t rel_offset;
     if ( ELF64_R_TYPE( reloc_entry.r_info ) == 2 || ELF64_R_TYPE( reloc_entry.r_info ) == 4 ) {
@@ -156,6 +175,7 @@ Program link_program( Elf_Info& elf_info,
     } else {
       throw out_of_range( "Relocation type not supported." );
     }
+
     // Check whether is a section
     if ( ELF64_ST_TYPE( elf_info.symtb[idx].st_info ) == STT_SECTION ) {
       string sec_name = string( elf_info.namestrs.data() + elf_info.sheader[elf_info.symtb[idx].st_shndx].sh_name );
@@ -204,7 +224,6 @@ Program link_program( Elf_Info& elf_info,
   // cout << endl;
 
   shared_ptr<char> code( reinterpret_cast<char*>( program_mem ) );
-  uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "init" ).idx].st_value;
-  uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "w2c__start" ).idx].st_value;
-  return Program( program_name, move( inputs ), move( outputs ), code, init_entry, main_entry, 0 );
+  uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "executeProgram" ).idx].st_value;
+  return Program( program_name, move( inputs ), move( outputs ), code, main_entry );
 }

@@ -69,7 +69,7 @@ string c_to_elf( const string& wasm_name,
   // Setup mcmodel
   auto& codegenOptions = compilerInstance.getCodeGenOpts();
   codegenOptions.CodeModel = "medium";
-  codegenOptions.RelocationModel = llvm::Reloc::Model::Static;
+  codegenOptions.RelocationModel = llvm::Reloc::Static;
 
   LLVMContext context;
   CodeGenAction* action = new EmitLLVMOnlyAction( &context );
