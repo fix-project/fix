@@ -44,7 +44,7 @@ public:
   void* execute() const
   {
     void* ( *main_func )();
-    main_func = reinterpret_cast<void* ( * )()>( code_.get() + main_entry_ );
+    main_func = reinterpret_cast<void* (*)()>( code_.get() + main_entry_ );
     return main_func();
   }
 

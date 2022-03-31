@@ -162,10 +162,12 @@ Program link_program( Elf_Info& elf_info,
     int idx = ELF64_R_SYM( reloc_entry.r_info );
 
     int64_t rel_offset;
-    if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PC32 || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PLT32 ) {
+    if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PC32
+         || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PLT32 ) {
       // S + A - P or L + A - P
       rel_offset = reloc_entry.r_addend - (int64_t)program_mem - reloc_entry.r_offset;
-    } else if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_64 || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_32 ) {
+    } else if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_64
+                || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_32 ) {
       // S + A
       rel_offset = reloc_entry.r_addend;
     } else {

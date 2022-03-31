@@ -48,6 +48,9 @@ public:
   Instance( const Instance& ) = default;
   Instance& operator=( const Instance& ) = default;
 
-  void setOutput(Name name) { output_ = name; }
+  MutableValueReference* getRWHandles() { return &rw_handle[0]; }
+  ObjectReference* getROHandles() { return &ro_handle[0]; }
+
+  void setOutput( Name name ) { output_ = name; }
   Name getOutput() { return output_; }
 };

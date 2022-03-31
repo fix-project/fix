@@ -1,6 +1,7 @@
 #pragma once
 
 #include "name.hh"
+#include "tree.hh"
 
 struct MutableValueMeta
 {
@@ -28,11 +29,14 @@ private:
 
 public:
   ~MutableValue();
+
+  void setData( uint8_t* val ) { data = val; }
+  uint8_t* getData() { return data; }
 };
 
-class MBlob : MutableValue
+class MBlob : public MutableValue
 {};
-class MTree : MutableValue
+class MTree : public MutableValue
 {};
 
 struct ObjectReference
@@ -42,8 +46,24 @@ struct ObjectReference
 
   ObjectReference()
     : name_()
+    , accessible_( true ) {};
+
+  ObjectReference( TreeEntry entry )
+    : name_( entry.first )
     , accessible_( true )
-  {}
+  {
+    switch ( entry.second ) {
+      case Laziness::Strict:
+        accessible_ = true;
+        break;
+      default:
+        accessible_ = false;
+    }
+  }
+
+  ObjectReference( Name name )
+    : name_( name )
+    , accessible_( true ) {};
 };
 
 using MutableValueReference = MutableValue*;

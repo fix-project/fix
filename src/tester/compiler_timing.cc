@@ -23,8 +23,7 @@ int main( int argc, char* argv[] )
   runtime.addWasm( "add", wasm_content, vector<string>() );
 
   int iterations = atoi( argv[2] );
-  for ( int i = 0; i < iterations; i++ )
-  {
+  for ( int i = 0; i < iterations; i++ ) {
     int arg1 = i;
     int arg2 = i + 1;
     Name arg1_name = runtime.addBlob( move( string( reinterpret_cast<char*>( &arg1 ), sizeof( int ) ) ) );
@@ -35,8 +34,7 @@ int main( int argc, char* argv[] )
     inputs.push_back( arg2_name );
     Name strict_input = runtime.addTree( move( inputs ) );
 
-    Name encode_name
-      = runtime.addEncode( Name( "add", NameType::Canonical, ContentType::Blob ), strict_input );
+    Name encode_name = runtime.addEncode( Name( "add", NameType::Canonical, ContentType::Blob ), strict_input );
     vector<size_t> path = { 0 };
 
     Thunk res( encode_name, path );

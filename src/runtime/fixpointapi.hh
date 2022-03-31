@@ -17,7 +17,7 @@ void attach_blob( void* module_instance, wasm_rt_memory_t* target_memory, uint32
 void detach_mem( void* module_instance, wasm_rt_memory_t* target_memory, uint32_t rw_handle );
 
 /* Traps if the rw_handle does not refer to an MBlob, or the specified size is larger than the size of the MBlob. */
-void freeze_blob( void* module_instance, size_t size, uint32_t ro_handle );
+void freeze_blob( void* module_instance, uint32_t rw_handle, size_t size, uint32_t ro_handle );
 
 /* Traps if ro_hander refers to nothing or is not accessible. */
 void designate_output( void* module_instance, uint32_t ro_handle );

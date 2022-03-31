@@ -30,8 +30,7 @@ int main( int argc, char* argv[] )
   inputs.push_back( arg2_name );
   Name strict_input = runtime.addTree( move( inputs ) );
 
-  Name encode_name
-    = runtime.addEncode( Name( "add", NameType::Canonical, ContentType::Blob ), strict_input );
+  Name encode_name = runtime.addEncode( Name( "add", NameType::Canonical, ContentType::Blob ), strict_input );
   vector<size_t> path = { 0 };
 
   Thunk res( encode_name, path );
