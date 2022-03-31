@@ -25,12 +25,16 @@ private:
   // Read-write handles
   MutableValueReference rw_handle[16];
 
+  // Output
+  Name output_;
+
 public:
   Instance( std::string program_name, Name encode_name )
     : program_name_( program_name )
     , encode_name_( encode_name )
     , ro_handle()
     , rw_handle()
+    , output_()
   {}
 
   Instance()
@@ -38,8 +42,12 @@ public:
     , encode_name_()
     , ro_handle()
     , rw_handle()
+    , output_()
   {}
 
   Instance( const Instance& ) = default;
   Instance& operator=( const Instance& ) = default;
+
+  void setOutput(Name name) { output_ = name; }
+  Name getOutput() { return output_; }
 };

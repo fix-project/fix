@@ -41,11 +41,11 @@ public:
     , main_entry_( main_entry )
   {}
 
-  void execute() const
+  void* execute() const
   {
-    void ( *main_func )();
-    main_func = reinterpret_cast<void ( * )()>( code_.get() + main_entry_ );
-    main_func();
+    void* ( *main_func )();
+    main_func = reinterpret_cast<void* ( * )()>( code_.get() + main_entry_ );
+    return main_func();
   }
 
   const std::vector<std::string>& getInputSymbols() const { return inputs_; }

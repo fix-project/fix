@@ -24,7 +24,7 @@ set(FETCHCONTENT_QUIET OFF)
 FetchContent_Declare(
   wabt
   GIT_REPOSITORY https://github.com/fixpointOS/wabt
-  GIT_TAG        module_instancing
+  GIT_TAG        module_instancing 
   )
 set(BUILD_TESTS off)
 set(BUILD_LIBWASM off)

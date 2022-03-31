@@ -81,11 +81,11 @@ struct Elf_Info
   std::map<std::string, func> func_map;
 
   Elf_Info()
-    : text_idx( 0 )
+    : text_idx( std::numeric_limits<uint64_t>::max() )
     , code()
-    , rodata_idx( 0 )
+    , rodata_idx( std::numeric_limits<uint64_t>::max() )
     , rodata()
-    , bss_idx( 0 )
+    , bss_idx( std::numeric_limits<uint64_t>::max() )
     , bss_size( 0 )
     , com_size( 0 )
     , symstrs()

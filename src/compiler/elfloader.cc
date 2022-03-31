@@ -161,16 +161,12 @@ Program link_program( Elf_Info& elf_info,
   for ( const auto& reloc_entry : elf_info.reloctb ) {
     int idx = ELF64_R_SYM( reloc_entry.r_info );
 
-    // Do nothing for w2c_memory
-    // if ( ELF64_R_TYPE( reloc_entry.r_info ) == 23 ) {
-    //  *( (int32_t*)( reinterpret_cast<char*>( program_mem ) + reloc_entry.r_offset ) ) = (int32_t)( -40 );
-    //  continue;
-    //}
-
     int64_t rel_offset;
-    if ( ELF64_R_TYPE( reloc_entry.r_info ) == 2 || ELF64_R_TYPE( reloc_entry.r_info ) == 4 ) {
+    if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PC32 || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PLT32 ) {
+      // S + A - P or L + A - P
       rel_offset = reloc_entry.r_addend - (int64_t)program_mem - reloc_entry.r_offset;
-    } else if ( ELF64_R_TYPE( reloc_entry.r_info ) == 1 || ELF64_R_TYPE( reloc_entry.r_info ) == 10 ) {
+    } else if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_64 || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_32 ) {
+      // S + A
       rel_offset = reloc_entry.r_addend;
     } else {
       throw out_of_range( "Relocation type not supported." );
@@ -215,13 +211,6 @@ Program link_program( Elf_Info& elf_info,
       *( (int32_t*)( reinterpret_cast<char*>( program_mem ) + reloc_entry.r_offset ) ) = (int32_t)rel_offset;
     }
   }
-
-  // cout << "Program mem at " << program_mem << endl;
-  // for (size_t i = 0; i < elf_info.code.size(); i++ )
-  // {
-  // printf(" %02x", ((unsigned char *)program_mem)[i]);
-  // }
-  // cout << endl;
 
   shared_ptr<char> code( reinterpret_cast<char*>( program_mem ) );
   uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "executeProgram" ).idx].st_value;
