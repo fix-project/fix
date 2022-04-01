@@ -5,7 +5,7 @@
 
 namespace fixpoint {
 /* Initialize module instance*/
-void* init_module_instance( size_t instance_size );
+void* init_module_instance( size_t instance_size, void* encode_name );
 
 /* Traps if src_handle is not accessible, or not a Tree.
  * Also traps if entry_num is too big.*/

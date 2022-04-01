@@ -3,14 +3,14 @@
 
 namespace fixpoint {
 // instance_size is the size of the WASM instance
-void* init_module_instance( size_t instance_size )
+void* init_module_instance( size_t instance_size, void* encode_name )
 {
   // allocate enough memory to hold FP instance and WASM instance
   Instance* ptr;
   ptr = (Instance*)malloc( sizeof( Instance ) + instance_size );
 
   // place the FP instance at the beginning of this region
-  ptr[0] = Instance();
+  ptr[0] = Instance( (Name*)encode_name );
 
   // advance to the end of the FP instance/beginning of the WASM instance, return a void* point to this spot
   ptr++;

@@ -7,11 +7,17 @@
 
 #define TRAP(x) (wasm_rt_trap(WASM_RT_TRAP_##x), 0)
 
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER
+#define FUNC_PROLOGUE
+
+#define FUNC_EPILOGUE
+#else
 #define FUNC_PROLOGUE                                            \
-  if (++module_instance->wasm_rt_call_stack_depth > WASM_RT_MAX_CALL_STACK_DEPTH) \
+  if (++wasm_rt_call_stack_depth > WASM_RT_MAX_CALL_STACK_DEPTH) \
     TRAP(EXHAUSTION)
 
-#define FUNC_EPILOGUE --module_instance->wasm_rt_call_stack_depth
+#define FUNC_EPILOGUE --wasm_rt_call_stack_depth
+#endif
 
 #define UNREACHABLE TRAP(UNREACHABLE)
 
@@ -376,6 +382,7 @@ static void init_instance_import(Z_addblob_module_instance_t* module_instance, s
 }
 
 void Z_addblob_init_module(){
+  wasm_rt_init();
   init_func_types();
 }
 
@@ -384,7 +391,6 @@ void Z_addblob_init(Z_addblob_module_instance_t* module_instance, struct Z_env_m
   init_globals(module_instance);
   init_memory(module_instance);
   init_table(module_instance);
-  module_instance->wasm_rt_call_stack_depth = 0;
 }
 
 void Z_addblob_free(Z_addblob_module_instance_t* module_instance) {

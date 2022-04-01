@@ -148,6 +148,7 @@ Program link_program( Elf_Info& elf_info,
     pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_free_memory", func( (uint64_t)wasm_rt_free_memory ) ) );
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_free_table", func( (uint64_t)wasm_rt_free_table ) ) );
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_init", func( (uint64_t)wasm_rt_init ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "fixpoint_get_tree_entry", func( (uint64_t)fixpoint::get_tree_entry ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_blob", func( (uint64_t)fixpoint::attach_blob ) ) );

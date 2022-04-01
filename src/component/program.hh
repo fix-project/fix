@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "name.hh"
 #include "parser.hh"
 #include "spans.hh"
 #include "wasm-rt.h"
@@ -41,11 +42,11 @@ public:
     , main_entry_( main_entry )
   {}
 
-  void* execute() const
+  void* execute( Name encode_name ) const
   {
-    void* ( *main_func )();
-    main_func = reinterpret_cast<void* (*)()>( code_.get() + main_entry_ );
-    return main_func();
+    void* ( *main_func )( void* );
+    main_func = reinterpret_cast<void* (*)( void* )>( code_.get() + main_entry_ );
+    return main_func( &encode_name );
   }
 
   const std::vector<std::string>& getInputSymbols() const { return inputs_; }

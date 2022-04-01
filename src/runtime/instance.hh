@@ -37,6 +37,16 @@ public:
     , output_()
   {}
 
+  Instance( Name* encode_name )
+    : program_name_( "" )
+    , encode_name_( *encode_name )
+    , ro_handle()
+    , rw_handle()
+    , output_()
+  {
+    ro_handle[0] = ObjectReference( encode_name_ );
+  }
+
   Instance()
     : program_name_( "" )
     , encode_name_()

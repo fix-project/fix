@@ -32,7 +32,6 @@ typedef struct Z_addblob_module_instance_t {
   wasm_rt_memory_t w2c_ro_mem_1;
   wasm_rt_memory_t w2c_rw_mem_0;
   wasm_rt_table_t w2c_T0;
-  uint32_t wasm_rt_call_stack_depth;
 } Z_addblob_module_instance_t;
 
 extern void Z_addblob_init_module();

@@ -163,7 +163,7 @@ Name RuntimeStorage::evaluateEncode( Name encode_name )
 
   Name function_name = this->getTree( forced_encode ).at( 1 ).first;
   string program_name = function_name.getContent();
-  void* wasm_instance = name_to_program_.at( program_name ).execute();
+  void* wasm_instance = name_to_program_.at( program_name ).execute( forced_encode );
 
   Instance* fixpoint_instance = reinterpret_cast<Instance*>( wasm_instance ) - 1;
   return fixpoint_instance->getOutput();

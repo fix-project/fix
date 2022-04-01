@@ -56,11 +56,13 @@ void Z_addblob_Z_env_Z_designate_output(struct Z_env_module_instance_t* env_modu
   fixpoint_designate_output(env_module_instance->module_instance, ro_handle);
 }
 
-extern void* init_module_instance(size_t);
-void executeProgram() {
-  Z_addblob_module_instance_t* instance = (Z_addblob_module_instance_t*)init_module_instance(sizeof(Z_addblob_module_instance_t));
+extern void* fixpoint_init_module_instance(size_t, void* encode_name);
+void* executeProgram(void* encode_name) {
+  Z_addblob_module_instance_t* instance = (Z_addblob_module_instance_t*)fixpoint_init_module_instance(sizeof(Z_addblob_module_instance_t), encode_name);
   Z_env_module_instance_t env_module_instance;
   env_module_instance.module_instance = instance;
+  Z_addblob_init_module();
   Z_addblob_init(instance, &env_module_instance);
   Z_addblob_Z__fixpoint_apply(instance);
+  return (void*)instance;
 }
