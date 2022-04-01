@@ -10,7 +10,7 @@ void* init_module_instance( size_t instance_size, void* encode_name )
   ptr = (Instance*)malloc( sizeof( Instance ) + instance_size );
 
   // place the FP instance at the beginning of this region
-  ptr[0] = Instance( (Name*)encode_name );
+  new((void*)ptr) Instance( (Name*)encode_name );
 
   // advance to the end of the FP instance/beginning of the WASM instance, return a void* point to this spot
   ptr++;
@@ -28,7 +28,7 @@ void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t ent
   ObjectReference obj = ro_handles[src_ro_handle];
 
   if ( obj.name_.getContentType() != ContentType::Tree ) {
-    // trap!
+    throw std::runtime_error("not a tree");
   }
 
   TreeEntry entry = RuntimeStorage::getInstance().getTree( obj.name_ ).at( entry_num );
@@ -38,7 +38,7 @@ void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t ent
 }
 
 // module_instance points to the WASM instance
-void attach_blob( void* module_instance, wasm_rt_memory_t* target_memory, uint32_t ro_handle )
+void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* target_memory )
 {
   // attach blob at handle to target_memory
   Instance* instance = (Instance*)module_instance - 1;
@@ -48,7 +48,7 @@ void attach_blob( void* module_instance, wasm_rt_memory_t* target_memory, uint32
   ObjectReference obj = ro_handles[ro_handle];
 
   if ( obj.name_.getContentType() != ContentType::Blob ) {
-    // trap!
+    throw std::runtime_error("not a blob");
   }
 
   std::string_view blob = RuntimeStorage::getInstance().getBlob( obj.name_ );
@@ -63,7 +63,7 @@ void attach_blob( void* module_instance, wasm_rt_memory_t* target_memory, uint32
 void detach_mem( void* module_instance, wasm_rt_memory_t* target_memory, uint32_t rw_handle )
 {
   if ( target_memory == NULL ) {
-    // trap!
+    throw std::runtime_error("memory does not exist");
   }
   Instance* instance = (Instance*)module_instance - 1;
 
@@ -77,7 +77,7 @@ void detach_mem( void* module_instance, wasm_rt_memory_t* target_memory, uint32_
   blob->setData( (uint8_t*)( (char*)ptr + sizeof( MutableValueMeta ) ) );
   memcpy( blob->getData(), target_memory->data, target_memory->size );
 
-  free( target_memory->data );
+  wasm_rt_free_memory( target_memory );
   target_memory->data = NULL;
   target_memory->pages = 0;
   target_memory->max_pages = 65536;

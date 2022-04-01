@@ -9,18 +9,18 @@ void Z_addblob_Z_env_Z_get_tree_entry(struct Z_env_module_instance_t* env_module
   fixpoint_get_tree_entry(env_module_instance->module_instance, src_ro_handle, entry_num, target_ro_handle);
 }
 
-extern void fixpoint_attach_blob(void*, wasm_rt_memory_t*, uint32_t);
+extern void fixpoint_attach_blob(void*, uint32_t, wasm_rt_memory_t*);
 void attach_blob_0(Z_addblob_module_instance_t* module_instance, uint32_t ro_handle) {
   wasm_rt_memory_t* ro_mem = Z_addblob_Z_ro_mem_0(module_instance);
-  fixpoint_attach_blob(module_instance, ro_mem, ro_handle);
+  fixpoint_attach_blob(module_instance, ro_handle, ro_mem);
 }
 
 void attach_blob_1(Z_addblob_module_instance_t* module_instance, uint32_t ro_handle) {
   wasm_rt_memory_t* ro_mem = Z_addblob_Z_ro_mem_1(module_instance);
-  fixpoint_attach_blob(module_instance, ro_mem, ro_handle);
+  fixpoint_attach_blob(module_instance, ro_handle, ro_mem);
 }
 
-void Z_addblob_Z_env_Z_attach_blob(struct Z_env_module_instance_t* env_module_instance, uint32_t ro_mem_num, uint32_t ro_handle) {
+void Z_addblob_Z_env_Z_attach_blob(struct Z_env_module_instance_t* env_module_instance, uint32_t ro_handle, uint32_t ro_mem_num) {
   if (ro_mem_num == 0) {
     attach_blob_0(env_module_instance->module_instance, ro_handle);
     return;

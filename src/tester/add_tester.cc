@@ -18,23 +18,24 @@ int main( int argc, char* argv[] )
 
   auto& runtime = RuntimeStorage::getInstance();
 
-  runtime.addWasm( "add", wasm_content, vector<string>() );
+  runtime.addWasm( "addblob", wasm_content );
 
   int arg1 = atoi( argv[2] );
   int arg2 = atoi( argv[3] );
   Name arg1_name = runtime.addBlob( move( string( reinterpret_cast<char*>( &arg1 ), sizeof( int ) ) ) );
   Name arg2_name = runtime.addBlob( move( string( reinterpret_cast<char*>( &arg2 ), sizeof( int ) ) ) );
+  
+  vector<TreeEntry> encode;
+  encode.push_back( TreeEntry( Name("empty", NameType::Canonical, ContentType::Blob ), Laziness::Strict ));
+  encode.push_back( TreeEntry( Name("addblob", NameType::Canonical, ContentType::Blob ), Laziness::Strict) );
+  encode.push_back( TreeEntry(arg1_name, Laziness::Strict) );
+  encode.push_back( TreeEntry(arg2_name, Laziness::Strict) );
+  
+  Name encode_name = runtime.addTree( move(encode) );
 
-  vector<Name> inputs;
-  inputs.push_back( arg1_name );
-  inputs.push_back( arg2_name );
-  Name strict_input = runtime.addTree( move( inputs ) );
-
-  Name encode_name = runtime.addEncode( Name( "add", NameType::Canonical, ContentType::Blob ), strict_input );
-  vector<size_t> path = { 0 };
-
-  Thunk res( encode_name, path );
-  Name res_name = runtime.forceThunk( res );
+  Thunk thunk ( encode_name );
+  Name thunk_name = runtime.addThunk( thunk );
+  Name res_name = runtime.forceThunk( thunk_name );
 
   cout << dec;
   cout << "The result is " << *( (const int*)runtime.getBlob( res_name ).data() ) << endl;

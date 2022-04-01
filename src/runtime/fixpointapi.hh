@@ -12,7 +12,7 @@ void* init_module_instance( size_t instance_size, void* encode_name );
 void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t entry_num, uint32_t target_ro_handle );
 
 /* Traps if handle is inaccessible, if handle does not refer to a Blob */
-void attach_blob( void* module_instance, wasm_rt_memory_t* target_memory, uint32_t ro_handle );
+void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* target_memory );
 
 void detach_mem( void* module_instance, wasm_rt_memory_t* target_memory, uint32_t rw_handle );
 

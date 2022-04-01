@@ -24,7 +24,8 @@ string_view RuntimeStorage::getBlob( const Name& name )
   switch ( name.getType() ) {
     case NameType::Literal:
       if ( name.getContentType() == ContentType::Blob ) {
-        return name.getContent();
+        literal_cache.push_back( name );
+        return literal_cache.back().getContent();
       }
       break;
 
@@ -68,6 +69,12 @@ span_view<TreeEntry> RuntimeStorage::getTree( const Name& name )
   }
 
   throw out_of_range( "Tree does not exist." );
+}
+
+Name RuntimeStorage::addThunk( Thunk thunk )
+{ 
+  string name_content((const char*)&thunk, sizeof(Thunk));
+  return Name( move( name_content ), NameType::Literal, ContentType::Thunk );
 }
 
 Name RuntimeStorage::getThunkEncodeName( const Name& name )
@@ -151,10 +158,6 @@ Name RuntimeStorage::reduceThunk( Name name )
 
 Name RuntimeStorage::evaluateEncode( Name encode_name )
 {
-  if ( this->getTree( encode_name ).size() == 1 ) {
-    throw runtime_error( "Invalid encode!" );
-  }
-
   Name forced_encode = this->forceTree( encode_name );
   Name res_name( forced_encode.getContent(), NameType::Canonical, ContentType::Thunk );
   if ( memorization_cache.contains( res_name ) ) {
@@ -169,14 +172,13 @@ Name RuntimeStorage::evaluateEncode( Name encode_name )
   return fixpoint_instance->getOutput();
 }
 
-void RuntimeStorage::addWasm( const string& name, const string& wasm_content, const vector<string>& deps )
+void RuntimeStorage::addWasm( const string& name, const string& wasm_content )
 {
   auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( name, wasm_content );
 
   string elf_content = c_to_elf( name, c_header, h_header, fixpoint_header, wasm_rt_content );
 
   addProgram( name, vector<string>(), vector<string>(), elf_content );
-  name_to_program_.at( name ).setDeps( deps );
 }
 
 void RuntimeStorage::addProgram( const string& name,

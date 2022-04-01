@@ -94,18 +94,18 @@ void InitComposer::write_attach_blob()
   if ( it == inspector_.GetImportedFunctions().end() )
     return;
 
-  result_ << "extern void fixpoint_attach_blob(void*, wasm_rt_memory_t*, uint32_t);" << endl;
+  result_ << "extern void fixpoint_attach_blob(void*, uint32_t, wasm_rt_memory_t*);" << endl;
   for ( uint32_t idx : ro_mems ) {
     result_ << "void attach_blob_" << idx << "(" << state_info_type_name_
             << "* module_instance, uint32_t ro_handle) {" << endl;
     result_ << "  wasm_rt_memory_t* ro_mem = Z_addblob_Z_ro_mem_" << idx << "(module_instance);" << endl;
-    result_ << "  fixpoint_attach_blob(module_instance, ro_mem, ro_handle);" << endl;
+    result_ << "  fixpoint_attach_blob(module_instance, ro_handle, ro_mem);" << endl;
     result_ << "}\n" << endl;
   }
 
   result_ << "void " << module_prefix_
-          << "Z_env_Z_attach_blob(struct Z_env_module_instance_t* env_module_instance, uint32_t ro_mem_num, "
-             "uint32_t ro_handle) {"
+          << "Z_env_Z_attach_blob(struct Z_env_module_instance_t* env_module_instance, uint32_t ro_handle, "
+             "uint32_t ro_mem_num) {"
           << endl;
   for ( uint32_t idx : ro_mems ) {
     result_ << "  if (ro_mem_num == " << idx << ") {" << endl;

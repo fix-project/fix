@@ -30,11 +30,15 @@ private:
   // Maps a string name to corresponding program
   absl::flat_hash_map<std::string, Program> name_to_program_;
 
+  // Stores literal name that are requested
+  std::vector<Name> literal_cache;
+
   RuntimeStorage()
     : storage()
     , memorization_cache()
     , trace_cache()
     , name_to_program_()
+    , literal_cache()
   {}
 
 public:
@@ -57,15 +61,14 @@ public:
   // Return reference to Tree
   span_view<TreeEntry> getTree( const Name& name );
 
+  // add Thunk
+  Name addThunk( Thunk thunk );
+
   // Return encode name referred to by thunk
   Name getThunkEncodeName( const Name& thunk_name );
 
-  // add Encode
-  Name addEncode( const Name& program_name, const Name& strict_input, const Name& lazy_input );
-  Name addEncode( const Name& program_name, const Name& strict_input );
-
   // add wasm module
-  void addWasm( const std::string& name, const std::string& wasm_content, const std::vector<std::string>& deps );
+  void addWasm( const std::string& name, const std::string& wasm_content );
 
   // add elf program
   void addProgram( const std::string& name,
