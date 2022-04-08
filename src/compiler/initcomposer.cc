@@ -96,10 +96,10 @@ void InitComposer::write_attach_blob()
 
   result_ << "extern void fixpoint_attach_blob(void*, uint32_t, wasm_rt_memory_t*);" << endl;
   for ( uint32_t idx : ro_mems ) {
-    result_ << "void attach_blob_" << idx << "(" << state_info_type_name_
-            << "* module_instance, uint32_t ro_handle) {" << endl;
-    result_ << "  wasm_rt_memory_t* ro_mem = Z_addblob_Z_ro_mem_" << idx << "(module_instance);" << endl;
-    result_ << "  fixpoint_attach_blob(module_instance, ro_handle, ro_mem);" << endl;
+    result_ << "void attach_blob_" << idx << "(Z_env_module_instance_t"
+            << "* env_module_instance, uint32_t ro_handle) {" << endl;
+    result_ << "  wasm_rt_memory_t* ro_mem = &env_module_instance->ro_mem_" << idx << ";" << endl;
+    result_ << "  fixpoint_attach_blob(env_module_instance->module_instance, ro_handle, ro_mem);" << endl;
     result_ << "}\n" << endl;
   }
 
@@ -109,7 +109,7 @@ void InitComposer::write_attach_blob()
           << endl;
   for ( uint32_t idx : ro_mems ) {
     result_ << "  if (ro_mem_num == " << idx << ") {" << endl;
-    result_ << "    attach_blob_" << idx << "(env_module_instance->module_instance, ro_handle);" << endl;
+    result_ << "    attach_blob_" << idx << "(env_module_instance, ro_handle);" << endl;
     result_ << "    return;" << endl;
     result_ << "  }" << endl;
   }
@@ -127,10 +127,10 @@ void InitComposer::write_detach_mem()
 
   result_ << "extern void fixpoint_detach_mem( void*, wasm_rt_memory_t*, uint32_t );" << endl;
   for ( uint32_t idx : rw_mems ) {
-    result_ << "void detach_mem_" << idx << "(" << state_info_type_name_
-            << "* module_instance, uint32_t rw_handle) {" << endl;
-    result_ << "  wasm_rt_memory_t* rw_mem = Z_addblob_Z_rw_mem_" << idx << "(module_instance);" << endl;
-    result_ << "  fixpoint_detach_mem(module_instance, rw_mem, rw_handle);" << endl;
+    result_ << "void detach_mem_" << idx << "(Z_env_module_instance_t" 
+            << "* env_module_instance, uint32_t rw_handle) {" << endl;
+    result_ << "  wasm_rt_memory_t* rw_mem = &env_module_instance->rw_mem_" << idx << ";" << endl;
+    result_ << "  fixpoint_detach_mem(env_module_instance->module_instance, rw_mem, rw_handle);" << endl;
     result_ << "}\n" << endl;
   }
 
@@ -140,7 +140,7 @@ void InitComposer::write_detach_mem()
           << endl;
   for ( uint32_t idx : rw_mems ) {
     result_ << "  if (rw_mem_num == " << idx << ") {" << endl;
-    result_ << "    detach_mem_" << idx << "(env_module_instance->module_instance, rw_handle);" << endl;
+    result_ << "    detach_mem_" << idx << "(env_module_instance, rw_handle);" << endl;
     result_ << "    return;" << endl;
     result_ << "  }" << endl;
   }
@@ -184,7 +184,37 @@ void InitComposer::write_env_instance()
 {
   result_ << "typedef struct Z_env_module_instance_t {" << endl;
   result_ << "  " << module_prefix_ << "module_instance_t* module_instance;" << endl;
+  
+  for (auto ro_mem : inspector_.GetExportedRO()) {
+    result_ << "  wasm_rt_memory_t ro_mem_" << ro_mem << ";" << endl;
+  }
+  for (auto rw_mem : inspector_.GetExportedRW()) {
+    result_ << "  wasm_rt_memory_t rw_mem_" << rw_mem << ";" << endl;
+  }
+
   result_ << "} Z_env_module_instance_t;" << endl;
+  result_ << endl;
+
+  for (auto ro_mem : inspector_.GetExportedRO()) {
+    result_ << "wasm_rt_memory_t* Z_env_Z_ro_mem_" << ro_mem << "(Z_env_module_instance_t* env_module_instance) {" << endl;
+    result_ << "  return &env_module_instance->ro_mem_" << ro_mem << ";" << endl;
+    result_ << "}" << endl;
+    result_ << endl;
+  }
+  for (auto rw_mem : inspector_.GetExportedRW()) {
+    result_ << "wasm_rt_memory_t* Z_env_Z_rw_mem_" << rw_mem<< "(Z_env_module_instance_t* env_module_instance) {" << endl;
+    result_ << " return &env_module_instance->rw_mem_" << rw_mem << ";" << endl;
+    result_ << "}" << endl;
+    result_ << endl;
+  }
+
+  auto nonzero_rw_mems = inspector_.GetNonZeroRW();
+  result_ << "void init_rw_mems(Z_env_module_instance_t* env_module_instance) {" << endl;
+  for (const auto& [rw_mem, size] : nonzero_rw_mems) {
+    result_ << "  wasm_rt_allocate_memory(&env_module_instance->rw_mem_" << rw_mem << ", " << size << ", 65536);" << endl;
+  }
+  result_ << "  return;" << endl;
+  result_ << "}" << endl;
   result_ << endl;
 }
 
@@ -210,17 +240,24 @@ string InitComposer::compose_header()
   write_detach_mem();
   write_freeze_blob();
   write_designate_output();
-
+  
   result_ << "extern void* fixpoint_init_module_instance(size_t, void* encode_name);" << endl;
-  result_ << "void* executeProgram(void* encode_name) {" << endl;
+  result_ << "extern void* fixpoint_init_env_module_instance(size_t);" << endl;
+  result_ << "void* initProgram(void* encode_name) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_
           << "*)fixpoint_init_module_instance(sizeof(" << state_info_type_name_ << "), encode_name);" << endl;
-  result_ << "  Z_env_module_instance_t env_module_instance;" << endl;
-  result_ << "  env_module_instance.module_instance = instance;" << endl;
+  result_ << "  Z_env_module_instance_t* env_module_instance = fixpoint_init_env_module_instance(sizeof(Z_env_module_instance_t));" << endl;
+  result_ << "  init_rw_mems(env_module_instance);" << endl;
+  result_ << "  env_module_instance->module_instance = instance;" << endl;
   result_ << "  " << module_prefix_ << "init_module();" << endl;
-  result_ << "  " << module_prefix_ << "init(instance, &env_module_instance);" << endl;
-  result_ << "  " << module_prefix_ << "Z__fixpoint_apply(instance);" << endl;
+  result_ << "  " << module_prefix_ << "init(instance, env_module_instance);" << endl;
   result_ << "  return (void*)instance;" << endl;
+  result_ << "}" << endl;
+  
+  result_ << endl;
+  result_ << "void* executeProgram(void* instance) {" << endl;
+  result_ << "  " << module_prefix_ << "Z__fixpoint_apply((" << state_info_type_name_ << "*)instance);" << endl;
+  result_ << "  return instance;" << endl;
   result_ << "}" << endl;
 
   return result_.str();

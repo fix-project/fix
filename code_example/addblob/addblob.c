@@ -322,15 +322,13 @@ static void w2c__fixpoint_apply(Z_addblob_module_instance_t* module_instance) {
   w2c_i0 = 2u;
   w2c_i1 = 1u;
   Z_addblob_Z_env_Z_attach_blob(module_instance->Z_env_module_instance, w2c_i0, w2c_i1);
-  w2c_i0 = 1u;
-  w2c_i0 = wasm_rt_grow_memory(&module_instance->w2c_rw_mem_0, w2c_i0);
   w2c_i0 = 0u;
   w2c_i1 = 0u;
-  w2c_i1 = i32_load(&module_instance->w2c_ro_mem_0, (u64)(w2c_i1));
+  w2c_i1 = i32_load(module_instance->Z_env_Z_ro_mem_0, (u64)(w2c_i1));
   w2c_i2 = 0u;
-  w2c_i2 = i32_load(&module_instance->w2c_ro_mem_1, (u64)(w2c_i2));
+  w2c_i2 = i32_load(module_instance->Z_env_Z_ro_mem_1, (u64)(w2c_i2));
   w2c_i1 += w2c_i2;
-  i32_store(&module_instance->w2c_rw_mem_0, (u64)(w2c_i0), w2c_i1);
+  i32_store(module_instance->Z_env_Z_rw_mem_0, (u64)(w2c_i0), w2c_i1);
   w2c_i0 = 0u;
   w2c_i1 = 0u;
   Z_addblob_Z_env_Z_detach_mem(module_instance->Z_env_module_instance, w2c_i0, w2c_i1);
@@ -347,9 +345,6 @@ static void init_globals(Z_addblob_module_instance_t* module_instance) {
 }
 
 static void init_memory(Z_addblob_module_instance_t* module_instance) {
-  wasm_rt_allocate_memory(&module_instance->w2c_ro_mem_0, 0, 65536);
-  wasm_rt_allocate_memory(&module_instance->w2c_ro_mem_1, 0, 65536);
-  wasm_rt_allocate_memory(&module_instance->w2c_rw_mem_0, 0, 65536);
 }
 
 static void init_table(Z_addblob_module_instance_t* module_instance) {
@@ -364,21 +359,24 @@ void Z_addblob_Z__fixpoint_apply(Z_addblob_module_instance_t* module_instance) {
 
 /* export: 'ro_mem_0' */
 wasm_rt_memory_t* Z_addblob_Z_ro_mem_0(Z_addblob_module_instance_t* module_instance){
-  return &module_instance->w2c_ro_mem_0;
+  return module_instance->Z_env_Z_ro_mem_0;
 }
 
 /* export: 'ro_mem_1' */
 wasm_rt_memory_t* Z_addblob_Z_ro_mem_1(Z_addblob_module_instance_t* module_instance){
-  return &module_instance->w2c_ro_mem_1;
+  return module_instance->Z_env_Z_ro_mem_1;
 }
 
 /* export: 'rw_mem_0' */
 wasm_rt_memory_t* Z_addblob_Z_rw_mem_0(Z_addblob_module_instance_t* module_instance){
-  return &module_instance->w2c_rw_mem_0;
+  return module_instance->Z_env_Z_rw_mem_0;
 }
 
 static void init_instance_import(Z_addblob_module_instance_t* module_instance, struct Z_env_module_instance_t* Z_env_module_instance){
   module_instance->Z_env_module_instance = Z_env_module_instance;
+  module_instance->Z_env_Z_ro_mem_0 = Z_env_Z_ro_mem_0(Z_env_module_instance);
+  module_instance->Z_env_Z_ro_mem_1 = Z_env_Z_ro_mem_1(Z_env_module_instance);
+  module_instance->Z_env_Z_rw_mem_0 = Z_env_Z_rw_mem_0(Z_env_module_instance);
 }
 
 void Z_addblob_init_module(){
@@ -395,7 +393,4 @@ void Z_addblob_init(Z_addblob_module_instance_t* module_instance, struct Z_env_m
 
 void Z_addblob_free(Z_addblob_module_instance_t* module_instance) {
   wasm_rt_free_table(&module_instance->w2c_T0);
-  wasm_rt_free_memory(&module_instance->w2c_ro_mem_0);
-  wasm_rt_free_memory(&module_instance->w2c_ro_mem_1);
-  wasm_rt_free_memory(&module_instance->w2c_rw_mem_0);
 }

@@ -25,12 +25,18 @@ typedef double f64;
 #endif
 
 struct Z_env_module_instance_t;
+extern wasm_rt_memory_t* Z_env_Z_ro_mem_0(struct Z_env_module_instance_t*);
+extern wasm_rt_memory_t* Z_env_Z_ro_mem_1(struct Z_env_module_instance_t*);
+extern wasm_rt_memory_t* Z_env_Z_rw_mem_0(struct Z_env_module_instance_t*);
 
 typedef struct Z_addblob_module_instance_t {
   struct Z_env_module_instance_t* Z_env_module_instance;
-  wasm_rt_memory_t w2c_ro_mem_0;
-  wasm_rt_memory_t w2c_ro_mem_1;
-  wasm_rt_memory_t w2c_rw_mem_0;
+  /* import: 'env' 'ro_mem_0' */
+  wasm_rt_memory_t *Z_env_Z_ro_mem_0;
+  /* import: 'env' 'ro_mem_1' */
+  wasm_rt_memory_t *Z_env_Z_ro_mem_1;
+  /* import: 'env' 'rw_mem_0' */
+  wasm_rt_memory_t *Z_env_Z_rw_mem_0;
   wasm_rt_table_t w2c_T0;
 } Z_addblob_module_instance_t;
 

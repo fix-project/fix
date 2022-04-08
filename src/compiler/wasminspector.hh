@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <set>
 
 #include "src/cast.h"
@@ -21,6 +22,7 @@ public:
   wabt::Result ValidateMemAccess();
   wabt::Result ValidateImports();
   const std::set<std::string>& GetImportedFunctions();
+  std::map<uint32_t, uint64_t> GetNonZeroRW();
   std::vector<uint32_t> GetExportedRO();
   std::vector<uint32_t> GetExportedRW();
 

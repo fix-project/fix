@@ -7,9 +7,9 @@
   (import "env" "detach_mem" (func $detach_mem (type 1)))
   (import "env" "freeze_blob" (func $freeze_blob (type 0)))
   (import "env" "designate_output" (func $designate_output (type 2)))
-  (memory $memzero 0)
-  (memory $memone 0)
-  (memory $memtwo 0)
+  (import "env" "ro_mem_0" (memory $memzero 0))
+  (import "env" "ro_mem_1" (memory $memone 0))
+  (import "env" "rw_mem_0" (memory $memtwo 1))
   (func (export "_fixpoint_apply")
     i32.const 0
     i32.const 2
@@ -25,9 +25,6 @@
     i32.const 2
     i32.const 1
     call $attach_blob
-    i32.const 1
-    memory.grow $memtwo
-    drop
     i32.const 0
     i32.const 0
     i32.load $memzero

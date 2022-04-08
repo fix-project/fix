@@ -28,7 +28,9 @@ WasmInspector::WasmInspector( Module* module, Errors* errors )
   }
 
   for ( Import* import_ : module->imports ) {
-    imported_functions_.insert( import_->field_name );
+    if ( import_->kind() == ExternalKind::Func ) {
+      imported_functions_.insert( import_->field_name );
+    }
   }
 }
 
@@ -104,14 +106,15 @@ Result WasmInspector::ValidateMemAccess()
 
 Result WasmInspector::ValidateImports()
 {
+  // Module does not contain imports from other modules
   for ( Import* import : current_module_->imports ) {
     switch ( import->kind() ) {
       case ExternalKind::Global:
-      case ExternalKind::Memory:
       case ExternalKind::Table: {
         break;
       }
 
+      case ExternalKind::Memory:
       case ExternalKind::Func: {
         if ( import->module_name != "env" ) {
           return Result::Error;
@@ -121,6 +124,27 @@ Result WasmInspector::ValidateImports()
 
       default:
         return Result::Error;
+    }
+  }
+
+  // All ro and rw memories are imported
+  for ( auto index : this->exported_ro_ ) {
+    if ( index >= current_module_->num_memory_imports ) {
+      return Result::Error;
+    }
+  }
+  
+  for ( auto index : this->exported_rw_ ) {
+    if ( index >= current_module_->num_memory_imports ) {
+      return Result::Error;
+    }
+  }
+
+  // Only rw memory can have nonzero initial size
+  for ( auto index : this->exported_ro_ ) {
+    Memory* memory = current_module_->memories[index];
+    if ( memory->page_limits.initial > 0 ) {
+      return Result::Error;
     }
   }
   return Result::Ok;
@@ -167,4 +191,16 @@ std::vector<uint32_t> WasmInspector::GetExportedRW()
   return result;
 }
 
+std::map<uint32_t, uint64_t> WasmInspector::GetNonZeroRW()
+{
+  std::map<uint32_t, uint64_t> result;
+  for ( Import* import_ : current_module_->imports ) {
+    if ( import_->kind() == ExternalKind::Memory ) {
+      if ( import_->field_name.find( "rw_mem" ) != string::npos && cast<MemoryImport>(import_)->memory.page_limits.initial != 0) {
+        result.insert( {(uint32_t)atoi( import_->field_name.substr( 7 ).data() ), cast<MemoryImport>(import_)->memory.page_limits.initial} );
+      }
+    }
+  }
+  return result;
+} 
 } // namespace wasminspector
