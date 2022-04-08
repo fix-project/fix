@@ -158,6 +158,7 @@ Program link_program( Elf_Info& elf_info,
     pair<string, func>( "fixpoint_designate_output", func( (uint64_t)fixpoint::designate_output ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "fixpoint_init_module_instance", func( (uint64_t)fixpoint::init_module_instance ) ) );
+  elf_info.func_map.insert(pair<string, func>( "fixpoint_init_env_module_instance", func( (uint64_t)fixpoint::init_env_instance )));
 
   for ( const auto& reloc_entry : elf_info.reloctb ) {
     int idx = ELF64_R_SYM( reloc_entry.r_info );
@@ -216,6 +217,7 @@ Program link_program( Elf_Info& elf_info,
   }
 
   shared_ptr<char> code( reinterpret_cast<char*>( program_mem ) );
+  uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "initProgram" ).idx].st_value;
   uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "executeProgram" ).idx].st_value;
-  return Program( program_name, move( inputs ), move( outputs ), code, main_entry );
+  return Program( program_name, move( inputs ), move( outputs ), code, init_entry, main_entry );
 }

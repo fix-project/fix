@@ -10,6 +10,9 @@
 #include "spans.hh"
 #include "wasm-rt.h"
 
+#include "timer.hh"
+#include "timing_helper.hh"
+
 class Program
 {
 private:
@@ -25,6 +28,8 @@ private:
 
   // Code and data section of the program
   std::shared_ptr<char> code_;
+  // Entry point of init function
+  uint64_t init_entry_;
   // Entry point of main function
   uint64_t main_entry_;
 
@@ -33,20 +38,28 @@ public:
            std::vector<std::string>&& inputs,
            std::vector<std::string>&& outputs,
            std::shared_ptr<char> code,
+           uint64_t init_entry,
            uint64_t main_entry )
     : name_( name )
     , deps_()
     , inputs_( std::move( inputs ) )
     , outputs_( std::move( outputs ) )
     , code_( code )
+    , init_entry_( init_entry )
     , main_entry_( main_entry )
   {}
 
   void* execute( Name encode_name ) const
-  {
+  { 
+    void* ( *init_func )( void* );
+    init_func = reinterpret_cast<void* (*)( void* )>( code_.get() + init_entry_ );
+    void* instance = init_func( &encode_name );
+    
     void* ( *main_func )( void* );
     main_func = reinterpret_cast<void* (*)( void* )>( code_.get() + main_entry_ );
-    return main_func( &encode_name );
+    
+    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _fixpoint_apply };
+    return main_func( instance );
   }
 
   const std::vector<std::string>& getInputSymbols() const { return inputs_; }

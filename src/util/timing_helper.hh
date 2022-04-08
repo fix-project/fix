@@ -4,13 +4,12 @@
 
 #include "timer.hh"
 
-inline Timer::Record _invocation_init;
-inline Timer::Record _memory_init_cheap;
-inline Timer::Record _memory_init_expensive;
-inline Timer::Record _path_open;
-inline Timer::Record _fd_write;
-inline Timer::Record _post_execution;
-inline Timer::Record _pre_execution;
 inline Timer::Record _hash;
+inline Timer::Record _fixpoint_apply;
+inline Timer::Record _get_tree_entry;
+inline Timer::Record _attach_blob;
+inline Timer::Record _detach_mem;
+inline Timer::Record _designate_output;
+inline Timer::Record _freeze_blob;
 
 void print_timer( std::ostream& out, const std::string_view name, const Timer::Record timer );

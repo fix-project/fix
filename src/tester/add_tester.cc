@@ -6,6 +6,8 @@
 #include "runtimestorage.hh"
 #include "util.hh"
 
+#include "timing_helper.hh" 
+
 using namespace std;
 
 int main( int argc, char* argv[] )
@@ -39,6 +41,5 @@ int main( int argc, char* argv[] )
 
   cout << dec;
   cout << "The result is " << *( (const int*)runtime.getBlob( res_name ).data() ) << endl;
-
   return 0;
 }

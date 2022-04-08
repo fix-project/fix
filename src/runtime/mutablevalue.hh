@@ -48,7 +48,7 @@ struct ObjectReference
     : name_()
     , accessible_( true ) {};
 
-  ObjectReference( TreeEntry entry )
+  ObjectReference( const TreeEntry & entry )
     : name_( entry.first )
     , accessible_( true )
   {
