@@ -85,18 +85,18 @@ uint32_t wasm_rt_register_func_type( uint32_t param_count, uint32_t result_count
 {
   FuncType func_type;
   func_type.param_count = param_count;
-  func_type.params = (wasm_rt_type_t*)malloc( param_count * sizeof( wasm_rt_type_t ) );
+  func_type.params = static_cast<wasm_rt_type_t*>( malloc( param_count * sizeof( wasm_rt_type_t ) ) );
   func_type.result_count = result_count;
-  func_type.results = (wasm_rt_type_t*)malloc( result_count * sizeof( wasm_rt_type_t ) );
+  func_type.results = static_cast<wasm_rt_type_t*>( malloc( result_count * sizeof( wasm_rt_type_t ) ) );
 
   va_list args;
   va_start( args, result_count );
 
   uint32_t i;
   for ( i = 0; i < param_count; ++i )
-    func_type.params[i] = (wasm_rt_type_t)va_arg( args, int );
+    func_type.params[i] = static_cast<wasm_rt_type_t>( va_arg( args, int ) );
   for ( i = 0; i < result_count; ++i )
-    func_type.results[i] = (wasm_rt_type_t)va_arg( args, int );
+    func_type.results[i] = static_cast<wasm_rt_type_t>( va_arg( args, int ) );
   va_end( args );
 
   for ( i = 0; i < g_func_type_count; ++i ) {
@@ -108,16 +108,14 @@ uint32_t wasm_rt_register_func_type( uint32_t param_count, uint32_t result_count
   }
 
   uint32_t idx = g_func_type_count++;
-  g_func_types = (FuncType*)realloc( g_func_types, g_func_type_count * sizeof( FuncType ) );
+  g_func_types = static_cast<FuncType*>( realloc( g_func_types, g_func_type_count * sizeof( FuncType ) ) );
   g_func_types[idx] = func_type;
   return idx + 1;
 }
 
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-static void signal_handler( int sig, siginfo_t* si, void* unused )
+static void signal_handler( int, siginfo_t* si, void* )
 {
-  (void)sig;
-  (void)unused;
   if ( si->si_code == SEGV_ACCERR ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   } else {
@@ -171,7 +169,7 @@ static void* os_mmap( size_t size )
 {
   int map_prot = PROT_NONE;
   int map_flags = MAP_ANONYMOUS | MAP_PRIVATE;
-  uint8_t* addr = (uint8_t*)mmap( NULL, size, map_prot, map_flags, -1, 0 );
+  uint8_t* addr = static_cast<uint8_t*>( mmap( NULL, size, map_prot, map_flags, -1, 0 ) );
   if ( addr == MAP_FAILED )
     return NULL;
   return addr;
@@ -193,14 +191,14 @@ static void os_print_last_error( const char* msg )
 }
 #endif
 
-void wasm_rt_init()
+void wasm_rt_init( void )
 {
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
   if ( !g_signal_handler_installed ) {
     g_signal_handler_installed = true;
 
     /* Use alt stack to handle SIGSEGV from stack overflow */
-    g_alt_stack = (char*)malloc( SIGSTKSZ );
+    g_alt_stack = static_cast<char*>( malloc( SIGSTKSZ ) );
     if ( g_alt_stack == NULL ) {
       perror( "malloc failed" );
       abort();
@@ -229,39 +227,52 @@ void wasm_rt_init()
 #endif
 }
 
-void wasm_rt_free()
+void wasm_rt_free( void )
 {
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
   free( g_alt_stack );
 #endif
 }
 
-void wasm_rt_allocate_memory( wasm_rt_memory_t* memory, uint32_t initial_pages, uint32_t max_pages )
+void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
+                                     uint32_t initial_pages,
+                                     uint32_t max_pages,
+                                     bool hw_checked )
 {
   uint32_t byte_length = initial_pages * PAGE_SIZE;
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-  /* Reserve 8GiB. */
-  void* addr = os_mmap( 0x200000000ul );
+  if ( hw_checked ) {
+    /* Reserve 8GiB. */
+    void* addr = os_mmap( 0x200000000ul );
 
-  if ( addr == (void*)-1 ) {
-    os_print_last_error( "os_mmap failed." );
-    abort();
+    if ( addr == (void*)-1 ) {
+      os_print_last_error( "os_mmap failed." );
+      abort();
+    }
+    int ret = os_mprotect( addr, byte_length );
+    if ( ret != 0 ) {
+      os_print_last_error( "os_mprotect failed." );
+      abort();
+    }
+    memory->data = static_cast<uint8_t*>( addr );
+  } else {
+    memory->data = static_cast<uint8_t*>( calloc( byte_length, 1 ) );
   }
-  int ret = os_mprotect( addr, byte_length );
-  if ( ret != 0 ) {
-    os_print_last_error( "os_mprotect failed." );
-    abort();
-  }
-  memory->data = (uint8_t*)addr;
-#else
-  memory->data = calloc( byte_length, 1 );
-#endif
   memory->size = byte_length;
   memory->pages = initial_pages;
   memory->max_pages = max_pages;
 }
 
-uint32_t wasm_rt_grow_memory( wasm_rt_memory_t* memory, uint32_t delta )
+void wasm_rt_allocate_memory_sw_checked( wasm_rt_memory_t* memory, uint32_t initial_pages, uint32_t max_pages )
+{
+  wasm_rt_allocate_memory_helper( memory, initial_pages, max_pages, false );
+}
+
+void wasm_rt_allocate_memory( wasm_rt_memory_t* memory, uint32_t initial_pages, uint32_t max_pages )
+{
+  wasm_rt_allocate_memory_helper( memory, initial_pages, max_pages, WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX );
+}
+
+uint32_t wasm_rt_grow_memory_helper( wasm_rt_memory_t* memory, uint32_t delta, bool hw_checked )
 {
   uint32_t old_pages = memory->pages;
   uint32_t new_pages = memory->pages + delta;
@@ -274,21 +285,23 @@ uint32_t wasm_rt_grow_memory( wasm_rt_memory_t* memory, uint32_t delta )
   uint32_t old_size = old_pages * PAGE_SIZE;
   uint32_t new_size = new_pages * PAGE_SIZE;
   uint32_t delta_size = delta * PAGE_SIZE;
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-  uint8_t* new_data = memory->data;
-  int ret = os_mprotect( new_data + old_size, delta_size );
-  if ( ret != 0 ) {
-    return (uint32_t)-1;
-  }
-#else
-  uint8_t* new_data = realloc( memory->data, new_size );
-  if ( new_data == NULL ) {
-    return (uint32_t)-1;
-  }
+  uint8_t* new_data;
+  if ( hw_checked ) {
+    new_data = memory->data;
+    int ret = os_mprotect( new_data + old_size, delta_size );
+    if ( ret != 0 ) {
+      return (uint32_t)-1;
+    }
+  } else {
+    new_data = static_cast<uint8_t*>( realloc( memory->data, new_size ) );
+    if ( new_data == NULL ) {
+      return (uint32_t)-1;
+    }
+
 #if !WABT_BIG_ENDIAN
-  memset( new_data + old_size, 0, delta_size );
+    memset( new_data + old_size, 0, delta_size );
 #endif
-#endif
+  }
 #if WABT_BIG_ENDIAN
   memmove( new_data + new_size - old_size, new_data, old_size );
   memset( new_data, 0, delta_size );
@@ -299,12 +312,32 @@ uint32_t wasm_rt_grow_memory( wasm_rt_memory_t* memory, uint32_t delta )
   return old_pages;
 }
 
+uint32_t wasm_rt_grow_memory_sw_checked( wasm_rt_memory_t* memory, uint32_t delta )
+{
+  return wasm_rt_grow_memory_helper( memory, delta, false );
+}
+
+uint32_t wasm_rt_grow_memory( wasm_rt_memory_t* memory, uint32_t delta )
+{
+  return wasm_rt_grow_memory_helper( memory, delta, WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX );
+}
+
+void wasm_rt_free_memory_hw_checked( wasm_rt_memory_t* memory )
+{
+  os_munmap( memory->data, memory->size ); // ignore error?
+}
+
+void wasm_rt_free_memory_sw_checked( wasm_rt_memory_t* memory )
+{
+  free( memory->data );
+}
+
 void wasm_rt_free_memory( wasm_rt_memory_t* memory )
 {
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-  os_munmap( memory->data, memory->size ); // ignore error?
+  wasm_rt_free_memory_hw_checked( memory );
 #else
-  free( memory->data );
+  wasm_rt_free_memory_sw_checked( memory );
 #endif
 }
 
@@ -384,17 +417,39 @@ double wasm_rt_fabs( double x )
 }
 #endif
 
-void wasm_rt_allocate_table( wasm_rt_table_t* table, uint32_t elements, uint32_t max_elements )
-{
-  table->size = elements;
-  table->max_size = max_elements;
-  table->data = (wasm_rt_elem_t*)calloc( table->size, sizeof( wasm_rt_elem_t ) );
-}
+#define DEFINE_TABLE_OPS( type )                                                                                   \
+  void wasm_rt_allocate_##type##_table(                                                                            \
+    wasm_rt_##type##_table_t* table, uint32_t elements, uint32_t max_elements )                                    \
+  {                                                                                                                \
+    table->size = elements;                                                                                        \
+    table->max_size = max_elements;                                                                                \
+    table->data = static_cast<wasm_rt_##type##_t*>( calloc( table->size, sizeof( wasm_rt_##type##_t ) ) );         \
+  }                                                                                                                \
+  void wasm_rt_free_##type##_table( wasm_rt_##type##_table_t* table ) { free( table->data ); }                     \
+  uint32_t wasm_rt_grow_##type##_table( wasm_rt_##type##_table_t* table, uint32_t delta, wasm_rt_##type##_t init ) \
+  {                                                                                                                \
+    uint32_t old_elems = table->size;                                                                              \
+    uint64_t new_elems = (uint64_t)table->size + delta;                                                            \
+    if ( new_elems == 0 ) {                                                                                        \
+      return 0;                                                                                                    \
+    }                                                                                                              \
+    if ( ( new_elems < old_elems ) || ( new_elems > table->max_size ) ) {                                          \
+      return (uint32_t)-1;                                                                                         \
+    }                                                                                                              \
+    void* new_data = realloc( table->data, new_elems * sizeof( wasm_rt_##type##_t ) );                             \
+    if ( !new_data ) {                                                                                             \
+      return (uint32_t)-1;                                                                                         \
+    }                                                                                                              \
+    table->data = static_cast<wasm_rt_##type##_t*>( new_data );                                                    \
+    table->size = new_elems;                                                                                       \
+    for ( uint32_t i = old_elems; i < new_elems; i++ ) {                                                           \
+      table->data[i] = init;                                                                                       \
+    }                                                                                                              \
+    return old_elems;                                                                                              \
+  }
 
-void wasm_rt_free_table( wasm_rt_table_t* table )
-{
-  free( table->data );
-}
+DEFINE_TABLE_OPS( funcref )
+DEFINE_TABLE_OPS( externref )
 
 const char* wasm_rt_strerror( wasm_rt_trap_t trap )
 {
@@ -403,9 +458,10 @@ const char* wasm_rt_strerror( wasm_rt_trap_t trap )
       return "No error";
     case WASM_RT_TRAP_OOB:
 #if WASM_RT_MERGED_OOB_AND_EXHAUSTION_TRAPS
-      return "Out-of-bounds access in linear memory or call stack exhausted";
+      return "Out-of-bounds access in linear memory or a table, or call stack "
+             "exhausted";
 #else
-      return "Out-of-bounds access in linear memory";
+      return "Out-of-bounds access in linear memory or a table";
     case WASM_RT_TRAP_EXHAUSTION:
       return "Call stack exhausted";
 #endif

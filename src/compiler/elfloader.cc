@@ -145,9 +145,14 @@ Program link_program( Elf_Info& elf_info,
     pair<string, func>( "wasm_rt_allocate_memory", func( (uint64_t)wasm_rt_allocate_memory ) ) );
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );
   elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_allocate_table", func( (uint64_t)wasm_rt_allocate_table ) ) );
+    pair<string, func>( "wasm_rt_allocate_funcref_table", func( (uint64_t)wasm_rt_allocate_funcref_table ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "wasm_rt_allocate_externref_table", func( (uint64_t)wasm_rt_allocate_externref_table ) ) );
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_free_memory", func( (uint64_t)wasm_rt_free_memory ) ) );
-  elf_info.func_map.insert( pair<string, func>( "wasm_rt_free_table", func( (uint64_t)wasm_rt_free_table ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "wasm_rt_free_funcref_table", func( (uint64_t)wasm_rt_free_funcref_table ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "wasm_rt_free_externref_table", func( (uint64_t)wasm_rt_free_externref_table ) ) );
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_init", func( (uint64_t)wasm_rt_init ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "fixpoint_get_tree_entry", func( (uint64_t)fixpoint::get_tree_entry ) ) );
