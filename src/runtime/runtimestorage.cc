@@ -72,8 +72,8 @@ span_view<TreeEntry> RuntimeStorage::getTree( const Name& name )
 }
 
 Name RuntimeStorage::addThunk( Thunk thunk )
-{ 
-  string name_content((const char*)&thunk, sizeof(Thunk));
+{
+  string name_content( (const char*)&thunk, sizeof( Thunk ) );
   return Name( move( name_content ), NameType::Literal, ContentType::Thunk );
 }
 

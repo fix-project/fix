@@ -133,7 +133,7 @@ Result WasmInspector::ValidateImports()
       return Result::Error;
     }
   }
-  
+
   for ( auto index : this->exported_rw_ ) {
     if ( index >= current_module_->num_memory_imports ) {
       return Result::Error;
@@ -196,11 +196,13 @@ std::map<uint32_t, uint64_t> WasmInspector::GetNonZeroRW()
   std::map<uint32_t, uint64_t> result;
   for ( Import* import_ : current_module_->imports ) {
     if ( import_->kind() == ExternalKind::Memory ) {
-      if ( import_->field_name.find( "rw_mem" ) != string::npos && cast<MemoryImport>(import_)->memory.page_limits.initial != 0) {
-        result.insert( {(uint32_t)atoi( import_->field_name.substr( 7 ).data() ), cast<MemoryImport>(import_)->memory.page_limits.initial} );
+      if ( import_->field_name.find( "rw_mem" ) != string::npos
+           && cast<MemoryImport>( import_ )->memory.page_limits.initial != 0 ) {
+        result.insert( { (uint32_t)atoi( import_->field_name.substr( 7 ).data() ),
+                         cast<MemoryImport>( import_ )->memory.page_limits.initial } );
       }
     }
   }
   return result;
-} 
+}
 } // namespace wasminspector

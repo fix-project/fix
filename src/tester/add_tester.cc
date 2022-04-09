@@ -6,7 +6,7 @@
 #include "runtimestorage.hh"
 #include "util.hh"
 
-#include "timing_helper.hh" 
+#include "timing_helper.hh"
 
 using namespace std;
 
@@ -26,16 +26,16 @@ int main( int argc, char* argv[] )
   int arg2 = atoi( argv[3] );
   Name arg1_name = runtime.addBlob( move( string( reinterpret_cast<char*>( &arg1 ), sizeof( int ) ) ) );
   Name arg2_name = runtime.addBlob( move( string( reinterpret_cast<char*>( &arg2 ), sizeof( int ) ) ) );
-  
-  vector<TreeEntry> encode;
-  encode.push_back( TreeEntry( Name("empty", NameType::Canonical, ContentType::Blob ), Laziness::Strict ));
-  encode.push_back( TreeEntry( Name("addblob", NameType::Canonical, ContentType::Blob ), Laziness::Strict) );
-  encode.push_back( TreeEntry(arg1_name, Laziness::Strict) );
-  encode.push_back( TreeEntry(arg2_name, Laziness::Strict) );
-  
-  Name encode_name = runtime.addTree( move(encode) );
 
-  Thunk thunk ( encode_name );
+  vector<TreeEntry> encode;
+  encode.push_back( TreeEntry( Name( "empty", NameType::Canonical, ContentType::Blob ), Laziness::Strict ) );
+  encode.push_back( TreeEntry( Name( "addblob", NameType::Canonical, ContentType::Blob ), Laziness::Strict ) );
+  encode.push_back( TreeEntry( arg1_name, Laziness::Strict ) );
+  encode.push_back( TreeEntry( arg2_name, Laziness::Strict ) );
+
+  Name encode_name = runtime.addTree( move( encode ) );
+
+  Thunk thunk( encode_name );
   Name thunk_name = runtime.addThunk( thunk );
   Name res_name = runtime.forceThunk( thunk_name );
 

@@ -50,14 +50,14 @@ public:
   {}
 
   void* execute( Name encode_name ) const
-  { 
+  {
     void* ( *init_func )( void* );
     init_func = reinterpret_cast<void* (*)( void* )>( code_.get() + init_entry_ );
     void* instance = init_func( &encode_name );
-    
+
     void* ( *main_func )( void* );
     main_func = reinterpret_cast<void* (*)( void* )>( code_.get() + main_entry_ );
-    
+
     RecordScopeTimer<Timer::Category::Nonblock> record_timer { _fixpoint_apply };
     return main_func( instance );
   }
