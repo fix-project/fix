@@ -2,15 +2,27 @@
 
 use strict;
 
+if ((scalar @ARGV) != 2) {
+  die qq{Usage: $0 add_tester addblob.wasm};
+}
+
+my ($executable, $wasm) = @ARGV;
+
 sub check_add($$) {
   my ($x, $y) = @_;
   my $expected_answer = unpack q{l}, (pack q{l}, ($x + $y) % 2**32);
 
-  my $result = `../build/src/tester/add_tester ../build/src/wasm-examples/addblob/addblob.wasm $x $y`;
+  my $result = `$executable $wasm $x $y 2>&1`;
+
+  if ($?) {
+    print STDERR qq{Got result:\n$result\n};
+    die qq{Failure in running $x + $y};
+  }
 
   my ($answer) = $result =~ m{^The result is (.*)};
 
   if ( $answer != $expected_answer ) {
+    print STDERR qq{Got result:\n$result\n};
     die qq{Wrong answer to $x + $y ($answer)};
   }
 }

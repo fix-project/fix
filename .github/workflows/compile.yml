@@ -11,8 +11,21 @@ jobs:
       - name: install-packages
         run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config zlib1g-dev cmake clang libclang-dev libcrypto++-dev
       - name: cmake
-        run: cmake -S . -B build
+        run: cmake -S . -B out
       - name: compile
-        run: cmake --build build --parallel 8
+        run: cmake --build out --parallel 8
       - name: test
-        run: cmake --build build --target test
+        run: cmake --build out --target check
+  sanitize:
+      runs-on: ubuntu-latest
+      container: ubuntu:rolling
+      steps:
+      - uses: actions/checkout@v1
+      - name: install-packages
+        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config zlib1g-dev cmake clang libclang-dev libcrypto++-dev
+      - name: cmake
+        run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=DebugASan
+      - name: compile
+        run: cmake --build out-sanitize --parallel 8
+      - name: test
+        run: cmake --build out-sanitize --target check
