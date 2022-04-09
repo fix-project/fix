@@ -2,7 +2,6 @@ cmake_minimum_required ( VERSION 2.8.5 )
 cmake_policy (SET CMP0048 NEW)
 project ( fixpoint )
 
-
 find_package ( PkgConfig )
 
 pkg_check_modules ( CRYPT REQUIRED libcrypto++ )
@@ -35,11 +34,13 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
   GIT_TAG        master
   )
+set(ABSL_PROPAGATE_CXX_STD on)
 FetchContent_MakeAvailable(absl)
 
 include ( etc/build_type.cmake )
 include ( etc/cflags.cmake )
 include ( etc/clang_format.cmake )
+include ( etc/tests.cmake )
 
 include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-src")
 include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-build")

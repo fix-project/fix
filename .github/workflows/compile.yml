@@ -8,7 +8,11 @@ jobs:
       container: ubuntu:rolling
       steps:
       - uses: actions/checkout@v1
-      - name: configure
-        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config zlib1g-dev cmake clang libclang-dev libcrypto++-dev && mkdir build && cd build && cmake ..
-      - name: build
-        run: cd build && make -j2
+      - name: install-packages
+        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config zlib1g-dev cmake clang libclang-dev libcrypto++-dev
+      - name: cmake
+        run: cmake -S . -B build
+      - name: compile
+        run: cmake --build build --parallel 8
+      - name: test
+        run: cmake --build build --target test
