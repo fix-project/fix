@@ -31,7 +31,7 @@ void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t ent
 
   ObjectReference* ro_handles = instance->getROHandles();
 
-  ObjectReference obj = ro_handles[src_ro_handle];
+  const ObjectReference& obj = instance->getROHandle( src_ro_handle );
 
   if ( obj.name_.getContentType() != ContentType::Tree ) {
     throw std::runtime_error( "not a tree" );
@@ -50,9 +50,7 @@ void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* t
   //  attach blob at handle to target_memory
   Instance* instance = (Instance*)module_instance - 1;
 
-  ObjectReference* ro_handles = instance->getROHandles();
-
-  ObjectReference obj = ro_handles[ro_handle];
+  const ObjectReference& obj = instance->getROHandle( ro_handle );
 
   if ( obj.name_.getContentType() != ContentType::Blob ) {
     throw std::runtime_error( "not a blob" );
