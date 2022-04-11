@@ -122,9 +122,7 @@ void designate_output( void* module_instance, uint32_t ro_handle )
   // RecordScopeTimer<Timer::Category::Nonblock> record_timer { _designate_output };
   Instance* instance = (Instance*)module_instance - 1;
 
-  ObjectReference* ro_handles = instance->getROHandles();
-
-  ObjectReference obj = ro_handles[ro_handle];
+  const ObjectReference& obj = instance->getROHandle( ro_handle );
 
   instance->setOutput( obj.name_ );
 }
