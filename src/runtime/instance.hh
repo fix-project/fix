@@ -64,9 +64,10 @@ public:
   void setOutput( Name name ) { output_ = name; }
   Name getOutput() { return output_; }
 
-  const ObjectReference& getROHandle( uint32_t index ) { 
+  const ObjectReference& getROHandle( uint32_t index )
+  {
     // need to error check index
-    const ObjectReference& ref = ro_handle[ index ];
+    const ObjectReference& ref = ro_handle[index];
     return ref;
   }
 };

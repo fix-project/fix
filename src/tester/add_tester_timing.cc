@@ -4,9 +4,8 @@
 
 #include "name.hh"
 #include "runtimestorage.hh"
-#include "util.hh"
-
 #include "timing_helper.hh"
+#include "util.hh"
 
 using namespace std;
 
@@ -40,16 +39,8 @@ int main( int argc, char* argv[] )
     Thunk thunk( encode_name );
     Name thunk_name = runtime.addThunk( thunk );
     Name res_name = runtime.forceThunk( thunk_name );
-
-    // cout << dec;
-    // cout << "The result is " << *( (const int*)runtime.getBlob( res_name ).data() ) << endl;
   }
 
-  print_timer( cout, "_fixpoint_apply", _fixpoint_apply );
-  // print_timer( cout, "_attach_blob", _attach_blob);
-  // print_timer(cout, "_get_tree_entry", _get_tree_entry);
-  // print_timer(cout, "_detach_mem", _detach_mem);
-  // print_timer(cout, "_freeze_blob", _freeze_blob);
-  // print_timer(cout, "_designate_output", _designate_output);
+  print_fixpoint_timers( cout );
   return 0;
 }

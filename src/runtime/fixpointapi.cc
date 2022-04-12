@@ -26,7 +26,10 @@ void* init_env_instance( size_t env_instance_size )
 // module_instance points to the WASM instance
 void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t entry_num, uint32_t target_ro_handle )
 {
-  // RecordScopeTimer<Timer::Category::Nonblock> record_timer { _get_tree_entry };
+#if TIME_FIXPOINT_API
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _get_tree_entry };
+#endif
+
   Instance* instance = (Instance*)module_instance - 1;
 
   ObjectReference* ro_handles = instance->getROHandles();
@@ -46,7 +49,9 @@ void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t ent
 // module_instance points to the WASM instance
 void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* target_memory )
 {
-  // RecordScopeTimer<Timer::Category::Nonblock> record_timer { _attach_blob };
+#if TIME_FIXPOINT_API
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _attach_blob };
+#endif
   //  attach blob at handle to target_memory
   Instance* instance = (Instance*)module_instance - 1;
 
@@ -67,7 +72,9 @@ void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* t
 // module_instance points to the WASM instance
 void detach_mem( void* module_instance, wasm_rt_memory_t* target_memory, uint32_t rw_handle )
 {
-  // RecordScopeTimer<Timer::Category::Nonblock> record_timer { _detach_mem };
+#if TIME_FIXPOINT_API
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _detach_mem };
+#endif
   if ( target_memory == NULL ) {
     throw std::runtime_error( "memory does not exist" );
   }
@@ -96,7 +103,9 @@ void detach_mem( void* module_instance, wasm_rt_memory_t* target_memory, uint32_
 // module_instance points to the WASM instance
 void freeze_blob( void* module_instance, uint32_t rw_handle, size_t size, uint32_t ro_handle )
 {
-  // RecordScopeTimer<Timer::Category::Nonblock> record_timer { _freeze_blob };
+#if TIME_FIXPOINT_API
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _freeze_blob };
+#endif
   Instance* instance = (Instance*)module_instance - 1;
 
   MutableValueReference* rw_handles = instance->getRWHandles();
@@ -119,7 +128,9 @@ void freeze_blob( void* module_instance, uint32_t rw_handle, size_t size, uint32
 // module_instance points to the WASM instance
 void designate_output( void* module_instance, uint32_t ro_handle )
 {
-  // RecordScopeTimer<Timer::Category::Nonblock> record_timer { _designate_output };
+#if TIME_FIXPOINT_API
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _designate_output };
+#endif
   Instance* instance = (Instance*)module_instance - 1;
 
   const ObjectReference& obj = instance->getROHandle( ro_handle );

@@ -58,7 +58,9 @@ public:
     void* ( *main_func )( void* );
     main_func = reinterpret_cast<void* (*)( void* )>( code_.get() + main_entry_ );
 
+#if !TIME_FIXPOINT_API
     RecordScopeTimer<Timer::Category::Nonblock> record_timer { _fixpoint_apply };
+#endif
     return main_func( instance );
   }
 
