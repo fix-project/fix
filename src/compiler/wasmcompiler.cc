@@ -14,6 +14,7 @@
 #include "src/c-writer.h"
 
 #include "initcomposer.hh"
+#include "wasminspector.hh"
 
 using namespace std;
 using namespace wabt;
@@ -109,12 +110,31 @@ tuple<string, string, string> wasm_to_c( const string& wasm_name, const string& 
       WABT_USE( dummy_result );
     }
 
+    wasminspector::WasmInspector inspector( &module, &errors );
+
+    if ( Succeeded( result ) ) {
+      result = inspector.ValidateMemAccess();
+      result |= inspector.ValidateImports();
+    }
+    if ( result != Result::Ok ) {
+      throw runtime_error( "Invalid module." );
+    }
+
+    if ( Succeeded( result ) ) {
+      for ( auto index : inspector.GetExportedROIndex() ) {
+        module.memories[index]->bounds_checked = true;
+      }
+      for ( auto index : inspector.GetExportedRWIndex() ) {
+        module.memories[index]->bounds_checked = true;
+      }
+    }
+
     if ( Succeeded( result ) ) {
       result = WriteC( &c_stream, &h_stream, ( wasm_name + ".h" ).c_str(), &module, s_write_c_options );
     }
 
     if ( Succeeded( result ) ) {
-      fixpoint_header = initcomposer::compose_header( wasm_name, &module, &errors );
+      fixpoint_header = initcomposer::compose_header( wasm_name, &module, &errors, &inspector );
     }
   }
   FormatErrorsToFile( errors, Location::Type::Binary );

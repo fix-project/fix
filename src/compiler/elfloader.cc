@@ -143,12 +143,18 @@ Program link_program( Elf_Info& elf_info,
     pair<string, func>( "wasm_rt_register_func_type", func( (uint64_t)wasm_rt_register_func_type ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "wasm_rt_allocate_memory", func( (uint64_t)wasm_rt_allocate_memory ) ) );
+  elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_memory_sw_checked",
+                                                func( (uint64_t)wasm_rt_allocate_memory_sw_checked ) ) );
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "wasm_rt_grow_memory_sw_checked", func( (uint64_t)wasm_rt_grow_memory_sw_checked ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "wasm_rt_allocate_funcref_table", func( (uint64_t)wasm_rt_allocate_funcref_table ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "wasm_rt_allocate_externref_table", func( (uint64_t)wasm_rt_allocate_externref_table ) ) );
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_free_memory", func( (uint64_t)wasm_rt_free_memory ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "wasm_rt_free_memory_sw_checked", func( (uint64_t)wasm_rt_free_memory_sw_checked ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "wasm_rt_free_funcref_table", func( (uint64_t)wasm_rt_free_funcref_table ) ) );
   elf_info.func_map.insert(

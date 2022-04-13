@@ -22,9 +22,11 @@ public:
   wabt::Result ValidateMemAccess();
   wabt::Result ValidateImports();
   const std::set<std::string>& GetImportedFunctions();
-  std::map<uint32_t, uint64_t> GetNonZeroRW();
+  std::map<uint32_t, uint64_t> GetRWSizes();
   std::vector<uint32_t> GetExportedRO();
   std::vector<uint32_t> GetExportedRW();
+  std::vector<wabt::Index> GetExportedROIndex() { return exported_ro_; }
+  std::vector<wabt::Index> GetExportedRWIndex() { return exported_rw_; }
 
   // Implementation of ExprVisitor::DelegateNop.
   wabt::Result OnMemoryCopyExpr( wabt::MemoryCopyExpr* ) override;

@@ -4,7 +4,6 @@
 
 #include "src/c-writer.h"
 #include "src/error.h"
-#include "wasminspector.hh"
 
 using namespace std;
 using namespace wabt;
@@ -37,14 +36,14 @@ string MangleStateInfoTypeName( const string& wasm_name )
 class InitComposer
 {
 public:
-  InitComposer( const string& wasm_name, Module* module, Errors* errors )
+  InitComposer( const string& wasm_name, Module* module, Errors* errors, wasminspector::WasmInspector* inspector )
     : current_module_( module )
     , errors_( errors )
     , wasm_name_( wasm_name )
     , state_info_type_name_( MangleStateInfoTypeName( wasm_name ) )
     , module_prefix_( MangleName( wasm_name ) + "_" )
     , result_()
-    , inspector_( module, errors )
+    , inspector_( inspector )
   {}
 
   InitComposer( const InitComposer& ) = default;
@@ -59,7 +58,7 @@ private:
   string state_info_type_name_;
   string module_prefix_;
   ostringstream result_;
-  wasminspector::WasmInspector inspector_;
+  wasminspector::WasmInspector* inspector_;
 
   void write_get_tree_entry();
   void write_attach_blob();
@@ -71,8 +70,8 @@ private:
 
 void InitComposer::write_get_tree_entry()
 {
-  auto it = inspector_.GetImportedFunctions().find( "get_tree_entry" );
-  if ( it == inspector_.GetImportedFunctions().end() )
+  auto it = inspector_->GetImportedFunctions().find( "get_tree_entry" );
+  if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
   result_ << "extern void fixpoint_get_tree_entry(void*, uint32_t, uint32_t, uint32_t);" << endl;
@@ -89,9 +88,9 @@ void InitComposer::write_get_tree_entry()
 
 void InitComposer::write_attach_blob()
 {
-  auto ro_mems = inspector_.GetExportedRO();
-  auto it = inspector_.GetImportedFunctions().find( "attach_blob" );
-  if ( it == inspector_.GetImportedFunctions().end() )
+  auto ro_mems = inspector_->GetExportedRO();
+  auto it = inspector_->GetImportedFunctions().find( "attach_blob" );
+  if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
   result_ << "extern void fixpoint_attach_blob(void*, uint32_t, wasm_rt_memory_t*);" << endl;
@@ -120,9 +119,9 @@ void InitComposer::write_attach_blob()
 
 void InitComposer::write_detach_mem()
 {
-  auto rw_mems = inspector_.GetExportedRW();
-  auto it = inspector_.GetImportedFunctions().find( "detach_mem" );
-  if ( it == inspector_.GetImportedFunctions().end() )
+  auto rw_mems = inspector_->GetExportedRW();
+  auto it = inspector_->GetImportedFunctions().find( "detach_mem" );
+  if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
   result_ << "extern void fixpoint_detach_mem( void*, wasm_rt_memory_t*, uint32_t );" << endl;
@@ -151,8 +150,8 @@ void InitComposer::write_detach_mem()
 
 void InitComposer::write_freeze_blob()
 {
-  auto it = inspector_.GetImportedFunctions().find( "freeze_blob" );
-  if ( it == inspector_.GetImportedFunctions().end() )
+  auto it = inspector_->GetImportedFunctions().find( "freeze_blob" );
+  if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
   result_ << "extern void fixpoint_freeze_blob( void*, uint32_t, uint32_t, uint32_t );" << endl;
@@ -167,8 +166,8 @@ void InitComposer::write_freeze_blob()
 
 void InitComposer::write_designate_output()
 {
-  auto it = inspector_.GetImportedFunctions().find( "designate_output" );
-  if ( it == inspector_.GetImportedFunctions().end() )
+  auto it = inspector_->GetImportedFunctions().find( "designate_output" );
+  if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
   result_ << "extern void fixpoint_designate_output( void*, uint32_t );" << endl;
@@ -185,24 +184,24 @@ void InitComposer::write_env_instance()
   result_ << "typedef struct Z_env_module_instance_t {" << endl;
   result_ << "  " << module_prefix_ << "module_instance_t* module_instance;" << endl;
 
-  for ( auto ro_mem : inspector_.GetExportedRO() ) {
+  for ( auto ro_mem : inspector_->GetExportedRO() ) {
     result_ << "  wasm_rt_memory_t ro_mem_" << ro_mem << ";" << endl;
   }
-  for ( auto rw_mem : inspector_.GetExportedRW() ) {
+  for ( auto rw_mem : inspector_->GetExportedRW() ) {
     result_ << "  wasm_rt_memory_t rw_mem_" << rw_mem << ";" << endl;
   }
 
   result_ << "} Z_env_module_instance_t;" << endl;
   result_ << endl;
 
-  for ( auto ro_mem : inspector_.GetExportedRO() ) {
+  for ( auto ro_mem : inspector_->GetExportedRO() ) {
     result_ << "wasm_rt_memory_t* Z_env_Z_ro_mem_" << ro_mem << "(Z_env_module_instance_t* env_module_instance) {"
             << endl;
     result_ << "  return &env_module_instance->ro_mem_" << ro_mem << ";" << endl;
     result_ << "}" << endl;
     result_ << endl;
   }
-  for ( auto rw_mem : inspector_.GetExportedRW() ) {
+  for ( auto rw_mem : inspector_->GetExportedRW() ) {
     result_ << "wasm_rt_memory_t* Z_env_Z_rw_mem_" << rw_mem << "(Z_env_module_instance_t* env_module_instance) {"
             << endl;
     result_ << " return &env_module_instance->rw_mem_" << rw_mem << ";" << endl;
@@ -210,11 +209,16 @@ void InitComposer::write_env_instance()
     result_ << endl;
   }
 
-  auto nonzero_rw_mems = inspector_.GetNonZeroRW();
-  result_ << "void init_rw_mems(Z_env_module_instance_t* env_module_instance) {" << endl;
-  for ( const auto& [rw_mem, size] : nonzero_rw_mems ) {
-    result_ << "  wasm_rt_allocate_memory(&env_module_instance->rw_mem_" << rw_mem << ", " << size << ", 65536);"
-            << endl;
+  auto ro_mems = inspector_->GetExportedRO();
+  auto rw_mems = inspector_->GetRWSizes();
+  result_ << "void init_mems(Z_env_module_instance_t* env_module_instance) {" << endl;
+  for ( const auto& ro_mem : ro_mems ) {
+    result_ << "  wasm_rt_allocate_memory_sw_checked(&env_module_instance->ro_mem_" << ro_mem << ", " << 0
+            << ", 65536);" << endl;
+  }
+  for ( const auto& [rw_mem, size] : rw_mems ) {
+    result_ << "  wasm_rt_allocate_memory_sw_checked(&env_module_instance->rw_mem_" << rw_mem << ", " << size
+            << ", 65536);" << endl;
   }
   result_ << "  return;" << endl;
   result_ << "}" << endl;
@@ -223,16 +227,6 @@ void InitComposer::write_env_instance()
 
 string InitComposer::compose_header()
 {
-  Result memcheck = inspector_.ValidateMemAccess();
-  if ( memcheck != Result::Ok ) {
-    throw runtime_error( "Invalid mem access." );
-  }
-
-  Result importcheck = inspector_.ValidateImports();
-  if ( importcheck != Result::Ok ) {
-    throw runtime_error( "Invalid imports." );
-  }
-
   result_ = ostringstream();
   result_ << "#include \"" << wasm_name_ << "_fixpoint.h\"" << endl;
   result_ << endl;
@@ -252,7 +246,7 @@ string InitComposer::compose_header()
   result_ << "  Z_env_module_instance_t* env_module_instance = "
              "fixpoint_init_env_module_instance(sizeof(Z_env_module_instance_t));"
           << endl;
-  result_ << "  init_rw_mems(env_module_instance);" << endl;
+  result_ << "  init_mems(env_module_instance);" << endl;
   result_ << "  env_module_instance->module_instance = instance;" << endl;
   result_ << "  " << module_prefix_ << "init_module();" << endl;
   result_ << "  " << module_prefix_ << "init(instance, env_module_instance);" << endl;
@@ -268,9 +262,9 @@ string InitComposer::compose_header()
   return result_.str();
 }
 
-string compose_header( string wasm_name, Module* module, Errors* error )
+string compose_header( string wasm_name, Module* module, Errors* error, wasminspector::WasmInspector* inspector )
 {
-  InitComposer composer( wasm_name, module, error );
+  InitComposer composer( wasm_name, module, error, inspector );
   return composer.compose_header();
 }
 }

@@ -253,8 +253,8 @@ extern void wasm_rt_allocate_memory_sw_checked(wasm_rt_memory_t*,
  *  ``` */
 extern uint32_t wasm_rt_grow_memory(wasm_rt_memory_t*, uint32_t pages);
 
-extern uint32_t wasm_rt_grow_memory_sw_cheked(wasm_rt_memory_t*,
-                                              uint32_t pages);
+extern uint32_t wasm_rt_grow_memory_sw_checked(wasm_rt_memory_t*,
+                                               uint32_t pages);
 
 /**
  * Free a Memory object.
