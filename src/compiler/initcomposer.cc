@@ -228,6 +228,7 @@ void InitComposer::write_env_instance()
 string InitComposer::compose_header()
 {
   result_ = ostringstream();
+  result_ << "#include <immintrin.h>" << endl;
   result_ << "#include \"" << wasm_name_ << "_fixpoint.h\"" << endl;
   result_ << endl;
 
@@ -238,9 +239,9 @@ string InitComposer::compose_header()
   write_freeze_blob();
   write_designate_output();
 
-  result_ << "extern void* fixpoint_init_module_instance(size_t, void* encode_name);" << endl;
+  result_ << "extern void* fixpoint_init_module_instance(size_t, __m256i encode_name);" << endl;
   result_ << "extern void* fixpoint_init_env_module_instance(size_t);" << endl;
-  result_ << "void* initProgram(void* encode_name) {" << endl;
+  result_ << "void* initProgram(__m256i encode_name) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_
           << "*)fixpoint_init_module_instance(sizeof(" << state_info_type_name_ << "), encode_name);" << endl;
   result_ << "  Z_env_module_instance_t* env_module_instance = "

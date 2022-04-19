@@ -18,13 +18,6 @@ class Program
 private:
   // Name of the program
   std::string name_;
-  // List of dependency
-  std::vector<std::string> deps_;
-
-  // List of named input symbols
-  std::vector<std::string> inputs_;
-  // List of named output symbols
-  std::vector<std::string> outputs_;
 
   // Code and data section of the program
   std::shared_ptr<char> code_;
@@ -34,16 +27,8 @@ private:
   uint64_t main_entry_;
 
 public:
-  Program( std::string name,
-           std::vector<std::string>&& inputs,
-           std::vector<std::string>&& outputs,
-           std::shared_ptr<char> code,
-           uint64_t init_entry,
-           uint64_t main_entry )
+  Program( std::string name, std::shared_ptr<char> code, uint64_t init_entry, uint64_t main_entry )
     : name_( name )
-    , deps_()
-    , inputs_( std::move( inputs ) )
-    , outputs_( std::move( outputs ) )
     , code_( code )
     , init_entry_( init_entry )
     , main_entry_( main_entry )
@@ -51,9 +36,9 @@ public:
 
   void* execute( Name encode_name ) const
   {
-    void* ( *init_func )( void* );
-    init_func = reinterpret_cast<void* (*)( void* )>( code_.get() + init_entry_ );
-    void* instance = init_func( &encode_name );
+    void* ( *init_func )( __m256i );
+    init_func = reinterpret_cast<void* (*)( __m256i )>( code_.get() + init_entry_ );
+    void* instance = init_func( encode_name );
 
     void* ( *main_func )( void* );
     main_func = reinterpret_cast<void* (*)( void* )>( code_.get() + main_entry_ );
@@ -63,10 +48,4 @@ public:
 #endif
     return main_func( instance );
   }
-
-  const std::vector<std::string>& getInputSymbols() const { return inputs_; }
-  const std::vector<std::string>& getOutputSymbols() const { return outputs_; }
-
-  void setDeps( const std::vector<std::string>& deps ) { deps_ = deps; }
-  const std::vector<std::string>& getDeps() const { return deps_; }
 };

@@ -17,5 +17,5 @@ public:
     : encode_name_( encode_name )
   {}
 
-  const Name& getEncode() const { return encode_name_; }
+  const Name& get_encode() const { return encode_name_; }
 };

@@ -37,9 +37,9 @@ public:
     , output_()
   {}
 
-  Instance( Name* encode_name )
+  Instance( __m256i encode_name )
     : program_name_( "" )
-    , encode_name_( *encode_name )
+    , encode_name_( Name( encode_name ) )
     , ro_handle()
     , rw_handle()
     , output_()
@@ -58,13 +58,13 @@ public:
   Instance( const Instance& ) = default;
   Instance& operator=( const Instance& ) = default;
 
-  MutableValueReference* getRWHandles() { return &rw_handle[0]; }
-  ObjectReference* getROHandles() { return &ro_handle[0]; }
+  MutableValueReference* get_rw_handles() { return &rw_handle[0]; }
+  ObjectReference* get_ro_handles() { return &ro_handle[0]; }
 
-  void setOutput( Name name ) { output_ = name; }
-  Name getOutput() { return output_; }
+  void set_output( Name name ) { output_ = name; }
+  Name get_output() { return output_; }
 
-  const ObjectReference& getROHandle( uint32_t index )
+  const ObjectReference& get_ro_handle( uint32_t index )
   {
     // need to error check index
     const ObjectReference& ref = ro_handle[index];

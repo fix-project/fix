@@ -43,51 +43,48 @@ private:
 
 public:
   // Return reference to static runtime storage
-  static RuntimeStorage& getInstance()
+  static RuntimeStorage& get_instance()
   {
     static RuntimeStorage runtime_instance;
     return runtime_instance;
   }
 
   // add blob
-  Name addBlob( std::string&& content );
+  Name add_blob( std::string&& content );
 
   // Return reference to blob content
-  std::string_view getBlob( const Name& name );
+  std::string_view get_blob( const Name& name );
 
   // add Tree
-  Name addTree( std::vector<TreeEntry>&& content );
+  Name add_tree( std::vector<Name>&& content );
 
   // Return reference to Tree
-  span_view<TreeEntry> getTree( const Name& name );
+  span_view<Name> get_tree( const Name& name );
 
   // add Thunk
-  Name addThunk( Thunk thunk );
+  Name add_thunk( Thunk thunk );
 
   // Return encode name referred to by thunk
-  Name getThunkEncodeName( const Name& thunk_name );
+  Name get_thunk_encode_name( const Name& thunk_name );
 
   // add wasm module
-  void addWasm( const std::string& name, const std::string& wasm_content );
+  void add_wasm( const std::string& name, const std::string& wasm_content );
 
   // add elf program
-  void addProgram( const std::string& name,
-                   std::vector<std::string>&& inputs,
-                   std::vector<std::string>&& outputs,
-                   std::string& program_content );
+  void add_program( const std::string& name, std::string& program_content );
 
   // force the object refered to by a name
-  Name force( Name name );
+  Name force( const Name& name );
 
   // force a Tree
-  Name forceTree( Name tree_name );
+  Name force_tree( const Name& tree_name );
 
   // force a Thunk
-  Name forceThunk( Name thunk_name );
+  Name force_thunk( const Name& thunk_name );
 
   // Reduce a Thunk by one step
-  Name reduceThunk( Name thunk_name );
+  Name reduce_thunk( const Name& thunk_name );
 
   // Evaluate an encode
-  Name evaluateEncode( Name encode_name );
+  Name evaluate_encode( const Name& encode_name );
 };

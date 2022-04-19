@@ -59,16 +59,12 @@ string c_to_elf( const string& wasm_name,
 
   compilerInstance.setFileManager( new FileManager( FileSystemOptions {}, RealFS ) );
 
-  // auto diskFile = RealFS->openFileForRead( "/usr/include/string.h" );
-  // cout << ( string )( ( *( *diskFile )->getBuffer( "ignore" ) )->getBuffer() ) << endl;
-
   // Create arguments
   const char* Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", FIXPOINT_C_INCLUDE_PATH };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
 
   // Setup mcmodel
   auto& codegenOptions = compilerInstance.getCodeGenOpts();
-  // codegenOptions.CodeModel = "small";
   codegenOptions.RelocationModel = llvm::Reloc::Static;
 
   LLVMContext context;
@@ -77,26 +73,30 @@ string c_to_elf( const string& wasm_name,
   targetOptions.Triple = llvm::sys::getDefaultTargetTriple();
   compilerInstance.createDiagnostics( diagPrinter.get(), false );
 
-  if ( !compilerInstance.ExecuteAction( *action ) ) {
-    cout << "Failed to execute action." << endl;
+  // add -mavx
+  llvm::StringMap<bool> FeatureMap;
+  FeatureMap["avx"] = true;
+  targetOptions.FeatureMap = FeatureMap;
+
+  if ( !compilerInstance.createTarget() ) {
     cout << diagOS.str() << endl;
+    throw runtime_error( "Failed to create target" );
+  }
+
+  if ( !compilerInstance.ExecuteAction( *action ) ) {
+    cout << diagOS.str() << endl;
+    throw runtime_error( "Failed to emit llvm" );
   }
 
   unique_ptr<llvm::Module> module = action->takeModule();
   if ( !module ) {
-    cout << "Failed to take module." << endl;
     cout << diagOS.str() << endl;
+    throw runtime_error( "Failed to take module" );
   }
 
-  // set up llvm target machine
+  // set up codegenopts
   auto& CodeGenOpts = compilerInstance.getCodeGenOpts();
   auto& Diagnostics = compilerInstance.getDiagnostics();
-
-  // if ( module->getTargetTriple() != targetOptions.Triple )
-  //{
-  // cout << "Wrong target triple" << endl;
-  // module->setTargetTriple( targetOptions.Triple );
-  // }
 
   std::string res;
   raw_string_ostream Str_OS( res );

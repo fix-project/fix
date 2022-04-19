@@ -5,7 +5,7 @@
 
 namespace fixpoint {
 /* Initialize module instance*/
-void* init_module_instance( size_t instance_size, void* encode_name );
+void* init_module_instance( size_t instance_size, __m256i encode_name );
 
 /* Initialize env instance*/
 void* init_env_instance( size_t env_instance_size );

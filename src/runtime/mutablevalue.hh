@@ -30,8 +30,8 @@ private:
 public:
   ~MutableValue();
 
-  void setData( uint8_t* val ) { data = val; }
-  uint8_t* getData() { return data; }
+  void set_data( uint8_t* val ) { data = val; }
+  uint8_t* get_data() { return data; }
 };
 
 class MBlob : public MutableValue
@@ -45,25 +45,14 @@ struct ObjectReference
   bool accessible_;
 
   ObjectReference()
-    : name_()
-    , accessible_( true ) {};
-
-  ObjectReference( const TreeEntry& entry )
-    : name_( entry.first )
+    : name_( "x" )
     , accessible_( true )
-  {
-    switch ( entry.second ) {
-      case Laziness::Strict:
-        accessible_ = true;
-        break;
-      default:
-        accessible_ = false;
-    }
-  }
+  {}
 
-  ObjectReference( Name name )
-    : name_( name )
-    , accessible_( true ) {};
+  ObjectReference( const Name& entry )
+    : name_( entry.name_only() )
+    , accessible_( entry.is_strict_tree_entry() )
+  {}
 };
 
 using MutableValueReference = MutableValue*;

@@ -120,10 +120,7 @@ Elf_Info load_program( string& program_content )
   return res;
 }
 
-Program link_program( Elf_Info& elf_info,
-                      const string& program_name,
-                      vector<string>&& inputs,
-                      vector<string>&& outputs )
+Program link_program( Elf_Info& elf_info, const string& program_name )
 {
   // Step 0: allocate memory for data and text
   size_t mem_size = elf_info.code.size() + elf_info.rodata.size() + elf_info.bss_size + elf_info.com_size;
@@ -231,5 +228,5 @@ Program link_program( Elf_Info& elf_info,
   shared_ptr<char> code( reinterpret_cast<char*>( program_mem ) );
   uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "initProgram" ).idx].st_value;
   uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "executeProgram" ).idx].st_value;
-  return Program( program_name, move( inputs ), move( outputs ), code, init_entry, main_entry );
+  return Program( program_name, code, init_entry, main_entry );
 }
