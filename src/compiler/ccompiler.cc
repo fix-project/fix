@@ -60,7 +60,8 @@ string c_to_elf( const string& wasm_name,
   compilerInstance.setFileManager( new FileManager( FileSystemOptions {}, RealFS ) );
 
   // Create arguments
-  const char* Args[] = { ( wasm_name + ".c" ).c_str(), "-O2", FIXPOINT_C_INCLUDE_PATH };
+  string wasm_file_name = wasm_name + ".c";
+  const char* Args[] = { wasm_file_name.c_str(), "-O2", FIXPOINT_C_INCLUDE_PATH };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
 
   // Setup mcmodel
@@ -73,9 +74,13 @@ string c_to_elf( const string& wasm_name,
   targetOptions.Triple = llvm::sys::getDefaultTargetTriple();
   compilerInstance.createDiagnostics( diagPrinter.get(), false );
 
-  // add -mavx
+  // add host features
   llvm::StringMap<bool> FeatureMap;
-  FeatureMap["avx"] = true;
+  if ( llvm::sys::getHostCPUFeatures( FeatureMap ) ) {
+    targetOptions.FeatureMap = FeatureMap;
+  } else {
+    throw runtime_error( "Failed to read host feature" );
+  }
   targetOptions.FeatureMap = FeatureMap;
 
   if ( !compilerInstance.createTarget() ) {
