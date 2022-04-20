@@ -131,8 +131,11 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
   if ( mprotect( program_mem, mem_size, PROT_EXEC | PROT_READ | PROT_WRITE ) ) {
     cerr << "Failed to set code buffer executable.\n";
   }
+
   memcpy( program_mem, elf_info.code.data(), elf_info.code.size() );
-  memcpy( (char*)program_mem + elf_info.code.size(), elf_info.rodata.data(), elf_info.rodata.size() );
+  if ( elf_info.rodata.size() != 0 ) {
+    memcpy( (char*)program_mem + elf_info.code.size(), elf_info.rodata.data(), elf_info.rodata.size() );
+  }
 
   // Step 1: Add wasm-rt functions to func_map
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_trap", func( (uint64_t)wasm_rt_trap ) ) );
@@ -219,13 +222,14 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
     }
 
     if ( ELF64_R_TYPE( reloc_entry.r_info ) == 1 ) {
-      *( (int64_t*)( reinterpret_cast<char*>( program_mem ) + reloc_entry.r_offset ) ) = rel_offset;
+      memcpy( static_cast<char*>( program_mem ) + reloc_entry.r_offset, &rel_offset, sizeof( int64_t ) );
     } else {
-      *( (int32_t*)( reinterpret_cast<char*>( program_mem ) + reloc_entry.r_offset ) ) = (int32_t)rel_offset;
+      int32_t rel_offset_32 = (int32_t)rel_offset;
+      memcpy( static_cast<char*>( program_mem ) + reloc_entry.r_offset, &rel_offset_32, sizeof( int32_t ) );
     }
   }
 
-  shared_ptr<char> code( reinterpret_cast<char*>( program_mem ) );
+  shared_ptr<char> code( static_cast<char*>( program_mem ) );
   uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "initProgram" ).idx].st_value;
   uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "executeProgram" ).idx].st_value;
   return Program( program_name, code, init_entry, main_entry );

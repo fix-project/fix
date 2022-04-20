@@ -66,6 +66,7 @@ string c_to_elf( const string& wasm_name,
 
   // Setup mcmodel
   auto& codegenOptions = compilerInstance.getCodeGenOpts();
+  codegenOptions.CodeModel = "large";
   codegenOptions.RelocationModel = llvm::Reloc::Static;
 
   LLVMContext context;

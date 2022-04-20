@@ -37,7 +37,7 @@ void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t ent
     throw std::runtime_error( "not a tree" );
   }
 
-  const Name& entry = RuntimeStorage::get_instance().get_tree( obj.name_ ).at( entry_num );
+  Name entry = RuntimeStorage::get_instance().get_tree( obj.name_ ).at( entry_num );
 
   ObjectReference ref( entry );
   ro_handles[target_ro_handle] = ref;
