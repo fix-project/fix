@@ -113,8 +113,11 @@ public:
 
   ContentType get_content_type() const
   {
-    assert( not is_literal_blob() );
-    return ContentType( metadata() & 0x03 );
+    if ( is_literal_blob() ) {
+      return ContentType::Blob;
+    } else {
+      return ContentType( metadata() & 0x03 );
+    }
   }
 
   std::string_view literal_blob() const

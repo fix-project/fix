@@ -6,9 +6,12 @@ namespace fixpoint {
 void* init_module_instance( size_t instance_size, __m256i encode_name )
 {
   // allocate aligned memory to hold FP instance and WASM instance
-  void* ptr = aligned_alloc( alignof( Instance ), sizeof( Instance ) + instance_size );
-  Instance* instance = new ( ptr ) Instance( encode_name );
-
+  size_t fixpoint_instance_size = sizeof( Instance ) + instance_size;
+  if ( fixpoint_instance_size % alignof( Instance ) != 0 ) {
+    fixpoint_instance_size = ( fixpoint_instance_size / alignof( Instance ) + 1 ) * alignof( Instance );
+  }
+  void* ptr = aligned_alloc( alignof( Instance ), fixpoint_instance_size );
+  Instance* instance = new ( ptr ) Instance(encode_name );
   // advance to the end of the FP instance/beginning of the WASM instance, return a void* point to this spot
   instance++;
 

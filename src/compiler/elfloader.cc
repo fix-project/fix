@@ -229,7 +229,7 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
     }
   }
 
-  shared_ptr<char> code( static_cast<char*>( program_mem ) );
+  shared_ptr<char> code( static_cast<char*>( program_mem ), free );
   uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "initProgram" ).idx].st_value;
   uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "executeProgram" ).idx].st_value;
   return Program( program_name, code, init_entry, main_entry );
