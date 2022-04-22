@@ -11,7 +11,7 @@ void* init_module_instance( size_t instance_size, __m256i encode_name )
     fixpoint_instance_size = ( fixpoint_instance_size / alignof( Instance ) + 1 ) * alignof( Instance );
   }
   void* ptr = aligned_alloc( alignof( Instance ), fixpoint_instance_size );
-  Instance* instance = new ( ptr ) Instance(encode_name );
+  Instance* instance = new ( ptr ) Instance( encode_name );
   // advance to the end of the FP instance/beginning of the WASM instance, return a void* point to this spot
   instance++;
 
@@ -21,6 +21,11 @@ void* init_module_instance( size_t instance_size, __m256i encode_name )
 void* init_env_instance( size_t env_instance_size )
 {
   return calloc( 1, env_instance_size );
+}
+
+void free_env_instance( void* env_instance )
+{
+  free( env_instance );
 }
 
 // module_instance points to the WASM instance
@@ -115,6 +120,9 @@ void freeze_blob( void* module_instance, uint32_t rw_handle, size_t size, uint32
   // TODO: make sure the mutablevalue that mutablevaluereference points to is a mblob, or else trap
 
   std::string blob_content( (char*)ref->get_data(), size );
+
+  free( ref->get_data() );
+  delete ( ref );
 
   Name blob = RuntimeStorage::get_instance().add_blob( std::move( blob_content ) );
 

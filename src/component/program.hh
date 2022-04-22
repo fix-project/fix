@@ -25,13 +25,20 @@ private:
   uint64_t init_entry_;
   // Entry point of main function
   uint64_t main_entry_;
+  // Entry point of clean up function
+  uint64_t cleanup_entry_;
 
 public:
-  Program( std::string name, std::shared_ptr<char> code, uint64_t init_entry, uint64_t main_entry )
+  Program( std::string name,
+           std::shared_ptr<char> code,
+           uint64_t init_entry,
+           uint64_t main_entry,
+           uint64_t cleanup_entry )
     : name_( name )
     , code_( code )
     , init_entry_( init_entry )
     , main_entry_( main_entry )
+    , cleanup_entry_( cleanup_entry )
   {}
 
   void* execute( Name encode_name ) const
@@ -47,5 +54,12 @@ public:
     RecordScopeTimer<Timer::Category::Nonblock> record_timer { _fixpoint_apply };
 #endif
     return main_func( instance );
+  }
+
+  void cleanup( void* instance ) const
+  {
+    void* ( *cleanup_func )( void* );
+    cleanup_func = reinterpret_cast<void* (*)( void* )>( code_.get() + cleanup_entry_ );
+    cleanup_func( instance );
   }
 };

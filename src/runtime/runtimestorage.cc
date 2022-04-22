@@ -135,7 +135,12 @@ Name RuntimeStorage::evaluate_encode( const Name& encode_name )
   void* wasm_instance = name_to_program_.at( program_name ).execute( forced_encode );
 
   Instance* fixpoint_instance = reinterpret_cast<Instance*>( wasm_instance ) - 1;
-  return fixpoint_instance->get_output();
+  Name output = fixpoint_instance->get_output();
+
+  name_to_program_.at( program_name ).cleanup( wasm_instance );
+  free( (void*)fixpoint_instance );
+
+  return output;
 }
 
 void RuntimeStorage::add_wasm( const string& name, const string& wasm_content )

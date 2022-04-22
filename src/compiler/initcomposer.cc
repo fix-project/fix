@@ -223,6 +223,16 @@ void InitComposer::write_env_instance()
   result_ << "  return;" << endl;
   result_ << "}" << endl;
   result_ << endl;
+
+  result_ << "void free_mems(Z_env_module_instance_t* env_module_instance) {" << endl;
+  for ( const auto& [rw_mem, size] : rw_mems ) {
+    result_ << "  if (env_module_instance->rw_mem_" << rw_mem << ".data != NULL) {" << endl;
+    result_ << "    wasm_rt_free_memory_sw_checked(&env_module_instance->rw_mem_" << rw_mem << ");" << endl;
+    result_ << "  }" << endl;
+  }
+  result_ << "  return;" << endl;
+  result_ << "}" << endl;
+  result_ << endl;
 }
 
 string InitComposer::compose_header()
@@ -258,6 +268,15 @@ string InitComposer::compose_header()
   result_ << "void* executeProgram(void* instance) {" << endl;
   result_ << "  " << module_prefix_ << "Z__fixpoint_apply((" << state_info_type_name_ << "*)instance);" << endl;
   result_ << "  return instance;" << endl;
+  result_ << "}" << endl;
+
+  result_ << endl;
+  result_ << "extern void fixpoint_free_env_module_instance(void*);" << endl;
+  result_ << "void cleanupProgram(void* instance) {" << endl;
+  result_ << "  " << module_prefix_ << "free((" << state_info_type_name_ << "*)instance);" << endl;
+  result_ << "  free_mems(((" << state_info_type_name_ << "*)instance)->Z_env_module_instance);" << endl;
+  result_ << "  fixpoint_free_env_module_instance(((" << state_info_type_name_
+          << "*)instance)->Z_env_module_instance);" << endl;
   result_ << "}" << endl;
 
   return result_.str();

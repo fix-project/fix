@@ -28,7 +28,7 @@ private:
   uint8_t* data;
 
 public:
-  ~MutableValue();
+  ~MutableValue() {};
 
   void set_data( uint8_t* val ) { data = val; }
   uint8_t* get_data() { return data; }

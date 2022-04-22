@@ -61,7 +61,7 @@ string c_to_elf( const string& wasm_name,
 
   // Create arguments
   string wasm_file_name = wasm_name + ".c";
-  const char* Args[] = { wasm_file_name.c_str(), "-O2", FIXPOINT_C_INCLUDE_PATH };
+  const char* Args[] = { wasm_file_name.c_str(), "-O2", "-Werror", FIXPOINT_C_INCLUDE_PATH };
   CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
 
   // Setup mcmodel
@@ -70,7 +70,7 @@ string c_to_elf( const string& wasm_name,
   codegenOptions.RelocationModel = llvm::Reloc::Static;
 
   LLVMContext context;
-  CodeGenAction* action = new EmitLLVMOnlyAction( &context );
+  std::unique_ptr<CodeGenAction> action( new EmitLLVMOnlyAction( &context ) );
   auto& targetOptions = compilerInstance.getTargetOpts();
   targetOptions.Triple = llvm::sys::getDefaultTargetTriple();
   compilerInstance.createDiagnostics( diagPrinter.get(), false );

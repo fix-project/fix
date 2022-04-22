@@ -10,6 +10,9 @@ void* init_module_instance( size_t instance_size, __m256i encode_name );
 /* Initialize env instance*/
 void* init_env_instance( size_t env_instance_size );
 
+/* Free env instance*/
+void free_env_instance( void* env_instance );
+
 /* Traps if src_handle is not accessible, or not a Tree.
  * Also traps if entry_num is too big.*/
 void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t entry_num, uint32_t target_ro_handle );

@@ -239,7 +239,16 @@ void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
                                      uint32_t max_pages,
                                      bool hw_checked )
 {
+  if ( initial_pages == 0 ) {
+    memory->data = NULL;
+    memory->size = 0;
+    memory->pages = initial_pages;
+    memory->max_pages = max_pages;
+    return;
+  }
+
   uint32_t byte_length = initial_pages * PAGE_SIZE;
+
   if ( hw_checked ) {
     /* Reserve 8GiB. */
     void* addr = os_mmap( 0x200000000ul );

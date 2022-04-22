@@ -171,6 +171,8 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
     pair<string, func>( "fixpoint_init_module_instance", func( (uint64_t)fixpoint::init_module_instance ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "fixpoint_init_env_module_instance", func( (uint64_t)fixpoint::init_env_instance ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "fixpoint_free_env_module_instance", func( (uint64_t)fixpoint::free_env_instance ) ) );
 
   for ( const auto& reloc_entry : elf_info.reloctb ) {
     int idx = ELF64_R_SYM( reloc_entry.r_info );
@@ -232,5 +234,6 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
   shared_ptr<char> code( static_cast<char*>( program_mem ), free );
   uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "initProgram" ).idx].st_value;
   uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "executeProgram" ).idx].st_value;
-  return Program( program_name, code, init_entry, main_entry );
+  uint64_t cleanup_entry = elf_info.symtb[elf_info.func_map.at( "cleanupProgram" ).idx].st_value;
+  return Program( program_name, code, init_entry, main_entry, cleanup_entry );
 }
