@@ -64,6 +64,17 @@ public:
     return __m256i { content_[0], content_[1], content_[2], content_[3] & 0x7f'ff'ff'ff'ff'ff'ff'ff };
   }
 
+  Name object_reference( bool accessible ) const
+  {
+    if ( !accessible ) {
+      return __m256i { content_[0], content_[1], content_[2], content_[3] | 0x20'00'00'00'00'00'00'00 };
+    } else {
+      return content_;
+    }
+  }
+
+  bool is_assesible() const { return !( metadata() & 0x20 ); }
+
   operator __m256i() const { return content_; }
 
   bool is_literal_blob() const { return metadata() & 0x40; }

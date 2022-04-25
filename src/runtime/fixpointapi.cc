@@ -41,14 +41,13 @@ void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t ent
 
   const ObjectReference& obj = instance->get_ro_handle( src_ro_handle );
 
-  if ( obj.name_.get_content_type() != ContentType::Tree ) {
+  if ( obj.get_content_type() != ContentType::Tree ) {
     throw std::runtime_error( "not a tree" );
   }
 
-  Name entry = RuntimeStorage::get_instance().get_tree( obj.name_ ).at( entry_num );
+  const Name& entry = RuntimeStorage::get_instance().get_tree( obj ).at( entry_num );
 
-  ObjectReference ref( entry );
-  ro_handles[target_ro_handle] = ref;
+  ro_handles[target_ro_handle] = entry.name_only().object_reference( entry.is_strict_tree_entry() );
 }
 
 // module_instance points to the WASM instance
@@ -62,11 +61,11 @@ void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* t
 
   const ObjectReference& obj = instance->get_ro_handle( ro_handle );
 
-  if ( obj.name_.get_content_type() != ContentType::Blob ) {
+  if ( obj.get_content_type() != ContentType::Blob ) {
     throw std::runtime_error( "not a blob" );
   }
 
-  std::string_view blob = RuntimeStorage::get_instance().get_blob( obj.name_ );
+  std::string_view blob = RuntimeStorage::get_instance().get_blob( obj );
 
   target_memory->data = (uint8_t*)const_cast<char*>( blob.data() );
   target_memory->pages = blob.size() / getpagesize();
@@ -143,6 +142,6 @@ void designate_output( void* module_instance, uint32_t ro_handle )
 
   const ObjectReference& obj = instance->get_ro_handle( ro_handle );
 
-  instance->set_output( obj.name_ );
+  instance->set_output( obj );
 }
 }

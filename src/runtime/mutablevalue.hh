@@ -39,21 +39,7 @@ class MBlob : public MutableValue
 class MTree : public MutableValue
 {};
 
-struct ObjectReference
-{
-  Name name_;
-  bool accessible_;
-
-  ObjectReference()
-    : name_( "x" )
-    , accessible_( true )
-  {}
-
-  ObjectReference( const Name& entry )
-    : name_( entry.name_only() )
-    , accessible_( entry.is_strict_tree_entry() )
-  {}
-};
+using ObjectReference = Name;
 
 using MutableValueReference = MutableValue*;
 
