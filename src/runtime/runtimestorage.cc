@@ -19,7 +19,7 @@ Name RuntimeStorage::add_blob( string&& blob_content )
   }
 }
 
-string_view RuntimeStorage::get_blob( const Name& name )
+string_view RuntimeStorage::get_blob( Name name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
@@ -42,7 +42,7 @@ Name RuntimeStorage::add_tree( vector<Name>&& tree_content )
   return name;
 }
 
-span_view<Name> RuntimeStorage::get_tree( const Name& name )
+span_view<Name> RuntimeStorage::get_tree( Name name )
 {
   const Object& obj = storage.get( name );
   if ( holds_alternative<Tree>( obj ) ) {
@@ -53,15 +53,15 @@ span_view<Name> RuntimeStorage::get_tree( const Name& name )
 
 Name RuntimeStorage::add_thunk( Thunk thunk )
 {
-  return thunk.get_encode().get_thunk_name();
+  return Name::get_thunk_name( thunk.get_encode() );
 }
 
-Name RuntimeStorage::get_thunk_encode_name( const Name& thunk_name )
+Name RuntimeStorage::get_thunk_encode_name( Name thunk_name )
 {
-  return thunk_name.get_encode_name();
+  return Name::get_encode_name( thunk_name );
 }
 
-Name RuntimeStorage::force( const Name& name )
+Name RuntimeStorage::force( Name name )
 {
   if ( name.is_literal_blob() ) {
     return name;
@@ -82,7 +82,7 @@ Name RuntimeStorage::force( const Name& name )
   }
 }
 
-Name RuntimeStorage::force_tree( const Name& name )
+Name RuntimeStorage::force_tree( Name name )
 {
   vector<Name> tree_content;
   for ( const auto& entry : get_tree( name ) ) {
@@ -96,7 +96,7 @@ Name RuntimeStorage::force_tree( const Name& name )
   return this->add_tree( move( tree_content ) );
 }
 
-Name RuntimeStorage::force_thunk( const Name& name )
+Name RuntimeStorage::force_thunk( Name name )
 {
   Name current_name = name;
   while ( true ) {
@@ -112,7 +112,7 @@ Name RuntimeStorage::force_thunk( const Name& name )
   }
 }
 
-Name RuntimeStorage::reduce_thunk( const Name& name )
+Name RuntimeStorage::reduce_thunk( Name name )
 {
   if ( memorization_cache.contains( name ) ) {
     return memorization_cache.at( name );
@@ -122,10 +122,10 @@ Name RuntimeStorage::reduce_thunk( const Name& name )
   }
 }
 
-Name RuntimeStorage::evaluate_encode( const Name& encode_name )
+Name RuntimeStorage::evaluate_encode( Name encode_name )
 {
   Name forced_encode = this->force_tree( encode_name );
-  Name forced_encode_thunk = forced_encode.get_thunk_name();
+  Name forced_encode_thunk = Name::get_thunk_name( forced_encode );
   if ( memorization_cache.contains( forced_encode_thunk ) ) {
     return memorization_cache.at( forced_encode_thunk );
   }

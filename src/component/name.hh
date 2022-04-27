@@ -21,14 +21,26 @@ enum class ContentType : uint8_t
 
 class Name
 {
+protected:
   __m256i content_ {};
 
   const char* data() const { return reinterpret_cast<const char*>( &content_ ); }
 
+  /**
+   * Name 8-bit metadata:
+   * 1) if the name is a literal:     | strict/lazy | other/literal | 0 | size of the blob (5 bits)
+   * 2) if the name is not a literal: | strict/lazy | other/literal | 0 | 0 | 0 | 0 | canonical/not |
+   * Blob/Tree/Thunk (2 bits)
+   *
+   * ObjectReference metadata:
+   * | reffed/not reffed | other/literal | accessible/not assessible | the same as underlying name
+   */
   uint8_t metadata() const { return _mm256_extract_epi8( content_, 31 ); }
 
 public:
   Name() = default;
+
+  operator __m256i() const { return content_; }
 
   Name( const __m256i val )
     : content_( val )
@@ -57,25 +69,16 @@ public:
     __builtin_memcpy( &content_, content.data(), 32 );
   }
 
-  bool is_strict_tree_entry() const { return !( metadata() & 0x80 ); }
-
-  Name name_only() const
+  ContentType get_content_type() const
   {
-    return __m256i { content_[0], content_[1], content_[2], content_[3] & 0x7f'ff'ff'ff'ff'ff'ff'ff };
-  }
-
-  Name object_reference( bool accessible ) const
-  {
-    if ( !accessible ) {
-      return __m256i { content_[0], content_[1], content_[2], content_[3] | 0x20'00'00'00'00'00'00'00 };
+    if ( is_literal_blob() ) {
+      return ContentType::Blob;
     } else {
-      return content_;
+      return ContentType( metadata() & 0x03 );
     }
   }
 
-  bool is_assesible() const { return !( metadata() & 0x20 ); }
-
-  operator __m256i() const { return content_; }
+  bool is_strict_tree_entry() const { return !( metadata() & 0x80 ); }
 
   bool is_literal_blob() const { return metadata() & 0x40; }
 
@@ -83,6 +86,12 @@ public:
   {
     assert( is_literal_blob() );
     return metadata() & 0x1f;
+  }
+
+  std::string_view literal_blob() const
+  {
+    assert( is_literal_blob() );
+    return { data(), literal_blob_len() };
   }
 
   bool is_canonical() const
@@ -103,38 +112,69 @@ public:
     return metadata() & ( 0x04 | static_cast<uint8_t>( ContentType::Thunk ) );
   }
 
-  Name get_thunk_name() const
+  bool is_reffed() const { return ( metadata() & 0x80 ); }
+
+  bool is_accessible() const { return !( metadata() & 0x20 ); }
+
+  static Name name_only( Name name )
   {
-    assert( is_canonical_tree() );
-    return __m256i { content_[0],
-                     content_[1],
-                     content_[2],
-                     ( content_[3] | 0x02'00'00'00'00'00'00'00 ) & ~( 0x01'00'00'00'00'00'00'00 ) };
+    return __m256i {
+      name.content_[0], name.content_[1], name.content_[2], name.content_[3] & 0x7f'ff'ff'ff'ff'ff'ff'ff
+    };
   }
 
-  Name get_encode_name() const
+  static Name object_reference_name_only( Name name )
   {
-    assert( is_canonical_thunk() );
-    return __m256i { content_[0],
-                     content_[1],
-                     content_[2],
-                     static_cast<int64_t>( ( content_[3] & ~( 0x02'00'00'00'00'00'00'00 ) )
+    return __m256i {
+      name.content_[0], name.content_[1], name.content_[2], name.content_[3] & 0x5f'ff'ff'ff'ff'ff'ff'ff
+    };
+  }
+
+  static Name ref_object_reference( Name name )
+  {
+    return __m256i { name.content_[0],
+                     name.content_[1],
+                     name.content_[2],
+                     static_cast<int64_t>( name.content_[3] | 0x80'00'00'00'00'00'00'00 ) };
+  }
+
+  static Name unref_object_reference( Name name )
+  {
+    return __m256i {
+      name.content_[0], name.content_[1], name.content_[2], name.content_[3] & 0x7f'ff'ff'ff'ff'ff'ff'ff
+    };
+  }
+
+  static Name get_thunk_name( Name name )
+  {
+    assert( name.is_canonical_tree() );
+    return __m256i { name.content_[0],
+                     name.content_[1],
+                     name.content_[2],
+                     ( name.content_[3] | 0x02'00'00'00'00'00'00'00 ) & ~( 0x01'00'00'00'00'00'00'00 ) };
+  }
+
+  static Name get_encode_name( Name name )
+  {
+    assert( name.is_canonical_thunk() );
+    return __m256i { name.content_[0],
+                     name.content_[1],
+                     name.content_[2],
+                     static_cast<int64_t>( ( name.content_[3] & ~( 0x02'00'00'00'00'00'00'00 ) )
                                            | 0x01'00'00'00'00'00'00'00 ) };
   }
 
-  ContentType get_content_type() const
+  static Name get_object_reference( Name name, bool accessible )
   {
-    if ( is_literal_blob() ) {
-      return ContentType::Blob;
+    Name name_only = Name::name_only( name );
+    if ( !accessible ) {
+      return __m256i { name_only.content_[0],
+                       name_only.content_[1],
+                       name_only.content_[2],
+                       name_only.content_[3] | 0x20'00'00'00'00'00'00'00 };
     } else {
-      return ContentType( metadata() & 0x03 );
+      return name.content_;
     }
-  }
-
-  std::string_view literal_blob() const
-  {
-    assert( is_literal_blob() );
-    return { data(), literal_blob_len() };
   }
 
   void* local_name()

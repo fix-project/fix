@@ -53,19 +53,19 @@ public:
   Name add_blob( std::string&& content );
 
   // Return reference to blob content
-  std::string_view get_blob( const Name& name );
+  std::string_view get_blob( Name name );
 
   // add Tree
   Name add_tree( std::vector<Name>&& content );
 
   // Return reference to Tree
-  span_view<Name> get_tree( const Name& name );
+  span_view<Name> get_tree( Name name );
 
   // add Thunk
   Name add_thunk( Thunk thunk );
 
   // Return encode name referred to by thunk
-  Name get_thunk_encode_name( const Name& thunk_name );
+  Name get_thunk_encode_name( Name thunk_name );
 
   // add wasm module
   void add_wasm( const std::string& name, const std::string& wasm_content );
@@ -74,17 +74,17 @@ public:
   void add_program( const std::string& name, std::string& program_content );
 
   // force the object refered to by a name
-  Name force( const Name& name );
+  Name force( Name name );
 
   // force a Tree
-  Name force_tree( const Name& tree_name );
+  Name force_tree( Name tree_name );
 
   // force a Thunk
-  Name force_thunk( const Name& thunk_name );
+  Name force_thunk( Name thunk_name );
 
   // Reduce a Thunk by one step
-  Name reduce_thunk( const Name& thunk_name );
+  Name reduce_thunk( Name thunk_name );
 
   // Evaluate an encode
-  Name evaluate_encode( const Name& encode_name );
+  Name evaluate_encode( Name encode_name );
 };

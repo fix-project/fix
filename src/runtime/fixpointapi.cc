@@ -45,9 +45,12 @@ void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t ent
     throw std::runtime_error( "not a tree" );
   }
 
-  const Name& entry = RuntimeStorage::get_instance().get_tree( obj ).at( entry_num );
+  Name entry = RuntimeStorage::get_instance().get_tree( obj ).at( entry_num );
 
-  ro_handles[target_ro_handle] = entry.name_only().object_reference( entry.is_strict_tree_entry() );
+  if ( ro_handles[target_ro_handle].is_reffed() ) {
+    throw std::runtime_error( "target ro handle is reffed by some other memory" );
+  }
+  ro_handles[target_ro_handle] = Name::get_object_reference( entry, entry.is_strict_tree_entry() );
 }
 
 // module_instance points to the WASM instance
@@ -59,13 +62,27 @@ void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* t
   //  attach blob at handle to target_memory
   Instance* instance = (Instance*)module_instance - 1;
 
-  const ObjectReference& obj = instance->get_ro_handle( ro_handle );
+  ObjectReference obj = instance->get_ro_handle( ro_handle );
 
+  if ( !obj.is_accessible() ) {
+    throw std::runtime_error( "object handle is not accessible" );
+  }
+  if ( obj.is_reffed() ) {
+    throw std::runtime_error( "object handle is already reffed" );
+  }
   if ( obj.get_content_type() != ContentType::Blob ) {
     throw std::runtime_error( "not a blob" );
   }
 
-  std::string_view blob = RuntimeStorage::get_instance().get_blob( obj );
+  ObjectReference* ro_handles = instance->get_ro_handles();
+  ro_handles[ro_handle] = Name::ref_object_reference( obj );
+
+  std::string_view blob;
+  if ( obj.is_literal_blob() ) {
+    blob = ro_handles[ro_handle].literal_blob();
+  } else {
+    blob = RuntimeStorage::get_instance().get_blob( obj );
+  }
 
   target_memory->data = (uint8_t*)const_cast<char*>( blob.data() );
   target_memory->pages = blob.size() / getpagesize();
@@ -142,6 +159,6 @@ void designate_output( void* module_instance, uint32_t ro_handle )
 
   const ObjectReference& obj = instance->get_ro_handle( ro_handle );
 
-  instance->set_output( obj );
+  instance->set_output( Name::object_reference_name_only( obj ) );
 }
 }
