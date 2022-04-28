@@ -1,30 +1,30 @@
 #pragma once
 
+#include "cookie.hh"
 #include "name.hh"
-#include "tree.hh"
 
-struct MutableValueMeta
+/**
+ * TreeEntry metadata:
+ * if the tree is a MTree before freezing: | strict/lazy(intended) | other/literal | accessible/not
+ * accessible(from original objectreference) | the same as underlying name otherwise, the same as Name
+ */
+class MTreeEntry : public cookie_name
 {
-  // The number of all MTrees/handles/memories that refer the mutable value
-  // Is it possible to replace this with shared_ptr?
-  unsigned int ref_count_;
-  // True if any rw_handle or rw_memory refers the mutable value
-  bool rw_reffed;
-  bool writable_;
-  size_t size_;
+public:
+  MTreeEntry() = default;
 
-  MutableValueMeta()
-    : ref_count_( 0 )
-    , rw_reffed( false )
-    , writable_( true )
-    , size_( 0 )
+  operator __m256i() const { return content_; }
+
+  MTreeEntry( const __m256i val )
+    : cookie_name( val )
   {}
+
+  bool is_accessible() const { return !( metadata() & 0x20 ); }
 };
 
 class MutableValue
 {
 private:
-  // Metadata for the memory region is stored at (data - sizeof(MutableValueMeta))
   uint8_t* data;
 
 public:
@@ -39,14 +39,37 @@ class MBlob : public MutableValue
 class MTree : public MutableValue
 {};
 
-using ObjectReference = Name;
-
-using MutableValueReference = MutableValue*;
-
-using RuntimeReference = std::variant<ObjectReference, MutableValueReference>;
-
-struct MTreeEntry
+/**
+ * MutableValueReference:
+ * content_[0...30]: address of wasm_rt_memory_t* / MTree( potentially wasm_rt_externref_table_t * )
+ * metadata: | 0 | 0 | 0 | 0 | 0 | MBlob/MTree | 1 | 1
+ */
+class MutableValueReference : public cookie_name
 {
-  RuntimeReference runtime_reference_;
-  bool intended_strictness;
+public:
+  MutableValueReference() = default;
+  MutableValueReference( void* ptr, bool is_mblob )
+  {
+    uint8_t metadata = 0x03 | is_mblob ? 0x04 : 0x00;
+    std::array<char, 32> content {};
+    __builtin_memcpy( &content, &ptr, 8 );
+    content[31] = metadata;
+    __builtin_memcpy( &content_, content.data(), 32 );
+  }
+
+  bool is_mblob() const { return metadata() & 0x04; }
+
+  bool is_mtree() const { return !is_mblob(); }
+
+  MBlob* get_mblob_ptr() const
+  {
+    assert( is_mblob() );
+    return reinterpret_cast<MBlob*>( _mm256_extract_epi64( content_, 0 ) );
+  }
+
+  MTree* get_mtree_ptr() const
+  {
+    assert( is_mtree() );
+    return reinterpret_cast<MTree*>( _mm256_extract_epi64( content_, 0 ) );
+  }
 };

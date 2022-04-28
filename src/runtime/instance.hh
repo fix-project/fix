@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "mutablevalue.hh"
 #include "name.hh"
+#include "runtimevalue.hh"
 #include "wasm-rt.h"
 
 class Instance

@@ -45,12 +45,13 @@ void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t ent
     throw std::runtime_error( "not a tree" );
   }
 
-  Name entry = RuntimeStorage::get_instance().get_tree( obj ).at( entry_num );
+  Name entry
+    = RuntimeStorage::get_instance().get_tree( ObjectReference::object_reference_name_only( obj ) ).at( entry_num );
 
   if ( ro_handles[target_ro_handle].is_reffed() ) {
     throw std::runtime_error( "target ro handle is reffed by some other memory" );
   }
-  ro_handles[target_ro_handle] = Name::get_object_reference( entry, entry.is_strict_tree_entry() );
+  ro_handles[target_ro_handle] = ObjectReference::get_object_reference( entry, entry.is_strict_tree_entry() );
 }
 
 // module_instance points to the WASM instance
@@ -75,13 +76,13 @@ void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* t
   }
 
   ObjectReference* ro_handles = instance->get_ro_handles();
-  ro_handles[ro_handle] = Name::ref_object_reference( obj );
+  ro_handles[ro_handle] = ObjectReference::ref_object_reference( obj );
 
   std::string_view blob;
   if ( obj.is_literal_blob() ) {
     blob = ro_handles[ro_handle].literal_blob();
   } else {
-    blob = RuntimeStorage::get_instance().get_blob( obj );
+    blob = RuntimeStorage::get_instance().get_blob( (__m256i)obj );
   }
 
   target_memory->data = (uint8_t*)const_cast<char*>( blob.data() );
@@ -104,21 +105,13 @@ void detach_mem( void* module_instance, wasm_rt_memory_t* target_memory, uint32_
   MutableValueReference* rw_handles = instance->get_rw_handles();
 
   MBlob* blob = new MBlob();
-  MutableValueMeta meta;
-
-  // void* ptr;
-  // ptr = malloc( target_memory->size + sizeof( MutableValueMeta ) );
-  // blob->setData( (uint8_t*)( (char*)ptr + sizeof( MutableValueMeta ) ) );
-  // memcpy( blob->getData(), target_memory->data, target_memory->size );
-
-  // wasm_rt_free_memory( target_memory );
   blob->set_data( target_memory->data );
   target_memory->data = NULL;
   target_memory->pages = 0;
   target_memory->max_pages = 65536;
   target_memory->size = 0;
 
-  rw_handles[rw_handle] = blob;
+  rw_handles[rw_handle] = MutableValueReference( blob, true );
 }
 
 // module_instance points to the WASM instance
@@ -135,10 +128,10 @@ void freeze_blob( void* module_instance, uint32_t rw_handle, size_t size, uint32
 
   // TODO: make sure the mutablevalue that mutablevaluereference points to is a mblob, or else trap
 
-  std::string blob_content( (char*)ref->get_data(), size );
+  std::string blob_content( (char*)ref.get_mblob_ptr()->get_data(), size );
 
-  free( ref->get_data() );
-  delete ( ref );
+  free( ref.get_mblob_ptr()->get_data() );
+  delete ( ref.get_mblob_ptr() );
 
   Name blob = RuntimeStorage::get_instance().add_blob( std::move( blob_content ) );
 
@@ -159,6 +152,6 @@ void designate_output( void* module_instance, uint32_t ro_handle )
 
   const ObjectReference& obj = instance->get_ro_handle( ro_handle );
 
-  instance->set_output( Name::object_reference_name_only( obj ) );
+  instance->set_output( ObjectReference::object_reference_name_only( obj ) );
 }
 }
