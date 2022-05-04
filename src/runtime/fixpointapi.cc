@@ -66,7 +66,7 @@ __m256i detach_mem( wasm_rt_memory_t* target_memory )
   RecordScopeTimer<Timer::Category::Nonblock> record_timer { _detach_mem };
 #endif
   MBlob* blob = new MBlob();
-  blob->set_data( target_memory->data );
+  *blob = *target_memory;
   target_memory->data = NULL;
   target_memory->pages = 0;
   target_memory->max_pages = 65536;
@@ -84,14 +84,14 @@ __m256i freeze_blob( __m256i rw_handle, size_t size )
 #endif
   // TODO: make sure the mutablevalue that mutablevaluereference points to is a mblob, or else trap
   MutableValueReference ref( rw_handle );
-  std::string blob_content( (char*)ref.get_mblob_ptr()->get_data(), size );
+  std::string blob_content( (char*)ref.get_mblob_ptr()->data, size );
 
-  free( ref.get_mblob_ptr()->get_data() );
+  wasm_rt_free_memory_sw_checked( ref.get_mblob_ptr() );
   delete ( ref.get_mblob_ptr() );
 
   Name blob = RuntimeStorage::get_instance().add_blob( std::move( blob_content ) );
 
-  // ObjectReference obj( blob );
-  return blob;
+  ObjectReference obj( blob );
+  return obj;
 }
 }

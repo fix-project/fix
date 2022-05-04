@@ -22,26 +22,12 @@ public:
   bool is_accessible() const { return !( metadata() & 0x20 ); }
 };
 
-class MutableValue
-{
-private:
-  uint8_t* data;
-
-public:
-  ~MutableValue() {};
-
-  void set_data( uint8_t* val ) { data = val; }
-  uint8_t* get_data() { return data; }
-};
-
-class MBlob : public MutableValue
-{};
-class MTree : public MutableValue
-{};
+using MBlob = wasm_rt_memory_t;
+using MTree = wasm_rt_externref_table_t;
 
 /**
  * MutableValueReference:
- * content_[0...30]: address of wasm_rt_memory_t* / MTree( potentially wasm_rt_externref_table_t * )
+ * content_[0...30]: address of MBlob/ MTree
  * metadata: | 0 | 0 | 0 | 0 | 0 | MBlob/MTree | 1 | 1
  */
 class MutableValueReference : public cookie_name
