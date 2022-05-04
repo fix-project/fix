@@ -191,6 +191,32 @@ std::vector<uint32_t> WasmInspector::GetExportedRW()
   return result;
 }
 
+std::vector<uint32_t> WasmInspector::GetImportedROTables()
+{
+  std::vector<uint32_t> result;
+  for ( Import* import_ : current_module_->imports ) {
+    if ( import_->kind() == ExternalKind::Table ) {
+      if ( import_->field_name.find( "ro_table" ) != string::npos ) {
+        result.push_back( (uint32_t)atoi( import_->field_name.substr( 9 ).data() ) );
+      }
+    }
+  }
+  return result;
+}
+
+std::vector<uint32_t> WasmInspector::GetImportedRWTables()
+{
+  std::vector<uint32_t> result;
+  for ( Import* import_ : current_module_->imports ) {
+    if ( import_->kind() == ExternalKind::Table ) {
+      if ( import_->field_name.find( "rw_table" ) != string::npos ) {
+        result.push_back( (uint32_t)atoi( import_->field_name.substr( 9 ).data() ) );
+      }
+    }
+  }
+  return result;
+}
+
 std::map<uint32_t, uint64_t> WasmInspector::GetRWSizes()
 {
   std::map<uint32_t, uint64_t> result;
@@ -199,6 +225,20 @@ std::map<uint32_t, uint64_t> WasmInspector::GetRWSizes()
       if ( import_->field_name.find( "rw_mem" ) != string::npos ) {
         result.insert( { (uint32_t)atoi( import_->field_name.substr( 7 ).data() ),
                          cast<MemoryImport>( import_ )->memory.page_limits.initial } );
+      }
+    }
+  }
+  return result;
+}
+
+std::map<uint32_t, uint64_t> WasmInspector::GetRWTableSizes()
+{
+  std::map<uint32_t, uint64_t> result;
+  for ( Import* import_ : current_module_->imports ) {
+    if ( import_->kind() == ExternalKind::Table ) {
+      if ( import_->field_name.find( "rw_table" ) != string::npos ) {
+        result.insert( { (uint32_t)atoi( import_->field_name.substr( 9 ).data() ),
+                         cast<TableImport>( import_ )->table.elem_limits.initial } );
       }
     }
   }

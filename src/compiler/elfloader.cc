@@ -160,13 +160,10 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
   elf_info.func_map.insert(
     pair<string, func>( "wasm_rt_free_externref_table", func( (uint64_t)wasm_rt_free_externref_table ) ) );
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_init", func( (uint64_t)wasm_rt_init ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "fixpoint_get_tree_entry", func( (uint64_t)fixpoint::get_tree_entry ) ) );
+  elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_tree", func( (uint64_t)fixpoint::attach_tree ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_blob", func( (uint64_t)fixpoint::attach_blob ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_detach_mem", func( (uint64_t)fixpoint::detach_mem ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_blob", func( (uint64_t)fixpoint::freeze_blob ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "fixpoint_designate_output", func( (uint64_t)fixpoint::designate_output ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "fixpoint_init_module_instance", func( (uint64_t)fixpoint::init_module_instance ) ) );
   elf_info.func_map.insert(

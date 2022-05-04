@@ -41,25 +41,28 @@ public:
     , cleanup_entry_( cleanup_entry )
   {}
 
-  void* execute( Name encode_name ) const
+  __m256i execute( Name encode_name ) const
   {
     void* ( *init_func )( __m256i );
     init_func = reinterpret_cast<void* (*)( __m256i )>( code_.get() + init_entry_ );
     void* instance = init_func( encode_name );
 
-    void* ( *main_func )( void* );
-    main_func = reinterpret_cast<void* (*)( void* )>( code_.get() + main_entry_ );
+    __m256i ( *main_func )( void* );
+    main_func = reinterpret_cast<__m256i ( * )( void* )>( code_.get() + main_entry_ );
 
+    __m256i output;
+
+    {
 #if !TIME_FIXPOINT_API
-    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _fixpoint_apply };
+      RecordScopeTimer<Timer::Category::Nonblock> record_timer { _fixpoint_apply };
 #endif
-    return main_func( instance );
-  }
+      output = main_func( instance );
+    }
 
-  void cleanup( void* instance ) const
-  {
     void* ( *cleanup_func )( void* );
     cleanup_func = reinterpret_cast<void* (*)( void* )>( code_.get() + cleanup_entry_ );
     cleanup_func( instance );
+    free( instance );
+    return output;
   }
 };

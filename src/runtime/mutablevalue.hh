@@ -57,6 +57,12 @@ public:
     __builtin_memcpy( &content_, content.data(), 32 );
   }
 
+  MutableValueReference( const __m256i val )
+    : cookie_name( val )
+  {}
+
+  operator __m256i() const { return content_; }
+
   bool is_mblob() const { return metadata() & 0x04; }
 
   bool is_mtree() const { return !is_mblob(); }

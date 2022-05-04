@@ -3,7 +3,7 @@
 #include "name.hh"
 #include "tree.hh"
 
-#include "objectreference.hh"
 #include "mutablevalue.hh"
+#include "objectreference.hh"
 
 using RuntimeReference = std::variant<ObjectReference, MutableValueReference>;

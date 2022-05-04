@@ -22,9 +22,9 @@ protected:
   cookie( const __m256i val )
     : content_( val )
   {}
-  
+
   operator __m256i() const { return content_; }
-  
+
   const char* data() const { return reinterpret_cast<const char*>( &content_ ); }
 
   uint8_t metadata() const { return _mm256_extract_epi8( content_, 31 ); }
@@ -36,9 +36,9 @@ protected:
   cookie( const std::array<char, 32>& input ) { __builtin_memcpy( &content_, input.data(), 32 ); }
 };
 
-/** 
+/**
  * cookie_name metadata:
- * if literal: | _ | other/literal | _ | size of the blob (5 bits) 
+ * if literal: | _ | other/literal | _ | size of the blob (5 bits)
  * otherwise:  | _ | other/literal | _ | 0 | 0 | canonical/not | Blob/Tree/Thunk (2 bits)
  * ( _ means the bit is not used/has no required value)
  */
@@ -46,9 +46,15 @@ class cookie_name : public cookie
 {
 protected:
   cookie_name() = default;
-  cookie_name( const __m256i val ) : cookie( val ) {}
-  cookie_name( uint64_t a, uint64_t b, uint64_t c, uint64_t d ) : cookie( a, b, c, d ) {}
-  cookie_name( const std::array<char, 32>& input ) : cookie( input ) {}
+  cookie_name( const __m256i val )
+    : cookie( val )
+  {}
+  cookie_name( uint64_t a, uint64_t b, uint64_t c, uint64_t d )
+    : cookie( a, b, c, d )
+  {}
+  cookie_name( const std::array<char, 32>& input )
+    : cookie( input )
+  {}
 
 public:
   bool is_literal_blob() const { return metadata() & 0x40; }

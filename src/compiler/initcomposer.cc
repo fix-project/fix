@@ -60,30 +60,62 @@ private:
   ostringstream result_;
   wasminspector::WasmInspector* inspector_;
 
-  void write_get_tree_entry();
+  void write_attach_tree();
   void write_attach_blob();
+  void write_set_ro_handles();
   void write_detach_mem();
   void write_freeze_blob();
   void write_designate_output();
   void write_env_instance();
 };
 
-void InitComposer::write_get_tree_entry()
+void InitComposer::write_attach_tree()
 {
-  auto it = inspector_->GetImportedFunctions().find( "get_tree_entry" );
+  auto it = inspector_->GetImportedFunctions().find( "attach_tree" );
   if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
-  result_ << "extern void fixpoint_get_tree_entry(void*, uint32_t, uint32_t, uint32_t);" << endl;
+  result_ << "extern void fixpoint_attach_tree(__m256i, wasm_rt_externref_table_t*);" << endl;
+  auto ro_tables = inspector_->GetImportedROTables();
+  for ( uint32_t idx : ro_tables ) {
+    result_ << "void attach_tree_" << idx << "(Z_env_module_instance_t* env_module_instance, __m256i ro_handle) {"
+            << endl;
+    result_ << "  wasm_rt_externref_table_t* ro_table = &env_module_instance->ro_table_" << idx << ";" << endl;
+    result_ << "  fixpoint_attach_tree(ro_handle, ro_table);" << endl;
+    result_ << "}\n" << endl;
+  }
+
   result_ << "void " << module_prefix_
-          << "Z_env_Z_get_tree_entry(struct Z_env_module_instance_t* env_module_instance, uint32_t src_ro_handle, "
-             "uint32_t entry_num, uint32_t target_ro_handle) {"
+          << "Z_env_Z_attach_tree(struct Z_env_module_instance_t* env_module_instance, __m256i ro_handle, uint32_t "
+             "ro_table_num) {"
           << endl;
-  result_ << "  fixpoint_get_tree_entry(env_module_instance->module_instance, src_ro_handle, entry_num, "
-             "target_ro_handle);"
-          << endl;
+  for ( uint32_t idx : ro_tables ) {
+    result_ << "  if (ro_table_num == " << idx << ") {" << endl;
+    result_ << "    attach_tree_" << idx << "(env_module_instance, ro_handle);" << endl;
+    result_ << "    return;" << endl;
+    result_ << "  }" << endl;
+  }
+  result_ << "  wasm_rt_trap(WASM_RT_TRAP_OOB);" << endl;
   result_ << "}" << endl;
   result_ << endl;
+}
+
+void InitComposer::write_set_ro_handles()
+{
+  result_ << "void " << module_prefix_
+          << "Z_env_Z_set_ro_handles(struct Z_env_module_instance_t* env_module_instance, uint32_t offset, __m256i "
+             "ro_handle) {"
+          << endl;
+  result_ << "  wasm_rt_externref_table_t* ro_handles = " << module_prefix_
+          << "Z_ro_handles(env_module_instance->module_instance);" << endl;
+  result_ << "  if (UNLIKELY(offset >= ro_handles->size)) wasm_rt_trap(WASM_RT_TRAP_OOB);" << endl;
+  result_ << "  __m256i original_ro_handle = ro_handles->data[offset];" << endl;
+  result_ << "  if (UNLIKELY( ( _mm256_extract_epi8( original_ro_handle, 31 ) & 0x20 ) != 0)) "
+             "wasm_rt_trap(WASM_RT_TRAP_UNREACHABLE);"
+          << endl;
+  result_ << "  ro_handles->data[offset] = ro_handle;" << endl;
+  result_ << "  return;" << endl;
+  result_ << "}" << endl;
 }
 
 void InitComposer::write_attach_blob()
@@ -93,17 +125,17 @@ void InitComposer::write_attach_blob()
   if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
-  result_ << "extern void fixpoint_attach_blob(void*, uint32_t, wasm_rt_memory_t*);" << endl;
+  result_ << "extern void fixpoint_attach_blob(__m256i, wasm_rt_memory_t*);" << endl;
   for ( uint32_t idx : ro_mems ) {
     result_ << "void attach_blob_" << idx << "(Z_env_module_instance_t"
-            << "* env_module_instance, uint32_t ro_handle) {" << endl;
+            << "* env_module_instance, __m256i ro_handle) {" << endl;
     result_ << "  wasm_rt_memory_t* ro_mem = &env_module_instance->ro_mem_" << idx << ";" << endl;
-    result_ << "  fixpoint_attach_blob(env_module_instance->module_instance, ro_handle, ro_mem);" << endl;
+    result_ << "  fixpoint_attach_blob(ro_handle, ro_mem);" << endl;
     result_ << "}\n" << endl;
   }
 
   result_ << "void " << module_prefix_
-          << "Z_env_Z_attach_blob(struct Z_env_module_instance_t* env_module_instance, uint32_t ro_handle, "
+          << "Z_env_Z_attach_blob(struct Z_env_module_instance_t* env_module_instance, __m256i ro_handle, "
              "uint32_t ro_mem_num) {"
           << endl;
   for ( uint32_t idx : ro_mems ) {
@@ -124,23 +156,21 @@ void InitComposer::write_detach_mem()
   if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
-  result_ << "extern void fixpoint_detach_mem( void*, wasm_rt_memory_t*, uint32_t );" << endl;
+  result_ << "extern __m256i fixpoint_detach_mem( wasm_rt_memory_t* );" << endl;
   for ( uint32_t idx : rw_mems ) {
-    result_ << "void detach_mem_" << idx << "(Z_env_module_instance_t"
-            << "* env_module_instance, uint32_t rw_handle) {" << endl;
+    result_ << "__m256i detach_mem_" << idx << "(Z_env_module_instance_t"
+            << "* env_module_instance) {" << endl;
     result_ << "  wasm_rt_memory_t* rw_mem = &env_module_instance->rw_mem_" << idx << ";" << endl;
-    result_ << "  fixpoint_detach_mem(env_module_instance->module_instance, rw_mem, rw_handle);" << endl;
+    result_ << "  return fixpoint_detach_mem(rw_mem);" << endl;
     result_ << "}\n" << endl;
   }
 
-  result_ << "void " << module_prefix_
-          << "Z_env_Z_detach_mem(struct Z_env_module_instance_t* env_module_instance, uint32_t rw_mem_num, "
-             "uint32_t rw_handle) {"
+  result_ << "__m256i " << module_prefix_
+          << "Z_env_Z_detach_mem(struct Z_env_module_instance_t* env_module_instance, uint32_t rw_mem_num) {"
           << endl;
   for ( uint32_t idx : rw_mems ) {
     result_ << "  if (rw_mem_num == " << idx << ") {" << endl;
-    result_ << "    detach_mem_" << idx << "(env_module_instance, rw_handle);" << endl;
-    result_ << "    return;" << endl;
+    result_ << "    return detach_mem_" << idx << "(env_module_instance);" << endl;
     result_ << "  }" << endl;
   }
   result_ << "  wasm_rt_trap(WASM_RT_TRAP_OOB);" << endl;
@@ -154,12 +184,12 @@ void InitComposer::write_freeze_blob()
   if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
-  result_ << "extern void fixpoint_freeze_blob( void*, uint32_t, uint32_t, uint32_t );" << endl;
-  result_ << "void " << module_prefix_
-          << "Z_env_Z_freeze_blob(struct Z_env_module_instance_t* env_module_instance, uint32_t rw_handle, "
-             "uint32_t size, uint32_t ro_handle) {"
+  result_ << "extern __m256i fixpoint_freeze_blob( __m256i, uint32_t );" << endl;
+  result_ << "__m256i " << module_prefix_
+          << "Z_env_Z_freeze_blob(struct Z_env_module_instance_t* env_module_instance, __m256i rw_handle, "
+             "uint32_t size) {"
           << endl;
-  result_ << "  fixpoint_freeze_blob(env_module_instance->module_instance, rw_handle, size, ro_handle);" << endl;
+  result_ << "  return fixpoint_freeze_blob(rw_handle, size);" << endl;
   result_ << "}" << endl;
   result_ << endl;
 }
@@ -170,11 +200,11 @@ void InitComposer::write_designate_output()
   if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
-  result_ << "extern void fixpoint_designate_output( void*, uint32_t );" << endl;
+  result_ << "extern void fixpoint_designate_output( __m256i );" << endl;
   result_ << "void " << module_prefix_
-          << "Z_env_Z_designate_output(struct Z_env_module_instance_t* env_module_instance, uint32_t ro_handle) {"
+          << "Z_env_Z_designate_output(struct Z_env_module_instance_t* env_module_instance, __m256i ro_handle) {"
           << endl;
-  result_ << "  fixpoint_designate_output(env_module_instance->module_instance, ro_handle);" << endl;
+  result_ << "  fixpoint_designate_output(ro_handle);" << endl;
   result_ << "}" << endl;
   result_ << endl;
 }
@@ -184,24 +214,38 @@ void InitComposer::write_env_instance()
   result_ << "typedef struct Z_env_module_instance_t {" << endl;
   result_ << "  " << module_prefix_ << "module_instance_t* module_instance;" << endl;
 
-  for ( auto ro_mem : inspector_->GetExportedRO() ) {
+  auto ro_mems = inspector_->GetExportedRO();
+  auto rw_mems = inspector_->GetExportedRW();
+  auto ro_tables = inspector_->GetImportedROTables();
+  auto rw_tables = inspector_->GetImportedRWTables();
+
+  for ( auto ro_mem : ro_mems ) {
     result_ << "  wasm_rt_memory_t ro_mem_" << ro_mem << ";" << endl;
   }
-  for ( auto rw_mem : inspector_->GetExportedRW() ) {
+  for ( auto rw_mem : rw_mems ) {
     result_ << "  wasm_rt_memory_t rw_mem_" << rw_mem << ";" << endl;
+  }
+
+  for ( auto ro_table : ro_tables ) {
+    result_ << "  wasm_rt_externref_table_t ro_table_" << ro_table << ";" << endl;
+  }
+
+  for ( auto rw_table : rw_tables ) {
+    result_ << "  wasm_rt_externref_table_t rw_table_" << rw_table << ";" << endl;
   }
 
   result_ << "} Z_env_module_instance_t;" << endl;
   result_ << endl;
 
-  for ( auto ro_mem : inspector_->GetExportedRO() ) {
+  for ( auto ro_mem : ro_mems ) {
     result_ << "wasm_rt_memory_t* Z_env_Z_ro_mem_" << ro_mem << "(Z_env_module_instance_t* env_module_instance) {"
             << endl;
     result_ << "  return &env_module_instance->ro_mem_" << ro_mem << ";" << endl;
     result_ << "}" << endl;
     result_ << endl;
   }
-  for ( auto rw_mem : inspector_->GetExportedRW() ) {
+
+  for ( auto rw_mem : rw_mems ) {
     result_ << "wasm_rt_memory_t* Z_env_Z_rw_mem_" << rw_mem << "(Z_env_module_instance_t* env_module_instance) {"
             << endl;
     result_ << " return &env_module_instance->rw_mem_" << rw_mem << ";" << endl;
@@ -209,14 +253,30 @@ void InitComposer::write_env_instance()
     result_ << endl;
   }
 
-  auto ro_mems = inspector_->GetExportedRO();
-  auto rw_mems = inspector_->GetRWSizes();
+  for ( auto ro_table : ro_tables ) {
+    result_ << "wasm_rt_externref_table_t* Z_env_Z_ro_table_" << ro_table
+            << "(Z_env_module_instance_t* env_module_instance) {" << endl;
+    result_ << "  return &env_module_instance->ro_table_" << ro_table << ";" << endl;
+    result_ << "}" << endl;
+    result_ << endl;
+  }
+
+  for ( auto rw_table : rw_tables ) {
+    result_ << "wasm_rt_externref_t* Z_env_Z_rw_table_" << rw_table
+            << "(Z_env_module_instance_t* env_module_instance) {" << endl;
+    result_ << "  return & env_module_instance->rw_table_" << rw_table << ";" << endl;
+    result_ << endl;
+    result_ << endl;
+  }
+
+  auto rw_mem_sizes = inspector_->GetRWSizes();
+  auto rw_table_sizes = inspector_->GetRWTableSizes();
   result_ << "void init_mems(Z_env_module_instance_t* env_module_instance) {" << endl;
   for ( const auto& ro_mem : ro_mems ) {
     result_ << "  wasm_rt_allocate_memory_sw_checked(&env_module_instance->ro_mem_" << ro_mem << ", " << 0
             << ", 65536);" << endl;
   }
-  for ( const auto& [rw_mem, size] : rw_mems ) {
+  for ( const auto& [rw_mem, size] : rw_mem_sizes ) {
     result_ << "  wasm_rt_allocate_memory_sw_checked(&env_module_instance->rw_mem_" << rw_mem << ", " << size
             << ", 65536);" << endl;
   }
@@ -225,9 +285,32 @@ void InitComposer::write_env_instance()
   result_ << endl;
 
   result_ << "void free_mems(Z_env_module_instance_t* env_module_instance) {" << endl;
-  for ( const auto& [rw_mem, size] : rw_mems ) {
+  for ( const auto& [rw_mem, size] : rw_mem_sizes ) {
     result_ << "  if (env_module_instance->rw_mem_" << rw_mem << ".data != NULL) {" << endl;
     result_ << "    wasm_rt_free_memory_sw_checked(&env_module_instance->rw_mem_" << rw_mem << ");" << endl;
+    result_ << "  }" << endl;
+  }
+  result_ << "  return;" << endl;
+  result_ << "}" << endl;
+  result_ << endl;
+
+  result_ << "void init_tables(Z_env_module_instance_t* env_module_instance) {" << endl;
+  for ( const auto& ro_table : ro_tables ) {
+    result_ << "  wasm_rt_allocate_externref_table(&env_module_instance->ro_table_" << ro_table << ", 0, 65536);"
+            << endl;
+  }
+  for ( const auto& [rw_table, size] : rw_table_sizes ) {
+    result_ << "  wasm_rt_allocate_externref_table(&env_module_instance->rw_table_" << rw_table << ", " << size
+            << ", 65536);" << endl;
+  }
+  result_ << "  return;" << endl;
+  result_ << "}" << endl;
+  result_ << endl;
+
+  result_ << "void free_tables(Z_env_module_instance_t* env_module_instance) {" << endl;
+  for ( const auto& [rw_table, size] : rw_table_sizes ) {
+    result_ << "  if (env_module_instance->rw_table_" << rw_table << ".data != NULL) {" << endl;
+    result_ << "    wasm_rt_free_externref_table(&env_module_instance->rw_table_" << rw_table << ");" << endl;
     result_ << "  }" << endl;
   }
   result_ << "  return;" << endl;
@@ -243,31 +326,34 @@ string InitComposer::compose_header()
   result_ << endl;
 
   write_env_instance();
-  write_get_tree_entry();
+  write_attach_tree();
   write_attach_blob();
   write_detach_mem();
   write_freeze_blob();
   write_designate_output();
+  write_set_ro_handles();
 
-  result_ << "extern void* fixpoint_init_module_instance(size_t, __m256i encode_name);" << endl;
+  result_ << "extern void* fixpoint_init_module_instance(size_t);" << endl;
   result_ << "extern void* fixpoint_init_env_module_instance(size_t);" << endl;
   result_ << "void* initProgram(__m256i encode_name) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_
-          << "*)fixpoint_init_module_instance(sizeof(" << state_info_type_name_ << "), encode_name);" << endl;
+          << "*)fixpoint_init_module_instance(sizeof(" << state_info_type_name_ << "));" << endl;
   result_ << "  Z_env_module_instance_t* env_module_instance = "
              "fixpoint_init_env_module_instance(sizeof(Z_env_module_instance_t));"
           << endl;
   result_ << "  init_mems(env_module_instance);" << endl;
+  result_ << "  init_tables(env_module_instance);" << endl;
   result_ << "  env_module_instance->module_instance = instance;" << endl;
   result_ << "  " << module_prefix_ << "init_module();" << endl;
   result_ << "  " << module_prefix_ << "init(instance, env_module_instance);" << endl;
+  result_ << "  " << module_prefix_ << "Z_ro_handles(instance)->data[0] = encode_name;" << endl;
   result_ << "  return (void*)instance;" << endl;
   result_ << "}" << endl;
 
   result_ << endl;
-  result_ << "void* executeProgram(void* instance) {" << endl;
-  result_ << "  " << module_prefix_ << "Z__fixpoint_apply((" << state_info_type_name_ << "*)instance);" << endl;
-  result_ << "  return instance;" << endl;
+  result_ << "__m256i executeProgram(void* instance) {" << endl;
+  result_ << "  return " << module_prefix_ << "Z__fixpoint_apply((" << state_info_type_name_ << "*)instance);"
+          << endl;
   result_ << "}" << endl;
 
   result_ << endl;
@@ -275,6 +361,7 @@ string InitComposer::compose_header()
   result_ << "void cleanupProgram(void* instance) {" << endl;
   result_ << "  " << module_prefix_ << "free((" << state_info_type_name_ << "*)instance);" << endl;
   result_ << "  free_mems(((" << state_info_type_name_ << "*)instance)->Z_env_module_instance);" << endl;
+  result_ << "  free_tables(((" << state_info_type_name_ << "*)instance)->Z_env_module_instance);" << endl;
   result_ << "  fixpoint_free_env_module_instance(((" << state_info_type_name_
           << "*)instance)->Z_env_module_instance);" << endl;
   result_ << "}" << endl;

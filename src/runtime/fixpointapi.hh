@@ -1,11 +1,10 @@
 #pragma once
 
-#include "instance.hh"
 #include "wasm-rt.h"
 
 namespace fixpoint {
 /* Initialize module instance*/
-void* init_module_instance( size_t instance_size, __m256i encode_name );
+void* init_module_instance( size_t instance_size );
 
 /* Initialize env instance*/
 void* init_env_instance( size_t env_instance_size );
@@ -13,18 +12,13 @@ void* init_env_instance( size_t env_instance_size );
 /* Free env instance*/
 void free_env_instance( void* env_instance );
 
-/* Traps if src_handle is not accessible, or not a Tree.
- * Also traps if entry_num is too big.*/
-void get_tree_entry( void* module_instance, uint32_t src_ro_handle, uint32_t entry_num, uint32_t target_ro_handle );
+void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_memory );
 
 /* Traps if handle is inaccessible, if handle does not refer to a Blob */
-void attach_blob( void* module_instance, uint32_t ro_handle, wasm_rt_memory_t* target_memory );
+void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory );
 
-void detach_mem( void* module_instance, wasm_rt_memory_t* target_memory, uint32_t rw_handle );
+__m256i detach_mem( wasm_rt_memory_t* target_memory );
 
 /* Traps if the rw_handle does not refer to an MBlob, or the specified size is larger than the size of the MBlob. */
-void freeze_blob( void* module_instance, uint32_t rw_handle, size_t size, uint32_t ro_handle );
-
-/* Traps if ro_hander refers to nothing or is not accessible. */
-void designate_output( void* module_instance, uint32_t ro_handle );
+__m256i freeze_blob( __m256i rw_handle, size_t size );
 }

@@ -21,6 +21,9 @@
 #include <stdint.h>
 #include <string.h>
 
+//#include <experimental/bits/simd.h>
+#include <immintrin.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -148,10 +151,11 @@ typedef struct {
 } wasm_rt_funcref_t;
 
 /** An external reference. These are opaque have meaning only to the host. */
-typedef void* wasm_rt_externref_t;
+typedef __m256i wasm_rt_externref_t;
 
 /** A Memory object. */
 typedef struct {
+  wasm_rt_externref_t ref;
   /** The linear memory data, with a byte length of `size`. */
   uint8_t* data;
   /** The current and maximum page count for this Memory object. If there is no

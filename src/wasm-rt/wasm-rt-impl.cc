@@ -38,6 +38,8 @@
 
 #define PAGE_SIZE 65536
 
+#include <iostream>
+
 typedef struct FuncType
 {
   wasm_rt_type_t* params;
@@ -64,6 +66,7 @@ void wasm_rt_trap( wasm_rt_trap_t code )
 #if !WASM_RT_MEMCHECK_SIGNAL_HANDLER
   wasm_rt_call_stack_depth = g_saved_call_stack_depth;
 #endif
+  std::cout << wasm_rt_strerror( code ) << std::endl;
   WASM_RT_LONGJMP( g_jmp_buf, code );
 }
 
@@ -432,7 +435,11 @@ double wasm_rt_fabs( double x )
   {                                                                                                                \
     table->size = elements;                                                                                        \
     table->max_size = max_elements;                                                                                \
-    table->data = static_cast<wasm_rt_##type##_t*>( calloc( table->size, sizeof( wasm_rt_##type##_t ) ) );         \
+    if ( table->size != 0 ) {                                                                                      \
+      void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), table->size * sizeof( wasm_rt_##type##_t ) );      \
+      memset( ptr, 0, table->size * sizeof( wasm_rt_##type##_t ) );                                                \
+      table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                       \
+    }                                                                                                              \
   }                                                                                                                \
   void wasm_rt_free_##type##_table( wasm_rt_##type##_table_t* table ) { free( table->data ); }                     \
   uint32_t wasm_rt_grow_##type##_table( wasm_rt_##type##_table_t* table, uint32_t delta, wasm_rt_##type##_t init ) \

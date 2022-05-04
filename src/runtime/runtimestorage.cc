@@ -132,14 +132,7 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
 
   Name function_name = this->get_tree( forced_encode ).at( 1 );
   string program_name = string( function_name.literal_blob() );
-  void* wasm_instance = name_to_program_.at( program_name ).execute( forced_encode );
-
-  Instance* fixpoint_instance = reinterpret_cast<Instance*>( wasm_instance ) - 1;
-  Name output = fixpoint_instance->get_output();
-
-  name_to_program_.at( program_name ).cleanup( wasm_instance );
-  free( (void*)fixpoint_instance );
-
+  __m256i output = name_to_program_.at( program_name ).execute( forced_encode );
   return output;
 }
 

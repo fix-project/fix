@@ -27,6 +27,9 @@ public:
   std::vector<uint32_t> GetExportedRW();
   std::vector<wabt::Index> GetExportedROIndex() { return exported_ro_; }
   std::vector<wabt::Index> GetExportedRWIndex() { return exported_rw_; }
+  std::vector<uint32_t> GetImportedROTables();
+  std::vector<uint32_t> GetImportedRWTables();
+  std::map<uint32_t, uint64_t> GetRWTableSizes();
 
   // Implementation of ExprVisitor::DelegateNop.
   wabt::Result OnMemoryCopyExpr( wabt::MemoryCopyExpr* ) override;
