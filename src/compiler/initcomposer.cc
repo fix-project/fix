@@ -62,10 +62,8 @@ private:
 
   void write_attach_tree();
   void write_attach_blob();
-  void write_set_ro_handles();
   void write_detach_mem();
   void write_freeze_blob();
-  void write_designate_output();
   void write_env_instance();
 };
 
@@ -98,24 +96,6 @@ void InitComposer::write_attach_tree()
   result_ << "  wasm_rt_trap(WASM_RT_TRAP_OOB);" << endl;
   result_ << "}" << endl;
   result_ << endl;
-}
-
-void InitComposer::write_set_ro_handles()
-{
-  result_ << "void " << module_prefix_
-          << "Z_env_Z_set_ro_handles(struct Z_env_module_instance_t* env_module_instance, uint32_t offset, __m256i "
-             "ro_handle) {"
-          << endl;
-  result_ << "  wasm_rt_externref_table_t* ro_handles = " << module_prefix_
-          << "Z_ro_handles(env_module_instance->module_instance);" << endl;
-  result_ << "  if (UNLIKELY(offset >= ro_handles->size)) wasm_rt_trap(WASM_RT_TRAP_OOB);" << endl;
-  result_ << "  __m256i original_ro_handle = ro_handles->data[offset];" << endl;
-  result_ << "  if (UNLIKELY( ( _mm256_extract_epi8( original_ro_handle, 31 ) & 0x20 ) != 0)) "
-             "wasm_rt_trap(WASM_RT_TRAP_UNREACHABLE);"
-          << endl;
-  result_ << "  ro_handles->data[offset] = ro_handle;" << endl;
-  result_ << "  return;" << endl;
-  result_ << "}" << endl;
 }
 
 void InitComposer::write_attach_blob()
@@ -190,21 +170,6 @@ void InitComposer::write_freeze_blob()
              "uint32_t size) {"
           << endl;
   result_ << "  return fixpoint_freeze_blob(rw_handle, size);" << endl;
-  result_ << "}" << endl;
-  result_ << endl;
-}
-
-void InitComposer::write_designate_output()
-{
-  auto it = inspector_->GetImportedFunctions().find( "designate_output" );
-  if ( it == inspector_->GetImportedFunctions().end() )
-    return;
-
-  result_ << "extern void fixpoint_designate_output( __m256i );" << endl;
-  result_ << "void " << module_prefix_
-          << "Z_env_Z_designate_output(struct Z_env_module_instance_t* env_module_instance, __m256i ro_handle) {"
-          << endl;
-  result_ << "  fixpoint_designate_output(ro_handle);" << endl;
   result_ << "}" << endl;
   result_ << endl;
 }
@@ -330,12 +295,10 @@ string InitComposer::compose_header()
   write_attach_blob();
   write_detach_mem();
   write_freeze_blob();
-  write_designate_output();
-  write_set_ro_handles();
 
   result_ << "extern void* fixpoint_init_module_instance(size_t);" << endl;
   result_ << "extern void* fixpoint_init_env_module_instance(size_t);" << endl;
-  result_ << "void* initProgram(__m256i encode_name) {" << endl;
+  result_ << "void* initProgram() {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_
           << "*)fixpoint_init_module_instance(sizeof(" << state_info_type_name_ << "));" << endl;
   result_ << "  Z_env_module_instance_t* env_module_instance = "
@@ -346,14 +309,7 @@ string InitComposer::compose_header()
   result_ << "  env_module_instance->module_instance = instance;" << endl;
   result_ << "  " << module_prefix_ << "init_module();" << endl;
   result_ << "  " << module_prefix_ << "init(instance, env_module_instance);" << endl;
-  result_ << "  " << module_prefix_ << "Z_ro_handles(instance)->data[0] = encode_name;" << endl;
   result_ << "  return (void*)instance;" << endl;
-  result_ << "}" << endl;
-
-  result_ << endl;
-  result_ << "__m256i executeProgram(void* instance) {" << endl;
-  result_ << "  return " << module_prefix_ << "Z__fixpoint_apply((" << state_info_type_name_ << "*)instance);"
-          << endl;
   result_ << "}" << endl;
 
   result_ << endl;
