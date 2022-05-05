@@ -163,7 +163,10 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
   elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_tree", func( (uint64_t)fixpoint::attach_tree ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_blob", func( (uint64_t)fixpoint::attach_blob ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_detach_mem", func( (uint64_t)fixpoint::detach_mem ) ) );
+  elf_info.func_map.insert(
+    pair<string, func>( "fixpoint_detach_table", func( (uint64_t)fixpoint::detach_table ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_blob", func( (uint64_t)fixpoint::freeze_blob ) ) );
+  elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_tree", func( (uint64_t)fixpoint::freeze_tree ) ) );
   elf_info.func_map.insert(
     pair<string, func>( "fixpoint_init_module_instance", func( (uint64_t)fixpoint::init_module_instance ) ) );
   elf_info.func_map.insert(

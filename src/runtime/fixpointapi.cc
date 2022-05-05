@@ -76,6 +76,17 @@ __m256i detach_mem( wasm_rt_memory_t* target_memory )
   return ref;
 }
 
+__m256i detach_table( wasm_rt_externref_table_t* target_table )
+{
+  MTree* tree = new MTree();
+  *tree = *target_table;
+  target_table->data = NULL;
+  target_table->size = 0;
+
+  MutableValueReference ref( tree, false );
+  return ref;
+}
+
 // module_instance points to the WASM instance
 __m256i freeze_blob( __m256i rw_handle, size_t size )
 {
@@ -84,6 +95,8 @@ __m256i freeze_blob( __m256i rw_handle, size_t size )
 #endif
   // TODO: make sure the mutablevalue that mutablevaluereference points to is a mblob, or else trap
   MutableValueReference ref( rw_handle );
+  assert( ref.is_valid() );
+
   std::string blob_content( (char*)ref.get_mblob_ptr()->data, size );
 
   wasm_rt_free_memory_sw_checked( ref.get_mblob_ptr() );
@@ -92,6 +105,25 @@ __m256i freeze_blob( __m256i rw_handle, size_t size )
   Name blob = RuntimeStorage::get_instance().add_blob( std::move( blob_content ) );
 
   ObjectReference obj( blob );
+  return obj;
+}
+
+__m256i freeze_tree( __m256i rw_handle, size_t size )
+{
+  MutableValueReference ref( rw_handle );
+  assert( ref.is_valid() );
+
+  MTree* mtree = ref.get_mtree_ptr();
+  for ( size_t i = 0; i < size; i++ ) {
+    mtree->data[i] = MTreeEntry::to_name( MTreeEntry( mtree->data[i] ) );
+  }
+  std::vector<Name> tree( mtree->data, mtree->data + size );
+  Name tree_name = RuntimeStorage::get_instance().add_tree( std::move( tree ) );
+
+  wasm_rt_free_externref_table( mtree );
+  delete ( mtree );
+
+  ObjectReference obj( tree_name );
   return obj;
 }
 }

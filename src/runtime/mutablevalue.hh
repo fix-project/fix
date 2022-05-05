@@ -5,8 +5,8 @@
 
 /**
  * TreeEntry metadata:
- * if the tree is a MTree before freezing: | strict/lazy(intended) | other/literal | accessible/not
- * accessible(from original objectreference) | the same as underlying name otherwise, the same as Name
+ * if the tree is a MTree before freezing: | assessible/not accessible | other/literal | strict/lazy(intended) | the
+ * same as underlying name otherwise, the same as Name
  */
 class MTreeEntry : public cookie_name
 {
@@ -19,7 +19,24 @@ public:
     : cookie_name( val )
   {}
 
-  bool is_accessible() const { return !( metadata() & 0x20 ); }
+  bool is_accessible() const { return !( metadata() & 0x80 ); }
+
+  bool is_intended_strict() const { return !( metadata() & 0x20 ); }
+
+  static __m256i to_name( MTreeEntry entry )
+  {
+    if ( entry.is_intended_strict() ) {
+      return __m256i {
+        entry.content_[0], entry.content_[1], entry.content_[2], entry.content_[3] & 0x5f'ff'ff'ff'ff'ff'ff'ff
+      };
+    } else {
+      return __m256i { entry.content_[0],
+                       entry.content_[1],
+                       entry.content_[2],
+                       static_cast<int64_t>( ( entry.content_[3] & 0x5f'ff'ff'ff'ff'ff'ff'ff )
+                                             | 0x80'00'00'00'00'00'00'00 ) };
+    }
+  }
 };
 
 using MBlob = wasm_rt_memory_t;
@@ -30,13 +47,13 @@ using MTree = wasm_rt_externref_table_t;
  * content_[0...30]: address of MBlob/ MTree
  * metadata: | 0 | 0 | 0 | 0 | 0 | MBlob/MTree | 1 | 1
  */
-class MutableValueReference : public cookie_name
+class MutableValueReference : public cookie
 {
 public:
   MutableValueReference() = default;
   MutableValueReference( void* ptr, bool is_mblob )
   {
-    uint8_t metadata = 0x03 | is_mblob ? 0x04 : 0x00;
+    uint8_t metadata = 0x03 | ( is_mblob ? 0x04 : 0x00 );
     std::array<char, 32> content {};
     __builtin_memcpy( &content, &ptr, 8 );
     content[31] = metadata;
@@ -44,10 +61,14 @@ public:
   }
 
   MutableValueReference( const __m256i val )
-    : cookie_name( val )
+    : cookie( val )
   {}
 
   operator __m256i() const { return content_; }
+
+  bool is_valid() const { 
+     return ( ( metadata() & 0xfb ) == 0x03 ); 
+  }
 
   bool is_mblob() const { return metadata() & 0x04; }
 
