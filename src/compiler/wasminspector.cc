@@ -160,7 +160,7 @@ Result WasmInspector::ValidateImports()
 
       case ExternalKind::Memory:
       case ExternalKind::Func: {
-        if ( import->module_name != "env" ) {
+        if ( import->module_name != "fixpoint" ) {
           return Result::Error;
         }
         break;
