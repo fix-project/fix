@@ -9,7 +9,7 @@ jobs:
       steps:
       - uses: actions/checkout@v1
       - name: install-packages
-        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config cmake clang libclang-dev
+        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config cmake clang libclang-dev lld
       - name: cmake
         run: cmake -S . -B build
       - name: compile
