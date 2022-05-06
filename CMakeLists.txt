@@ -4,7 +4,6 @@ project ( fixpoint )
 
 find_package ( PkgConfig )
 
-include ( etc/build_type.cmake )
 include ( etc/cflags.cmake )
 include ( etc/clang_format.cmake )
 include ( etc/tests.cmake )
