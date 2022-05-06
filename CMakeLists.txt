@@ -1,6 +1,5 @@
-cmake_minimum_required ( VERSION 2.8.5 )
-cmake_policy (SET CMP0048 NEW)
-project ( fixpoint )
+cmake_minimum_required ( VERSION 3.18 )
+project ( flatware )
 
 find_package ( PkgConfig )
 
