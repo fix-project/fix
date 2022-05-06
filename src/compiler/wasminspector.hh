@@ -19,23 +19,25 @@ public:
   WasmInspector( const WasmInspector& ) = default;
   WasmInspector& operator=( const WasmInspector& ) = default;
 
-  wabt::Result ValidateMemAccess();
-  wabt::Result ValidateImports();
-  const std::set<std::string>& GetImportedFunctions();
-  std::map<uint32_t, uint64_t> GetRWSizes();
-  std::vector<uint32_t> GetExportedRO();
-  std::vector<uint32_t> GetExportedRW();
-  std::vector<wabt::Index> GetExportedROIndex() { return exported_ro_; }
-  std::vector<wabt::Index> GetExportedRWIndex() { return exported_rw_; }
-  std::vector<uint32_t> GetImportedROTables();
-  std::vector<uint32_t> GetImportedRWTables();
-  std::map<uint32_t, uint64_t> GetRWTableSizes();
+  wabt::Result Validate();
+  const std::set<std::string>& GetImportedFunctions() { return imported_functions_; }
+  std::vector<uint32_t> GetExportedROMems() { return exported_ro_mem_idx_; }
+  std::vector<uint32_t> GetExportedRWMems() { return exported_rw_mem_idx_; }
+  std::vector<uint32_t> GetExportedROTables() { return exported_ro_table_idx_; }
+  std::vector<uint32_t> GetExportedRWTables() { return exported_rw_table_idx_; }
+  std::vector<wabt::Index> GetExportedROMemIndex() { return exported_ro_mem_; }
+  std::vector<wabt::Index> GetExportedRWMemIndex() { return exported_rw_mem_; }
 
   // Implementation of ExprVisitor::DelegateNop.
   wabt::Result OnMemoryCopyExpr( wabt::MemoryCopyExpr* ) override;
   wabt::Result OnMemoryFillExpr( wabt::MemoryFillExpr* ) override;
   wabt::Result OnMemoryGrowExpr( wabt::MemoryGrowExpr* ) override;
   wabt::Result OnMemoryInitExpr( wabt::MemoryInitExpr* ) override;
+  wabt::Result OnTableSetExpr( wabt::TableSetExpr* ) override;
+  wabt::Result OnTableCopyExpr( wabt::TableCopyExpr* ) override;
+  wabt::Result OnTableGrowExpr( wabt::TableGrowExpr* ) override;
+  wabt::Result OnTableFillExpr( wabt::TableFillExpr* ) override;
+  wabt::Result OnTableInitExpr( wabt::TableInitExpr* ) override;
   wabt::Result OnStoreExpr( wabt::StoreExpr* ) override;
 
 private:
@@ -47,6 +49,9 @@ private:
   void VisitScriptModule( wabt::ScriptModule* script_module );
   void VisitCommand( wabt::Command* command );
   wabt::Result CheckMemoryAccess( wabt::Var* memidx );
+  wabt::Result CheckTableAccess( wabt::Var* tableidx );
+  wabt::Result ValidateAccess();
+  wabt::Result ValidateImports();
 
   wabt::Errors* errors_ = nullptr;
   wabt::Module* current_module_ = nullptr;
@@ -55,8 +60,14 @@ private:
   wabt::Result result_ = wabt::Result::Ok;
 
   std::set<std::string> imported_functions_;
-  std::vector<wabt::Index> exported_ro_;
-  std::vector<wabt::Index> exported_rw_;
+  std::vector<wabt::Index> exported_ro_mem_;
+  std::vector<uint32_t> exported_ro_mem_idx_;
+  std::vector<wabt::Index> exported_rw_mem_;
+  std::vector<uint32_t> exported_rw_mem_idx_;
+  std::vector<wabt::Index> exported_ro_table_;
+  std::vector<uint32_t> exported_ro_table_idx_;
+  std::vector<wabt::Index> exported_rw_table_;
+  std::vector<uint32_t> exported_rw_table_idx_;
 };
 
 } // namespace wasminspector

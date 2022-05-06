@@ -66,9 +66,7 @@ public:
 
   operator __m256i() const { return content_; }
 
-  bool is_valid() const { 
-     return ( ( metadata() & 0xfb ) == 0x03 ); 
-  }
+  bool is_valid() const { return ( ( metadata() & 0xfb ) == 0x03 ); }
 
   bool is_mblob() const { return metadata() & 0x04; }
 

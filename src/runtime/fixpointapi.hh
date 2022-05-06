@@ -6,12 +6,6 @@ namespace fixpoint {
 /* Initialize module instance*/
 void* init_module_instance( size_t instance_size );
 
-/* Initialize env instance*/
-void* init_env_instance( size_t env_instance_size );
-
-/* Free env instance*/
-void free_env_instance( void* env_instance );
-
 void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_memory );
 
 /* Traps if handle is inaccessible, if handle does not refer to a Blob */

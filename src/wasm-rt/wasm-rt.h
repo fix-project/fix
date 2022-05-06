@@ -156,6 +156,7 @@ typedef __m256i wasm_rt_externref_t;
 /** A Memory object. */
 typedef struct {
   wasm_rt_externref_t ref;
+  bool read_only;
   /** The linear memory data, with a byte length of `size`. */
   uint8_t* data;
   /** The current and maximum page count for this Memory object. If there is no
@@ -178,6 +179,7 @@ typedef struct {
 
 /** A Table of type externref. */
 typedef struct {
+  bool read_only;
   /** The table element data, with an element count of `size`. */
   wasm_rt_externref_t* data;
   /** The maximum element count of this Table object. If there is no maximum,

@@ -113,18 +113,17 @@ tuple<string, string, string> wasm_to_c( const string& wasm_name, const string& 
     wasminspector::WasmInspector inspector( &module, &errors );
 
     if ( Succeeded( result ) ) {
-      result = inspector.ValidateMemAccess();
-      result |= inspector.ValidateImports();
+      result = inspector.Validate();
     }
     if ( result != Result::Ok ) {
       throw runtime_error( "Invalid module." );
     }
 
     if ( Succeeded( result ) ) {
-      for ( auto index : inspector.GetExportedROIndex() ) {
+      for ( auto index : inspector.GetExportedROMemIndex() ) {
         module.memories[index]->bounds_checked = true;
       }
-      for ( auto index : inspector.GetExportedRWIndex() ) {
+      for ( auto index : inspector.GetExportedRWMemIndex() ) {
         module.memories[index]->bounds_checked = true;
       }
     }

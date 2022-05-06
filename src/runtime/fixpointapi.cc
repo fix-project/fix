@@ -3,22 +3,11 @@
 #include "runtimevalue.hh"
 
 namespace fixpoint {
-// instance_size is the size of the WASM instance
 void* init_module_instance( size_t instance_size )
 {
-  return calloc( 1, instance_size );
-}
-
-void* init_env_instance( size_t env_instance_size )
-{
-  void* ptr = aligned_alloc( alignof( __m256i ), env_instance_size );
-  memset( ptr, 0, env_instance_size );
+  void* ptr = aligned_alloc( alignof( __m256i ), instance_size );
+  memset( ptr, 0, instance_size );
   return ptr;
-}
-
-void free_env_instance( void* env_instance )
-{
-  free( env_instance );
 }
 
 void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )

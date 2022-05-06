@@ -341,6 +341,8 @@ void wasm_rt_free_memory_hw_checked( wasm_rt_memory_t* memory )
 
 void wasm_rt_free_memory_sw_checked( wasm_rt_memory_t* memory )
 {
+  if ( memory->read_only )
+    return;
   free( memory->data );
 }
 
@@ -441,7 +443,6 @@ double wasm_rt_fabs( double x )
       table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                       \
     }                                                                                                              \
   }                                                                                                                \
-  void wasm_rt_free_##type##_table( wasm_rt_##type##_table_t* table ) { free( table->data ); }                     \
   uint32_t wasm_rt_grow_##type##_table( wasm_rt_##type##_table_t* table, uint32_t delta, wasm_rt_##type##_t init ) \
   {                                                                                                                \
     uint32_t old_elems = table->size;                                                                              \
@@ -465,7 +466,17 @@ double wasm_rt_fabs( double x )
   }
 
 DEFINE_TABLE_OPS( funcref )
+void wasm_rt_free_funcref_table( wasm_rt_funcref_table_t* table )
+{
+  free( table->data );
+}
 DEFINE_TABLE_OPS( externref )
+void wasm_rt_free_externref_table( wasm_rt_externref_table_t* table )
+{
+  if ( table->read_only )
+    return;
+  free( table->data );
+}
 
 const char* wasm_rt_strerror( wasm_rt_trap_t trap )
 {

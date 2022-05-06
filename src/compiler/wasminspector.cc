@@ -13,16 +13,35 @@ WasmInspector::WasmInspector( Module* module, Errors* errors )
   , current_module_( module )
   , visitor_( this )
   , imported_functions_()
-  , exported_ro_()
-  , exported_rw_()
+  , exported_ro_mem_()
+  , exported_ro_mem_idx_()
+  , exported_rw_mem_()
+  , exported_rw_mem_idx_()
+  , exported_ro_table_()
+  , exported_ro_table_idx_()
+  , exported_rw_table_()
+  , exported_rw_table_idx_()
 {
   for ( Export* export_ : module->exports ) {
     if ( export_->kind == ExternalKind::Memory ) {
       if ( export_->name.find( "ro_mem" ) != string::npos ) {
-        exported_ro_.push_back( module->GetMemoryIndex( export_->var ) );
+        exported_ro_mem_.push_back( module->GetMemoryIndex( export_->var ) );
+        exported_ro_mem_idx_.push_back( (uint32_t)atoi( export_->name.substr( 7 ).data() ) );
       }
       if ( export_->name.find( "rw_mem" ) != string::npos ) {
-        exported_rw_.push_back( module->GetMemoryIndex( export_->var ) );
+        exported_rw_mem_.push_back( module->GetMemoryIndex( export_->var ) );
+        exported_rw_mem_idx_.push_back( (uint32_t)atoi( export_->name.substr( 7 ).data() ) );
+      }
+    }
+
+    if ( export_->kind == ExternalKind::Table ) {
+      if ( export_->name.find( "ro_table" ) != string::npos ) {
+        exported_ro_table_.push_back( module->GetTableIndex( export_->var ) );
+        exported_ro_table_idx_.push_back( (uint32_t)atoi( export_->name.substr( 9 ).data() ) );
+      }
+      if ( export_->name.find( "rw_table" ) != string::npos ) {
+        exported_rw_table_.push_back( module->GetTableIndex( export_->var ) );
+        exported_rw_table_idx_.push_back( (uint32_t)atoi( export_->name.substr( 9 ).data() ) );
       }
     }
   }
@@ -59,6 +78,31 @@ Result WasmInspector::OnStoreExpr( StoreExpr* expr )
   return CheckMemoryAccess( &expr->memidx );
 }
 
+Result WasmInspector::OnTableSetExpr( TableSetExpr* expr )
+{
+  return CheckTableAccess( &expr->var );
+}
+
+Result WasmInspector::OnTableCopyExpr( TableCopyExpr* expr )
+{
+  return CheckTableAccess( &expr->dst_table );
+}
+
+Result WasmInspector::OnTableGrowExpr( TableGrowExpr* expr )
+{
+  return CheckTableAccess( &expr->var );
+}
+
+Result WasmInspector::OnTableFillExpr( TableFillExpr* expr )
+{
+  return CheckTableAccess( &expr->var );
+}
+
+Result WasmInspector::OnTableInitExpr( TableInitExpr* expr )
+{
+  return CheckTableAccess( &expr->table_index );
+}
+
 void WasmInspector::VisitFunc( Func* func )
 {
   current_func_ = func;
@@ -89,7 +133,7 @@ void WasmInspector::VisitDataSegment( DataSegment* segment )
   visitor_.VisitExprList( segment->offset );
 }
 
-Result WasmInspector::ValidateMemAccess()
+Result WasmInspector::ValidateAccess()
 {
   for ( Func* func : current_module_->funcs )
     VisitFunc( func );
@@ -127,121 +171,49 @@ Result WasmInspector::ValidateImports()
     }
   }
 
-  // All ro and rw memories are imported
-  for ( auto index : this->exported_ro_ ) {
-    if ( index >= current_module_->num_memory_imports ) {
-      return Result::Error;
-    }
-  }
-
-  for ( auto index : this->exported_rw_ ) {
-    if ( index >= current_module_->num_memory_imports ) {
-      return Result::Error;
-    }
-  }
-
   // Only rw memory can have nonzero initial size
-  for ( auto index : this->exported_ro_ ) {
+  for ( auto index : this->exported_ro_mem_ ) {
     Memory* memory = current_module_->memories[index];
     if ( memory->page_limits.initial > 0 ) {
       return Result::Error;
     }
   }
+
+  // Only rw table can have nonzero initial size
+  for ( auto index : this->exported_ro_table_ ) {
+    Table* table = current_module_->tables[index];
+    if ( table->elem_limits.initial > 0 ) {
+      return Result::Error;
+    }
+  }
+
   return Result::Ok;
+}
+
+Result WasmInspector::Validate()
+{
+  auto result = ValidateAccess();
+  result |= ValidateImports();
+  return result;
 }
 
 Result WasmInspector::CheckMemoryAccess( Var* memidx )
 {
-  if ( find( exported_ro_.begin(), exported_ro_.end(), current_module_->GetMemoryIndex( *memidx ) )
-       == exported_ro_.end() ) {
+  if ( find( exported_ro_mem_.begin(), exported_ro_mem_.end(), current_module_->GetMemoryIndex( *memidx ) )
+       == exported_ro_mem_.end() ) {
     return Result::Ok;
   } else {
     return Result::Error;
   }
 }
 
-const set<string>& WasmInspector::GetImportedFunctions()
+Result WasmInspector::CheckTableAccess( Var* tableidx )
 {
-  return imported_functions_;
-}
-
-std::vector<uint32_t> WasmInspector::GetExportedRO()
-{
-  std::vector<uint32_t> result;
-  for ( Export* export_ : current_module_->exports ) {
-    if ( export_->kind == ExternalKind::Memory ) {
-      if ( export_->name.find( "ro_mem" ) != string::npos ) {
-        result.push_back( (uint32_t)atoi( export_->name.substr( 7 ).data() ) );
-      }
-    }
+  if ( find( exported_ro_table_.begin(), exported_ro_table_.end(), current_module_->GetTableIndex( *tableidx ) )
+       == exported_ro_table_.end() ) {
+    return Result::Ok;
+  } else {
+    return Result::Error;
   }
-  return result;
-}
-
-std::vector<uint32_t> WasmInspector::GetExportedRW()
-{
-  std::vector<uint32_t> result;
-  for ( Export* export_ : current_module_->exports ) {
-    if ( export_->kind == ExternalKind::Memory ) {
-      if ( export_->name.find( "rw_mem" ) != string::npos ) {
-        result.push_back( (uint32_t)atoi( export_->name.substr( 7 ).data() ) );
-      }
-    }
-  }
-  return result;
-}
-
-std::vector<uint32_t> WasmInspector::GetImportedROTables()
-{
-  std::vector<uint32_t> result;
-  for ( Import* import_ : current_module_->imports ) {
-    if ( import_->kind() == ExternalKind::Table ) {
-      if ( import_->field_name.find( "ro_table" ) != string::npos ) {
-        result.push_back( (uint32_t)atoi( import_->field_name.substr( 9 ).data() ) );
-      }
-    }
-  }
-  return result;
-}
-
-std::vector<uint32_t> WasmInspector::GetImportedRWTables()
-{
-  std::vector<uint32_t> result;
-  for ( Import* import_ : current_module_->imports ) {
-    if ( import_->kind() == ExternalKind::Table ) {
-      if ( import_->field_name.find( "rw_table" ) != string::npos ) {
-        result.push_back( (uint32_t)atoi( import_->field_name.substr( 9 ).data() ) );
-      }
-    }
-  }
-  return result;
-}
-
-std::map<uint32_t, uint64_t> WasmInspector::GetRWSizes()
-{
-  std::map<uint32_t, uint64_t> result;
-  for ( Import* import_ : current_module_->imports ) {
-    if ( import_->kind() == ExternalKind::Memory ) {
-      if ( import_->field_name.find( "rw_mem" ) != string::npos ) {
-        result.insert( { (uint32_t)atoi( import_->field_name.substr( 7 ).data() ),
-                         cast<MemoryImport>( import_ )->memory.page_limits.initial } );
-      }
-    }
-  }
-  return result;
-}
-
-std::map<uint32_t, uint64_t> WasmInspector::GetRWTableSizes()
-{
-  std::map<uint32_t, uint64_t> result;
-  for ( Import* import_ : current_module_->imports ) {
-    if ( import_->kind() == ExternalKind::Table ) {
-      if ( import_->field_name.find( "rw_table" ) != string::npos ) {
-        result.insert( { (uint32_t)atoi( import_->field_name.substr( 9 ).data() ),
-                         cast<TableImport>( import_ )->table.elem_limits.initial } );
-      }
-    }
-  }
-  return result;
 }
 } // namespace wasminspector
