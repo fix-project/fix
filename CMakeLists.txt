@@ -56,9 +56,12 @@ include_directories ("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 include_directories ("${PROJECT_SOURCE_DIR}/src/storage")
 
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/util")
-add_subdirectory ("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/runtime")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/component")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/compiler")
-add_subdirectory ("${PROJECT_SOURCE_DIR}/src/wasm-examples")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/src/wasm-rt")
+#add_subdirectory ("${PROJECT_SOURCE_DIR}/src/storage") # only headers
+
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/tester")
+
+add_subdirectory ("${PROJECT_SOURCE_DIR}/testing/wasm-examples")
