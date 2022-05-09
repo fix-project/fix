@@ -1,5 +1,5 @@
 (module
-  (import "env" "memory" (memory $tmem 0))
+  (import "flatware" "memory" (memory $tmem 0))
   (import "sloth" "_start" (func $start))
   (memory $mymem (export "rw_mem_0") 1)
   (table $return 1 externref)

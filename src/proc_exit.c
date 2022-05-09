@@ -7,7 +7,7 @@ typedef char __attribute__((address_space(10)))* externref;
 extern void memory_copy_rw_0(const void*, size_t) __attribute( ( import_module("helper"), import_name("memory_copy_rw_0") ) );
 extern externref detach_mem_rw_mem_0(void) __attribute( ( import_module("fixpoint"), import_name("detach_mem_rw_mem_0") ) );
 extern externref freeze_blob (externref, uint32_t) __attribute( ( import_module("fixpoint"), import_name("freeze_blob") ) );
-extern void designate_output(externref) __attribute( ( import_module("helper"), import_name("memory_copy_rw_0") ) );
+extern void designate_output(externref) __attribute( ( import_module("helper"), import_name("designate_output") ) );
 void proc_exit( uint32_t rval ) __attribute( ( export_name("proc_exit") ) );
 
 void proc_exit(uint32_t rval) {
