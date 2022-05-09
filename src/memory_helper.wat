@@ -1,6 +1,8 @@
 (module
   (import "env" "memory" (memory $tmem 0))
+  (import "sloth" "_start" (func $start))
   (memory $mymem (export "rw_mem_0") 1)
+  (table $return 1 externref)
   (func (export "memory_copy_rw_0") (param $ptr i32) (param $len i32)
   	(memory.copy $tmem $mymem
 		(i32.const 0)
@@ -8,5 +10,12 @@
 		(local.get $len)
 	)
   )
+  (func (export "designate_output") (param $a externref)
+	(table.set $return (i32.const 0) (local.get $a))
+  )
+  (func (export "_fixpoint_apply") (param $encode externref) (result externref)
+	(call $start)
+	(table.get $return (i32.const 0))
+  )	
 )
 
