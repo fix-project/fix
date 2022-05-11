@@ -67,6 +67,7 @@ private:
   void write_freeze_blob();
   void write_freeze_tree();
   void write_init_read_only_mem_table();
+  void write_get_instance_size();
 };
 
 void InitComposer::write_attach_tree()
@@ -177,6 +178,13 @@ void InitComposer::write_init_read_only_mem_table()
   result_ << endl;
 }
 
+void InitComposer::write_get_instance_size()
+{
+  result_ << "size_t get_instance_size() {" << endl;
+  result_ << "  return sizeof(" << state_info_type_name_ << ");" << endl;
+  result_ << "}\n" << endl;
+}
+
 string InitComposer::compose_header()
 {
   result_ = ostringstream();
@@ -191,16 +199,15 @@ string InitComposer::compose_header()
   write_detach_table();
   write_freeze_blob();
   write_freeze_tree();
+  write_get_instance_size();
 
-  result_ << "extern void* fixpoint_init_module_instance(size_t);" << endl;
-  result_ << "void* initProgram() {" << endl;
-  result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_
-          << "*)fixpoint_init_module_instance(sizeof(" << state_info_type_name_ << "));" << endl;
+  result_ << "void initProgram(void* ptr) {" << endl;
+  result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_ << "*)ptr;" << endl;
   result_ << "  " << module_prefix_ << "init_module();" << endl;
   result_ << "  " << module_prefix_ << "init(instance, (struct Z_fixpoint_module_instance_t*)instance);" << endl;
   result_ << "  init_mems(instance);" << endl;
   result_ << "  init_tables(instance);" << endl;
-  result_ << "  return (void*)instance;" << endl;
+  result_ << "  return;" << endl;
   result_ << "}" << endl;
 
   return result_.str();

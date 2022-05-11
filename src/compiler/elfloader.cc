@@ -167,8 +167,6 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
     pair<string, func>( "fixpoint_detach_table", func( (uint64_t)fixpoint::detach_table ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_blob", func( (uint64_t)fixpoint::freeze_blob ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_tree", func( (uint64_t)fixpoint::freeze_tree ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "fixpoint_init_module_instance", func( (uint64_t)fixpoint::init_module_instance ) ) );
 
   for ( const auto& reloc_entry : elf_info.reloctb ) {
     int idx = ELF64_R_SYM( reloc_entry.r_info );
@@ -232,5 +230,6 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
   uint64_t main_entry
     = elf_info.symtb[elf_info.func_map.at( "Z_" + program_name + "_Z__fixpoint_apply" ).idx].st_value;
   uint64_t cleanup_entry = elf_info.symtb[elf_info.func_map.at( "Z_" + program_name + "_free" ).idx].st_value;
-  return Program( program_name, code, init_entry, main_entry, cleanup_entry );
+  uint64_t instance_size_entry = elf_info.symtb[elf_info.func_map.at( "get_instance_size" ).idx].st_value;
+  return Program( program_name, code, init_entry, main_entry, cleanup_entry, instance_size_entry );
 }

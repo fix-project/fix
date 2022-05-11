@@ -3,9 +3,6 @@
 #include "wasm-rt.h"
 
 namespace fixpoint {
-/* Initialize module instance*/
-void* init_module_instance( size_t instance_size );
-
 void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_memory );
 
 /* Traps if handle is inaccessible, if handle does not refer to a Blob */

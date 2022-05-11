@@ -3,13 +3,6 @@
 #include "runtimevalue.hh"
 
 namespace fixpoint {
-void* init_module_instance( size_t instance_size )
-{
-  void* ptr = aligned_alloc( alignof( __m256i ), instance_size );
-  memset( ptr, 0, instance_size );
-  return ptr;
-}
-
 void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )
 {
   ObjectReference obj( ro_handle );

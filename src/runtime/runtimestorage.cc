@@ -129,10 +129,19 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
   if ( memorization_cache.contains( forced_encode_thunk ) ) {
     return memorization_cache.at( forced_encode_thunk );
   }
-
   Name function_name = this->get_tree( forced_encode ).at( 1 );
   string program_name = string( function_name.literal_blob() );
-  __m256i output = name_to_program_.at( program_name ).execute( forced_encode );
+
+  size_t instance_size = name_to_program_.at( program_name ).get_instance_and_context_size();
+  void* ptr = aligned_alloc( alignof( __m256i ), instance_size );
+  memset( ptr, 0, instance_size );
+  string_span instance { static_cast<const char*>( ptr ), instance_size };
+
+  name_to_program_.at( program_name ).populate_instance_and_context( instance );
+  __m256i output = name_to_program_.at( program_name ).execute( forced_encode, instance );
+  name_to_program_.at( program_name ).cleanup( instance );
+  free( ptr );
+
   return output;
 }
 
