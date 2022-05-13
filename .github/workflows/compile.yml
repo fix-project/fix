@@ -15,7 +15,7 @@ jobs:
       - name: compile
         run: cmake --build out --parallel 8
       - name: test
-        run: cmake --build out --target check
+        run: cmake --build out --target fixpoint-check
   sanitize:
       runs-on: ubuntu-latest
       container: ubuntu:rolling
@@ -28,4 +28,4 @@ jobs:
       - name: compile
         run: cmake --build out-sanitize --parallel 8
       - name: test
-        run: cmake --build out-sanitize --target check
+        run: cmake --build out-sanitize --target fixpoint-check

@@ -1,6 +1,6 @@
 enable_testing()
 
-add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^t_"
+add_custom_target (fixpoint-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^t_"
                          COMMENT "Testing...")
 
 add_test(NAME t_addblob WORKING_DIRECTORY
