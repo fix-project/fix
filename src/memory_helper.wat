@@ -1,6 +1,7 @@
 (module
   (import "flatware" "memory" (memory $tmem 0))
   (import "sloth" "_start" (func $start))
+  (import "fixpoint" "exit" (func $fixpoint_exit (param externref)))
   (memory $mymem (export "rw_mem_0") 1)
   (table $return 1 externref)
   (func (export "memory_copy_rw_0") (param $ptr i32) (param $len i32)
@@ -13,9 +14,13 @@
   (func (export "designate_output") (param $a externref)
 	(table.set $return (i32.const 0) (local.get $a))
   )
-  (func (export "_fixpoint_apply") (param $encode externref) (result externref)
+  (func (export "flatware_start")
 	(call $start)
-	(table.get $return (i32.const 0))
-  )	
+  (call $fixpoint_exit (table.get $return (i32.const 0)))
+  unreachable
+  )
+  (func (export "flatware_exit")
+  (call $fixpoint_exit (table.get $return (i32.const 0)))
+  unreachable)
 )
 
