@@ -225,7 +225,6 @@ string InitComposer::compose_header()
 
   result_ << "void initProgram(void* ptr) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_ << "*)ptr;" << endl;
-  result_ << "  " << module_prefix_ << "init_module();" << endl;
   result_ << "  " << module_prefix_ << "init(instance, (struct Z_fixpoint_module_instance_t*)instance);" << endl;
   result_ << "  init_mems(instance);" << endl;
   result_ << "  init_tables(instance);" << endl;

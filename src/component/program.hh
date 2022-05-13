@@ -36,7 +36,8 @@ public:
            uint64_t init_entry,
            uint64_t main_entry,
            uint64_t cleanup_entry,
-           uint64_t instance_size_entry )
+           uint64_t instance_size_entry,
+           uint64_t init_module_entry )
     : name_( name )
     , code_( code )
     , init_entry_( init_entry )
@@ -47,6 +48,10 @@ public:
     size_t ( *size_func )( void );
     size_func = reinterpret_cast<size_t ( * )( void )>( code_.get() + instance_size_entry );
     instance_size_ = size_func();
+
+    void ( *init_module_func )( void );
+    init_module_func = reinterpret_cast<void (*)( void )>( code_.get() + init_module_entry );
+    init_module_func();
   }
 
   struct Context
