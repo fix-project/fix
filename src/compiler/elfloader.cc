@@ -162,11 +162,8 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
   elf_info.func_map.insert( pair<string, func>( "wasm_rt_init", func( (uint64_t)wasm_rt_init ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_tree", func( (uint64_t)fixpoint::attach_tree ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_blob", func( (uint64_t)fixpoint::attach_blob ) ) );
-  elf_info.func_map.insert( pair<string, func>( "fixpoint_detach_mem", func( (uint64_t)fixpoint::detach_mem ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "fixpoint_detach_table", func( (uint64_t)fixpoint::detach_table ) ) );
-  elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_blob", func( (uint64_t)fixpoint::freeze_blob ) ) );
-  elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_tree", func( (uint64_t)fixpoint::freeze_tree ) ) );
+  elf_info.func_map.insert( pair<string, func>( "fixpoint_create_blob", func( (uint64_t)fixpoint::create_blob ) ) );
+  elf_info.func_map.insert( pair<string, func>( "fixpoint_create_tree", func( (uint64_t)fixpoint::create_tree ) ) );
   elf_info.func_map.insert( pair<string, func>( "memmove", func( (uint64_t)memmove ) ) );
 
   for ( const auto& reloc_entry : elf_info.reloctb ) {

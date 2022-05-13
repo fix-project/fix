@@ -6,9 +6,7 @@
  (import "fixpoint" "attach_blob_ro_mem_0"   (func $attach_blob_ro_mem_0 (param externref)))
  (import "fixpoint" "attach_blob_ro_mem_1"   (func $attach_blob_ro_mem_1 (param externref)))
  ;;  Detach a Wasm memory (returns reference to a Fixpoint MBlob):
- (import "fixpoint" "detach_mem_rw_mem_0"    (func $detach_mem_rw_mem_0 (result externref)))
- ;;  Freeze an MBlob into a Blob of a given length:
- (import "fixpoint" "freeze_blob"            (func $freeze_blob (param externref i32) (result externref)))
+ (import "fixpoint" "create_blob_rw_mem_0"    (func $create_blob_rw_mem_0 (param i32)(result externref)))
 
  ;; Declare a read-only table to hold the ENCODE
  (table $ro_table_0 (export "ro_table_0") 0 externref)
@@ -30,10 +28,9 @@
        (call $attach_blob_ro_mem_1 (table.get $ro_table_0 (i32.const 3))) ;; attach 2nd addend to $ro_mem_1
 
        (i32.store $rw_mem_0                                               ;; Store to the output memory...
-		  (i32.const 0)                                           ;; ... at location zero...
-		  (i32.add (i32.load $ro_mem_0 (i32.const 0))             ;; ... the sum of the two addends.
+		   (i32.const 0)                                           ;; ... at location zero...
+		   (i32.add (i32.load $ro_mem_0 (i32.const 0))             ;; ... the sum of the two addends.
 			   (i32.load $ro_mem_1 (i32.const 0))))
 
-       (call $freeze_blob                                                 ;; Freeze the output Blob...
-	     (call $detach_mem_rw_mem_0)                                  ;; ... with contents from the output memory...
-	     (i32.const 4))))                                             ;; ... and a length of 4 bytes.
+       (call $create_blob_rw_mem_0                             ;; Freeze the output Blob from the output memory...
+	     (i32.const 4))))                                        ;; ... and a length of 4 bytes.

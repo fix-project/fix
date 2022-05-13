@@ -1,12 +1,10 @@
 (module
   (type (;0;) (func (param externref)))
-  (type (;1;) (func (param externref i32) (result externref)))
-  (type (;2;) (func (result externref)))
+  (type (;1;) (func (param i32) (result externref)))
   (import "fixpoint" "attach_tree_ro_table_0" (func $attach_tree_ro_tree_0 (type 0)))
   (import "fixpoint" "attach_blob_ro_mem_0" (func $attach_blob_ro_mem_0 (type 0)))
   (import "fixpoint" "attach_blob_ro_mem_1" (func $attach_blob_ro_mem_1 (type 0)))
-  (import "fixpoint" "detach_mem_rw_mem_0" (func $detach_mem_rw_mem_0 (type 2)))
-  (import "fixpoint" "freeze_blob" (func $freeze_blob (type 1)))
+  (import "fixpoint" "create_blob_rw_mem_0" (func $create_blob_rw_mem_0  (type 1)))
   (memory $memzero 0)
   (memory $memone 0)
   (memory $memtwo 1)
@@ -22,8 +20,8 @@
     i32.const 0
     (i32.add (i32.load 0 (i32.const 0)) (i32.load 1 (i32.const 0)))
     i32.store $memtwo
-    (table.set $rw_handles (i32.const 0) (call $detach_mem_rw_mem_0)) 
-    (call $freeze_blob (table.get $rw_handles (i32.const 0)) (i32.const 4))
+    (table.set $rw_handles (i32.const 0) (call $create_blob_rw_mem_0 (i32.const 4))) 
+    (table.get $rw_handles (i32.const 0))
   )
   (table (;0;) 1 1 funcref)
   (export "ro_mem_0" (memory $memzero))

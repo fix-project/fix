@@ -20,8 +20,8 @@ int main( int argc, char* argv[] )
 
   auto& runtime = RuntimeStorage::get_instance();
 
-  string program_name (basename( argv[1] ));
-  program_name = program_name.substr(0, program_name.length() - 5);
+  string program_name( basename( argv[1] ) );
+  program_name = program_name.substr( 0, program_name.length() - 5 );
   runtime.add_wasm( program_name, wasm_content );
 
   vector<Name> encode;

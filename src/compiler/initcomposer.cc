@@ -62,10 +62,8 @@ private:
 
   void write_attach_tree();
   void write_attach_blob();
-  void write_detach_mem();
-  void write_detach_table();
-  void write_freeze_blob();
-  void write_freeze_tree();
+  void write_create_blob();
+  void write_create_tree();
   void write_init_read_only_mem_table();
   void write_get_instance_size();
   void write_context();
@@ -115,64 +113,32 @@ void InitComposer::write_attach_blob()
   }
 }
 
-void InitComposer::write_detach_mem()
+void InitComposer::write_create_blob()
 {
   auto rw_mems = inspector_->GetExportedRWMems();
-  result_ << "extern __m256i fixpoint_detach_mem( wasm_rt_memory_t* );" << endl;
+  result_ << "extern __m256i fixpoint_create_blob( wasm_rt_memory_t*, uint32_t );" << endl;
   for ( uint32_t idx : rw_mems ) {
-    result_ << "__m256i " << module_prefix_ << "Z_fixpoint_Z_detach_mem_rw_mem_" << idx
-            << "(struct Z_fixpoint_module_instance_t* module_instance) {" << endl;
+    result_ << "__m256i " << module_prefix_ << "Z_fixpoint_Z_create_blob_rw_mem_" << idx
+            << "(struct Z_fixpoint_module_instance_t* module_instance, uint32_t size) {" << endl;
     result_ << "  wasm_rt_memory_t* rw_mem = " << module_prefix_ << "Z_rw_mem_" << idx << "(("
             << state_info_type_name_ << "*)module_instance);" << endl;
-    result_ << "  return fixpoint_detach_mem(rw_mem);" << endl;
+    result_ << "  return fixpoint_create_blob(rw_mem, size);" << endl;
     result_ << "}\n" << endl;
   }
 }
 
-void InitComposer::write_detach_table()
+void InitComposer::write_create_tree()
 {
   auto rw_tables = inspector_->GetExportedRWTables();
-  result_ << "extern __m256i fixpoint_detach_table( wasm_rt_externref_table_t* );" << endl;
+  result_ << "extern __m256i fixpoint_create_tree( wasm_rt_externref_table_t*, uint32_t );" << endl;
   for ( auto rw_table : rw_tables ) {
-    result_ << "__m256i " << module_prefix_ << "Z_fixpoint_Z_detach_table_rw_table_" << rw_table
-            << "(struct Z_fixpoint_module_instance_t* module_instance) {" << endl;
+    result_ << "__m256i " << module_prefix_ << "Z_fixpoint_Z_create_tree_rw_table_" << rw_table
+            << "(struct Z_fixpoint_module_instance_t* module_instance, uint32_t size) {" << endl;
     result_ << "  wasm_rt_externref_table_t* rw_table = " << module_prefix_ << "Z_rw_table_" << rw_table << "(("
             << state_info_type_name_ << "*)module_instance);" << endl;
-    result_ << "  return fixpoint_detach_table(rw_table);" << endl;
+    result_ << "  return fixpoint_detach_table(rw_table, size);" << endl;
     result_ << "}\n" << endl;
   }
-}
-
-void InitComposer::write_freeze_blob()
-{
-  auto it = inspector_->GetImportedFunctions().find( "freeze_blob" );
-  if ( it == inspector_->GetImportedFunctions().end() )
-    return;
-
-  result_ << "extern __m256i fixpoint_freeze_blob( __m256i, uint32_t );" << endl;
-  result_ << "__m256i " << module_prefix_
-          << "Z_fixpoint_Z_freeze_blob(struct Z_fixpoint_module_instance_t* module_instance, __m256i rw_handle, "
-             "uint32_t size) {"
-          << endl;
-  result_ << "  return fixpoint_freeze_blob(rw_handle, size);" << endl;
-  result_ << "}" << endl;
-  result_ << endl;
-}
-
-void InitComposer::write_freeze_tree()
-{
-  auto it = inspector_->GetImportedFunctions().find( "freeze_tree" );
-  if ( it == inspector_->GetImportedFunctions().end() )
-    return;
-
-  result_ << "extern __m256i fixpoint_freeze_tree( __m256i, uint32_t );" << endl;
-  result_ << "__m256i " << module_prefix_
-          << "Z_fixpoint_Z_freeze_tree(struct Z_fixpoint_module_instance_t* fixpoint_module_instance, __m256i "
-             "rw_handle, uint32_t size) {"
-          << endl;
-  result_ << "  return fixpoint_freeze_tree(rw_handle, size);" << endl;
-  result_ << "}" << endl;
-  result_ << endl;
 }
 
 void InitComposer::write_init_read_only_mem_table()
@@ -208,7 +174,8 @@ void InitComposer::write_exit()
   if ( it == inspector_->GetImportedFunctions().end() )
     return;
 
-  result_ << "wasm_rt_externref_t " << module_prefix_ << "start_wrapper(" << state_info_type_name_ << "* module_instance, wasm_rt_externref_t encode) {" << endl;
+  result_ << "wasm_rt_externref_t " << module_prefix_ << "start_wrapper(" << state_info_type_name_
+          << "* module_instance, wasm_rt_externref_t encode) {" << endl;
   result_ << "  asm(\"\"" << endl;
   result_ << "      :" << endl;
   result_ << "      :" << endl;
@@ -220,8 +187,11 @@ void InitComposer::write_exit()
   result_ << "  asm(\"_fixpoint_jmp_back:\");" << endl;
   result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
   result_ << "}\n" << endl;
-  
-  result_ << "void " << module_prefix_ << "Z_fixpoint_Z_exit(struct Z_fixpoint_module_instance_t* module_instance, wasm_rt_externref_t return_value ) {" << endl;
+
+  result_ << "void " << module_prefix_
+          << "Z_fixpoint_Z_exit(struct Z_fixpoint_module_instance_t* module_instance, wasm_rt_externref_t "
+             "return_value ) {"
+          << endl;
   result_ << "  get_context_ptr(module_instance)->return_value = return_value;" << endl;
   result_ << "  get_context_ptr(module_instance)->returned = true;" << endl;
   result_ << "  asm(\"mov %0, %%rsp\"" << endl;
@@ -229,8 +199,9 @@ void InitComposer::write_exit()
   result_ << "       : \"r\"(get_context_ptr(module_instance)->stack_ptr));" << endl;
   result_ << "  asm(\"jmp _fixpoint_jmp_back\");" << endl;
   result_ << "}\n" << endl;
-  
-  result_ << "__attribute__((optnone)) wasm_rt_externref_t " << module_prefix_  << "Z__fixpoint_apply(" << state_info_type_name_ << "* module_instance, wasm_rt_externref_t encode) {" << endl;
+
+  result_ << "__attribute__((optnone)) wasm_rt_externref_t " << module_prefix_ << "Z__fixpoint_apply("
+          << state_info_type_name_ << "* module_instance, wasm_rt_externref_t encode) {" << endl;
   result_ << "  " << module_prefix_ << "start_wrapper(module_instance, encode);" << endl;
   result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
   result_ << "}\n" << endl;
@@ -248,10 +219,8 @@ string InitComposer::compose_header()
   write_init_read_only_mem_table();
   write_attach_tree();
   write_attach_blob();
-  write_detach_mem();
-  write_detach_table();
-  write_freeze_blob();
-  write_freeze_tree();
+  write_create_tree();
+  write_create_blob();
   write_exit();
 
   result_ << "void initProgram(void* ptr) {" << endl;

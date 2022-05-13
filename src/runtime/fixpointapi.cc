@@ -58,31 +58,21 @@ __m256i detach_mem( wasm_rt_memory_t* target_memory )
   return ref;
 }
 
-__m256i detach_table( wasm_rt_externref_table_t* target_table )
-{
-  MTree* tree = new MTree();
-  *tree = *target_table;
-  target_table->data = NULL;
-  target_table->size = 0;
-
-  MutableValueReference ref( tree, false );
-  return ref;
-}
-
 // module_instance points to the WASM instance
-__m256i freeze_blob( __m256i rw_handle, size_t size )
+__m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 {
 #if TIME_FIXPOINT_API
   RecordScopeTimer<Timer::Category::Nonblock> record_timer { _freeze_blob };
 #endif
   // TODO: make sure the mutablevalue that mutablevaluereference points to is a mblob, or else trap
-  MutableValueReference ref( rw_handle );
-  assert( ref.is_valid() );
 
-  std::string blob_content( (char*)ref.get_mblob_ptr()->data, size );
+  std::string blob_content( (char*)memory->data, size );
 
-  wasm_rt_free_memory_sw_checked( ref.get_mblob_ptr() );
-  delete ( ref.get_mblob_ptr() );
+  wasm_rt_free_memory_sw_checked( memory );
+  memory->data = NULL;
+  memory->pages = 0;
+  memory->max_pages = 65536;
+  memory->size = 0;
 
   Name blob = RuntimeStorage::get_instance().add_blob( std::move( blob_content ) );
 
@@ -90,20 +80,17 @@ __m256i freeze_blob( __m256i rw_handle, size_t size )
   return obj;
 }
 
-__m256i freeze_tree( __m256i rw_handle, size_t size )
+__m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
 {
-  MutableValueReference ref( rw_handle );
-  assert( ref.is_valid() );
-
-  MTree* mtree = ref.get_mtree_ptr();
   for ( size_t i = 0; i < size; i++ ) {
-    mtree->data[i] = MTreeEntry::to_name( MTreeEntry( mtree->data[i] ) );
+    table->data[i] = MTreeEntry::to_name( MTreeEntry( table->data[i] ) );
   }
-  std::vector<Name> tree( mtree->data, mtree->data + size );
+  std::vector<Name> tree( table->data, table->data + size );
   Name tree_name = RuntimeStorage::get_instance().add_tree( std::move( tree ) );
 
-  wasm_rt_free_externref_table( mtree );
-  delete ( mtree );
+  wasm_rt_free_externref_table( table );
+  table->data = NULL;
+  table->size = 0;
 
   ObjectReference obj( tree_name );
   return obj;
