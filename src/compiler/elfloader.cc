@@ -167,6 +167,7 @@ Program link_program( Elf_Info& elf_info, const string& program_name )
     pair<string, func>( "fixpoint_detach_table", func( (uint64_t)fixpoint::detach_table ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_blob", func( (uint64_t)fixpoint::freeze_blob ) ) );
   elf_info.func_map.insert( pair<string, func>( "fixpoint_freeze_tree", func( (uint64_t)fixpoint::freeze_tree ) ) );
+  elf_info.func_map.insert( pair<string, func>( "memmove", func( (uint64_t)memmove ) ) );
 
   for ( const auto& reloc_entry : elf_info.reloctb ) {
     int idx = ELF64_R_SYM( reloc_entry.r_info );

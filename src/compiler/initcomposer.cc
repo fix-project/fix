@@ -68,7 +68,24 @@ private:
   void write_freeze_tree();
   void write_init_read_only_mem_table();
   void write_get_instance_size();
+  void write_context();
+  void write_exit();
 };
+
+void InitComposer::write_context()
+{
+  result_ << "typedef struct Context {" << endl;
+  result_ << "  __m256i return_value;" << endl;
+  result_ << "  size_t memory_usage;" << endl;
+  result_ << "  uint64_t stack_ptr;" << endl;
+  result_ << "  uint64_t rdi;" << endl;
+  result_ << "  bool returned;" << endl;
+  result_ << "} Context;\n" << endl;
+
+  result_ << "Context* get_context_ptr( void* instance ) {" << endl;
+  result_ << "  return (Context*)((char*)instance + get_instance_size());" << endl;
+  result_ << "}\n" << endl;
+}
 
 void InitComposer::write_attach_tree()
 {
@@ -185,6 +202,40 @@ void InitComposer::write_get_instance_size()
   result_ << "}\n" << endl;
 }
 
+void InitComposer::write_exit()
+{
+  auto it = inspector_->GetImportedFunctions().find( "exit" );
+  if ( it == inspector_->GetImportedFunctions().end() )
+    return;
+
+  result_ << "wasm_rt_externref_t " << module_prefix_ << "start_wrapper(" << state_info_type_name_ << "* module_instance, wasm_rt_externref_t encode) {" << endl;
+  result_ << "  asm(\"\"" << endl;
+  result_ << "      :" << endl;
+  result_ << "      :" << endl;
+  result_ << "      :\"rbx\",\"rbp\", \"r12\", \"r13\", \"r14\", \"r15\");" << endl;
+  result_ << "  asm(\"mov %%rsp, %0\" : \"=r\"(get_context_ptr(module_instance)->stack_ptr));" << endl;
+  result_ << "  if(!get_context_ptr(module_instance)->returned) {" << endl;
+  result_ << "    " << module_prefix_ << "Z_flatware_start( module_instance );" << endl;
+  result_ << "  }" << endl;
+  result_ << "  asm(\"_fixpoint_jmp_back:\");" << endl;
+  result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
+  result_ << "}\n" << endl;
+  
+  result_ << "void " << module_prefix_ << "Z_fixpoint_Z_exit(struct Z_fixpoint_module_instance_t* module_instance, wasm_rt_externref_t return_value ) {" << endl;
+  result_ << "  get_context_ptr(module_instance)->return_value = return_value;" << endl;
+  result_ << "  get_context_ptr(module_instance)->returned = true;" << endl;
+  result_ << "  asm(\"mov %0, %%rsp\"" << endl;
+  result_ << "       :" << endl;
+  result_ << "       : \"r\"(get_context_ptr(module_instance)->stack_ptr));" << endl;
+  result_ << "  asm(\"jmp _fixpoint_jmp_back\");" << endl;
+  result_ << "}\n" << endl;
+  
+  result_ << "__attribute__((optnone)) wasm_rt_externref_t " << module_prefix_  << "Z__fixpoint_apply(" << state_info_type_name_ << "* module_instance, wasm_rt_externref_t encode) {" << endl;
+  result_ << "  " << module_prefix_ << "start_wrapper(module_instance, encode);" << endl;
+  result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
+  result_ << "}\n" << endl;
+}
+
 string InitComposer::compose_header()
 {
   result_ = ostringstream();
@@ -192,6 +243,8 @@ string InitComposer::compose_header()
   result_ << "#include \"" << wasm_name_ << "_fixpoint.h\"" << endl;
   result_ << endl;
 
+  write_get_instance_size();
+  write_context();
   write_init_read_only_mem_table();
   write_attach_tree();
   write_attach_blob();
@@ -199,7 +252,7 @@ string InitComposer::compose_header()
   write_detach_table();
   write_freeze_blob();
   write_freeze_tree();
-  write_get_instance_size();
+  write_exit();
 
   result_ << "void initProgram(void* ptr) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_ << "*)ptr;" << endl;

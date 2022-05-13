@@ -53,6 +53,9 @@ public:
   {
     Name return_value;
     size_t memory_usage;
+    uint64_t stack_ptr;
+    uint64_t rdi;
+    bool returned;
   };
 
   size_t get_instance_and_context_size() const { return instance_size_ + sizeof( Context ); }
@@ -65,6 +68,7 @@ public:
 
     Context* c = reinterpret_cast<Context*>( instance.mutable_data() + instance_size_ );
     c->memory_usage = 0;
+    c->returned = false;
   }
 
   __m256i execute( Name encode_name, string_span instance ) const
