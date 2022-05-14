@@ -19,3 +19,14 @@ add_custom_command(
           -o add-simple.wasm)
 
 add_custom_target(add_simple_wasm ALL DEPENDS add-simple.wasm)
+
+add_custom_command(
+  OUTPUT "exit.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/exit.wat
+          ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
+  COMMAND ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
+          --enable-multi-memory
+          ${CMAKE_CURRENT_SOURCE_DIR}/exit.wat
+          -o exit.wasm)
+
+add_custom_target(exit_wasm ALL DEPENDS exit.wasm)
