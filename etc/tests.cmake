@@ -14,3 +14,9 @@ add_test(NAME t_add_simple WORKING_DIRECTORY
   ${CMAKE_CURRENT_BINARY_DIR}/src/tester/add_tester
   ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/add-simple.wasm
 )
+
+add_test(NAME t_exit WORKING_DIRECTORY
+  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testing/exit-test
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/wasi_tester
+  ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/exit.wasm
+)

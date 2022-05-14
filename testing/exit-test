@@ -1,0 +1,28 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+if ((scalar @ARGV) != 2) {
+  die qq{Usage: $0 wasi_tester exit.wasm};
+}
+
+my ($executable, $wasm) = @ARGV;
+
+sub check_exit($) {
+  my ($expected_answer) = @_;
+
+  my $result = `$executable $wasm 2>&1`;
+
+  if ($?) {
+    die qq{Failure in running exit-test: $result};
+  }
+
+  my ($answer) = $result =~ m{= (.*)};
+
+  if ( $answer != $expected_answer ) {
+    print STDERR qq{Got result:\n$result\n};
+    die qq{Wrong exit value ($answer, was expecting $expected_answer)};
+  }
+}
+
+check_exit(17);
