@@ -17,7 +17,7 @@ sub check_exit($) {
     die qq{Failure in running exit-test: $result};
   }
 
-  my ($answer) = $result =~ m{= (.*)};
+  my ($answer) = $result =~ m{^The result is (.*)};
 
   if ( $answer != $expected_answer ) {
     print STDERR qq{Got result:\n$result\n};

@@ -50,7 +50,7 @@ public:
     instance_size_ = size_func();
 
     void ( *init_module_func )( void );
-    init_module_func = reinterpret_cast<void (*)( void )>( code_.get() + init_module_entry );
+    init_module_func = reinterpret_cast<void ( * )( void )>( code_.get() + init_module_entry );
     init_module_func();
   }
 

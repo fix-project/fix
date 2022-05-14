@@ -35,6 +35,6 @@ int main( int argc, char* argv[] )
   Name res_name = runtime.force_thunk( thunk_name );
 
   cout << dec;
-  cout << "$? is " << *( (const int*)runtime.get_blob( res_name ).data() ) << endl;
+  cout << "The result is " << *( (const int*)runtime.get_blob( res_name ).data() ) << endl;
   return 0;
 }
