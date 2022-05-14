@@ -170,7 +170,7 @@ void InitComposer::write_get_instance_size()
 
 void InitComposer::write_exit()
 {
-  result_ << "wasm_rt_externref_t " << module_prefix_ << "start_wrapper(" << state_info_type_name_
+  result_ << "wasm_rt_externref_t _fixpoint_apply(" << state_info_type_name_
           << "* module_instance, wasm_rt_externref_t encode) {" << endl;
   result_ << "  asm(\"\"" << endl;
   result_ << "      :" << endl;
@@ -197,12 +197,6 @@ void InitComposer::write_exit()
   result_ << "      :" << endl;
   result_ << "      : \"r\"(module_instance));" << endl;
   result_ << "  asm(\"jmp _fixpoint_jmp_back\");" << endl;
-  result_ << "}\n" << endl;
-
-  result_ << "__attribute__((optnone)) wasm_rt_externref_t "
-          << "_fixpoint_apply(" << state_info_type_name_ << "* module_instance, wasm_rt_externref_t encode) {"
-          << endl;
-  result_ << "  return " << module_prefix_ << "start_wrapper(module_instance, encode);" << endl;
   result_ << "}\n" << endl;
 }
 
