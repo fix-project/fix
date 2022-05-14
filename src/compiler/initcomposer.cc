@@ -170,10 +170,6 @@ void InitComposer::write_get_instance_size()
 
 void InitComposer::write_exit()
 {
-  auto it = inspector_->GetImportedFunctions().find( "exit" );
-  if ( it == inspector_->GetImportedFunctions().end() )
-    return;
-
   result_ << "wasm_rt_externref_t " << module_prefix_ << "start_wrapper(" << state_info_type_name_
           << "* module_instance, wasm_rt_externref_t encode) {" << endl;
   result_ << "  asm(\"\"" << endl;
@@ -182,7 +178,7 @@ void InitComposer::write_exit()
   result_ << "      :\"rbx\",\"rbp\", \"r12\", \"r13\", \"r14\", \"r15\");" << endl;
   result_ << "  asm(\"mov %%rsp, %0\" : \"=r\"(get_context_ptr(module_instance)->stack_ptr));" << endl;
   result_ << "  if(!get_context_ptr(module_instance)->returned) {" << endl;
-  result_ << "    " << module_prefix_ << "Z_flatware_start( module_instance );" << endl;
+  result_ << "    return " << module_prefix_ << "Z__fixpoint_apply( module_instance, encode );" << endl;
   result_ << "  }" << endl;
   result_ << "  asm(\"_fixpoint_jmp_back:\");" << endl;
   result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
@@ -200,10 +196,14 @@ void InitComposer::write_exit()
   result_ << "  asm(\"jmp _fixpoint_jmp_back\");" << endl;
   result_ << "}\n" << endl;
 
-  result_ << "__attribute__((optnone)) wasm_rt_externref_t " << module_prefix_ << "Z__fixpoint_apply("
+  result_ << "__attribute__((optnone)) wasm_rt_externref_t " << "_fixpoint_apply("
           << state_info_type_name_ << "* module_instance, wasm_rt_externref_t encode) {" << endl;
-  result_ << "  " << module_prefix_ << "start_wrapper(module_instance, encode);" << endl;
-  result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
+  result_ << "  __m256i result = " << module_prefix_ << "start_wrapper(module_instance, encode);" << endl;
+  result_ << "  if (!get_context_ptr(module_instance)->returned) {" << endl;
+  result_ << "    return result;" << endl;
+  result_ << "  } else {" << endl;
+  result_ << "    return get_context_ptr(module_instance)->return_value;" << endl;
+  result_ << "  }" << endl;
   result_ << "}\n" << endl;
 }
 
