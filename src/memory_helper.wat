@@ -14,7 +14,7 @@
   (func (export "designate_output") (param $a externref)
 	(table.set $return (i32.const 0) (local.get $a))
   )
-  (func (export "flatware_start")
+  (func (export "_fixpoint_apply") (param externref) (result externref)
 	(call $start)
   (call $fixpoint_exit (table.get $return (i32.const 0)))
   unreachable
