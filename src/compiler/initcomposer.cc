@@ -75,9 +75,7 @@ void InitComposer::write_context()
   result_ << "typedef struct Context {" << endl;
   result_ << "  __m256i return_value;" << endl;
   result_ << "  size_t memory_usage;" << endl;
-  result_ << "  uint64_t stack_ptr;" << endl;
-  result_ << "  uint64_t rdi;" << endl;
-  result_ << "  bool returned;" << endl;
+  result_ << "  jmp_buf buffer;" << endl;
   result_ << "} Context;\n" << endl;
 
   result_ << "Context* get_context_ptr( void* instance ) {" << endl;
@@ -172,15 +170,9 @@ void InitComposer::write_exit()
 {
   result_ << "wasm_rt_externref_t _fixpoint_apply(" << state_info_type_name_
           << "* module_instance, wasm_rt_externref_t encode) {" << endl;
-  result_ << "  asm(\"\"" << endl;
-  result_ << "      :" << endl;
-  result_ << "      :" << endl;
-  result_ << "      :\"rbx\",\"rbp\", \"r12\", \"r13\", \"r14\", \"r15\");" << endl;
-  result_ << "  asm(\"mov %%rsp, %0\" : \"=r\"(get_context_ptr(module_instance)->stack_ptr));" << endl;
-  result_ << "  if(!get_context_ptr(module_instance)->returned) {" << endl;
+  result_ << "  if( setjmp(get_context_ptr(module_instance)->buffer) == 0 ) {" << endl;
   result_ << "    return " << module_prefix_ << "Z__fixpoint_apply( module_instance, encode );" << endl;
   result_ << "  }" << endl;
-  result_ << "  asm(\"_fixpoint_jmp_back:\");" << endl;
   result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
   result_ << "}\n" << endl;
 
@@ -189,14 +181,7 @@ void InitComposer::write_exit()
              "return_value ) {"
           << endl;
   result_ << "  get_context_ptr(module_instance)->return_value = return_value;" << endl;
-  result_ << "  get_context_ptr(module_instance)->returned = true;" << endl;
-  result_ << "  asm(\"mov %0, %%rsp\"" << endl;
-  result_ << "       :" << endl;
-  result_ << "       : \"r\"(get_context_ptr(module_instance)->stack_ptr));" << endl;
-  result_ << "  asm(\"mov %0, %%rdi\"" << endl;
-  result_ << "      :" << endl;
-  result_ << "      : \"r\"(module_instance));" << endl;
-  result_ << "  asm(\"jmp _fixpoint_jmp_back\");" << endl;
+  result_ << "  longjmp(get_context_ptr(module_instance)->buffer, 1);" << endl;
   result_ << "}\n" << endl;
 }
 
@@ -204,6 +189,7 @@ string InitComposer::compose_header()
 {
   result_ = ostringstream();
   result_ << "#include <immintrin.h>" << endl;
+  result_ << "#include <setjmp.h>" << endl;
   result_ << "#include \"" << wasm_name_ << "_fixpoint.h\"" << endl;
   result_ << endl;
 
