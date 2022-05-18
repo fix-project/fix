@@ -12,7 +12,23 @@ using namespace std;
 Name RuntimeStorage::add_blob( string&& blob_content )
 {
   if ( blob_content.length() > 32 ) {
-    throw runtime_error( "Unimplemented" );
+    string hash = sha256::encode( string_view { blob_content } );
+    Name name( hash, ContentType::Blob );
+    storage.put( name, Blob( move( blob_content ) ) );
+    return name;
+  } else {
+    Name name( blob_content );
+    return name;
+  }
+}
+
+Name RuntimeStorage::add_local_blob( string&& blob_content )
+{
+  if ( blob_content.length() > 32 ) {
+    Name name( next_local_name_, ContentType::Blob );
+    next_local_name_++;
+    storage.put( name, Blob( move( blob_content ) ) );
+    return name;
   } else {
     Name name( blob_content );
     return name;
@@ -42,6 +58,13 @@ Name RuntimeStorage::add_tree( vector<Name>&& tree_content )
   return name;
 }
 
+Name RuntimeStorage::add_local_tree( vector<Name>&& tree_content )
+{
+  Name name( next_local_name_, ContentType::Tree );
+  next_local_name_++;
+  storage.put( name, Tree( move( tree_content ) ) );
+  return name;
+}
 span_view<Name> RuntimeStorage::get_tree( Name name )
 {
   const Object& obj = storage.get( name );

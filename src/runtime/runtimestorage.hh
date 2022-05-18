@@ -33,12 +33,16 @@ private:
   // Stores literal name that are requested
   std::vector<Name> literal_cache;
 
+  // Unique id for local name
+  uint32_t next_local_name_;
+
   RuntimeStorage()
     : storage()
     , memorization_cache()
     , trace_cache()
     , name_to_program_()
     , literal_cache()
+    , next_local_name_( 0 )
   {}
 
 public:
@@ -51,12 +55,14 @@ public:
 
   // add blob
   Name add_blob( std::string&& content );
+  Name add_local_blob( std::string&& content );
 
   // Return reference to blob content
   std::string_view get_blob( Name name );
 
   // add Tree
   Name add_tree( std::vector<Name>&& content );
+  Name add_local_tree( std::vector<Name>&& content );
 
   // Return reference to Tree
   span_view<Name> get_tree( Name name );

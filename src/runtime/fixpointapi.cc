@@ -1,6 +1,7 @@
 #include "fixpointapi.hh"
+#include "mutablevalue.hh"
+#include "objectreference.hh"
 #include "runtimestorage.hh"
-#include "runtimevalue.hh"
 
 namespace fixpoint {
 void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )
@@ -42,22 +43,6 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
   target_memory->size = blob.size();
 }
 
-__m256i detach_mem( wasm_rt_memory_t* target_memory )
-{
-#if TIME_FIXPOINT_API
-  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _detach_mem };
-#endif
-  MBlob* blob = new MBlob();
-  *blob = *target_memory;
-  target_memory->data = NULL;
-  target_memory->pages = 0;
-  target_memory->max_pages = 65536;
-  target_memory->size = 0;
-
-  MutableValueReference ref( blob, true );
-  return ref;
-}
-
 // module_instance points to the WASM instance
 __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 {
@@ -74,7 +59,7 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   memory->max_pages = 65536;
   memory->size = 0;
 
-  Name blob = RuntimeStorage::get_instance().add_blob( std::move( blob_content ) );
+  Name blob = RuntimeStorage::get_instance().add_local_blob( std::move( blob_content ) );
 
   ObjectReference obj( blob );
   return obj;
@@ -86,7 +71,7 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
     table->data[i] = MTreeEntry::to_name( MTreeEntry( table->data[i] ) );
   }
   std::vector<Name> tree( table->data, table->data + size );
-  Name tree_name = RuntimeStorage::get_instance().add_tree( std::move( tree ) );
+  Name tree_name = RuntimeStorage::get_instance().add_local_tree( std::move( tree ) );
 
   wasm_rt_free_externref_table( table );
   table->data = NULL;

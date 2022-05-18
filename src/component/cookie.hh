@@ -39,7 +39,7 @@ protected:
 /**
  * cookie_name metadata:
  * if literal: | _ | other/literal | _ | size of the blob (5 bits)
- * otherwise:  | _ | other/literal | _ | 0 | 0 | canonical/not | Blob/Tree/Thunk (2 bits)
+ * otherwise:  | _ | other/literal | _ | 0 | 0 | canonical/local | Blob/Tree/Thunk (2 bits)
  * ( _ means the bit is not used/has no required value)
  */
 class cookie_name : public cookie
@@ -71,16 +71,22 @@ public:
     return metadata() & 0x04;
   }
 
-  bool is_canonical_tree() const
+  bool is_local() const
   {
     assert( not is_literal_blob() );
-    return metadata() & ( 0x04 | static_cast<uint8_t>( ContentType::Tree ) );
+    return !is_canonical();
   }
 
-  bool is_canonical_thunk() const
+  bool is_tree() const
   {
     assert( not is_literal_blob() );
-    return metadata() & ( 0x04 | static_cast<uint8_t>( ContentType::Thunk ) );
+    return ( ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Tree ) );
+  }
+
+  bool is_thunk() const
+  {
+    assert( not is_literal_blob() );
+    return ( ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Thunk ) );
   }
 
   ContentType get_content_type() const

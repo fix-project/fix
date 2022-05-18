@@ -18,8 +18,8 @@ class Name : public cookie_name
   /**
    * Name 8-bit metadata:
    * 1) if the name is a literal:     | strict/lazy | other/literal | 0 | size of the blob (5 bits)
-   * 2) if the name is not a literal: | strict/lazy | other/literal | 0 | 0 | 0 | canonical/not | Blob/Tree/Thunk (2
-   * bits)
+   * 2) if the name is not a literal: | strict/lazy | other/literal | 0 | 0 | 0 | canonical/local | Blob/Tree/Thunk
+   * (2 bits)
    */
 
 public:
@@ -49,10 +49,15 @@ public:
   {
     assert( literal_content.size() < 32 );
     uint8_t metadata = 0x40 | literal_content.size();
-    std::array<char, 32> content {};
-    __builtin_memcpy( &content, literal_content.data(), literal_content.size() );
-    content[31] = metadata;
-    __builtin_memcpy( &content_, content.data(), 32 );
+    __builtin_memcpy( (char*)&content_, literal_content.data(), literal_content.size() );
+    __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
+  }
+
+  Name( uint32_t local_id, ContentType content_type )
+  {
+    uint8_t metadata = static_cast<uint8_t>( content_type );
+    __builtin_memcpy( (char*)&content_, &local_id, sizeof( uint32_t ) );
+    __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
 
   bool is_strict_tree_entry() const { return !( metadata() & 0x80 ); }
@@ -66,7 +71,7 @@ public:
 
   static Name get_thunk_name( Name name )
   {
-    assert( name.is_canonical_tree() );
+    assert( name.is_tree() );
     return __m256i { name.content_[0],
                      name.content_[1],
                      name.content_[2],
@@ -75,7 +80,7 @@ public:
 
   static Name get_encode_name( Name name )
   {
-    assert( name.is_canonical_thunk() );
+    assert( name.is_thunk() );
     return __m256i { name.content_[0],
                      name.content_[1],
                      name.content_[2],
