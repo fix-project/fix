@@ -15,7 +15,8 @@ public:
   // Construct from name and content
   Blob( std::string&& content )
     : content_( std::move( content ) )
-  {}
+  {
+  }
 
   std::string_view content() const { return content_; }
 };

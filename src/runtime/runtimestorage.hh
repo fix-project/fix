@@ -43,7 +43,8 @@ private:
     , name_to_program_()
     , literal_cache()
     , next_local_name_( 0 )
-  {}
+  {
+  }
 
 public:
   // Return reference to static runtime storage

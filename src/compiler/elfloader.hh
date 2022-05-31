@@ -35,13 +35,15 @@ struct func
     : idx( idx_ )
     , type( type_ )
     , lib_addr( 0 )
-  {}
+  {
+  }
 
   func( uint64_t lib_addr_ )
     : idx( 0 )
     , type( LIB )
     , lib_addr( lib_addr_ )
-  {}
+  {
+  }
 };
 
 // Represents one object file
@@ -95,7 +97,8 @@ struct Elf_Info
     , sheader()
     , com_symtb_entry()
     , func_map()
-  {}
+  {
+  }
 };
 
 Elf_Info load_program( std::string& program_content );

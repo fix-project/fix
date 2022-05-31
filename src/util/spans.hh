@@ -8,7 +8,8 @@ class string_span : public std::string_view
 {
   string_span( std::string_view s )
     : std::string_view( s )
-  {}
+  {
+  }
 
 public:
   using std::string_view::string_view;
@@ -40,11 +41,13 @@ class span_view
 public:
   span_view()
     : storage_()
-  {}
+  {
+  }
 
   span_view( const T* addr, const size_t len )
     : storage_( reinterpret_cast<const char*>( addr ), len * elem_size_ )
-  {}
+  {
+  }
 
   span_view( const std::string_view s )
     : storage_( s )
@@ -85,7 +88,8 @@ class span : public span_view<T>
 {
   span( span_view<T> s )
     : span_view<T>( s )
-  {}
+  {
+  }
 
 public:
   using span_view<T>::span_view;

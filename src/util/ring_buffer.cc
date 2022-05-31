@@ -54,7 +54,8 @@ RingStorage::RingStorage( const size_t capacity )
                      PROT_READ | PROT_WRITE,
                      MAP_SHARED | MAP_FIXED,
                      fd_.fd_num() )
-{}
+{
+}
 
 size_t RingBuffer::next_index_to_write() const
 {

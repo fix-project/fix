@@ -19,7 +19,8 @@ protected:
 public:
   explicit TypedRingStorage( const size_t capacity )
     : RingStorage( capacity * elem_size_ )
-  {}
+  {
+  }
 
   size_t capacity() const { return RingStorage::capacity() / elem_size_; }
 };

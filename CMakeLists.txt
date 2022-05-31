@@ -23,7 +23,7 @@ set(FETCHCONTENT_QUIET OFF)
 FetchContent_Declare(
   wabt
   GIT_REPOSITORY https://github.com/fixpointOS/wabt
-  GIT_TAG        fixpoint
+  GIT_TAG        externref_init
   )
 set(BUILD_TESTS off)
 set(BUILD_LIBWASM off)

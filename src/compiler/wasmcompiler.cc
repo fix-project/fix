@@ -31,7 +31,8 @@ static std::unique_ptr<FileStream> s_log_stream;
 
 MemoryStringStream::MemoryStringStream( Stream* log_stream )
   : Stream( log_stream )
-{}
+{
+}
 
 string&& MemoryStringStream::ReleaseStringBuf()
 {

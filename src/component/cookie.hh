@@ -21,7 +21,8 @@ protected:
 
   cookie( const __m256i val )
     : content_( val )
-  {}
+  {
+  }
 
   operator __m256i() const { return content_; }
 
@@ -31,7 +32,8 @@ protected:
 
   cookie( uint64_t a, uint64_t b, uint64_t c, uint64_t d )
     : content_( __m256i { int64_t( a ), int64_t( b ), int64_t( c ), int64_t( d ) } )
-  {}
+  {
+  }
 
   cookie( const std::array<char, 32>& input ) { __builtin_memcpy( &content_, input.data(), 32 ); }
 };
@@ -48,13 +50,16 @@ protected:
   cookie_name() = default;
   cookie_name( const __m256i val )
     : cookie( val )
-  {}
+  {
+  }
   cookie_name( uint64_t a, uint64_t b, uint64_t c, uint64_t d )
     : cookie( a, b, c, d )
-  {}
+  {
+  }
   cookie_name( const std::array<char, 32>& input )
     : cookie( input )
-  {}
+  {
+  }
 
 public:
   bool is_literal_blob() const { return metadata() & 0x40; }
@@ -75,6 +80,11 @@ public:
   {
     assert( not is_literal_blob() );
     return !is_canonical();
+  }
+
+  bool is_blob() const
+  {
+    return ( is_literal_blob() || ( ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Blob ) ) );
   }
 
   bool is_tree() const

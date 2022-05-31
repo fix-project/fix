@@ -34,7 +34,14 @@ int main( int argc, char* argv[] )
   Name thunk_name = runtime.add_thunk( thunk );
   Name res_name = runtime.force_thunk( thunk_name );
 
-  cout << dec;
-  cout << "The result is " << *( (const int*)runtime.get_blob( res_name ).data() ) << endl;
-  return 0;
+  if ( res_name.is_blob() ) {
+    cout << dec;
+    cout << "The result is " << *( (const int*)runtime.get_blob( res_name ).data() ) << endl;
+    return 0;
+  } else {
+    auto output_tree = runtime.get_tree( res_name );
+    cout << dec;
+    cout << "The result is " << *( (const int*)runtime.get_blob( output_tree[0] ).data() ) << endl;
+    return 0;
+  }
 }

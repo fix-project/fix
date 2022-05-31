@@ -15,7 +15,8 @@ public:
   // Constructor
   Thunk( const Name& encode_name )
     : encode_name_( encode_name )
-  {}
+  {
+  }
 
   const Name& get_encode() const { return encode_name_; }
 };

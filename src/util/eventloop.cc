@@ -26,7 +26,8 @@ EventLoop::BasicRule::BasicRule( const size_t s_category_id,
   , interest( s_interest )
   , callback( s_callback )
   , cancel_requested( false )
-{}
+{
+}
 
 EventLoop::FDRule::FDRule( BasicRule&& base,
                            FileDescriptor&& s_fd,
@@ -38,7 +39,8 @@ EventLoop::FDRule::FDRule( BasicRule&& base,
   , direction( s_direction )
   , cancel( s_cancel )
   , recover( s_recover )
-{}
+{
+}
 
 EventLoop::RuleHandle EventLoop::add_rule( const size_t category_id,
                                            const FileDescriptor& fd,

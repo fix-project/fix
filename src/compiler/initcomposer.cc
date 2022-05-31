@@ -44,7 +44,8 @@ public:
     , module_prefix_( MangleName( wasm_name ) + "_" )
     , result_()
     , inspector_( inspector )
-  {}
+  {
+  }
 
   InitComposer( const InitComposer& ) = default;
   InitComposer& operator=( const InitComposer& ) = default;
@@ -134,7 +135,7 @@ void InitComposer::write_create_tree()
             << "(struct Z_fixpoint_module_instance_t* module_instance, uint32_t size) {" << endl;
     result_ << "  wasm_rt_externref_table_t* rw_table = " << module_prefix_ << "Z_rw_table_" << rw_table << "(("
             << state_info_type_name_ << "*)module_instance);" << endl;
-    result_ << "  return fixpoint_detach_table(rw_table, size);" << endl;
+    result_ << "  return fixpoint_create_tree(rw_table, size);" << endl;
     result_ << "}\n" << endl;
   }
 }

@@ -17,7 +17,8 @@ public:
 
   MTreeEntry( const __m256i val )
     : cookie_name( val )
-  {}
+  {
+  }
 
   bool is_accessible() const { return !( metadata() & 0x80 ); }
 
