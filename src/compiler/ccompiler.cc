@@ -7,6 +7,7 @@
 #include <clang/CodeGen/BackendUtil.h>
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/FrontendAction.h>
 #include <clang/Frontend/TextDiagnosticPrinter.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/Module.h>
@@ -34,18 +35,14 @@ string c_to_elf( const string& wasm_name,
 
   // Create compiler instance
   clang::CompilerInstance compilerInstance;
-  auto& compilerInvocation = compilerInstance.getInvocation();
 
   // Create diagnostic engine
-  auto& diagOpt = compilerInvocation.getDiagnosticOpts();
-  diagOpt.DiagnosticLogFile = "-";
-
   string diagOutput;
   raw_string_ostream diagOS( diagOutput );
   auto diagPrinter = make_unique<TextDiagnosticPrinter>( diagOS, new DiagnosticOptions() );
 
   IntrusiveRefCntPtr<DiagnosticsEngine> diagEngine
-    = compilerInstance.createDiagnostics( &diagOpt, diagPrinter.get(), false );
+    = CompilerInstance::createDiagnostics( new DiagnosticOptions(), diagPrinter.get(), false );
 
   // Create File System
   IntrusiveRefCntPtr<vfs::OverlayFileSystem> RealFS( new vfs::OverlayFileSystem( vfs::getRealFileSystem() ) );
@@ -59,30 +56,25 @@ string c_to_elf( const string& wasm_name,
 
   compilerInstance.setFileManager( new FileManager( FileSystemOptions {}, RealFS ) );
 
-  // Create arguments
-  string wasm_file_name = wasm_name + ".c";
-  const char* Args[] = { wasm_file_name.c_str(), "-O2", "-Werror", FIXPOINT_C_INCLUDE_PATH };
-  CompilerInvocation::CreateFromArgs( compilerInvocation, Args, *diagEngine );
-
-  // Setup mcmodel
-  auto& codegenOptions = compilerInstance.getCodeGenOpts();
-  codegenOptions.CodeModel = "large";
-  codegenOptions.RelocationModel = llvm::Reloc::Static;
+  // Create compiler invocation
+  string input_file = wasm_name + ".c";
+  const char* Args[] = { "clang", "-c", "-O2", "-Werror", "-march=native", input_file.data() };
+  std::shared_ptr<CompilerInvocation> compilerInvocation = createInvocationFromCommandLine( Args, diagEngine );
+  if ( !compilerInvocation ) {
+    throw runtime_error( "Failed to create compiler Invocation" );
+  }
 
   LLVMContext context;
   std::unique_ptr<CodeGenAction> action( new EmitLLVMOnlyAction( &context ) );
   auto& targetOptions = compilerInstance.getTargetOpts();
   targetOptions.Triple = llvm::sys::getDefaultTargetTriple();
   compilerInstance.createDiagnostics( diagPrinter.get(), false );
+  compilerInstance.setInvocation( compilerInvocation );
 
-  // add host features
-  llvm::StringMap<bool> FeatureMap;
-  if ( llvm::sys::getHostCPUFeatures( FeatureMap ) ) {
-    targetOptions.FeatureMap = FeatureMap;
-  } else {
-    throw runtime_error( "Failed to read host feature" );
-  }
-  targetOptions.FeatureMap = FeatureMap;
+  // Setup mcmodel
+  auto& codegenOptions = compilerInstance.getCodeGenOpts();
+  codegenOptions.CodeModel = "large";
+  codegenOptions.RelocationModel = llvm::Reloc::Static;
 
   if ( !compilerInstance.createTarget() ) {
     cout << diagOS.str() << endl;
