@@ -52,7 +52,6 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   // TODO: make sure the mutablevalue that mutablevaluereference points to is a mblob, or else trap
 
   std::string blob_content( (char*)memory->data, size );
-
   wasm_rt_free_memory_sw_checked( memory );
   memory->data = NULL;
   memory->pages = 0;

@@ -14,34 +14,39 @@
 #include "spans.hh"
 #include "wasm-rt.h"
 
-// Symbol Type
-#define TEXT 0
-#define BSS 1
-#define COM 2
-#define LIB 3
-#define RODATA 4
-
 // A function in a program
-struct func
+struct symbol
 {
-  // Idx of the function in the program's symbol table
-  uint64_t idx;
-  // Type of the function
-  int type;
+  // Idx of the symbol in the program's symbol table
+  uint64_t idx_;
+  // Section that the symbol comes from
+  uint64_t section_idx_;
   // Address of the function if it's a library function
-  uint64_t lib_addr;
+  uint64_t lib_addr_;
+  // Whether this symbol is lib or not
+  bool is_lib;
 
-  func( uint64_t idx_, int type_ )
-    : idx( idx_ )
-    , type( type_ )
-    , lib_addr( 0 )
+  symbol( uint64_t idx, uint64_t section_idx )
+    : idx_( idx )
+    , section_idx_( section_idx )
+    , lib_addr_( 0 )
+    , is_lib( false )
   {
   }
 
-  func( uint64_t lib_addr_ )
-    : idx( 0 )
-    , type( LIB )
-    , lib_addr( lib_addr_ )
+  symbol( uint64_t lib_addr )
+    : idx_( 0 )
+    , section_idx_( 0 )
+    , lib_addr_( lib_addr )
+    , is_lib( true )
+  {
+  }
+
+  symbol()
+    : idx_( 0 )
+    , section_idx_( 0 )
+    , lib_addr_( 0 )
+    , is_lib( false )
   {
   }
 };
@@ -49,22 +54,8 @@ struct func
 // Represents one object file
 struct Elf_Info
 {
-  // Index of the code section
-  uint64_t text_idx;
-  // Code section
-  std::string_view code;
-
-  // Index of the rodata section
-  uint64_t rodata_idx;
-  // Rodata section
-  std::string_view rodata;
-
-  // Index of the bss section
-  uint64_t bss_idx;
-  // Size of the bss section
-  uint64_t bss_size;
-  // Size of the com section
-  uint64_t com_size;
+  // Size of the whold program
+  size_t size;
 
   // String signs for symbol table
   std::string_view symstrs;
@@ -72,34 +63,35 @@ struct Elf_Info
   std::string_view namestrs;
   // Symbol table
   span_view<Elf64_Sym> symtb;
-  // Relocation table
-  span_view<Elf64_Rela> reloctb;
   // Section header
   span_view<Elf64_Shdr> sheader;
 
-  // COM variable waiting for an address
-  std::vector<int> com_symtb_entry;
   // Map from function/variable name to func entry
-  std::map<std::string, func> func_map;
+  std::map<std::string, symbol> func_map;
+
+  // Map from section name to the offset of section in program memory
+  // std::map<std::string, uint64_t> section_to_offset;
+  // Map from section idx to the offset of section in program memory
+  std::map<uint64_t, uint64_t> idx_to_offset;
+  // Map from section idx to section name
+  // std::map<uint64_t, std::string> idx_to_section_name;
+  // Map from section idx to section content
+  // std::map<uint64_t, std::string_view> idx_to_section_content;
+  // List of relocation_tables
+  std::vector<size_t> relocation_tables;
 
   Elf_Info()
-    : text_idx( std::numeric_limits<uint64_t>::max() )
-    , code()
-    , rodata_idx( std::numeric_limits<uint64_t>::max() )
-    , rodata()
-    , bss_idx( std::numeric_limits<uint64_t>::max() )
-    , bss_size( 0 )
-    , com_size( 0 )
+    : size( 0 )
     , symstrs()
     , namestrs()
     , symtb()
-    , reloctb()
     , sheader()
-    , com_symtb_entry()
     , func_map()
+    , idx_to_offset()
+    , relocation_tables()
   {
   }
 };
 
 Elf_Info load_program( std::string& program_content );
-Program link_program( Elf_Info& elf_info, const std::string& program_name );
+Program link_program( std::string& program_content, const std::string& program_name );

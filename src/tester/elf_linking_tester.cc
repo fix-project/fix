@@ -21,13 +21,12 @@ int main( int argc, char* argv[] )
   fout << elf_content;
   fout.close();
 
-  cout << "Text_idx " << elf_info.text_idx << " bss_idx " << elf_info.bss_idx << endl;
   for ( auto const& pair : elf_info.func_map ) {
     cout << pair.first << endl;
   }
 
-  string name( "test" );
-  link_program( elf_info, name );
+  string program_name( basename( argv[1] ) );
+  link_program( elf_content, program_name );
 
   return 0;
 }

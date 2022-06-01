@@ -42,6 +42,10 @@ int main( int argc, char* argv[] )
     auto output_tree = runtime.get_tree( res_name );
     cout << dec;
     cout << "The result is " << *( (const int*)runtime.get_blob( output_tree[0] ).data() ) << endl;
+    auto blob_content = runtime.user_get_blob( output_tree[1] );
+    if ( blob_content.size() > 0 ) {
+      cout << blob_content.data() << std::endl;
+    }
     return 0;
   }
 }

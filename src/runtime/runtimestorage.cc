@@ -49,6 +49,20 @@ string_view RuntimeStorage::get_blob( Name name )
   throw out_of_range( "Blob does not exist." );
 }
 
+string_view RuntimeStorage::user_get_blob( const Name& name )
+{
+  if ( name.is_literal_blob() ) {
+    return name.literal_blob();
+  } else {
+    const Object& obj = storage.get( name );
+    if ( holds_alternative<Blob>( obj ) ) {
+      return get<Blob>( obj ).content();
+    }
+  }
+
+  throw out_of_range( "Blob does not exist." );
+}
+
 Name RuntimeStorage::add_tree( vector<Name>&& tree_content )
 {
   string hash = sha256::encode(
@@ -179,6 +193,5 @@ void RuntimeStorage::add_wasm( const string& name, const string& wasm_content )
 
 void RuntimeStorage::add_program( const string& name, string& program_content )
 {
-  auto elf_info = load_program( program_content );
-  name_to_program_.insert_or_assign( name, link_program( elf_info, name ) );
+  name_to_program_.insert_or_assign( name, link_program( program_content, name ) );
 }

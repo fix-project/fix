@@ -5,6 +5,29 @@
 
 using namespace std;
 
+const static map<string, uint64_t> library_func_map
+  = { { "wasm_rt_trap", (uint64_t)wasm_rt_trap },
+      { "wasm_rt_register_func_type", (uint64_t)wasm_rt_register_func_type },
+      { "wasm_rt_allocate_memory", (uint64_t)wasm_rt_allocate_memory },
+      { "wasm_rt_allocate_memory_sw_checked", (uint64_t)wasm_rt_allocate_memory_sw_checked },
+      { "wasm_rt_grow_memory", (uint64_t)wasm_rt_grow_memory },
+      { "wasm_rt_grow_memory_sw_checked", (uint64_t)wasm_rt_grow_memory_sw_checked },
+      { "wasm_rt_allocate_funcref_table", (uint64_t)wasm_rt_allocate_funcref_table },
+      { "wasm_rt_allocate_externref_table", (uint64_t)wasm_rt_allocate_externref_table },
+      { "wasm_rt_free_memory", (uint64_t)wasm_rt_free_memory },
+      { "wasm_rt_free_memory_sw_checked", (uint64_t)wasm_rt_free_memory_sw_checked },
+      { "wasm_rt_free_funcref_table", (uint64_t)wasm_rt_free_funcref_table },
+      { "wasm_rt_free_externref_table", (uint64_t)wasm_rt_free_externref_table },
+      { "wasm_rt_init", (uint64_t)wasm_rt_init },
+      { "fixpoint_attach_tree", (uint64_t)fixpoint::attach_tree },
+      { "fixpoint_attach_blob", (uint64_t)fixpoint::attach_blob },
+      { "fixpoint_create_tree", (uint64_t)fixpoint::create_tree },
+      { "fixpoint_create_blob", (uint64_t)fixpoint::create_blob },
+      { "memcpy", (uint64_t)memcpy },
+      { "memmove", (uint64_t)memmove },
+      { "_setjmp", (uint64_t)setjmp },
+      { "longjmp", (uint64_t)longjmp } };
+
 void __stack_chk_fail( void )
 {
   cerr << "stack smashing detected." << endl;
@@ -31,25 +54,20 @@ Elf_Info load_program( string& program_content )
   res.namestrs = string_view( program_content.data() + res.sheader[header->e_shstrndx].sh_offset,
                               res.sheader[header->e_shstrndx].sh_size );
 
-  int i = 0;
-  for ( const auto& section : res.sheader ) {
+  size_t program_size = 0;
+  for ( size_t i = 0; i < res.sheader.size(); i++ ) {
+    const auto& section = res.sheader[i];
+    // Skip empty sections
+    if ( section.sh_size == 0 )
+      continue;
 
-    // Allocate code block for .text section
-    if ( strcmp( res.namestrs.data() + section.sh_name, ".text" ) == 0 ) {
-      res.text_idx = i;
-      res.code = string_view( program_content.data() + section.sh_offset, section.sh_size );
-    }
-
-    // Record size of .bss section
-    if ( strcmp( res.namestrs.data() + section.sh_name, ".bss" ) == 0 ) {
-      res.bss_size = section.sh_size;
-      res.bss_idx = i;
-    }
-
-    if ( strcmp( res.namestrs.data() + section.sh_name, ".rodata" ) == 0
-         || strcmp( res.namestrs.data() + section.sh_name, ".rodata.str1.1" ) == 0 ) {
-      res.rodata_idx = i;
-      res.rodata = string_view( program_content.data() + section.sh_offset, section.sh_size );
+    // Handle sections with content (.text and .rodata and .bss)
+    if ( section.sh_type == SHT_PROGBITS || section.sh_type == SHT_NOBITS ) {
+      if ( program_size % section.sh_addralign != 0 ) {
+        program_size = ( program_size / section.sh_addralign + 1 ) * section.sh_addralign;
+      }
+      res.idx_to_offset[i] = program_size;
+      program_size += section.sh_size;
     }
 
     // Process symbol table
@@ -73,23 +91,7 @@ Elf_Info load_program( string& program_content )
           }
 
           string name = string( res.symstrs.data() + symtb_entry.st_name );
-
-          // A function
-          if ( symtb_entry.st_shndx == res.text_idx ) {
-            res.func_map.insert( pair<string, func>( name, func( j, TEXT ) ) );
-          }
-          // An .bss variable
-          else if ( symtb_entry.st_shndx == res.bss_idx ) {
-            res.func_map.insert( pair<string, func>( name, func( j, BSS ) ) );
-          }
-          // An COM variable
-          else if ( symtb_entry.st_shndx == SHN_COMMON ) {
-            res.func_map.insert( pair<string, func>( name, func( j, COM ) ) );
-            res.com_size += symtb_entry.st_size;
-            res.com_symtb_entry.push_back( j );
-          } else if ( symtb_entry.st_shndx == res.rodata_idx ) {
-            res.func_map.insert( pair<string, func>( name, func( j, RODATA ) ) );
-          }
+          res.func_map[name] = symbol( j, symtb_entry.st_shndx );
         }
         j++;
       }
@@ -97,141 +99,108 @@ Elf_Info load_program( string& program_content )
 
     // Load relocation table
     if ( section.sh_type == SHT_RELA || section.sh_type == SHT_REL ) {
-      if ( strcmp( res.namestrs.data() + section.sh_name, ".rela.text" ) == 0 ) {
-        res.reloctb
-          = span_view<Elf64_Rela>( string_view( program_content.data() + section.sh_offset, section.sh_size ) );
-      }
+      res.relocation_tables.push_back( i );
     }
 
     if ( section.sh_type == SHT_DYNAMIC ) {
       cerr << "This is a dynamic linking table.\n";
     }
-    i++;
   }
-
-  // Step 3: Update symbol table entry for *COM*
-  uint64_t com_base = res.rodata.size() + res.bss_size;
-  for ( int com_sym_idx : res.com_symtb_entry ) {
-    Elf64_Sym& mutable_symtb_entry = const_cast<Elf64_Sym&>( res.symtb[com_sym_idx] );
-    mutable_symtb_entry.st_value = com_base;
-    com_base += mutable_symtb_entry.st_size;
-  }
-
+  res.size = program_size;
   return res;
 }
 
-Program link_program( Elf_Info& elf_info, const string& program_name )
+Program link_program( string& program_content, const string& program_name )
 {
+  Elf_Info elf_info = load_program( program_content );
+
   // Step 0: allocate memory for data and text
-  size_t mem_size = elf_info.code.size() + elf_info.rodata.size() + elf_info.bss_size + elf_info.com_size;
   void* program_mem = 0;
-  if ( posix_memalign( &program_mem, getpagesize(), mem_size ) ) {
+  if ( posix_memalign( &program_mem, getpagesize(), elf_info.size ) ) {
     cerr << "Failed to allocate memory.\n";
   }
-  if ( mprotect( program_mem, mem_size, PROT_EXEC | PROT_READ | PROT_WRITE ) ) {
+  if ( mprotect( program_mem, elf_info.size, PROT_EXEC | PROT_READ | PROT_WRITE ) ) {
     cerr << "Failed to set code buffer executable.\n";
   }
-
-  memcpy( program_mem, elf_info.code.data(), elf_info.code.size() );
-  if ( elf_info.rodata.size() != 0 ) {
-    memcpy( (char*)program_mem + elf_info.code.size(), elf_info.rodata.data(), elf_info.rodata.size() );
+  memset( program_mem, 0, elf_info.size );
+  // Step 1: Copy sections with initialization data
+  for ( const auto& [section_idx, section_offset] : elf_info.idx_to_offset ) {
+    const auto& section = elf_info.sheader[section_idx];
+    // Sections with initialization data
+    if ( section.sh_type == SHT_PROGBITS ) {
+      memcpy( static_cast<char*>( program_mem ) + section_offset,
+              program_content.data() + section.sh_offset,
+              section.sh_size );
+    }
   }
 
-  // Step 1: Add wasm-rt functions to func_map
-  elf_info.func_map.insert( pair<string, func>( "wasm_rt_trap", func( (uint64_t)wasm_rt_trap ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_register_func_type", func( (uint64_t)wasm_rt_register_func_type ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_allocate_memory", func( (uint64_t)wasm_rt_allocate_memory ) ) );
-  elf_info.func_map.insert( pair<string, func>( "wasm_rt_allocate_memory_sw_checked",
-                                                func( (uint64_t)wasm_rt_allocate_memory_sw_checked ) ) );
-  elf_info.func_map.insert( pair<string, func>( "wasm_rt_grow_memory", func( (uint64_t)wasm_rt_grow_memory ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_grow_memory_sw_checked", func( (uint64_t)wasm_rt_grow_memory_sw_checked ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_allocate_funcref_table", func( (uint64_t)wasm_rt_allocate_funcref_table ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_allocate_externref_table", func( (uint64_t)wasm_rt_allocate_externref_table ) ) );
-  elf_info.func_map.insert( pair<string, func>( "wasm_rt_free_memory", func( (uint64_t)wasm_rt_free_memory ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_free_memory_sw_checked", func( (uint64_t)wasm_rt_free_memory_sw_checked ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_free_funcref_table", func( (uint64_t)wasm_rt_free_funcref_table ) ) );
-  elf_info.func_map.insert(
-    pair<string, func>( "wasm_rt_free_externref_table", func( (uint64_t)wasm_rt_free_externref_table ) ) );
-  elf_info.func_map.insert( pair<string, func>( "wasm_rt_init", func( (uint64_t)wasm_rt_init ) ) );
-  elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_tree", func( (uint64_t)fixpoint::attach_tree ) ) );
-  elf_info.func_map.insert( pair<string, func>( "fixpoint_attach_blob", func( (uint64_t)fixpoint::attach_blob ) ) );
-  elf_info.func_map.insert( pair<string, func>( "fixpoint_create_blob", func( (uint64_t)fixpoint::create_blob ) ) );
-  elf_info.func_map.insert( pair<string, func>( "fixpoint_create_tree", func( (uint64_t)fixpoint::create_tree ) ) );
-  elf_info.func_map.insert( pair<string, func>( "memmove", func( (uint64_t)memmove ) ) );
-  elf_info.func_map.insert( pair<string, func>( "_setjmp", func( (uint64_t)setjmp ) ) );
-  elf_info.func_map.insert( pair<string, func>( "longjmp", func( (uint64_t)longjmp ) ) );
+  // Step 3: Relocate every section
+  for ( const auto& reloc_table_idx : elf_info.relocation_tables ) {
+    const auto& section = elf_info.sheader[reloc_table_idx];
+    span_view<Elf64_Rela> reloctb
+      = span_view<Elf64_Rela>( string_view( program_content.data() + section.sh_offset, section.sh_size ) );
 
-  for ( const auto& reloc_entry : elf_info.reloctb ) {
-    int idx = ELF64_R_SYM( reloc_entry.r_info );
+    if ( elf_info.idx_to_offset.find( section.sh_info ) != elf_info.idx_to_offset.end() ) {
+      for ( const auto& reloc_entry : reloctb ) {
+        int idx = ELF64_R_SYM( reloc_entry.r_info );
 
-    int64_t rel_offset;
-    if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PC32
-         || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PLT32 ) {
-      // S + A - P or L + A - P
-      rel_offset = reloc_entry.r_addend - (int64_t)program_mem - reloc_entry.r_offset;
-    } else if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_64
-                || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_32 ) {
-      // S + A
-      rel_offset = reloc_entry.r_addend;
-    } else {
-      throw out_of_range( "Relocation type not supported." );
-    }
+        int64_t rel_offset;
+        if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PC32
+             || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PC64
+             || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PLT32 ) {
+          // S + A - P or L + A - P
+          rel_offset
+            = reloc_entry.r_addend
+              - ( (int64_t)program_mem + elf_info.idx_to_offset.at( section.sh_info ) + reloc_entry.r_offset );
+        } else if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_64
+                    || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_32 ) {
+          // S + A
+          rel_offset = reloc_entry.r_addend;
+        } else {
+          throw out_of_range( "Relocation type not supported." );
+        }
 
-    // Check whether is a section
-    if ( ELF64_ST_TYPE( elf_info.symtb[idx].st_info ) == STT_SECTION ) {
-      string sec_name = string( elf_info.namestrs.data() + elf_info.sheader[elf_info.symtb[idx].st_shndx].sh_name );
-      if ( sec_name == ".text" ) {
-        rel_offset += (int64_t)( program_mem );
-      } else if ( sec_name == ".rodata" || sec_name == ".rodata.str1.1" ) {
-        rel_offset += (int64_t)( program_mem ) + elf_info.code.size();
-      } else if ( sec_name == ".bss" ) {
-        rel_offset += (int64_t)( program_mem ) + elf_info.code.size() + elf_info.rodata.size();
-      } else if ( sec_name == ".data" ) {
-        printf( "No .data section\n" );
+        const auto& symtb_entry = elf_info.symtb[idx];
+        // Handle relocation for section
+        if ( ELF64_ST_TYPE( symtb_entry.st_info ) == STT_SECTION ) {
+          rel_offset += (int64_t)( program_mem ) + elf_info.idx_to_offset.at( symtb_entry.st_shndx );
+        }
+        // Handle relcoation for function and data
+        else {
+          if ( symtb_entry.st_shndx == SHN_UNDEF ) {
+            string name = string( elf_info.symstrs.data() + symtb_entry.st_name );
+            rel_offset += library_func_map.at( name );
+          } else {
+            rel_offset += (int64_t)( program_mem ) + elf_info.idx_to_offset.at( symtb_entry.st_shndx )
+                          + symtb_entry.st_value;
+          }
+        }
+
+        // qword relocation
+        if ( ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_64
+             || ELF64_R_TYPE( reloc_entry.r_info ) == R_X86_64_PC64 ) {
+          memcpy( static_cast<char*>( program_mem ) + elf_info.idx_to_offset.at( section.sh_info )
+                    + reloc_entry.r_offset,
+                  &rel_offset,
+                  sizeof( int64_t ) );
+        } else {
+          int32_t rel_offset_32 = (int32_t)rel_offset;
+          memcpy( static_cast<char*>( program_mem ) + elf_info.idx_to_offset.at( section.sh_info )
+                    + reloc_entry.r_offset,
+                  &rel_offset_32,
+                  sizeof( int32_t ) );
+        }
       }
-    } else {
-      string name = string( elf_info.symstrs.data() + elf_info.symtb[idx].st_name );
-      func dest = elf_info.func_map.at( name );
-      switch ( dest.type ) {
-        case LIB:
-          rel_offset += (int64_t)( dest.lib_addr );
-          break;
-        case TEXT:
-          rel_offset += (int64_t)( program_mem ) + elf_info.symtb[dest.idx].st_value;
-          break;
-        case RODATA:
-          rel_offset += (int64_t)( program_mem ) + elf_info.code.size() + elf_info.symtb[dest.idx].st_value;
-          break;
-        case BSS:
-        case COM:
-          rel_offset += (int64_t)( program_mem ) + elf_info.code.size() + elf_info.rodata.size()
-                        + elf_info.symtb[dest.idx].st_value;
-          break;
-      }
-    }
-
-    if ( ELF64_R_TYPE( reloc_entry.r_info ) == 1 ) {
-      memcpy( static_cast<char*>( program_mem ) + reloc_entry.r_offset, &rel_offset, sizeof( int64_t ) );
-    } else {
-      int32_t rel_offset_32 = (int32_t)rel_offset;
-      memcpy( static_cast<char*>( program_mem ) + reloc_entry.r_offset, &rel_offset_32, sizeof( int32_t ) );
     }
   }
 
   shared_ptr<char> code( static_cast<char*>( program_mem ), free );
-  uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "initProgram" ).idx].st_value;
-  uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "_fixpoint_apply" ).idx].st_value;
-  uint64_t cleanup_entry = elf_info.symtb[elf_info.func_map.at( "Z_" + program_name + "_free" ).idx].st_value;
-  uint64_t instance_size_entry = elf_info.symtb[elf_info.func_map.at( "get_instance_size" ).idx].st_value;
+  uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "initProgram" ).idx_].st_value;
+  uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "_fixpoint_apply" ).idx_].st_value;
+  uint64_t cleanup_entry = elf_info.symtb[elf_info.func_map.at( "Z_" + program_name + "_free" ).idx_].st_value;
+  uint64_t instance_size_entry = elf_info.symtb[elf_info.func_map.at( "get_instance_size" ).idx_].st_value;
   uint64_t init_module_entry
-    = elf_info.symtb[elf_info.func_map.at( "Z_" + program_name + "_init_module" ).idx].st_value;
+    = elf_info.symtb[elf_info.func_map.at( "Z_" + program_name + "_init_module" ).idx_].st_value;
   return Program(
     program_name, code, init_entry, main_entry, cleanup_entry, instance_size_entry, init_module_entry );
 }

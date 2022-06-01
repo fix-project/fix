@@ -60,6 +60,7 @@ public:
 
   // Return reference to blob content
   std::string_view get_blob( Name name );
+  std::string_view user_get_blob( const Name& name );
 
   // add Tree
   Name add_tree( std::vector<Name>&& content );
