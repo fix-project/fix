@@ -18,6 +18,18 @@
 		(local.get $ptr)
 		(local.get $len))
   )
+  (func (export "program_memory_copy_rw_0") (param $ptr i32) (param $len i32)
+    (memory.copy $smem $mymem0
+    (i32.const 0)
+    (local.get $ptr)
+    (local.get $len))
+  )
+  (func (export "program_memory_copy_rw_1") (param $ptr i32) (param $len i32)
+    (memory.copy $smem $mymem1
+    (i32.const 0)
+    (local.get $ptr)
+    (local.get $len))
+  )
   (func (export "get_i32") (param $offset i32) (result i32)
     (local.get $offset)
     (i32.load $smem)

@@ -11,7 +11,8 @@ typedef struct filedesc {
 static struct filedesc stdout = {.offset = 0};
 
 extern void memory_copy_rw_0(const void*, size_t) __attribute( ( import_module("helper"), import_name("memory_copy_rw_0") ) );
-extern void memory_copy_rw_1(uint32_t, uint32_t) __attribute( ( import_module("helper"), import_name("memory_copy_rw_1") ) );
+extern void memory_copy_rw_1(const void*, size_t) __attribute( ( import_module("helper"), import_name("memory_copy_rw_1") ) );
+extern void program_memory_copy_rw_1(uint32_t, uint32_t) __attribute( ( import_module("helper"), import_name("program_memory_copy_rw_1") ) );
 extern externref create_blob_rw_mem_0(uint32_t) __attribute( ( import_module("fixpoint"), import_name("create_blob_rw_mem_0") ) );
 extern externref create_blob_rw_mem_1(uint32_t) __attribute( ( import_module("fixpoint"), import_name("create_blob_rw_mem_1") ) );
 extern externref create_tree_rw_table_0(uint32_t) __attribute( ( import_module("fixpoint"), import_name("create_tree_rw_table_0") ) );
@@ -24,7 +25,7 @@ extern void fixpoint_exit(externref) __attribute( ( import_module("fixpoint"), i
 
 void proc_exit( uint32_t rval ) __attribute( ( export_name("proc_exit") ) );
 uint32_t fd_close ( int fd ) __attribute( ( export_name("fd_close") ) );
-uint32_t fd_fdstat_get ( uint32_t fd, uint32_t res ) __attribute ( ( export_name("fd_stat_get") ) );
+uint32_t fd_fdstat_get ( uint32_t fd, uint32_t res ) __attribute ( ( export_name("fd_fdstat_get") ) );
 uint32_t fd_seek ( uint32_t fd, int64_t offset, uint32_t whence, uint32_t file_size ) __attribute ( ( export_name("fd_seek") ) ); // not used atm
 uint32_t fd_write ( uint32_t fd, uint32_t vec, uint32_t vec_len, uint32_t retptr0 ) __attribute ( ( export_name("fd_write") ) );
 externref flatware_exit( void );
@@ -56,7 +57,7 @@ uint32_t fd_seek(__attribute__((unused)) uint32_t fd, __attribute__((unused)) in
 uint32_t fd_write(__attribute__((unused)) uint32_t fd, uint32_t iovs, __attribute__((unused)) uint32_t iovs_len, __attribute__((unused)) uint32_t retptr0) {
   uint32_t offset = get_i32(iovs);
   uint32_t size = get_i32(iovs + 4);
-  memory_copy_rw_1(offset, size);
+  program_memory_copy_rw_1(offset, size);
   stdout.offset += size;
   return size;
 }
