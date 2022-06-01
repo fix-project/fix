@@ -81,19 +81,16 @@ Elf_Info load_program( string& program_content )
       res.symstrs = string_view( program_content.data() + res.sheader[symbstrs_idx].sh_offset,
                                  res.sheader[symbstrs_idx].sh_size );
 
-      int j = 0;
       for ( const auto& symtb_entry : res.symtb ) {
         if ( symtb_entry.st_name != 0 ) {
           // Funtion/Variable not defined
           if ( symtb_entry.st_shndx == SHN_UNDEF ) {
-            j++;
             continue;
           }
 
           string name = string( res.symstrs.data() + symtb_entry.st_name );
-          res.func_map[name] = symbol( j, symtb_entry.st_shndx );
+          res.func_map[name] = symtb_entry.st_value;
         }
-        j++;
       }
     }
 
@@ -195,12 +192,11 @@ Program link_program( string& program_content, const string& program_name )
   }
 
   shared_ptr<char> code( static_cast<char*>( program_mem ), free );
-  uint64_t init_entry = elf_info.symtb[elf_info.func_map.at( "initProgram" ).idx_].st_value;
-  uint64_t main_entry = elf_info.symtb[elf_info.func_map.at( "_fixpoint_apply" ).idx_].st_value;
-  uint64_t cleanup_entry = elf_info.symtb[elf_info.func_map.at( "Z_" + program_name + "_free" ).idx_].st_value;
-  uint64_t instance_size_entry = elf_info.symtb[elf_info.func_map.at( "get_instance_size" ).idx_].st_value;
-  uint64_t init_module_entry
-    = elf_info.symtb[elf_info.func_map.at( "Z_" + program_name + "_init_module" ).idx_].st_value;
+  uint64_t init_entry = elf_info.func_map.at( "initProgram" );
+  uint64_t main_entry = elf_info.func_map.at( "_fixpoint_apply" );
+  uint64_t cleanup_entry = elf_info.func_map.at( "Z_" + program_name + "_free" );
+  uint64_t instance_size_entry = elf_info.func_map.at( "get_instance_size" );
+  uint64_t init_module_entry = elf_info.func_map.at( "Z_" + program_name + "_init_module" );
   return Program(
     program_name, code, init_entry, main_entry, cleanup_entry, instance_size_entry, init_module_entry );
 }
