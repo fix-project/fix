@@ -49,16 +49,11 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 #if TIME_FIXPOINT_API
   RecordScopeTimer<Timer::Category::Nonblock> record_timer { _freeze_blob };
 #endif
-  // TODO: make sure the mutablevalue that mutablevaluereference points to is a mblob, or else trap
-
-  std::string blob_content( (char*)memory->data, size );
-  wasm_rt_free_memory_sw_checked( memory );
+  Name blob = RuntimeStorage::get_instance().add_local_blob( Blob( (char*)memory->data, size ) );
   memory->data = NULL;
   memory->pages = 0;
   memory->max_pages = 65536;
   memory->size = 0;
-
-  Name blob = RuntimeStorage::get_instance().add_local_blob( std::move( blob_content ) );
 
   ObjectReference obj( blob );
   return obj;
@@ -69,9 +64,8 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
   for ( size_t i = 0; i < size; i++ ) {
     table->data[i] = MTreeEntry::to_name( MTreeEntry( table->data[i] ) );
   }
-  std::vector<Name> tree( table->data, table->data + size );
+  Tree tree( reinterpret_cast<Name*>( table->data ), size );
   Name tree_name = RuntimeStorage::get_instance().add_local_tree( std::move( tree ) );
-  wasm_rt_free_externref_table( table );
   table->data = NULL;
   table->size = 0;
 

@@ -55,16 +55,16 @@ public:
   }
 
   // add blob
-  Name add_blob( std::string&& content );
-  Name add_local_blob( std::string&& content );
+  Name add_blob( Blob&& blob );
+  Name add_local_blob( Blob&& blob );
 
   // Return reference to blob content
   std::string_view get_blob( Name name );
   std::string_view user_get_blob( const Name& name );
 
   // add Tree
-  Name add_tree( std::vector<Name>&& content );
-  Name add_local_tree( std::vector<Name>&& content );
+  Name add_tree( Tree&& tree );
+  Name add_local_tree( Tree&& tree );
 
   // Return reference to Tree
   span_view<Name> get_tree( Name name );

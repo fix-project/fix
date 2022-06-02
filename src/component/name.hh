@@ -47,7 +47,7 @@ public:
     __builtin_memcpy( &content_, hash.data(), 32 );
   }
 
-  Name( const std::string& literal_content )
+  Name( std::string_view literal_content )
   {
     assert( literal_content.size() < 32 );
     uint8_t metadata = 0x40 | literal_content.size();

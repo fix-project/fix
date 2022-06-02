@@ -9,28 +9,28 @@
 
 using namespace std;
 
-Name RuntimeStorage::add_blob( string&& blob_content )
+Name RuntimeStorage::add_blob( Blob&& blob )
 {
-  if ( blob_content.length() > 32 ) {
-    string hash = sha256::encode( string_view { blob_content } );
+  if ( blob.size() > 32 ) {
+    string hash = sha256::encode( blob.content() );
     Name name( hash, ContentType::Blob );
-    storage.put( name, Blob( move( blob_content ) ) );
+    storage.put( name, move( blob ) );
     return name;
   } else {
-    Name name( blob_content );
+    Name name( blob.content() );
     return name;
   }
 }
 
-Name RuntimeStorage::add_local_blob( string&& blob_content )
+Name RuntimeStorage::add_local_blob( Blob&& blob )
 {
-  if ( blob_content.length() > 32 ) {
+  if ( blob.size() > 32 ) {
     Name name( next_local_name_, ContentType::Blob );
     next_local_name_++;
-    storage.put( name, Blob( move( blob_content ) ) );
+    storage.put( name, move( blob ) );
     return name;
   } else {
-    Name name( blob_content );
+    Name name( blob.content() );
     return name;
   }
 }
@@ -63,20 +63,20 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
   throw out_of_range( "Blob does not exist." );
 }
 
-Name RuntimeStorage::add_tree( vector<Name>&& tree_content )
+Name RuntimeStorage::add_tree( Tree&& tree )
 {
-  string hash = sha256::encode(
-    string_view { reinterpret_cast<char*>( tree_content.data() ), tree_content.size() * sizeof( Name ) } );
+  string hash = sha256::encode( string_view { reinterpret_cast<const char*>( tree.content().data() ),
+                                              tree.content().size() * sizeof( Name ) } );
   Name name( hash, ContentType::Tree );
-  storage.put( name, Tree( move( tree_content ) ) );
+  storage.put( name, move( tree ) );
   return name;
 }
 
-Name RuntimeStorage::add_local_tree( vector<Name>&& tree_content )
+Name RuntimeStorage::add_local_tree( Tree&& tree )
 {
   Name name( next_local_name_, ContentType::Tree );
   next_local_name_++;
-  storage.put( name, Tree( move( tree_content ) ) );
+  storage.put( name, move( tree ) );
   return name;
 }
 span_view<Name> RuntimeStorage::get_tree( Name name )
