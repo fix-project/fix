@@ -30,3 +30,14 @@ add_custom_command(
           -o exit.wasm)
 
 add_custom_target(exit_wasm ALL DEPENDS exit.wasm)
+
+add_custom_command(
+  OUTPUT "fib.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/fib.wat
+          ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
+  COMMAND ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
+          --enable-multi-memory
+          ${CMAKE_CURRENT_SOURCE_DIR}/fib.wat
+          -o fib.wasm)
+
+add_custom_target(fib_wasm ALL DEPENDS fib.wasm)

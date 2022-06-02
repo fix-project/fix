@@ -23,6 +23,7 @@ const static map<string, uint64_t> library_func_map
       { "fixpoint_attach_blob", (uint64_t)fixpoint::attach_blob },
       { "fixpoint_create_tree", (uint64_t)fixpoint::create_tree },
       { "fixpoint_create_blob", (uint64_t)fixpoint::create_blob },
+      { "fixpoint_create_thunk", (uint64_t)fixpoint::create_thunk },
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
       { "_setjmp", (uint64_t)setjmp },

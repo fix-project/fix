@@ -22,7 +22,7 @@ private:
   InMemoryStorage<Object> storage;
 
   // Memorization Cache: maps a Thunk to the Name of a reduction of the original Thunk
-  absl::flat_hash_map<Name, Name> memorization_cache;
+  absl::flat_hash_map<Name, Name> memoization_cache;
 
   // Trace Cache: maps a Name to a human-readable string
   absl::flat_hash_map<Name, std::string> trace_cache;
@@ -38,7 +38,7 @@ private:
 
   RuntimeStorage()
     : storage()
-    , memorization_cache()
+    , memoization_cache()
     , trace_cache()
     , name_to_program_()
     , literal_cache()

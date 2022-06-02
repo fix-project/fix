@@ -71,12 +71,17 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
   }
   std::vector<Name> tree( table->data, table->data + size );
   Name tree_name = RuntimeStorage::get_instance().add_local_tree( std::move( tree ) );
-
   wasm_rt_free_externref_table( table );
   table->data = NULL;
   table->size = 0;
 
   ObjectReference obj( tree_name );
   return obj;
+}
+
+__m256i create_thunk( __m256i ro_handle )
+{
+  Name encode( ro_handle );
+  return Name::get_thunk_name( encode );
 }
 }

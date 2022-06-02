@@ -65,6 +65,7 @@ private:
   void write_attach_blob();
   void write_create_blob();
   void write_create_tree();
+  void write_create_thunk();
   void write_init_read_only_mem_table();
   void write_get_instance_size();
   void write_context();
@@ -140,6 +141,16 @@ void InitComposer::write_create_tree()
   }
 }
 
+void InitComposer::write_create_thunk()
+{
+  result_ << "extern __m256i fixpoint_create_thunk(__m256i);" << endl;
+  result_ << "__m256i " << module_prefix_
+          << "Z_fixpoint_Z_create_thunk(struct Z_fixpoint_module_instance_t* module_instance, __m256i handle) {"
+          << endl;
+  result_ << "  return fixpoint_create_thunk(handle);" << endl;
+  result_ << "}\n" << endl;
+}
+
 void InitComposer::write_init_read_only_mem_table()
 {
   result_ << "void init_mems(" << state_info_type_name_ << "* module_instance) {" << endl;
@@ -201,6 +212,7 @@ string InitComposer::compose_header()
   write_attach_blob();
   write_create_tree();
   write_create_blob();
+  write_create_thunk();
   write_exit();
 
   result_ << "void initProgram(void* ptr) {" << endl;

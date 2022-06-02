@@ -151,11 +151,13 @@ Name RuntimeStorage::force_thunk( Name name )
 
 Name RuntimeStorage::reduce_thunk( Name name )
 {
-  if ( memorization_cache.contains( name ) ) {
-    return memorization_cache.at( name );
+  if ( memoization_cache.contains( name ) ) {
+    return memoization_cache.at( name );
   } else {
     Name encode_name = this->get_thunk_encode_name( name );
-    return this->evaluate_encode( encode_name );
+    Name result = this->evaluate_encode( encode_name );
+    memoization_cache[name] = result;
+    return result;
   }
 }
 
@@ -163,12 +165,11 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
 {
   Name forced_encode = this->force_tree( encode_name );
   Name forced_encode_thunk = Name::get_thunk_name( forced_encode );
-  if ( memorization_cache.contains( forced_encode_thunk ) ) {
-    return memorization_cache.at( forced_encode_thunk );
+  if ( memoization_cache.contains( forced_encode_thunk ) ) {
+    return memoization_cache.at( forced_encode_thunk );
   }
   Name function_name = this->get_tree( forced_encode ).at( 1 );
   string program_name = string( function_name.literal_blob() );
-
   size_t instance_size = name_to_program_.at( program_name ).get_instance_and_context_size();
   void* ptr = aligned_alloc( alignof( __m256i ), instance_size );
   memset( ptr, 0, instance_size );
@@ -179,6 +180,7 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
   name_to_program_.at( program_name ).cleanup( instance );
   free( ptr );
 
+  memoization_cache[forced_encode_thunk] = Name( output );
   return output;
 }
 
