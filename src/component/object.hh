@@ -6,4 +6,4 @@
 #include "thunk.hh"
 #include "tree.hh"
 
-using Object = std::variant<Blob, Tree, Thunk>;
+using Object = std::variant<Blob, Tree>;

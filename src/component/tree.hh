@@ -36,5 +36,9 @@ public:
   {
   }
 
+  Tree(const Tree&) = delete;
+  Tree& operator=(const Tree&) = delete;
+  Tree(Tree&&) = default;
+  
   span_view<Name> content() const { return span_view<Name>( raw_content_.get(), size_ ); }
 };
