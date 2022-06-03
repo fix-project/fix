@@ -10,14 +10,14 @@ using namespace std;
 
 void Timer::summary( ostream& out ) const
 {
-  const uint64_t now = timestamp_ns();
+  const uint64_t now = __rdtsc();
 
   const uint64_t elapsed = now - _beginning_timestamp;
 
   out << "Global timing summary\n---------------------\n\n";
 
   out << "Total time: ";
-  pp_ns( out, now - _beginning_timestamp );
+  pp_ticks( out, now - _beginning_timestamp );
   out << "\n";
 
   uint64_t accounted = 0;
@@ -25,19 +25,19 @@ void Timer::summary( ostream& out ) const
   for ( unsigned int i = 0; i < num_categories; i++ ) {
     out << "   " << _category_names.at( i ) << ": ";
     out << string( 32 - strlen( _category_names.at( i ) ), ' ' );
-    out << fixed << setw( 5 ) << setprecision( 1 ) << 100 * _records.at( i ).total_ns / double( elapsed ) << "%";
-    accounted += _records.at( i ).total_ns;
+    out << fixed << setw( 5 ) << setprecision( 1 ) << 100 * _records.at( i ).total_ticks / double( elapsed ) << "%";
+    accounted += _records.at( i ).total_ticks;
 
     if ( _records.at( i ).count > 0 ) {
       out << "   [mean=";
-      pp_ns( out, _records.at( i ).total_ns / _records.at( i ).count );
+      pp_ticks( out, _records.at( i ).total_ticks / _records.at( i ).count );
       out << "] ";
     } else {
       out << "                   ";
     }
 
     out << "[max= ";
-    pp_ns( out, _records.at( i ).max_ns );
+    pp_ticks( out, _records.at( i ).max_ticks );
     out << "]";
     out << " [count=" << _records.at( i ).count << "]";
 

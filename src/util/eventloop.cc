@@ -249,12 +249,12 @@ void EventLoop::summary( ostream& out ) const
     out << "   " << name << ": ";
     out << string( 27 - name.size(), ' ' );
     out << "mean ";
-    Timer::pp_ns( out, timer.total_ns / timer.count );
+    Timer::pp_ticks( out, timer.total_ticks / timer.count );
 
     out << "  [";
-    Timer::pp_ns( out, timer.min_ns );
+    Timer::pp_ticks( out, timer.min_ticks );
     out << "..";
-    Timer::pp_ns( out, timer.max_ns );
+    Timer::pp_ticks( out, timer.max_ticks );
     out << "]";
 
     out << " N=" << timer.count;

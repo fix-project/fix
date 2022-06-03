@@ -6,6 +6,9 @@
 namespace fixpoint {
 void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )
 {
+#if TIME_FIXPOINT == 2
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _attach_tree };
+#endif
   ObjectReference obj( ro_handle );
   if ( obj.get_content_type() != ContentType::Tree || !obj.is_accessible() ) {
     throw std::runtime_error( "not an accessible tree" );
@@ -18,7 +21,7 @@ void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )
 
 void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
 {
-#if TIME_FIXPOINT_API
+#if TIME_FIXPOINT == 2
   RecordScopeTimer<Timer::Category::Nonblock> record_timer { _attach_blob };
 #endif
   ObjectReference obj( ro_handle );
@@ -46,8 +49,8 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
 // module_instance points to the WASM instance
 __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 {
-#if TIME_FIXPOINT_API
-  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _freeze_blob };
+#if TIME_FIXPOINT == 2
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _create_blob };
 #endif
   Name blob = RuntimeStorage::get_instance().add_local_blob( Blob( (char*)memory->data, size ) );
   memory->data = NULL;
@@ -61,6 +64,9 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 
 __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
 {
+#if TIME_FIXPOINT == 2
+  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _create_tree };
+#endif
   for ( size_t i = 0; i < size; i++ ) {
     table->data[i] = MTreeEntry::to_name( MTreeEntry( table->data[i] ) );
   }

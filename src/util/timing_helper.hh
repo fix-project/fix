@@ -4,17 +4,16 @@
 
 #include "timer.hh"
 
-#ifndef TIME_FIXPOINT_API
-#define TIME_FIXPOINT_API 0
+#ifndef TIME_FIXPOINT
+#define TIME_FIXPOINT 0
 #endif
 
 inline Timer::Record _hash;
-inline Timer::Record _fixpoint_apply;
-inline Timer::Record _get_tree_entry;
+inline Timer::Record _execution;
 inline Timer::Record _attach_blob;
-inline Timer::Record _detach_mem;
-inline Timer::Record _designate_output;
-inline Timer::Record _freeze_blob;
+inline Timer::Record _create_blob;
+inline Timer::Record _attach_tree;
+inline Timer::Record _create_tree;
 
 void print_timer( std::ostream& out, const std::string_view name, const Timer::Record timer );
 
