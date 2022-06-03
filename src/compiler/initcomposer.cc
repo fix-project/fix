@@ -41,7 +41,7 @@ public:
     , errors_( errors )
     , wasm_name_( wasm_name )
     , state_info_type_name_( MangleStateInfoTypeName( wasm_name ) )
-    , module_prefix_( MangleName( wasm_name ) + "_" )
+    , module_prefix_( MangleName( wasm_name ) )
     , result_()
     , inspector_( inspector )
   {
@@ -90,7 +90,7 @@ void InitComposer::write_attach_tree()
   result_ << "extern void fixpoint_attach_tree(__m256i, wasm_rt_externref_table_t*);" << endl;
   auto ro_tables = inspector_->GetExportedROTables();
   for ( uint32_t idx : ro_tables ) {
-    result_ << "void " << module_prefix_ << "Z_fixpoint_Z_attach_tree_ro_table_" << idx
+    result_ << "void Z_fixpointZ_attach_tree_ro_table_" << idx
             << "(struct Z_fixpoint_module_instance_t* module_instance, __m256i ro_handle) {" << endl;
     result_ << "  wasm_rt_externref_table_t* ro_table = " << module_prefix_ << "Z_ro_table_" << idx << "(("
             << state_info_type_name_ << "*)module_instance);" << endl;
@@ -104,7 +104,7 @@ void InitComposer::write_attach_blob()
   auto ro_mems = inspector_->GetExportedROMems();
   result_ << "extern void fixpoint_attach_blob(__m256i, wasm_rt_memory_t*);" << endl;
   for ( uint32_t idx : ro_mems ) {
-    result_ << "void " << module_prefix_ << "Z_fixpoint_Z_attach_blob_ro_mem_" << idx
+    result_ << "void Z_fixpointZ_attach_blob_ro_mem_" << idx
             << "(struct Z_fixpoint_module_instance_t* module_instance, __m256i ro_handle) {" << endl;
     result_ << "  wasm_rt_memory_t* ro_mem = " << module_prefix_ << "Z_ro_mem_" << idx << "(("
             << state_info_type_name_ << "*)module_instance);" << endl;
@@ -118,7 +118,7 @@ void InitComposer::write_create_blob()
   auto rw_mems = inspector_->GetExportedRWMems();
   result_ << "extern __m256i fixpoint_create_blob( wasm_rt_memory_t*, uint32_t );" << endl;
   for ( uint32_t idx : rw_mems ) {
-    result_ << "__m256i " << module_prefix_ << "Z_fixpoint_Z_create_blob_rw_mem_" << idx
+    result_ << "__m256i Z_fixpointZ_create_blob_rw_mem_" << idx
             << "(struct Z_fixpoint_module_instance_t* module_instance, uint32_t size) {" << endl;
     result_ << "  wasm_rt_memory_t* rw_mem = " << module_prefix_ << "Z_rw_mem_" << idx << "(("
             << state_info_type_name_ << "*)module_instance);" << endl;
@@ -132,7 +132,7 @@ void InitComposer::write_create_tree()
   auto rw_tables = inspector_->GetExportedRWTables();
   result_ << "extern __m256i fixpoint_create_tree( wasm_rt_externref_table_t*, uint32_t );" << endl;
   for ( auto rw_table : rw_tables ) {
-    result_ << "__m256i " << module_prefix_ << "Z_fixpoint_Z_create_tree_rw_table_" << rw_table
+    result_ << "__m256i Z_fixpointZ_create_tree_rw_table_" << rw_table
             << "(struct Z_fixpoint_module_instance_t* module_instance, uint32_t size) {" << endl;
     result_ << "  wasm_rt_externref_table_t* rw_table = " << module_prefix_ << "Z_rw_table_" << rw_table << "(("
             << state_info_type_name_ << "*)module_instance);" << endl;
@@ -145,7 +145,7 @@ void InitComposer::write_create_thunk()
 {
   result_ << "extern __m256i fixpoint_create_thunk(__m256i);" << endl;
   result_ << "__m256i " << module_prefix_
-          << "Z_fixpoint_Z_create_thunk(struct Z_fixpoint_module_instance_t* module_instance, __m256i handle) {"
+          << "Z_fixpointZ_create_thunk(struct Z_fixpoint_module_instance_t* module_instance, __m256i handle) {"
           << endl;
   result_ << "  return fixpoint_create_thunk(handle);" << endl;
   result_ << "}\n" << endl;
@@ -188,8 +188,7 @@ void InitComposer::write_exit()
   result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
   result_ << "}\n" << endl;
 
-  result_ << "void " << module_prefix_
-          << "Z_fixpoint_Z_exit(struct Z_fixpoint_module_instance_t* module_instance, wasm_rt_externref_t "
+  result_ << "void Z_fixpointZ_exit(struct Z_fixpoint_module_instance_t* module_instance, wasm_rt_externref_t "
              "return_value ) {"
           << endl;
   result_ << "  get_context_ptr(module_instance)->return_value = return_value;" << endl;
@@ -217,7 +216,8 @@ string InitComposer::compose_header()
 
   result_ << "void initProgram(void* ptr) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_ << "*)ptr;" << endl;
-  result_ << "  " << module_prefix_ << "init(instance, (struct Z_fixpoint_module_instance_t*)instance);" << endl;
+  result_ << "  " << module_prefix_ << "_instantiate(instance, (struct Z_fixpoint_module_instance_t*)instance);"
+          << endl;
   result_ << "  init_mems(instance);" << endl;
   result_ << "  init_tables(instance);" << endl;
   result_ << "  return;" << endl;

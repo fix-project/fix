@@ -5,6 +5,15 @@
 
 using namespace std;
 
+static void throw_assertion_failure( const char* __assertion,
+                                     const char* __file,
+                                     unsigned int __line,
+                                     const char* __function )
+{
+  throw runtime_error( "assertion `" + string( __assertion ) + "' failed at " + string( __file ) + ":"
+                       + to_string( __line ) + " (" + string( __function ) + ")" );
+}
+
 const static map<string, uint64_t> library_func_map
   = { { "wasm_rt_trap", (uint64_t)wasm_rt_trap },
       { "wasm_rt_register_func_type", (uint64_t)wasm_rt_register_func_type },
@@ -19,6 +28,7 @@ const static map<string, uint64_t> library_func_map
       { "wasm_rt_free_funcref_table", (uint64_t)wasm_rt_free_funcref_table },
       { "wasm_rt_free_externref_table", (uint64_t)wasm_rt_free_externref_table },
       { "wasm_rt_init", (uint64_t)wasm_rt_init },
+      { "wasm_rt_is_initialized", (uint64_t)wasm_rt_is_initialized },
       { "fixpoint_attach_tree", (uint64_t)fixpoint::attach_tree },
       { "fixpoint_attach_blob", (uint64_t)fixpoint::attach_blob },
       { "fixpoint_create_tree", (uint64_t)fixpoint::create_tree },
@@ -27,7 +37,8 @@ const static map<string, uint64_t> library_func_map
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
       { "_setjmp", (uint64_t)setjmp },
-      { "longjmp", (uint64_t)longjmp } };
+      { "longjmp", (uint64_t)longjmp },
+      { "__assert_fail", (uint64_t)throw_assertion_failure } };
 
 void __stack_chk_fail( void )
 {

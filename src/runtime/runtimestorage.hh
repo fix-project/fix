@@ -44,6 +44,7 @@ private:
     , literal_cache()
     , next_local_name_( 0 )
   {
+    wasm_rt_init();
   }
 
 public:

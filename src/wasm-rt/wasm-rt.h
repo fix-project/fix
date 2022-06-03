@@ -195,6 +195,9 @@ typedef struct {
 /** Initialize the runtime. */
 void wasm_rt_init(void);
 
+/** Is the runtime initialized? */
+bool wasm_rt_is_initialized(void);
+
 /** Free the runtime's state. */
 void wasm_rt_free(void);
 

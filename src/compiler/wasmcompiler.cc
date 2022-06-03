@@ -21,14 +21,6 @@ using namespace wabt;
 
 namespace wasmcompiler {
 
-//  static int s_verbose;
-static std::string s_infile;
-static std::string s_outfile;
-static Features s_features;
-static WriteCOptions s_write_c_options;
-static bool s_read_debug_names = true;
-static std::unique_ptr<FileStream> s_log_stream;
-
 MemoryStringStream::MemoryStringStream( Stream* log_stream )
   : Stream( log_stream )
 {
@@ -80,68 +72,52 @@ Result MemoryStringStream::TruncateImpl( size_t size )
   return Result::Ok;
 }
 
+void wabt_try( const string_view what, const Errors& errors, const Result value )
+{
+  if ( not Succeeded( value ) ) {
+    const string error_str = FormatErrorsToString( errors, Location::Type::Binary );
+    throw runtime_error( "wabt error: " + string( what ) + " failed\n\n===\n\n" + error_str + "\n\n===\n" );
+  }
+}
+
 tuple<string, string, string> wasm_to_c( const string& wasm_name, const string& wasm_content )
 {
-  Result result;
-
   Errors errors;
   Module module;
-  const bool kStopOnFirstError = true;
-  const bool kFailOnCustomSectionError = true;
 
-  s_features.enable_multi_memory();
+  ReadBinaryOptions options;
+  options.features.enable_multi_memory();
 
-  ReadBinaryOptions options(
-    s_features, s_log_stream.get(), s_read_debug_names, kStopOnFirstError, kFailOnCustomSectionError );
-  result = ReadBinaryIr( wasm_name.c_str(), wasm_content.data(), wasm_content.size(), options, &errors, &module );
+  wabt_try(
+    "ReadBinaryIr",
+    errors,
+    ReadBinaryIr( wasm_name.c_str(), wasm_content.data(), wasm_content.size(), options, &errors, &module ) );
+
   MemoryStringStream c_stream;
   MemoryStringStream h_stream;
   string fixpoint_header;
-  if ( Succeeded( result ) ) {
-    if ( Succeeded( result ) ) {
-      ValidateOptions v_options( s_features );
-      result = ValidateModule( &module, &errors, v_options );
-      result |= GenerateNames( &module );
-    }
 
-    if ( Succeeded( result ) ) {
-      /* TODO(binji): This shouldn't fail; if a name can't be applied
-       * (because the index is invalid, say) it should just be skipped. */
-      Result dummy_result = ApplyNames( &module );
-      WABT_USE( dummy_result );
-    }
+  wabt_try( "ValidateModule", errors, ValidateModule( &module, &errors, options.features ) );
+  wabt_try( "GenerateNames", errors, GenerateNames( &module ) );
+  wabt_try( "ApplyNames", errors, ApplyNames( &module ) );
 
-    wasminspector::WasmInspector inspector( &module, &errors );
+  wasminspector::WasmInspector inspector( &module, &errors );
+  wabt_try( "Inspector validate", errors, inspector.Validate() );
 
-    if ( Succeeded( result ) ) {
-      result = inspector.Validate();
-    }
-    if ( result != Result::Ok ) {
-      throw runtime_error( "Invalid module." );
-    }
-
-    if ( Succeeded( result ) ) {
-      for ( auto index : inspector.GetExportedROMemIndex() ) {
-        module.memories[index]->bounds_checked = true;
-      }
-      for ( auto index : inspector.GetExportedRWMemIndex() ) {
-        module.memories[index]->bounds_checked = true;
-      }
-    }
-
-    if ( Succeeded( result ) ) {
-      result = WriteC( &c_stream, &h_stream, ( wasm_name + ".h" ).c_str(), &module, s_write_c_options );
-    }
-
-    if ( Succeeded( result ) ) {
-      fixpoint_header = initcomposer::compose_header( wasm_name, &module, &errors, &inspector );
-    }
+  for ( auto index : inspector.GetExportedROMemIndex() ) {
+    module.memories[index]->bounds_checked = true;
   }
-  FormatErrorsToFile( errors, Location::Type::Binary );
-  if ( result != Result::Ok ) {
-    throw runtime_error( "WasmToC fails." );
+  for ( auto index : inspector.GetExportedRWMemIndex() ) {
+    module.memories[index]->bounds_checked = true;
   }
+
+  WriteCOptions write_c_options;
+  write_c_options.module_name = wasm_name;
+  string header_name = wasm_name + ".h";
+  wabt_try( "WriteC", errors, WriteC( &c_stream, &h_stream, header_name.c_str(), &module, write_c_options ) );
+
+  fixpoint_header = initcomposer::compose_header( wasm_name, &module, &errors, &inspector );
 
   return { c_stream.ReleaseStringBuf(), h_stream.ReleaseStringBuf(), fixpoint_header };
 }
-}
+} /* namespace wasmcompiler */

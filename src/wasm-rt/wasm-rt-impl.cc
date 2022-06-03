@@ -230,6 +230,14 @@ void wasm_rt_init( void )
 #endif
 }
 
+bool wasm_rt_is_initialized(void) {
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
+  return g_signal_handler_installed;
+#else
+  return true;
+#endif
+}
+
 void wasm_rt_free( void )
 {
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
