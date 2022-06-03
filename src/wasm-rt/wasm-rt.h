@@ -153,6 +153,9 @@ typedef struct {
 /** An external reference. These are opaque have meaning only to the host. */
 typedef __m256i wasm_rt_externref_t;
 
+/** Default (null) value of an externref */
+static const wasm_rt_externref_t wasm_rt_externref_null_value = {0, 0, 0, 0};
+
 /** A Memory object. */
 typedef struct {
   wasm_rt_externref_t ref;
