@@ -69,7 +69,6 @@ private:
   void write_init_read_only_mem_table();
   void write_get_instance_size();
   void write_context();
-  void write_exit();
 };
 
 void InitComposer::write_context()
@@ -77,7 +76,6 @@ void InitComposer::write_context()
   result_ << "typedef struct Context {" << endl;
   result_ << "  __m256i return_value;" << endl;
   result_ << "  size_t memory_usage;" << endl;
-  result_ << "  jmp_buf buffer;" << endl;
   result_ << "} Context;\n" << endl;
 
   result_ << "Context* get_context_ptr( void* instance ) {" << endl;
@@ -178,29 +176,10 @@ void InitComposer::write_get_instance_size()
   result_ << "}\n" << endl;
 }
 
-void InitComposer::write_exit()
-{
-  result_ << "wasm_rt_externref_t _fixpoint_apply(" << state_info_type_name_
-          << "* module_instance, wasm_rt_externref_t encode) {" << endl;
-  result_ << "  if( setjmp(get_context_ptr(module_instance)->buffer) == 0 ) {" << endl;
-  result_ << "    return " << module_prefix_ << "Z__fixpoint_apply( module_instance, encode );" << endl;
-  result_ << "  }" << endl;
-  result_ << "  return get_context_ptr(module_instance)->return_value;" << endl;
-  result_ << "}\n" << endl;
-
-  result_ << "void Z_fixpointZ_exit(struct Z_fixpoint_module_instance_t* module_instance, wasm_rt_externref_t "
-             "return_value ) {"
-          << endl;
-  result_ << "  get_context_ptr(module_instance)->return_value = return_value;" << endl;
-  result_ << "  longjmp(get_context_ptr(module_instance)->buffer, 1);" << endl;
-  result_ << "}\n" << endl;
-}
-
 string InitComposer::compose_header()
 {
   result_ = ostringstream();
   result_ << "#include <immintrin.h>" << endl;
-  result_ << "#include <setjmp.h>" << endl;
   result_ << "#include \"" << wasm_name_ << "_fixpoint.h\"" << endl;
   result_ << endl;
 
@@ -212,7 +191,6 @@ string InitComposer::compose_header()
   write_create_tree();
   write_create_blob();
   write_create_thunk();
-  write_exit();
 
   result_ << "void initProgram(void* ptr) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_ << "*)ptr;" << endl;

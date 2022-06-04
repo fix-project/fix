@@ -17,6 +17,7 @@
 #ifndef WASM_RT_H_
 #define WASM_RT_H_
 
+#include <setjmp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -25,22 +26,23 @@
 #include <immintrin.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #ifndef __has_builtin
-#define __has_builtin(x) 0  // Compatibility with non-clang compilers.
+#define __has_builtin( x ) 0 // Compatibility with non-clang compilers.
 #endif
 
-#if __has_builtin(__builtin_expect)
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#define LIKELY(x) __builtin_expect(!!(x), 1)
+#if __has_builtin( __builtin_expect )
+#define UNLIKELY( x ) __builtin_expect( !!( x ), 0 )
+#define LIKELY( x ) __builtin_expect( !!( x ), 1 )
 #else
-#define UNLIKELY(x) (x)
-#define LIKELY(x) (x)
+#define UNLIKELY( x ) ( x )
+#define LIKELY( x ) ( x )
 #endif
 
-#if __has_builtin(__builtin_memcpy)
+#if __has_builtin( __builtin_memcpy )
 #define wasm_rt_memcpy __builtin_memcpy
 #else
 #define wasm_rt_memcpy memcpy
@@ -54,8 +56,8 @@ extern "C" {
  * */
 
 /** Check whether the signal handler is supported at all. */
-#if (defined(__linux__) || defined(__unix__) || defined(__APPLE__)) && \
-    defined(__WORDSIZE) && __WORDSIZE == 64
+#if ( defined( __linux__ ) || defined( __unix__ ) || defined( __APPLE__ ) ) && defined( __WORDSIZE )               \
+  && __WORDSIZE == 64
 
 /* If the signal handler is supported, then use it by default. */
 #ifndef WASM_RT_MEMCHECK_SIGNAL_HANDLER
@@ -95,240 +97,285 @@ extern uint32_t wasm_rt_call_stack_depth;
 
 #endif
 
-#if defined(_MSC_VER)
-#define WASM_RT_NO_RETURN __declspec(noreturn)
+#if defined( _MSC_VER )
+#define WASM_RT_NO_RETURN __declspec( noreturn )
 #else
-#define WASM_RT_NO_RETURN __attribute__((noreturn))
+#define WASM_RT_NO_RETURN __attribute__( ( noreturn ) )
 #endif
 
-#if defined(__APPLE__) && WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
+#if defined( __APPLE__ ) && WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
 #define WASM_RT_MERGED_OOB_AND_EXHAUSTION_TRAPS 1
 #else
 #define WASM_RT_MERGED_OOB_AND_EXHAUSTION_TRAPS 0
 #endif
 
-/** Reason a trap occurred. Provide this to `wasm_rt_trap`. */
-typedef enum {
-  WASM_RT_TRAP_NONE,         /** No error. */
-  WASM_RT_TRAP_OOB,          /** Out-of-bounds access in linear memory or a table. */
-  WASM_RT_TRAP_INT_OVERFLOW, /** Integer overflow on divide or truncation. */
-  WASM_RT_TRAP_DIV_BY_ZERO,  /** Integer divide by zero. */
-  WASM_RT_TRAP_INVALID_CONVERSION, /** Conversion from NaN to integer. */
-  WASM_RT_TRAP_UNREACHABLE,        /** Unreachable instruction executed. */
-  WASM_RT_TRAP_CALL_INDIRECT,      /** Invalid call_indirect, for any reason. */
+  /** Reason a trap occurred. Provide this to `wasm_rt_trap`. */
+  typedef enum
+  {
+    WASM_RT_TRAP_NONE,               /** No error. */
+    WASM_RT_TRAP_OOB,                /** Out-of-bounds access in linear memory or a table. */
+    WASM_RT_TRAP_INT_OVERFLOW,       /** Integer overflow on divide or truncation. */
+    WASM_RT_TRAP_DIV_BY_ZERO,        /** Integer divide by zero. */
+    WASM_RT_TRAP_INVALID_CONVERSION, /** Conversion from NaN to integer. */
+    WASM_RT_TRAP_UNREACHABLE,        /** Unreachable instruction executed. */
+    WASM_RT_TRAP_CALL_INDIRECT,      /** Invalid call_indirect, for any reason. */
+    WASM_RT_TRAP_UNCAUGHT_EXCEPTION, /* Exception thrown and not caught */
 #if WASM_RT_MERGED_OOB_AND_EXHAUSTION_TRAPS
-  WASM_RT_TRAP_EXHAUSTION = WASM_RT_TRAP_OOB,
+    WASM_RT_TRAP_EXHAUSTION = WASM_RT_TRAP_OOB,
 #else
   WASM_RT_TRAP_EXHAUSTION, /** Call stack exhausted. */
 #endif
-} wasm_rt_trap_t;
+  } wasm_rt_trap_t;
 
-/** Value types. Used to define function signatures. */
-typedef enum {
-  WASM_RT_I32,
-  WASM_RT_I64,
-  WASM_RT_F32,
-  WASM_RT_F64,
-  WASM_RT_FUNCREF,
-  WASM_RT_EXTERNREF,
-} wasm_rt_type_t;
+  /** Value types. Used to define function signatures. */
+  typedef enum
+  {
+    WASM_RT_I32,
+    WASM_RT_I64,
+    WASM_RT_F32,
+    WASM_RT_F64,
+    WASM_RT_FUNCREF,
+    WASM_RT_EXTERNREF,
+  } wasm_rt_type_t;
 
-/** A generic function pointer type, both for Wasm functions (`code`)
- * and host functions (`hostcode`). All function pointers are stored
- * in this canonical form, but must be cast to their proper signature
- * to call. */
-typedef void (*wasm_rt_function_ptr_t)(void);
+  /** A generic function pointer type, both for Wasm functions (`code`)
+   * and host functions (`hostcode`). All function pointers are stored
+   * in this canonical form, but must be cast to their proper signature
+   * to call. */
+  typedef void ( *wasm_rt_function_ptr_t )( void );
 
-/** A function instance (the runtime representation of a function).
- * These can be stored in tables of type funcref, or used as values. */
-typedef struct {
-  /** The index as returned from `wasm_rt_register_func_type`. */
-  uint32_t func_type;
-  /** The function. */
-  wasm_rt_function_ptr_t func;
-  /** The module instance of the originating module. */
-  void* module_instance;
-} wasm_rt_funcref_t;
+  /** A function instance (the runtime representation of a function).
+   * These can be stored in tables of type funcref, or used as values. */
+  typedef struct
+  {
+    /** The index as returned from `wasm_rt_register_func_type`. */
+    uint32_t func_type;
+    /** The function. */
+    wasm_rt_function_ptr_t func;
+    /** The module instance of the originating module. */
+    void* module_instance;
+  } wasm_rt_funcref_t;
 
-/** An external reference. These are opaque have meaning only to the host. */
-typedef __m256i wasm_rt_externref_t;
+  /** An external reference. These are opaque have meaning only to the host. */
+  typedef __m256i wasm_rt_externref_t;
 
-/** Default (null) value of an externref */
-static const wasm_rt_externref_t wasm_rt_externref_null_value = {0, 0, 0, 0};
+  /** Default (null) value of an externref */
+  static const wasm_rt_externref_t wasm_rt_externref_null_value = { 0, 0, 0, 0 };
 
-/** A Memory object. */
-typedef struct {
-  wasm_rt_externref_t ref;
-  bool read_only;
-  /** The linear memory data, with a byte length of `size`. */
-  uint8_t* data;
-  /** The current and maximum page count for this Memory object. If there is no
-   * maximum, `max_pages` is 0xffffffffu (i.e. UINT32_MAX). */
-  uint32_t pages, max_pages;
-  /** The current size of the linear memory, in bytes. */
-  uint32_t size;
-} wasm_rt_memory_t;
+  /** A Memory object. */
+  typedef struct
+  {
+    wasm_rt_externref_t ref;
+    bool read_only;
+    /** The linear memory data, with a byte length of `size`. */
+    uint8_t* data;
+    /** The current and maximum page count for this Memory object. If there is no
+     * maximum, `max_pages` is 0xffffffffu (i.e. UINT32_MAX). */
+    uint32_t pages, max_pages;
+    /** The current size of the linear memory, in bytes. */
+    uint32_t size;
+  } wasm_rt_memory_t;
 
-/** A Table of type funcref. */
-typedef struct {
-  /** The table element data, with an element count of `size`. */
-  wasm_rt_funcref_t* data;
-  /** The maximum element count of this Table object. If there is no maximum,
-   * `max_size` is 0xffffffffu (i.e. UINT32_MAX). */
-  uint32_t max_size;
-  /** The current element count of the table. */
-  uint32_t size;
-} wasm_rt_funcref_table_t;
+  /** A Table of type funcref. */
+  typedef struct
+  {
+    /** The table element data, with an element count of `size`. */
+    wasm_rt_funcref_t* data;
+    /** The maximum element count of this Table object. If there is no maximum,
+     * `max_size` is 0xffffffffu (i.e. UINT32_MAX). */
+    uint32_t max_size;
+    /** The current element count of the table. */
+    uint32_t size;
+  } wasm_rt_funcref_table_t;
 
-/** A Table of type externref. */
-typedef struct {
-  bool read_only;
-  /** The table element data, with an element count of `size`. */
-  wasm_rt_externref_t* data;
-  /** The maximum element count of this Table object. If there is no maximum,
-   * `max_size` is 0xffffffffu (i.e. UINT32_MAX). */
-  uint32_t max_size;
-  /** The current element count of the table. */
-  uint32_t size;
-} wasm_rt_externref_table_t;
+  /** A Table of type externref. */
+  typedef struct
+  {
+    bool read_only;
+    /** The table element data, with an element count of `size`. */
+    wasm_rt_externref_t* data;
+    /** The maximum element count of this Table object. If there is no maximum,
+     * `max_size` is 0xffffffffu (i.e. UINT32_MAX). */
+    uint32_t max_size;
+    /** The current element count of the table. */
+    uint32_t size;
+  } wasm_rt_externref_table_t;
 
-/** Initialize the runtime. */
-void wasm_rt_init(void);
+  /** Initialize the runtime. */
+  void wasm_rt_init( void );
 
-/** Is the runtime initialized? */
-bool wasm_rt_is_initialized(void);
+  /** Is the runtime initialized? */
+  bool wasm_rt_is_initialized( void );
 
-/** Free the runtime's state. */
-void wasm_rt_free(void);
+  /** Free the runtime's state. */
+  void wasm_rt_free( void );
 
-/** Stop execution immediately and jump back to the call to `wasm_rt_try`.
- *  The result of `wasm_rt_try` will be the provided trap reason.
- *
- *  This is typically called by the generated code, and not the embedder. */
-WASM_RT_NO_RETURN void wasm_rt_trap(wasm_rt_trap_t);
+  /** Stop execution immediately and jump back to the call to `wasm_rt_impl_try`.
+   *  The result of `wasm_rt_impl_try` will be the provided trap reason.
+   *
+   *  This is typically called by the generated code, and not the embedder. */
+  WASM_RT_NO_RETURN void wasm_rt_trap( wasm_rt_trap_t );
 
-/**
- * Return a human readable error string based on a trap type.
- */
-const char* wasm_rt_strerror(wasm_rt_trap_t trap);
+  /**
+   * Return a human readable error string based on a trap type.
+   */
+  const char* wasm_rt_strerror( wasm_rt_trap_t trap );
 
-/** Register a function type with the given signature. The returned function
- * index is guaranteed to be the same for all calls with the same signature.
- * The following varargs must all be of type `wasm_rt_type_t`, first the
- * params` and then the `results`.
- *
- *  ```
- *    // Register (func (param i32 f32) (result i64)).
- *    wasm_rt_register_func_type(2, 1, WASM_RT_I32, WASM_RT_F32, WASM_RT_I64);
- *    => returns 1
- *
- *    // Register (func (result i64)).
- *    wasm_rt_register_func_type(0, 1, WASM_RT_I32);
- *    => returns 2
- *
- *    // Register (func (param i32 f32) (result i64)) again.
- *    wasm_rt_register_func_type(2, 1, WASM_RT_I32, WASM_RT_F32, WASM_RT_I64);
- *    => returns 1
- *  ``` */
-extern uint32_t wasm_rt_register_func_type(uint32_t params,
-                                           uint32_t results,
-                                           ...);
+  /** Register a function type with the given signature. The returned function
+   * index is guaranteed to be the same for all calls with the same signature.
+   * The following varargs must all be of type `wasm_rt_type_t`, first the
+   * params` and then the `results`.
+   *
+   *  ```
+   *    // Register (func (param i32 f32) (result i64)).
+   *    wasm_rt_register_func_type(2, 1, WASM_RT_I32, WASM_RT_F32, WASM_RT_I64);
+   *    => returns 1
+   *
+   *    // Register (func (result i64)).
+   *    wasm_rt_register_func_type(0, 1, WASM_RT_I32);
+   *    => returns 2
+   *
+   *    // Register (func (param i32 f32) (result i64)) again.
+   *    wasm_rt_register_func_type(2, 1, WASM_RT_I32, WASM_RT_F32, WASM_RT_I64);
+   *    => returns 1
+   *  ``` */
+  extern uint32_t wasm_rt_register_func_type( uint32_t params, uint32_t results, ... );
 
-/** Initialize a Memory object with an initial page size of `initial_pages` and
- * a maximum page size of `max_pages`.
- *
- *  ```
- *    wasm_rt_memory_t my_memory;
- *    // 1 initial page (65536 bytes), and a maximum of 2 pages.
- *    wasm_rt_allocate_memory(&my_memory, 1, 2);
- *  ``` */
-extern void wasm_rt_allocate_memory(wasm_rt_memory_t*,
-                                    uint32_t initial_pages,
-                                    uint32_t max_pages);
+  /**
+   * Register a tag with the given size. Returns the tag.
+   */
+  uint32_t wasm_rt_register_tag( uint32_t size );
 
-extern void wasm_rt_allocate_memory_sw_checked(wasm_rt_memory_t*,
-                                               uint32_t initial_pages,
-                                               uint32_t max_pages);
+  /**
+   * Set the active exception to given tag, size, and contents.
+   */
+  void wasm_rt_load_exception( uint32_t tag, uint32_t size, const void* values );
 
-/** Grow a Memory object by `pages`, and return the previous page count. If
- * this new page count is greater than the maximum page count, the grow fails
- * and 0xffffffffu (UINT32_MAX) is returned instead.
- *
- *  ```
- *    wasm_rt_memory_t my_memory;
- *    ...
- *    // Grow memory by 10 pages.
- *    uint32_t old_page_size = wasm_rt_grow_memory(&my_memory, 10);
- *    if (old_page_size == UINT32_MAX) {
- *      // Failed to grow memory.
- *    }
- *  ``` */
-extern uint32_t wasm_rt_grow_memory(wasm_rt_memory_t*, uint32_t pages);
+  /**
+   * Throw the active exception.
+   */
+  WASM_RT_NO_RETURN void wasm_rt_throw( void );
 
-extern uint32_t wasm_rt_grow_memory_sw_checked(wasm_rt_memory_t*,
-                                               uint32_t pages);
+  /**
+   * Stores the current unwind target (for use if an exception is thrown), and
+   * returns the previous one.
+   */
+  jmp_buf* wasm_rt_push_unwind_target( jmp_buf* target );
 
-/**
- * Free a Memory object.
- */
-extern void wasm_rt_free_memory(wasm_rt_memory_t*);
+  /**
+   * Restore the unwind target at the end of a try-catch block.
+   */
+  void wasm_rt_pop_unwind_target( jmp_buf* target );
 
-extern void wasm_rt_free_memory_sw_checked(wasm_rt_memory_t*);
+  /**
+   * Tag of the active exception.
+   */
+  uint32_t wasm_rt_exception_tag( void );
 
-/** Initialize a funcref Table object with an element count of `elements` and a
- * maximum size of `max_elements`.
- *
- *  ```
- *    wasm_rt_funcref_table_t my_table;
- *    // 5 elements and a maximum of 10 elements.
- *    wasm_rt_allocate_funcref_table(&my_table, 5, 10);
- *  ``` */
-extern void wasm_rt_allocate_funcref_table(wasm_rt_funcref_table_t*,
-                                           uint32_t elements,
-                                           uint32_t max_elements);
+  /**
+   * Size of the active exception.
+   */
+  uint32_t wasm_rt_exception_size( void );
 
-/**
- * Free a funcref Table object.
- */
-extern void wasm_rt_free_funcref_table(wasm_rt_funcref_table_t*);
+  /**
+   * Contents of the active exception.
+   */
+  void* wasm_rt_exception( void );
 
-/** Initialize an externref Table object with an element count of `elements` and
- * a maximum size of `max_elements`. Usage as per
- * wasm_rt_allocate_funcref_table. */
-extern void wasm_rt_allocate_externref_table(wasm_rt_externref_table_t*,
-                                             uint32_t elements,
-                                             uint32_t max_elements);
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
+#define WASM_RT_SETJMP( buf ) sigsetjmp( buf, 1 )
+#else
+#define WASM_RT_SETJMP( buf ) setjmp( buf )
+#endif
 
-/**
- * Free an externref Table object.
- */
-extern void wasm_rt_free_externref_table(wasm_rt_externref_table_t*);
+#define wasm_rt_try( target ) WASM_RT_SETJMP( target )
 
-/** Grow a Table object by `delta` elements (giving the new elements the value
- * `init`), and return the previous element count. If this new element count is
- * greater than the maximum element count, the grow fails and 0xffffffffu
- * (UINT32_MAX) is returned instead.  ``` */
-extern uint32_t wasm_rt_grow_funcref_table(wasm_rt_funcref_table_t*,
-                                           uint32_t delta,
-                                           wasm_rt_funcref_t init);
-extern uint32_t wasm_rt_grow_externref_table(wasm_rt_externref_table_t*,
-                                             uint32_t delta,
-                                             wasm_rt_externref_t init);
+  /** Initialize a Memory object with an initial page size of `initial_pages` and
+   * a maximum page size of `max_pages`.
+   *
+   *  ```
+   *    wasm_rt_memory_t my_memory;
+   *    // 1 initial page (65536 bytes), and a maximum of 2 pages.
+   *    wasm_rt_allocate_memory(&my_memory, 1, 2);
+   *  ``` */
+  extern void wasm_rt_allocate_memory( wasm_rt_memory_t*, uint32_t initial_pages, uint32_t max_pages );
+
+  extern void wasm_rt_allocate_memory_sw_checked( wasm_rt_memory_t*, uint32_t initial_pages, uint32_t max_pages );
+
+  /** Grow a Memory object by `pages`, and return the previous page count. If
+   * this new page count is greater than the maximum page count, the grow fails
+   * and 0xffffffffu (UINT32_MAX) is returned instead.
+   *
+   *  ```
+   *    wasm_rt_memory_t my_memory;
+   *    ...
+   *    // Grow memory by 10 pages.
+   *    uint32_t old_page_size = wasm_rt_grow_memory(&my_memory, 10);
+   *    if (old_page_size == UINT32_MAX) {
+   *      // Failed to grow memory.
+   *    }
+   *  ``` */
+  extern uint32_t wasm_rt_grow_memory( wasm_rt_memory_t*, uint32_t pages );
+
+  extern uint32_t wasm_rt_grow_memory_sw_checked( wasm_rt_memory_t*, uint32_t pages );
+
+  /**
+   * Free a Memory object.
+   */
+  extern void wasm_rt_free_memory( wasm_rt_memory_t* );
+
+  extern void wasm_rt_free_memory_sw_checked( wasm_rt_memory_t* );
+
+  /** Initialize a funcref Table object with an element count of `elements` and a
+   * maximum size of `max_elements`.
+   *
+   *  ```
+   *    wasm_rt_funcref_table_t my_table;
+   *    // 5 elements and a maximum of 10 elements.
+   *    wasm_rt_allocate_funcref_table(&my_table, 5, 10);
+   *  ``` */
+  extern void wasm_rt_allocate_funcref_table( wasm_rt_funcref_table_t*, uint32_t elements, uint32_t max_elements );
+
+  /**
+   * Free a funcref Table object.
+   */
+  extern void wasm_rt_free_funcref_table( wasm_rt_funcref_table_t* );
+
+  /** Initialize an externref Table object with an element count of `elements` and
+   * a maximum size of `max_elements`. Usage as per
+   * wasm_rt_allocate_funcref_table. */
+  extern void wasm_rt_allocate_externref_table( wasm_rt_externref_table_t*,
+                                                uint32_t elements,
+                                                uint32_t max_elements );
+
+  /**
+   * Free an externref Table object.
+   */
+  extern void wasm_rt_free_externref_table( wasm_rt_externref_table_t* );
+
+  /** Grow a Table object by `delta` elements (giving the new elements the value
+   * `init`), and return the previous element count. If this new element count is
+   * greater than the maximum element count, the grow fails and 0xffffffffu
+   * (UINT32_MAX) is returned instead.  ``` */
+  extern uint32_t wasm_rt_grow_funcref_table( wasm_rt_funcref_table_t*, uint32_t delta, wasm_rt_funcref_t init );
+  extern uint32_t wasm_rt_grow_externref_table( wasm_rt_externref_table_t*,
+                                                uint32_t delta,
+                                                wasm_rt_externref_t init );
 
 #ifdef _WIN32
-float wasm_rt_truncf(float x);
-double wasm_rt_trunc(double x);
-float wasm_rt_nearbyintf(float x);
-double wasm_rt_nearbyint(double x);
-float wasm_rt_fabsf(float x);
-double wasm_rt_fabs(double x);
+  float wasm_rt_truncf( float x );
+  double wasm_rt_trunc( double x );
+  float wasm_rt_nearbyintf( float x );
+  double wasm_rt_nearbyint( double x );
+  float wasm_rt_fabsf( float x );
+  double wasm_rt_fabs( double x );
 #else
-#define wasm_rt_truncf(x) truncf(x)
-#define wasm_rt_trunc(x) trunc(x)
-#define wasm_rt_nearbyintf(x) nearbyintf(x)
-#define wasm_rt_nearbyint(x) nearbyint(x)
-#define wasm_rt_fabsf(x) fabsf(x)
-#define wasm_rt_fabs(x) fabs(x)
+#define wasm_rt_truncf( x ) truncf( x )
+#define wasm_rt_trunc( x ) trunc( x )
+#define wasm_rt_nearbyintf( x ) nearbyintf( x )
+#define wasm_rt_nearbyint( x ) nearbyint( x )
+#define wasm_rt_fabsf( x ) fabsf( x )
+#define wasm_rt_fabs( x ) fabs( x )
 #endif
 
 #ifdef __cplusplus

@@ -87,6 +87,7 @@ tuple<string, string, string> wasm_to_c( const string& wasm_name, const string& 
 
   ReadBinaryOptions options;
   options.features.enable_multi_memory();
+  options.features.enable_exceptions();
 
   wabt_try(
     "ReadBinaryIr",

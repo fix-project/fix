@@ -28,7 +28,18 @@ const static map<string, uint64_t> library_func_map
       { "wasm_rt_free_funcref_table", (uint64_t)wasm_rt_free_funcref_table },
       { "wasm_rt_free_externref_table", (uint64_t)wasm_rt_free_externref_table },
       { "wasm_rt_init", (uint64_t)wasm_rt_init },
+      { "wasm_rt_free", (uint64_t)wasm_rt_free },
       { "wasm_rt_is_initialized", (uint64_t)wasm_rt_is_initialized },
+      { "wasm_rt_register_tag", (uint64_t)wasm_rt_register_tag },
+      { "wasm_rt_load_exception", (uint64_t)wasm_rt_load_exception },
+      { "wasm_rt_throw", (uint64_t)wasm_rt_throw },
+      { "wasm_rt_push_unwind_target", (uint64_t)wasm_rt_push_unwind_target },
+      { "wasm_rt_pop_unwind_target", (uint64_t)wasm_rt_pop_unwind_target },
+      { "wasm_rt_exception_tag", (uint64_t)wasm_rt_exception_tag },
+      { "wasm_rt_exception_size", (uint64_t)wasm_rt_exception_size },
+      { "wasm_rt_exception", (uint64_t)wasm_rt_exception },
+      { "__sigsetjmp", (uint64_t)__sigsetjmp },
+      { "siglongjmp", (uint64_t)siglongjmp },
       { "fixpoint_attach_tree", (uint64_t)fixpoint::attach_tree },
       { "fixpoint_attach_blob", (uint64_t)fixpoint::attach_blob },
       { "fixpoint_create_tree", (uint64_t)fixpoint::create_tree },
@@ -36,8 +47,6 @@ const static map<string, uint64_t> library_func_map
       { "fixpoint_create_thunk", (uint64_t)fixpoint::create_thunk },
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
-      { "_setjmp", (uint64_t)setjmp },
-      { "longjmp", (uint64_t)longjmp },
       { "__assert_fail", (uint64_t)throw_assertion_failure } };
 
 void __stack_chk_fail( void )
@@ -178,6 +187,9 @@ Program link_program( string& program_content, const string& program_name )
         else {
           if ( symtb_entry.st_shndx == SHN_UNDEF ) {
             string name = string( elf_info.symstrs.data() + symtb_entry.st_name );
+            if ( library_func_map.count( name ) != 1 ) {
+              throw runtime_error( "can't find function " + name );
+            }
             rel_offset += library_func_map.at( name );
           } else {
             rel_offset += (int64_t)( program_mem ) + elf_info.idx_to_offset.at( symtb_entry.st_shndx )
@@ -205,7 +217,7 @@ Program link_program( string& program_content, const string& program_name )
 
   shared_ptr<char> code( static_cast<char*>( program_mem ), free );
   uint64_t init_entry = elf_info.func_map.at( "initProgram" );
-  uint64_t main_entry = elf_info.func_map.at( "_fixpoint_apply" );
+  uint64_t main_entry = elf_info.func_map.at( "Z_" + program_name + "Z__fixpoint_apply" );
   uint64_t cleanup_entry = elf_info.func_map.at( "Z_" + program_name + "_free" );
   uint64_t instance_size_entry = elf_info.func_map.at( "get_instance_size" );
   uint64_t init_module_entry = elf_info.func_map.at( "Z_" + program_name + "_init_module" );

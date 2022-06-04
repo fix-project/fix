@@ -37,8 +37,7 @@
 #endif
 
 #define PAGE_SIZE 65536
-
-#include <iostream>
+#define MAX_EXCEPTION_SIZE PAGE_SIZE
 
 typedef struct FuncType
 {
@@ -60,13 +59,20 @@ jmp_buf g_jmp_buf;
 FuncType* g_func_types;
 uint32_t g_func_type_count;
 
+uint32_t g_tag_count;
+
+uint32_t g_active_exception_tag;
+void* g_active_exception;
+uint32_t g_active_exception_size;
+
+jmp_buf* g_unwind_target;
+
 void wasm_rt_trap( wasm_rt_trap_t code )
 {
   assert( code != WASM_RT_TRAP_NONE );
 #if !WASM_RT_MEMCHECK_SIGNAL_HANDLER
   wasm_rt_call_stack_depth = g_saved_call_stack_depth;
 #endif
-  std::cout << wasm_rt_strerror( code ) << std::endl;
   WASM_RT_LONGJMP( g_jmp_buf, code );
 }
 
@@ -114,6 +120,56 @@ uint32_t wasm_rt_register_func_type( uint32_t param_count, uint32_t result_count
   g_func_types = static_cast<FuncType*>( realloc( g_func_types, g_func_type_count * sizeof( FuncType ) ) );
   g_func_types[idx] = func_type;
   return idx + 1;
+}
+
+uint32_t wasm_rt_register_tag( uint32_t size )
+{
+  if ( size > MAX_EXCEPTION_SIZE ) {
+    wasm_rt_trap( WASM_RT_TRAP_EXHAUSTION );
+  }
+  return g_tag_count++;
+}
+
+void wasm_rt_load_exception( uint32_t tag, uint32_t size, const void* values )
+{
+  assert( size <= MAX_EXCEPTION_SIZE );
+
+  g_active_exception_tag = tag;
+  g_active_exception_size = size;
+
+  memcpy( g_active_exception, values, size );
+}
+
+WASM_RT_NO_RETURN void wasm_rt_throw( void )
+{
+  WASM_RT_LONGJMP( *g_unwind_target, WASM_RT_TRAP_UNCAUGHT_EXCEPTION );
+}
+
+jmp_buf* wasm_rt_push_unwind_target( jmp_buf* target )
+{
+  jmp_buf* prev_target = g_unwind_target;
+  g_unwind_target = target;
+  return prev_target;
+}
+
+void wasm_rt_pop_unwind_target( jmp_buf* target )
+{
+  g_unwind_target = target;
+}
+
+uint32_t wasm_rt_exception_tag( void )
+{
+  return g_active_exception_tag;
+}
+
+uint32_t wasm_rt_exception_size( void )
+{
+  return g_active_exception_size;
+}
+
+void* wasm_rt_exception( void )
+{
+  return g_active_exception;
 }
 
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
@@ -230,7 +286,8 @@ void wasm_rt_init( void )
 #endif
 }
 
-bool wasm_rt_is_initialized(void) {
+bool wasm_rt_is_initialized( void )
+{
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
   return g_signal_handler_installed;
 #else
@@ -510,6 +567,8 @@ const char* wasm_rt_strerror( wasm_rt_trap_t trap )
       return "Unreachable instruction executed";
     case WASM_RT_TRAP_CALL_INDIRECT:
       return "Invalid call_indirect";
+    case WASM_RT_TRAP_UNCAUGHT_EXCEPTION:
+      return "Uncaught exception";
   }
   return "invalid trap code";
 }

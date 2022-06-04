@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <memory>
-#include <setjmp.h>
 #include <string>
 #include <vector>
 
@@ -59,7 +58,6 @@ public:
   {
     Name return_value;
     size_t memory_usage;
-    jmp_buf buffer;
   };
 
   size_t get_instance_and_context_size() const { return instance_size_ + sizeof( Context ); }
