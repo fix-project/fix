@@ -15,6 +15,7 @@ add_custom_command(
           ${CMAKE_BINARY_DIR}/src/wasi_snapshot_preview1.wasm
           wasi_snapshot_preview1.wasm
           --enable-multi-memory
+	  --enable-exceptions
 )
 
 add_custom_command(
@@ -24,6 +25,7 @@ add_custom_command(
           wasi_snapshot_preview1.wasm
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
           --enable-multi-memory
+	  --enable-exceptions
           sloth.wasm
           wasi_snapshot_preview1.wasm
           -n wasi_snapshot_preview1

@@ -7,6 +7,7 @@ add_custom_command(
           ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
           --enable-multi-memory
+	  --enable-exceptions
           ${CMAKE_CURRENT_SOURCE_DIR}/memory_helper.wat
           -o helper.wasm
 )
@@ -18,6 +19,7 @@ add_custom_command(
           trivial-demo
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
           --enable-multi-memory
+	  --enable-exceptions
           trivial-demo
           -m flatware 
           helper.wasm
