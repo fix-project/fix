@@ -1,32 +1,42 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
-typedef char __attribute__((address_space(10)))* externref;
+typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
-typedef struct filedesc {
+typedef struct filedesc
+{
   uint32_t offset;
 } filedesc;
 
-static struct filedesc stdout = {.offset = 0};
+static struct filedesc stdout = { .offset = 0 };
 
-extern void memory_copy_rw_0(const void*, size_t) __attribute( ( import_module("helper"), import_name("memory_copy_rw_0") ) );
-extern void memory_copy_rw_1(const void*, size_t) __attribute( ( import_module("helper"), import_name("memory_copy_rw_1") ) );
-extern void program_memory_copy_rw_1(uint32_t, uint32_t) __attribute( ( import_module("helper"), import_name("program_memory_copy_rw_1") ) );
-extern externref create_blob_rw_mem_0(uint32_t) __attribute( ( import_module("fixpoint"), import_name("create_blob_rw_mem_0") ) );
-extern externref create_blob_rw_mem_1(uint32_t) __attribute( ( import_module("fixpoint"), import_name("create_blob_rw_mem_1") ) );
-extern externref create_tree_rw_table_0(uint32_t) __attribute( ( import_module("fixpoint"), import_name("create_tree_rw_table_0") ) );
+extern void memory_copy_rw_0( const void*, size_t )
+  __attribute( ( import_module( "helper" ), import_name( "memory_copy_rw_0" ) ) );
+extern void memory_copy_rw_1( const void*, size_t )
+  __attribute( ( import_module( "helper" ), import_name( "memory_copy_rw_1" ) ) );
+extern void program_memory_copy_rw_1( uint32_t, uint32_t )
+  __attribute( ( import_module( "helper" ), import_name( "program_memory_copy_rw_1" ) ) );
+extern externref create_blob_rw_mem_0( uint32_t )
+  __attribute( ( import_module( "fixpoint" ), import_name( "create_blob_rw_mem_0" ) ) );
+extern externref create_blob_rw_mem_1( uint32_t )
+  __attribute( ( import_module( "fixpoint" ), import_name( "create_blob_rw_mem_1" ) ) );
+extern externref create_tree_rw_table_0( uint32_t )
+  __attribute( ( import_module( "fixpoint" ), import_name( "create_tree_rw_table_0" ) ) );
 extern uint32_t get_i32( uint32_t ) __attribute( ( import_module( "helper" ), import_name( "get_i32" ) ) );
 extern void run_start( void ) __attribute( ( import_module( "helper" ), import_name( "run-start" ) ) );
-extern void set_return( uint32_t, externref ) __attribute( ( import_module("helper"), import_name("set_return")));
+extern void set_return( uint32_t, externref )
+  __attribute( ( import_module( "helper" ), import_name( "set_return" ) ) );
 __attribute( ( noreturn ) ) void flatware_exit( void )
   __attribute( ( import_module( "helper" ), import_name( "exit" ) ) );
 
 __attribute( ( noreturn ) ) void proc_exit( uint32_t rval ) __attribute( ( export_name( "proc_exit" ) ) );
-uint32_t fd_close ( int fd ) __attribute( ( export_name("fd_close") ) );
-uint32_t fd_fdstat_get ( uint32_t fd, uint32_t res ) __attribute ( ( export_name("fd_fdstat_get") ) );
-uint32_t fd_seek ( uint32_t fd, int64_t offset, uint32_t whence, uint32_t file_size ) __attribute ( ( export_name("fd_seek") ) ); // not used atm
-uint32_t fd_write ( uint32_t fd, uint32_t vec, uint32_t vec_len, uint32_t retptr0 ) __attribute ( ( export_name("fd_write") ) );
+uint32_t fd_close( int fd ) __attribute( ( export_name( "fd_close" ) ) );
+uint32_t fd_fdstat_get( uint32_t fd, uint32_t res ) __attribute( ( export_name( "fd_fdstat_get" ) ) );
+uint32_t fd_seek( uint32_t fd, int64_t offset, uint32_t whence, uint32_t file_size )
+  __attribute( ( export_name( "fd_seek" ) ) ); // not used atm
+uint32_t fd_write( uint32_t fd, uint32_t vec, uint32_t vec_len, uint32_t retptr0 )
+  __attribute( ( export_name( "fd_write" ) ) );
 externref fixpoint_apply( externref encode ) __attribute( ( export_name( "_fixpoint_apply" ) ) );
 
 __attribute( ( noreturn ) ) void proc_exit( uint32_t rval )
@@ -36,23 +46,33 @@ __attribute( ( noreturn ) ) void proc_exit( uint32_t rval )
   flatware_exit();
 }
 
-uint32_t fd_close(__attribute__((unused)) int fd) {
+uint32_t fd_close( __attribute__( ( unused ) ) int fd )
+{
 
   return 0;
 }
 
-uint32_t fd_fdstat_get(__attribute__((unused)) uint32_t fd, __attribute__((unused)) uint32_t res) {
+uint32_t fd_fdstat_get( __attribute__( ( unused ) ) uint32_t fd, __attribute__( ( unused ) ) uint32_t res )
+{
   return 0;
 }
 
-uint32_t fd_seek(__attribute__((unused)) uint32_t fd, __attribute__((unused)) int64_t offset, __attribute__((unused)) uint32_t whence, __attribute__((unused)) uint32_t file_size) {
+uint32_t fd_seek( __attribute__( ( unused ) ) uint32_t fd,
+                  __attribute__( ( unused ) ) int64_t offset,
+                  __attribute__( ( unused ) ) uint32_t whence,
+                  __attribute__( ( unused ) ) uint32_t file_size )
+{
   return 0;
 }
 
-uint32_t fd_write(__attribute__((unused)) uint32_t fd, uint32_t iovs, __attribute__((unused)) uint32_t iovs_len, __attribute__((unused)) uint32_t retptr0) {
-  uint32_t offset = get_i32(iovs);
-  uint32_t size = get_i32(iovs + 4);
-  program_memory_copy_rw_1(offset, size);
+uint32_t fd_write( __attribute__( ( unused ) ) uint32_t fd,
+                   uint32_t iovs,
+                   __attribute__( ( unused ) ) uint32_t iovs_len,
+                   __attribute__( ( unused ) ) uint32_t retptr0 )
+{
+  uint32_t offset = get_i32( iovs );
+  uint32_t size = get_i32( iovs + 4 );
+  program_memory_copy_rw_1( offset, size );
   stdout.offset += size;
   return size;
 }
