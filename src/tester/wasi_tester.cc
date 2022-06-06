@@ -6,8 +6,6 @@
 #include "runtimestorage.hh"
 #include "util.hh"
 
-#include "timing_helper.hh"
-
 using namespace std;
 
 int main( int argc, char* argv[] )

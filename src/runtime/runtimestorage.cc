@@ -4,7 +4,6 @@
 #include "elfloader.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
-#include "timing_helper.hh"
 #include "wasm-rt-content.h"
 
 using namespace std;

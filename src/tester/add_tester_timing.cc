@@ -4,7 +4,6 @@
 
 #include "name.hh"
 #include "runtimestorage.hh"
-#include "timing_helper.hh"
 #include "util.hh"
 
 using namespace std;
@@ -25,8 +24,8 @@ int main( int argc, char* argv[] )
   for ( int i = 0; i < N; i++ ) {
     int arg1 = atoi( argv[2] );
     int arg2 = i;
-    Name arg1_name = runtime.add_blob( move( string( reinterpret_cast<char*>( &arg1 ), sizeof( int ) ) ) );
-    Name arg2_name = runtime.add_blob( move( string( reinterpret_cast<char*>( &arg2 ), sizeof( int ) ) ) );
+    Name arg1_name = runtime.add_blob( string( reinterpret_cast<char*>( &arg1 ), sizeof( int ) ) );
+    Name arg2_name = runtime.add_blob( string( reinterpret_cast<char*>( &arg2 ), sizeof( int ) ) );
 
     vector<Name> encode;
     encode.push_back( Name( "empty" ) );
@@ -41,6 +40,7 @@ int main( int argc, char* argv[] )
     runtime.force_thunk( thunk_name );
   }
 
-  print_fixpoint_timers( cout );
+  global_timer().summary( cout );
+
   return 0;
 }

@@ -6,9 +6,7 @@
 namespace fixpoint {
 void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )
 {
-#if TIME_FIXPOINT == 2
-  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _attach_tree };
-#endif
+  GlobalScopeTimer<Timer::Category::AttachTree> record_timer;
   ObjectReference obj( ro_handle );
   if ( obj.get_content_type() != ContentType::Tree || !obj.is_accessible() ) {
     throw std::runtime_error( "not an accessible tree" );
@@ -21,9 +19,7 @@ void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )
 
 void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
 {
-#if TIME_FIXPOINT == 2
-  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _attach_blob };
-#endif
+  GlobalScopeTimer<Timer::Category::AttachBlob> record_timer;
   ObjectReference obj( ro_handle );
   if ( !obj.is_accessible() ) {
     throw std::runtime_error( "object handle is not accessible" );
@@ -49,9 +45,7 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
 // module_instance points to the WASM instance
 __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 {
-#if TIME_FIXPOINT == 2
-  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _create_blob };
-#endif
+  GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
   Name blob = RuntimeStorage::get_instance().add_local_blob( Blob( (char*)memory->data, size ) );
   memory->data = NULL;
   memory->pages = 0;
@@ -64,9 +58,7 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 
 __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
 {
-#if TIME_FIXPOINT == 2
-  RecordScopeTimer<Timer::Category::Nonblock> record_timer { _create_tree };
-#endif
+  GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
   for ( size_t i = 0; i < size; i++ ) {
     table->data[i] = MTreeEntry::to_name( MTreeEntry( table->data[i] ) );
   }

@@ -17,7 +17,7 @@ void Timer::summary( ostream& out ) const
   out << "Global timing summary\n---------------------\n\n";
 
   out << "Total time: ";
-  pp_ticks( out, now - _beginning_timestamp );
+  out << now - _beginning_timestamp;
   out << "\n";
 
   uint64_t accounted = 0;
@@ -25,21 +25,21 @@ void Timer::summary( ostream& out ) const
   for ( unsigned int i = 0; i < num_categories; i++ ) {
     out << "   " << _category_names.at( i ) << ": ";
     out << string( 32 - strlen( _category_names.at( i ) ), ' ' );
-    out << fixed << setw( 5 ) << setprecision( 1 ) << 100 * _records.at( i ).total_ticks / double( elapsed ) << "%";
+    out << fixed << setw( 6 ) << setprecision( 1 ) << 100 * _records.at( i ).total_ticks / double( elapsed ) << "%";
     accounted += _records.at( i ).total_ticks;
 
     if ( _records.at( i ).count > 0 ) {
       out << "   [mean=";
-      pp_ticks( out, _records.at( i ).total_ticks / _records.at( i ).count );
+      out << fixed << setw( 6 ) << _records.at( i ).total_ticks / _records.at( i ).count;
       out << "] ";
     } else {
-      out << "                   ";
+      out << "                 ";
     }
 
     out << "[max= ";
-    pp_ticks( out, _records.at( i ).max_ticks );
+    out << fixed << setw( 6 ) << _records.at( i ).max_ticks;
     out << "]";
-    out << " [count=" << _records.at( i ).count << "]";
+    out << " [count=" << fixed << setw( 6 ) << _records.at( i ).count << "]";
 
     out << "\n";
   }

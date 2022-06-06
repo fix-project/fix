@@ -11,7 +11,6 @@
 #include "wasm-rt.h"
 
 #include "timer.hh"
-#include "timing_helper.hh"
 
 class Program
 {
@@ -74,9 +73,7 @@ public:
 
   __m256i execute( Name encode_name, string_span instance ) const
   {
-#if TIME_FIXPOINT == 1
-    RecordScopeTimer<Timer::Category::Nonblock> record_timer { _execution };
-#endif
+    GlobalScopeTimer<Timer::Category::Execution> record_timer;
     __m256i ( *main_func )( void*, __m256i );
     main_func = reinterpret_cast<__m256i ( * )( void*, __m256i )>( code_.get() + main_entry_ );
     return main_func( instance.mutable_data(), encode_name );

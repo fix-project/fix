@@ -11,3 +11,5 @@ configure_file(include-path.hh.in include-path.hh)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_library (compiler STATIC ${LIB_SOURCES} include-path.hh)
+add_library (compiler-timing STATIC ${LIB_SOURCES} include-path.hh)
+target_compile_definitions(compiler-timing PUBLIC TIME_FIXPOINT=1)
