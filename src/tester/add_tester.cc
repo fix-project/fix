@@ -20,10 +20,8 @@ int main( int argc, char* argv[] )
 
   runtime.add_wasm( "addblob", wasm_content );
 
-  int arg1 = atoi( argv[2] );
-  int arg2 = atoi( argv[3] );
-  Name arg1_name = runtime.add_blob( Blob( string( reinterpret_cast<char*>( &arg1 ), sizeof( int ) ) ) );
-  Name arg2_name = runtime.add_blob( Blob( string( reinterpret_cast<char*>( &arg2 ), sizeof( int ) ) ) );
+  Name arg1_name = runtime.add_blob( make_blob( atoi( argv[2] ) ) );
+  Name arg2_name = runtime.add_blob( make_blob( atoi( argv[3] ) ) );
 
   vector<Name> encode;
   encode.push_back( Name( "empty" ) );

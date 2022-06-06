@@ -1,48 +1,63 @@
 #pragma once
 
+#include <cstdlib>
 #include <memory>
-#include <string>
 #include <string_view>
-
-#include "sha256.hh"
 
 class Blob
 {
 private:
-  // Content of the blob
-  const std::string content_;
-  char* raw_content_;
+  uint8_t* owned_content_;
   size_t size_;
-  bool free_;
 
 public:
-  // Construct from name and content
-  Blob( std::string&& content )
-    : content_( std::move( content ) )
-    , raw_content_( const_cast<char*>( content_.data() ) )
-    , size_( content_.size() )
-    , free_( false )
-  {
-  }
-
-  Blob( char* data, size_t size )
-    : content_()
-    , raw_content_( data )
+  Blob( uint8_t* data, const size_t size )
+    : owned_content_( std::move( data ) )
     , size_( size )
-    , free_( true )
   {
   }
 
-  Blob(const Blob&) = delete;
-  Blob& operator=(const Blob&) = delete;
-  Blob(Blob&&) = default;
-
-  ~Blob() {
-    if ( free_ ) {
-      free( raw_content_ );
+  Blob( Blob&& other )
+    : owned_content_( other.owned_content_ )
+    , size_( other.size_ )
+  {
+    if ( owned_content_ != other.owned_content_ ) {
+      other.owned_content_ = nullptr;
     }
   }
 
-  std::string_view content() const { return std::string_view( raw_content_, size_ ); }
+  Blob& operator=( Blob&& other )
+  {
+    owned_content_ = other.owned_content_;
+    size_ = other.size_;
+
+    if ( owned_content_ != other.owned_content_ ) {
+      other.owned_content_ = nullptr;
+    }
+    return *this;
+  }
+
+  Blob( const Blob& ) = delete;
+  Blob& operator=( const Blob& ) = delete;
+
+  std::string_view content() const { return { reinterpret_cast<char*>( owned_content_ ), size_ }; }
   size_t size() const { return size_; }
+
+  ~Blob()
+  {
+    if ( owned_content_ ) {
+      free( owned_content_ );
+    };
+  }
 };
+
+template<typename T>
+Blob make_blob( const T& t )
+{
+  uint8_t* t_storage = static_cast<uint8_t*>( malloc( sizeof( T ) ) );
+  if ( not t_storage ) {
+    throw std::bad_alloc();
+  }
+  memcpy( t_storage, &t, sizeof( T ) );
+  return { t_storage, sizeof( T ) };
+}

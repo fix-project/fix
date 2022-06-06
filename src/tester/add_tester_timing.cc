@@ -20,12 +20,11 @@ int main( int argc, char* argv[] )
 
   runtime.add_wasm( "addblob", wasm_content );
 
-  int N = atoi( argv[3] );
+  const int arg1 = atoi( argv[2] );
+  const int N = atoi( argv[3] );
+  Name arg1_name = runtime.add_blob( make_blob( arg1 ) );
   for ( int i = 0; i < N; i++ ) {
-    int arg1 = atoi( argv[2] );
-    int arg2 = i;
-    Name arg1_name = runtime.add_blob( string( reinterpret_cast<char*>( &arg1 ), sizeof( int ) ) );
-    Name arg2_name = runtime.add_blob( string( reinterpret_cast<char*>( &arg2 ), sizeof( int ) ) );
+    Name arg2_name = runtime.add_blob( make_blob( i ) );
 
     vector<Name> encode;
     encode.push_back( Name( "empty" ) );

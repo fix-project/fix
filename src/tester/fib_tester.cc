@@ -22,8 +22,7 @@ int main( int argc, char* argv[] )
   runtime.add_wasm( "fib", fib_wasm_content );
   runtime.add_wasm( "add", add_wasm_content );
 
-  int arg = atoi( argv[3] );
-  Name arg_name = runtime.add_blob( move( string( reinterpret_cast<char*>( &arg ), sizeof( int ) ) ) );
+  Name arg_name = runtime.add_blob( make_blob( atoi( argv[3] ) ) );
 
   vector<Name> encode;
   encode.push_back( Name( "empty" ) );

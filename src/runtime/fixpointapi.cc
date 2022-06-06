@@ -46,14 +46,12 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
 __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 {
   GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
-  Name blob = RuntimeStorage::get_instance().add_local_blob( Blob( (char*)memory->data, size ) );
+  uint8_t* frozen_memory_data = memory->data;
   memory->data = NULL;
   memory->pages = 0;
   memory->max_pages = 65536;
   memory->size = 0;
-
-  ObjectReference obj( blob );
-  return obj;
+  return RuntimeStorage::get_instance().add_local_blob( Blob( frozen_memory_data, size ) );
 }
 
 __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
