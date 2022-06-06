@@ -63,10 +63,11 @@ public:
   void start()
   {
     if ( _current_category.has_value() ) {
-      throw std::runtime_error( "timer started when already running" );
+      abort();
     }
 
     const uint64_t now = __rdtsc();
+    _mm_lfence();
 
     _current_category = category;
     _start_time = now;
@@ -76,9 +77,10 @@ public:
   void stop()
   {
     if ( not _current_category.has_value() or _current_category.value() != category ) {
-      throw std::runtime_error( "timer stopped when not running, or with mismatched category" );
+      abort();
     }
 
+    _mm_lfence();
     const uint64_t now = __rdtsc();
 
     _records[static_cast<size_t>( category )].log( now - _start_time );
