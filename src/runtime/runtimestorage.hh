@@ -79,9 +79,6 @@ public:
   // add wasm module
   void add_wasm( const std::string& name, const std::string& wasm_content );
 
-  // add elf program
-  void add_program( const std::string& name, std::string& program_content );
-
   // force the object refered to by a name
   Name force( Name name );
 

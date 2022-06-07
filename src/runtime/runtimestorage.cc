@@ -195,10 +195,5 @@ void RuntimeStorage::add_wasm( const string& name, const string& wasm_content )
 
   string elf_content = c_to_elf( name, c_header, h_header, fixpoint_header, wasm_rt_content );
 
-  add_program( name, elf_content );
-}
-
-void RuntimeStorage::add_program( const string& name, string& program_content )
-{
-  name_to_program_.insert_or_assign( name, link_program( program_content, name ) );
+  name_to_program_.insert_or_assign( name, link_program( elf_content, name ) );
 }
