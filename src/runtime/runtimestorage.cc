@@ -107,10 +107,10 @@ Name RuntimeStorage::force( Name name )
         return name;
 
       case ContentType::Tree:
-        return this->force_tree( name );
+        return force_tree( name );
 
       case ContentType::Thunk:
-        return this->force_thunk( name );
+        return force_thunk( name );
 
       default:
         throw runtime_error( "Invalid content type." );
@@ -118,25 +118,31 @@ Name RuntimeStorage::force( Name name )
   }
 }
 
+// XXX should force tree in-place rather than constructing new one
 Name RuntimeStorage::force_tree( Name name )
 {
-  vector<Name> tree_content;
-  for ( const auto& entry : get_tree( name ) ) {
+  const auto orig_tree = get_tree( name );
+  Name* new_tree = static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * orig_tree.size() ) );
+  if ( not new_tree ) {
+    throw bad_alloc();
+  }
+  for ( size_t i = 0; i < orig_tree.size(); ++i ) {
+    const auto& entry = orig_tree[i];
     if ( entry.is_strict_tree_entry() ) {
-      tree_content.push_back( this->force( entry ) );
+      new_tree[i] = force( entry );
     } else {
-      tree_content.push_back( entry );
+      new_tree[i] = entry;
     }
   }
 
-  return this->add_tree( move( tree_content ) );
+  return add_tree( { new_tree, orig_tree.size() } );
 }
 
 Name RuntimeStorage::force_thunk( Name name )
 {
   Name current_name = name;
   while ( true ) {
-    Name new_name = this->reduce_thunk( current_name );
+    Name new_name = reduce_thunk( current_name );
     switch ( new_name.get_content_type() ) {
       case ContentType::Blob:
       case ContentType::Tree:
@@ -153,8 +159,8 @@ Name RuntimeStorage::reduce_thunk( Name name )
   if ( memoization_cache.contains( name ) ) {
     return memoization_cache.at( name );
   } else {
-    Name encode_name = this->get_thunk_encode_name( name );
-    Name result = this->evaluate_encode( encode_name );
+    Name encode_name = get_thunk_encode_name( name );
+    Name result = evaluate_encode( encode_name );
     memoization_cache[name] = result;
     return result;
   }
@@ -162,12 +168,12 @@ Name RuntimeStorage::reduce_thunk( Name name )
 
 Name RuntimeStorage::evaluate_encode( Name encode_name )
 {
-  Name forced_encode = this->force_tree( encode_name );
+  Name forced_encode = force_tree( encode_name );
   Name forced_encode_thunk = Name::get_thunk_name( forced_encode );
   if ( memoization_cache.contains( forced_encode_thunk ) ) {
     return memoization_cache.at( forced_encode_thunk );
   }
-  Name function_name = this->get_tree( forced_encode ).at( 1 );
+  Name function_name = get_tree( forced_encode ).at( 1 );
   string program_name = string( function_name.literal_blob() );
   size_t instance_size = name_to_program_.at( program_name ).get_instance_and_context_size();
   void* ptr = aligned_alloc( alignof( __m256i ), instance_size );

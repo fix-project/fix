@@ -21,7 +21,7 @@ public:
     : owned_content_( other.owned_content_ )
     , size_( other.size_ )
   {
-    if ( owned_content_ != other.owned_content_ ) {
+    if ( this != &other ) {
       other.owned_content_ = nullptr;
     }
   }
@@ -31,7 +31,7 @@ public:
     owned_content_ = other.owned_content_;
     size_ = other.size_;
 
-    if ( owned_content_ != other.owned_content_ ) {
+    if ( this != &other ) {
       other.owned_content_ = nullptr;
     }
     return *this;

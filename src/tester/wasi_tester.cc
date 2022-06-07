@@ -26,7 +26,7 @@ int main( int argc, char* argv[] )
   encode.push_back( Name( "empty" ) );
   encode.push_back( Name( program_name ) );
 
-  Name encode_name = runtime.add_tree( move( encode ) );
+  Name encode_name = runtime.add_tree( Tree::make_tree( encode ) );
 
   Thunk thunk( encode_name );
   Name thunk_name = runtime.add_thunk( thunk );

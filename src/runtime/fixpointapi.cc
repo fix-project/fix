@@ -47,9 +47,13 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 {
   GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
   uint8_t* frozen_memory_data = memory->data;
+
+  if ( size > memory->size ) {
+    wasm_rt_trap( WASM_RT_TRAP_OOB );
+  }
+
   memory->data = NULL;
   memory->pages = 0;
-  memory->max_pages = 65536;
   memory->size = 0;
   return RuntimeStorage::get_instance().add_local_blob( Blob( frozen_memory_data, size ) );
 }
@@ -57,16 +61,18 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
 {
   GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
+
+  if ( size > table->size ) {
+    wasm_rt_trap( WASM_RT_TRAP_OOB );
+  }
+
   for ( size_t i = 0; i < size; i++ ) {
     table->data[i] = MTreeEntry::to_name( MTreeEntry( table->data[i] ) );
   }
-  Tree tree( reinterpret_cast<Name*>( table->data ), size );
-  Name tree_name = RuntimeStorage::get_instance().add_local_tree( std::move( tree ) );
+  __m256i* frozen_tree_data = table->data;
   table->data = NULL;
   table->size = 0;
-
-  ObjectReference obj( tree_name );
-  return obj;
+  return RuntimeStorage::get_instance().add_local_tree( { frozen_tree_data, size } );
 }
 
 __m256i create_thunk( __m256i ro_handle )
