@@ -4,7 +4,7 @@
 
 #include "ccompiler.hh"
 #include "initcomposer.hh"
-#include "util.hh"
+#include "mmap.hh"
 #include "wasmcompiler.hh"
 
 using namespace std;
@@ -15,7 +15,8 @@ int main( int argc, char* argv[] )
     cerr << "Usage: " << argv[0] << " wasm_name path_to_wasm_file path_to_c path_to_h path_to_fixpoint_header\n";
   }
 
-  string wasm_content = util::read_file( argv[2] );
+  ReadOnlyFile wasm_content { argv[2] };
+
   auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( wasm_content );
 
   ofstream fout_c( argv[3] );

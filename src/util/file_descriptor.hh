@@ -84,6 +84,9 @@ public:
   //! Set blocking(true) or non-blocking(false)
   void set_blocking( const bool blocking );
 
+  //! Size of file
+  off_t size() const;
+
   //! \name FDWrapper accessors
   //!@{
   int fd_num() const { return _internal_fd->_fd; }                        //!< \brief underlying descriptor number

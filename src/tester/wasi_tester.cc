@@ -1,10 +1,9 @@
-#include <fstream>
 #include <iostream>
 #include <string>
 
+#include "mmap.hh"
 #include "name.hh"
 #include "runtimestorage.hh"
-#include "util.hh"
 
 using namespace std;
 
@@ -14,7 +13,7 @@ int main( int argc, char* argv[] )
     cerr << "Usage: " << argv[0] << " path_to_wasi_wasm_file\n";
   }
 
-  string wasm_content = util::read_file( argv[1] );
+  ReadOnlyFile wasm_content { argv[1] };
 
   auto& runtime = RuntimeStorage::get_instance();
 

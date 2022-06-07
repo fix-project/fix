@@ -7,7 +7,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "name.hh"
-#include "util.hh"
 
 template<typename T>
 class Storage

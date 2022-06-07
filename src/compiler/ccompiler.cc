@@ -22,10 +22,10 @@ using namespace std;
 using namespace clang;
 using namespace llvm;
 
-string c_to_elf( const string& c_content,
-                 const string& h_content,
-                 const string& fixpoint_header,
-                 const string& wasm_rt_content )
+string c_to_elf( const string_view c_content,
+                 const string_view h_content,
+                 const string_view fixpoint_header,
+                 const string_view wasm_rt_content )
 {
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();

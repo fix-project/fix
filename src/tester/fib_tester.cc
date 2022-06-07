@@ -1,10 +1,9 @@
-#include <fstream>
 #include <iostream>
 #include <string>
 
+#include "mmap.hh"
 #include "name.hh"
 #include "runtimestorage.hh"
-#include "util.hh"
 
 using namespace std;
 
@@ -14,8 +13,8 @@ int main( int argc, char* argv[] )
     cerr << "Usage: " << argv[0] << " path_to_fib_wasm_file path_to_add_wasm_file arg\n";
   }
 
-  string fib_wasm_content = util::read_file( argv[1] );
-  string add_wasm_content = util::read_file( argv[2] );
+  ReadOnlyFile fib_wasm_content { argv[1] };
+  ReadOnlyFile add_wasm_content { argv[2] };
 
   auto& runtime = RuntimeStorage::get_instance();
 

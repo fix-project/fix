@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <iostream>
 #include <stdexcept>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -131,6 +133,13 @@ void FileDescriptor::set_blocking( const bool blocking )
   CheckSystemCall( "fcntl", fcntl( fd_num(), F_SETFL, flags ) );
 
   _internal_fd->_non_blocking = not blocking;
+}
+
+off_t FileDescriptor::size() const
+{
+  struct stat file_info;
+  CheckSystemCall( "fstat", fstat( fd_num(), &file_info ) );
+  return file_info.st_size;
 }
 
 int FileDescriptor::FDWrapper::CheckSystemCall( const string_view s_attempt, const int return_value ) const
