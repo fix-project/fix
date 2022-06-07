@@ -17,7 +17,7 @@ int main( int argc, char* argv[] )
 
   auto& runtime = RuntimeStorage::get_instance();
 
-  runtime.add_wasm( "addblob", wasm_content );
+  Name wasm_name = runtime.add_blob( string_view( wasm_content ) );
 
   const int arg1 = atoi( argv[2] );
   const int N = atoi( argv[3] );
@@ -27,7 +27,7 @@ int main( int argc, char* argv[] )
 
     vector<Name> encode;
     encode.push_back( Name( "empty" ) );
-    encode.push_back( Name( "addblob" ) );
+    encode.push_back( wasm_name );
     encode.push_back( arg1_name );
     encode.push_back( arg2_name );
 

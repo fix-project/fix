@@ -17,13 +17,11 @@ int main( int argc, char* argv[] )
 
   auto& runtime = RuntimeStorage::get_instance();
 
-  string program_name( basename( argv[1] ) );
-  program_name = program_name.substr( 0, program_name.length() - 5 );
-  runtime.add_wasm( program_name, wasm_content );
+  Name wasm_name = runtime.add_blob( string_view( wasm_content ) );
 
   vector<Name> encode;
   encode.push_back( Name( "empty" ) );
-  encode.push_back( Name( program_name ) );
+  encode.push_back( wasm_name );
 
   Name encode_name = runtime.add_tree( Tree::make_tree( encode ) );
 

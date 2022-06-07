@@ -46,16 +46,16 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
 __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 {
   GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
-  uint8_t* frozen_memory_data = memory->data;
 
   if ( size > memory->size ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
 
+  unique_char_ptr frozen_memory_data { reinterpret_cast<char*>( memory->data ) };
   memory->data = NULL;
   memory->pages = 0;
   memory->size = 0;
-  return RuntimeStorage::get_instance().add_local_blob( Blob( frozen_memory_data, size ) );
+  return RuntimeStorage::get_instance().add_local_blob( Blob( move( frozen_memory_data ), size ) );
 }
 
 __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )

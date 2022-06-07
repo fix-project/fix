@@ -173,25 +173,30 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
     return memoization_cache.at( forced_encode_thunk );
   }
   Name function_name = get_tree( forced_encode ).at( 1 );
-  string program_name = string( function_name.literal_blob() );
-  size_t instance_size = name_to_program_.at( program_name ).get_instance_and_context_size();
+
+  if ( not function_name.is_blob() ) {
+    throw runtime_error( "ENCODE functions not yet supported" );
+  }
+
+  if ( not name_to_program_.contains( function_name ) ) {
+    /* compile the Wasm to C and then to ELF */
+    const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
+
+    name_to_program_.insert_or_assign(
+      function_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+  }
+
+  const Program& program = name_to_program_.at( function_name );
+  size_t instance_size = program.get_instance_and_context_size();
   void* ptr = aligned_alloc( alignof( __m256i ), instance_size );
   memset( ptr, 0, instance_size );
   string_span instance { static_cast<const char*>( ptr ), instance_size };
 
-  name_to_program_.at( program_name ).populate_instance_and_context( instance );
-  __m256i output = name_to_program_.at( program_name ).execute( forced_encode, instance );
-  name_to_program_.at( program_name ).cleanup( instance );
+  program.populate_instance_and_context( instance );
+  __m256i output = program.execute( forced_encode, instance );
+  program.cleanup( instance );
   free( ptr );
 
   memoization_cache[forced_encode_thunk] = Name( output );
   return output;
-}
-
-void RuntimeStorage::add_wasm( const string& name, const string_view wasm_content )
-{
-  const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( wasm_content );
-
-  name_to_program_.insert_or_assign(
-    name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
 }

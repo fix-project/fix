@@ -27,8 +27,8 @@ private:
   // Trace Cache: maps a Name to a human-readable string
   absl::flat_hash_map<Name, std::string> trace_cache;
 
-  // Maps a string name to corresponding program
-  absl::flat_hash_map<std::string, Program> name_to_program_;
+  // Maps a Wasm function Name to corresponding compiled Program
+  absl::flat_hash_map<Name, Program> name_to_program_;
 
   // Stores literal name that are requested
   std::vector<Name> literal_cache;
@@ -75,9 +75,6 @@ public:
 
   // Return encode name referred to by thunk
   Name get_thunk_encode_name( Name thunk_name );
-
-  // add wasm module
-  void add_wasm( const std::string& name, const std::string_view wasm_content );
 
   // force the object refered to by a name
   Name force( Name name );

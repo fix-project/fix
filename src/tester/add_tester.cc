@@ -17,14 +17,13 @@ int main( int argc, char* argv[] )
 
   auto& runtime = RuntimeStorage::get_instance();
 
-  runtime.add_wasm( "addblob", wasm_content );
-
+  Name wasm_name = runtime.add_blob( string_view( wasm_content ) );
   Name arg1_name = runtime.add_blob( make_blob( atoi( argv[2] ) ) );
   Name arg2_name = runtime.add_blob( make_blob( atoi( argv[3] ) ) );
 
   vector<Name> encode;
   encode.push_back( Name( "empty" ) );
-  encode.push_back( Name( "addblob" ) );
+  encode.push_back( wasm_name );
   encode.push_back( arg1_name );
   encode.push_back( arg2_name );
 

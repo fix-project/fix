@@ -18,16 +18,15 @@ int main( int argc, char* argv[] )
 
   auto& runtime = RuntimeStorage::get_instance();
 
-  runtime.add_wasm( "fib", fib_wasm_content );
-  runtime.add_wasm( "add", add_wasm_content );
-
+  Name fib_name = runtime.add_blob( string_view( fib_wasm_content ) );
+  Name add_name = runtime.add_blob( string_view( add_wasm_content ) );
   Name arg_name = runtime.add_blob( make_blob( atoi( argv[3] ) ) );
 
   vector<Name> encode;
   encode.push_back( Name( "empty" ) );
-  encode.push_back( Name( "fib" ) );
+  encode.push_back( fib_name );
   encode.push_back( arg_name );
-  encode.push_back( Name( "add" ) );
+  encode.push_back( add_name );
   Name encode_name = runtime.add_tree( Tree::make_tree( encode ) );
 
   Thunk thunk( encode_name );
