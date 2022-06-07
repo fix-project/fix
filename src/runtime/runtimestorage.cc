@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "elfloader.hh"
+#include "object.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
 #include "wasm-rt-content.h"
@@ -121,8 +122,7 @@ Name RuntimeStorage::force( Name name )
 Name RuntimeStorage::force_tree( Name name )
 {
   const auto orig_tree = get_tree( name );
-  unique_name_ptr new_tree { static_cast<Name*>(
-    aligned_alloc( alignof( Name ), sizeof( Name ) * orig_tree.size() ) ) };
+  Tree_ptr new_tree { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * orig_tree.size() ) ) };
   if ( not new_tree ) {
     throw bad_alloc();
   }

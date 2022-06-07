@@ -27,13 +27,9 @@ struct OptionalFree
 template<typename T, typename View>
 class Value
 {
-private:
+public:
   using ptr_type = std::unique_ptr<T, OptionalFree<T>>;
 
-  ptr_type data_;
-  uint32_t size_;
-
-public:
   Value( ptr_type&& data, const uint32_t size )
     : data_( std::move( data ) )
     , size_( size )
@@ -59,6 +55,10 @@ public:
   operator View() const { return { data_.get(), size_ }; }
   const T* data() const { return data_.get(); }
   uint32_t size() const { return size_; }
+
+private:
+  ptr_type data_;
+  uint32_t size_;
 };
 
 static_assert( sizeof( __m256i ) == sizeof( Name ) );
@@ -67,13 +67,13 @@ using Blob = Value<char, std::string_view>;
 using Tree = Value<Name, span_view<Name>>;
 using Object = std::variant<Blob, Tree>;
 
-using unique_char_ptr = std::unique_ptr<char, OptionalFree<char>>;
-using unique_name_ptr = std::unique_ptr<Name, OptionalFree<Name>>;
+using Blob_ptr = Blob::ptr_type;
+using Tree_ptr = Tree::ptr_type;
 
 template<typename T>
 Blob make_blob( const T& t )
 {
-  unique_char_ptr t_storage { static_cast<char*>( malloc( sizeof( T ) ) ) };
+  Blob_ptr t_storage { static_cast<char*>( malloc( sizeof( T ) ) ) };
   if ( not t_storage ) {
     throw std::bad_alloc();
   }
