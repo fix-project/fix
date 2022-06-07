@@ -50,5 +50,5 @@ struct Elf_Info
   }
 };
 
-Elf_Info load_program( std::string& program_content );
+Elf_Info load_program( const std::string_view program_content );
 Program link_program( std::string& program_content, const std::string& program_name );

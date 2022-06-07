@@ -54,7 +54,7 @@ void __stack_chk_fail( void )
   cerr << "stack smashing detected." << endl;
 }
 
-Elf_Info load_program( string& program_content )
+Elf_Info load_program( const string_view program_content )
 {
   Elf_Info res;
 
