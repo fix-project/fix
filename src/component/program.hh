@@ -15,9 +15,6 @@
 class Program
 {
 private:
-  // Name of the program
-  std::string name_;
-
   // Code and data section of the program
   std::shared_ptr<char> code_;
   // Entry point of init function
@@ -30,15 +27,13 @@ private:
   size_t instance_size_;
 
 public:
-  Program( std::string name,
-           std::shared_ptr<char> code,
+  Program( std::shared_ptr<char> code,
            uint64_t init_entry,
            uint64_t main_entry,
            uint64_t cleanup_entry,
            uint64_t instance_size_entry,
            uint64_t init_module_entry )
-    : name_( name )
-    , code_( code )
+    : code_( code )
     , init_entry_( init_entry )
     , main_entry_( main_entry )
     , cleanup_entry_( cleanup_entry )

@@ -22,8 +22,7 @@ using namespace std;
 using namespace clang;
 using namespace llvm;
 
-string c_to_elf( const string& wasm_name,
-                 const string& c_content,
+string c_to_elf( const string& c_content,
                  const string& h_content,
                  const string& fixpoint_header,
                  const string& wasm_rt_content )
@@ -49,16 +48,15 @@ string c_to_elf( const string& wasm_name,
   IntrusiveRefCntPtr<vfs::InMemoryFileSystem> InMemFS( new vfs::InMemoryFileSystem() );
   RealFS->pushOverlay( InMemFS );
 
-  InMemFS->addFile( "./" + wasm_name + ".c", 0, MemoryBuffer::getMemBuffer( c_content ) );
-  InMemFS->addFile( "./" + wasm_name + ".h", 0, MemoryBuffer::getMemBuffer( fixpoint_header ) );
-  InMemFS->addFile( "./" + wasm_name + "_fixpoint.h", 0, MemoryBuffer::getMemBuffer( h_content ) );
+  InMemFS->addFile( "./function.c", 0, MemoryBuffer::getMemBuffer( c_content ) );
+  InMemFS->addFile( "./function.h", 0, MemoryBuffer::getMemBuffer( fixpoint_header ) );
+  InMemFS->addFile( "./function_fixpoint.h", 0, MemoryBuffer::getMemBuffer( h_content ) );
   InMemFS->addFile( "./wasm-rt.h", 0, MemoryBuffer::getMemBuffer( wasm_rt_content ) );
 
   compilerInstance.setFileManager( new FileManager( FileSystemOptions {}, RealFS ) );
 
   // Create compiler invocation
-  string input_file = wasm_name + ".c";
-  const char* Args[] = { "clang", "-c", "-O2", "-Werror", "-march=native", input_file.data() };
+  const char* Args[] = { "clang", "-c", "-O2", "-Wall", "-Werror", "-march=native", "-mtune=native", "function.c" };
   std::shared_ptr<CompilerInvocation> compilerInvocation = createInvocationFromCommandLine( Args, diagEngine );
   if ( !compilerInvocation ) {
     throw runtime_error( "Failed to create compiler Invocation" );

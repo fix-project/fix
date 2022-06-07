@@ -25,8 +25,7 @@ int main( int argc, char* argv[] )
     cout << pair.first << endl;
   }
 
-  string program_name( basename( argv[1] ) );
-  link_program( elf_content, program_name );
+  link_program( elf_content );
 
   return 0;
 }

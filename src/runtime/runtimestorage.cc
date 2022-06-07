@@ -189,10 +189,10 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
   return output;
 }
 
-void RuntimeStorage::add_wasm( const string& name, const string& wasm_content )
+void RuntimeStorage::add_wasm( const string& name, const string_view wasm_content )
 {
-  const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( name, wasm_content );
+  const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( wasm_content );
 
   name_to_program_.insert_or_assign(
-    name, link_program( c_to_elf( name, c_header, h_header, fixpoint_header, wasm_rt_content ), name ) );
+    name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
 }

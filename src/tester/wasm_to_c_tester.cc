@@ -16,7 +16,7 @@ int main( int argc, char* argv[] )
   }
 
   string wasm_content = util::read_file( argv[2] );
-  auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( argv[1], wasm_content );
+  auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( wasm_content );
 
   ofstream fout_c( argv[3] );
   fout_c << c_header;

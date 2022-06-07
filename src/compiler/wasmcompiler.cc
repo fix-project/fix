@@ -87,7 +87,7 @@ void wabt_try( const string_view what, const Errors& errors, const Result value 
   }
 }
 
-tuple<string, string, string> wasm_to_c( const string& wasm_name, const string& wasm_content )
+tuple<string, string, string> wasm_to_c( const string_view wasm_content )
 {
   Errors errors;
   Module module;
@@ -96,10 +96,9 @@ tuple<string, string, string> wasm_to_c( const string& wasm_name, const string& 
   options.features.enable_multi_memory();
   options.features.enable_exceptions();
 
-  wabt_try(
-    "ReadBinaryIr",
-    errors,
-    ReadBinaryIr( wasm_name.c_str(), wasm_content.data(), wasm_content.size(), options, &errors, &module ) );
+  wabt_try( "ReadBinaryIr",
+            errors,
+            ReadBinaryIr( "function", wasm_content.data(), wasm_content.size(), options, &errors, &module ) );
 
   MemoryStringStream c_stream;
   MemoryStringStream h_stream;
@@ -120,11 +119,10 @@ tuple<string, string, string> wasm_to_c( const string& wasm_name, const string& 
   }
 
   WriteCOptions write_c_options;
-  write_c_options.module_name = wasm_name;
-  string header_name = wasm_name + ".h";
-  wabt_try( "WriteC", errors, WriteC( &c_stream, &h_stream, header_name.c_str(), &module, write_c_options ) );
+  write_c_options.module_name = "function";
+  wabt_try( "WriteC", errors, WriteC( &c_stream, &h_stream, "function.h", &module, write_c_options ) );
 
-  fixpoint_header = initcomposer::compose_header( wasm_name, &module, &errors, &inspector );
+  fixpoint_header = initcomposer::compose_header( "function", &module, &errors, &inspector );
 
   return { c_stream.ReleaseStringBuf(), h_stream.ReleaseStringBuf(), fixpoint_header };
 }

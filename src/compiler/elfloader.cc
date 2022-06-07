@@ -128,7 +128,7 @@ Elf_Info load_program( const string_view program_content )
   return res;
 }
 
-Program link_program( const string_view program_content, const string& program_name )
+Program link_program( const string_view program_content )
 {
   Elf_Info elf_info = load_program( program_content );
 
@@ -217,10 +217,9 @@ Program link_program( const string_view program_content, const string& program_n
 
   shared_ptr<char> code( static_cast<char*>( program_mem ), free );
   uint64_t init_entry = elf_info.func_map.at( "initProgram" );
-  uint64_t main_entry = elf_info.func_map.at( "Z_" + program_name + "Z__fixpoint_apply" );
-  uint64_t cleanup_entry = elf_info.func_map.at( "Z_" + program_name + "_free" );
+  uint64_t main_entry = elf_info.func_map.at( "Z_functionZ__fixpoint_apply" );
+  uint64_t cleanup_entry = elf_info.func_map.at( "Z_function_free" );
   uint64_t instance_size_entry = elf_info.func_map.at( "get_instance_size" );
-  uint64_t init_module_entry = elf_info.func_map.at( "Z_" + program_name + "_init_module" );
-  return Program(
-    program_name, code, init_entry, main_entry, cleanup_entry, instance_size_entry, init_module_entry );
+  uint64_t init_module_entry = elf_info.func_map.at( "Z_function_init_module" );
+  return Program( code, init_entry, main_entry, cleanup_entry, instance_size_entry, init_module_entry );
 }

@@ -77,7 +77,7 @@ public:
   Name get_thunk_encode_name( Name thunk_name );
 
   // add wasm module
-  void add_wasm( const std::string& name, const std::string& wasm_content );
+  void add_wasm( const std::string& name, const std::string_view wasm_content );
 
   // force the object refered to by a name
   Name force( Name name );

@@ -16,13 +16,13 @@ int main( int argc, char* argv[] )
   }
 
   string wasm_content = util::read_file( argv[2] );
-  auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( argv[1], wasm_content );
+  auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( wasm_content );
   cout << "Composed c, h, and init" << endl;
 
   string wasm_rt_content = util::read_file( argv[3] );
   cout << "Read wasm_rt" << endl;
 
-  string elf_res = c_to_elf( argv[1], c_header, h_header, fixpoint_header, wasm_rt_content );
+  string elf_res = c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content );
 
   ofstream fout_obj( argv[4] );
   fout_obj << elf_res;
