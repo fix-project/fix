@@ -27,7 +27,8 @@ int main( int argc, char* argv[] )
   encode.push_back( fib_name );
   encode.push_back( arg_name );
   encode.push_back( add_name );
-  Name encode_name = runtime.add_tree( Tree::make_tree( encode ) );
+
+  Name encode_name = runtime.add_tree( span_view<Name>( encode.data(), encode.size() ) );
 
   Thunk thunk( encode_name );
   Name thunk_name = runtime.add_thunk( thunk );

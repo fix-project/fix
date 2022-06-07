@@ -63,8 +63,8 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
 
 Name RuntimeStorage::add_tree( Tree&& tree )
 {
-  string hash = sha256::encode( string_view { reinterpret_cast<const char*>( tree.content().data() ),
-                                              tree.content().size() * sizeof( Name ) } );
+  string hash
+    = sha256::encode( string_view { reinterpret_cast<const char*>( tree.data() ), tree.size() * sizeof( Name ) } );
   Name name( hash, ContentType::Tree );
   storage.put( name, move( tree ) );
   return name;
@@ -81,7 +81,7 @@ span_view<Name> RuntimeStorage::get_tree( Name name )
 {
   const Object& obj = storage.get( name );
   if ( holds_alternative<Tree>( obj ) ) {
-    return get<Tree>( obj ).content();
+    return get<Tree>( obj );
   }
   throw out_of_range( "Tree does not exist." );
 }
@@ -121,20 +121,21 @@ Name RuntimeStorage::force( Name name )
 Name RuntimeStorage::force_tree( Name name )
 {
   const auto orig_tree = get_tree( name );
-  Name* new_tree = static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * orig_tree.size() ) );
+  unique_name_ptr new_tree { static_cast<Name*>(
+    aligned_alloc( alignof( Name ), sizeof( Name ) * orig_tree.size() ) ) };
   if ( not new_tree ) {
     throw bad_alloc();
   }
   for ( size_t i = 0; i < orig_tree.size(); ++i ) {
     const auto& entry = orig_tree[i];
     if ( entry.is_strict_tree_entry() ) {
-      new_tree[i] = force( entry );
+      new_tree.get()[i] = force( entry );
     } else {
-      new_tree[i] = entry;
+      new_tree.get()[i] = entry;
     }
   }
 
-  return add_tree( { new_tree, orig_tree.size() } );
+  return add_tree( Tree( move( new_tree ), orig_tree.size() ) );
 }
 
 Name RuntimeStorage::force_thunk( Name name )

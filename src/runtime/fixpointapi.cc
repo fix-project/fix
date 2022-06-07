@@ -69,10 +69,10 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
   for ( size_t i = 0; i < size; i++ ) {
     table->data[i] = MTreeEntry::to_name( MTreeEntry( table->data[i] ) );
   }
-  __m256i* frozen_tree_data = table->data;
+  unique_name_ptr frozen_tree_data { reinterpret_cast<Name*>( table->data ) };
   table->data = NULL;
   table->size = 0;
-  return RuntimeStorage::get_instance().add_local_tree( { frozen_tree_data, size } );
+  return RuntimeStorage::get_instance().add_local_tree( Tree( move( frozen_tree_data ), size ) );
 }
 
 __m256i create_thunk( __m256i ro_handle )

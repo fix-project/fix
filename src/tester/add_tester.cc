@@ -27,7 +27,9 @@ int main( int argc, char* argv[] )
   encode.push_back( arg1_name );
   encode.push_back( arg2_name );
 
-  Name encode_name = runtime.add_tree( Tree::make_tree( encode ) );
+  span_view<Name> encode_view { encode.data(), encode.size() };
+
+  Name encode_name = runtime.add_tree( encode_view );
 
   Thunk thunk( encode_name );
   Name thunk_name = runtime.add_thunk( thunk );
