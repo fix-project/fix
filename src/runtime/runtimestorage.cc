@@ -191,9 +191,8 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
 
 void RuntimeStorage::add_wasm( const string& name, const string& wasm_content )
 {
-  auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( name, wasm_content );
+  const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( name, wasm_content );
 
-  string elf_content = c_to_elf( name, c_header, h_header, fixpoint_header, wasm_rt_content );
-
-  name_to_program_.insert_or_assign( name, link_program( elf_content, name ) );
+  name_to_program_.insert_or_assign(
+    name, link_program( c_to_elf( name, c_header, h_header, fixpoint_header, wasm_rt_content ), name ) );
 }

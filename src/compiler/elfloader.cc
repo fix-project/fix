@@ -128,7 +128,7 @@ Elf_Info load_program( const string_view program_content )
   return res;
 }
 
-Program link_program( string& program_content, const string& program_name )
+Program link_program( const string_view program_content, const string& program_name )
 {
   Elf_Info elf_info = load_program( program_content );
 
