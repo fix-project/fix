@@ -11,13 +11,12 @@ using namespace std;
 Name RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 32 ) {
-    string hash = sha256::encode( blob.content() );
+    string hash = sha256::encode( blob );
     Name name( hash, ContentType::Blob );
     storage.put( name, move( blob ) );
     return name;
   } else {
-    Name name( blob.content() );
-    return name;
+    return Name( blob );
   }
 }
 
@@ -29,7 +28,7 @@ Name RuntimeStorage::add_local_blob( Blob&& blob )
     storage.put( name, move( blob ) );
     return name;
   } else {
-    Name name( blob.content() );
+    Name name( blob );
     return name;
   }
 }
@@ -41,7 +40,7 @@ string_view RuntimeStorage::get_blob( Name name )
   } else {
     const Object& obj = storage.get( name );
     if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj ).content();
+      return get<Blob>( obj );
     }
   }
 
@@ -55,7 +54,7 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
   } else {
     const Object& obj = storage.get( name );
     if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj ).content();
+      return get<Blob>( obj );
     }
   }
 
