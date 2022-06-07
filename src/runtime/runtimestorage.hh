@@ -22,13 +22,13 @@ private:
   InMemoryStorage<Object> storage;
 
   // Memorization Cache: maps a Thunk to the Name of a reduction of the original Thunk
-  absl::flat_hash_map<Name, Name> memoization_cache;
+  absl::flat_hash_map<Name, Name, NameHash> memoization_cache;
 
   // Trace Cache: maps a Name to a human-readable string
-  absl::flat_hash_map<Name, std::string> trace_cache;
+  absl::flat_hash_map<Name, std::string, NameHash> trace_cache;
 
   // Maps a Wasm function Name to corresponding compiled Program
-  absl::flat_hash_map<Name, Program> name_to_program_;
+  absl::flat_hash_map<Name, Program, NameHash> name_to_program_;
 
   // Stores literal name that are requested
   std::vector<Name> literal_cache;

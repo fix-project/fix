@@ -22,7 +22,7 @@ template<typename T>
 class InMemoryStorage : public Storage<T>
 {
 private:
-  absl::flat_hash_map<Name, T> name_to_object_;
+  absl::flat_hash_map<Name, T, NameHash> name_to_object_;
 
 public:
   InMemoryStorage()

@@ -90,14 +90,21 @@ public:
                                            | 0x01'00'00'00'00'00'00'00 ) };
   }
 
-  template<typename H>
-  friend H AbslHashValue( H h, const Name& name )
-  {
-    return H::combine( std::move( h ), name.content_[0], name.content_[1], name.content_[2], name.content_[3] );
-  }
+  // template<typename H>
+  // friend H AbslHashValue( H h, const Name& name )
+  // {
+  //   return H::combine( std::move( h ), name.content_[0], name.content_[1], name.content_[2], name.content_[3] );
+  // }
 
   friend bool operator==( const Name& lhs, const Name& rhs );
   friend std::ostream& operator<<( std::ostream& s, const Name& name );
+
+  friend struct NameHash;
+};
+
+struct NameHash
+{
+  std::size_t operator()( Name const& name ) const noexcept { return name.content_[0]; }
 };
 
 bool operator==( const Name& lhs, const Name& rhs );

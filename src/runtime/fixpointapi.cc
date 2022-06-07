@@ -21,11 +21,8 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
 {
   GlobalScopeTimer<Timer::Category::AttachBlob> record_timer;
   ObjectReference obj( ro_handle );
-  if ( !obj.is_accessible() ) {
-    throw std::runtime_error( "object handle is not accessible" );
-  }
-  if ( obj.get_content_type() != ContentType::Blob ) {
-    throw std::runtime_error( "not a blob" );
+  if ( obj.get_content_type() != ContentType::Blob || !obj.is_accessible() ) {
+    throw std::runtime_error( "not an accssible blob" );
   }
 
   std::string_view blob;
