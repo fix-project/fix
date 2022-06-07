@@ -26,6 +26,21 @@ public:
   {
   }
 
+  Blob( std::unique_ptr<char> data, const size_t size )
+    : Blob( data.release(), size, true )
+  {
+  }
+
+  Blob( std::unique_ptr<uint8_t> data, const size_t size )
+    : Blob( data.release(), size, true )
+  {
+  }
+
+  Blob( std::string_view str )
+    : Blob( const_cast<char*>( str.data() ), str.size(), false )
+  {
+  }
+
   Blob( Blob&& other )
     : Blob( other.data_, other.size_, true )
   {
@@ -43,6 +58,7 @@ public:
     if ( this != &other ) {
       other.own_ = false;
     }
+
     return *this;
   }
 
@@ -50,7 +66,7 @@ public:
   Blob& operator=( const Blob& ) = delete;
 
   operator std::string_view() const { return { data_, size_ }; }
-  char* data() const { return data_; }
+  const char* data() const { return data_; }
   size_t size() const { return size_; }
 
   ~Blob()
@@ -64,7 +80,7 @@ public:
 template<typename T>
 Blob make_blob( const T& t )
 {
-  uint8_t* t_storage = static_cast<uint8_t*>( malloc( sizeof( T ) ) );
+  char* t_storage = static_cast<char*>( malloc( sizeof( T ) ) );
   if ( not t_storage ) {
     throw std::bad_alloc();
   }
