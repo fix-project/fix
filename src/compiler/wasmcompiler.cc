@@ -21,56 +21,63 @@ using namespace wabt;
 
 namespace wasmcompiler {
 
-MemoryStringStream::MemoryStringStream( Stream* log_stream )
-  : Stream( log_stream )
+class MemoryStringStream : public Stream
 {
-}
+public:
+  WABT_DISALLOW_COPY_AND_ASSIGN( MemoryStringStream )
+  explicit MemoryStringStream( Stream* log_stream = nullptr )
+    : Stream( log_stream )
+  {
+  }
 
-string&& MemoryStringStream::ReleaseStringBuf()
-{
-  return move( buf_ );
-}
+  std::string&& ReleaseStringBuf() { return move( buf_ ); }
+  std::string_view Buf() { return { buf_ }; }
 
-Result MemoryStringStream::WriteDataImpl( size_t dst_offset, const void* src, size_t size )
-{
-  if ( size == 0 ) {
+protected:
+  Result WriteDataImpl( size_t dst_offset, const void* src, size_t size ) override
+  {
+    if ( size == 0 ) {
+      return Result::Ok;
+    }
+    const size_t end = dst_offset + size;
+    if ( end > buf_.size() ) {
+      buf_.resize( end );
+    }
+    char* dst = &buf_[dst_offset];
+    memcpy( dst, src, size );
     return Result::Ok;
   }
-  size_t end = dst_offset + size;
-  if ( end > buf_.size() ) {
-    buf_.resize( end );
-  }
-  char* dst = &buf_[dst_offset];
-  memcpy( dst, src, size );
-  return Result::Ok;
-}
 
-Result MemoryStringStream::MoveDataImpl( size_t dst_offset, size_t src_offset, size_t size )
-{
-  if ( size == 0 ) {
+  Result MoveDataImpl( size_t dst_offset, size_t src_offset, size_t size ) override
+  {
+    if ( size == 0 ) {
+      return Result::Ok;
+    }
+    const size_t src_end = src_offset + size;
+    const size_t dst_end = dst_offset + size;
+    const size_t end = src_end > dst_end ? src_end : dst_end;
+    if ( end > buf_.size() ) {
+      buf_.resize( end );
+    }
+
+    char* dst = &buf_[dst_offset];
+    char* src = &buf_[src_offset];
+    memmove( dst, src, size );
     return Result::Ok;
   }
-  size_t src_end = src_offset + size;
-  size_t dst_end = dst_offset + size;
-  size_t end = src_end > dst_end ? src_end : dst_end;
-  if ( end > buf_.size() ) {
-    buf_.resize( end );
+
+  Result TruncateImpl( size_t size ) override
+  {
+    if ( size > buf_.size() ) {
+      return Result::Error;
+    }
+    buf_.resize( size );
+    return Result::Ok;
   }
 
-  char* dst = &buf_[dst_offset];
-  char* src = &buf_[src_offset];
-  memmove( dst, src, size );
-  return Result::Ok;
-}
-
-Result MemoryStringStream::TruncateImpl( size_t size )
-{
-  if ( size > buf_.size() ) {
-    return Result::Error;
-  }
-  buf_.resize( size );
-  return Result::Ok;
-}
+private:
+  std::string buf_ {};
+};
 
 void wabt_try( const string_view what, const Errors& errors, const Result value )
 {
