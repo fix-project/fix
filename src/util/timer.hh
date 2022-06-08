@@ -52,6 +52,8 @@ public:
     { "Hash", "Execution", "Attach blob", "Create blob", "Attach tree", "Create tree" }
   };
 
+  static uint64_t baseline_;
+
 private:
   uint64_t _beginning_timestamp = __rdtsc();
   std::array<Record, num_categories> _records {};
@@ -87,6 +89,13 @@ public:
     _current_category.reset();
   }
 
+  template<Category category>
+  uint64_t mean()
+  {
+    size_t category_idx = static_cast<size_t>( category );
+    return _records.at( category_idx ).total_ticks / _records.at( category_idx ).count;
+  }
+
   void summary( std::ostream& out ) const;
 };
 
@@ -99,6 +108,11 @@ inline Timer& global_timer()
 inline void reset_global_timer()
 {
   global_timer() = Timer {};
+}
+
+inline void set_time_baseline( uint64_t baseline )
+{
+  Timer::baseline_ = baseline;
 }
 
 #ifndef TIME_FIXPOINT
