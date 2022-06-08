@@ -1,19 +1,15 @@
 #include "add.hh"
 #include <cstring>
+#include <stdlib.h>
 
 int add( int a, int b )
 {
   return a + b;
 }
 
-inline uint32_t cast( char buffer[4] )
+int add( const char* a, const char* b )
 {
-  return (uint32_t)buffer[0] << 24 | (uint32_t)buffer[1] << 16 | (uint32_t)buffer[2] << 8 | (uint32_t)buffer[3];
-}
-
-uint32_t add( char a[4], char b[4] )
-{
-  return cast( a ) + cast( b );
+  return atoi( a ) + atoi( b );
 }
 
 int Base::add( int x, int y )
@@ -21,9 +17,9 @@ int Base::add( int x, int y )
   return x + y;
 }
 
-uint32_t Base::add_char( char x[4], char y[4] )
+int Base::add_char( const char* x, const char* y )
 {
-  return cast( x ) + cast( y );
+  return atoi( x ) + atoi( y );
 }
 
 int Derived::add( int x, int y )
@@ -31,7 +27,7 @@ int Derived::add( int x, int y )
   return x + y;
 }
 
-uint32_t Derived::add_char( char x[4], char y[4] )
+int Derived::add_char( const char* x, const char* y )
 {
-  return cast( x ) + cast( y );
+  return atoi( x ) + atoi( y );
 }

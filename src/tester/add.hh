@@ -1,14 +1,14 @@
 #include <stdint.h>
 
 int add( int a, int b );
-uint32_t add( char a[4], char b[4] );
+int add( const char* a, const char* b );
 
 class Base
 {
 public:
   int a, b;
   virtual int add( int x, int y );
-  virtual uint32_t add_char( char x[4], char y[4] );
+  virtual int add_char( const char* x, const char* y );
   virtual ~Base() = default;
   Base( int a_, int b_ )
     : a( a_ )
@@ -21,7 +21,7 @@ class Derived : public Base
 {
 public:
   int add( int x, int y ) override;
-  uint32_t add_char( char x[4], char y[4] ) override;
+  int add_char( const char* x, const char* y ) override;
   Derived( int a_, int b_ )
     : Base( a_, b_ )
   {

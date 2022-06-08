@@ -65,3 +65,4 @@ add_subdirectory ("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 add_subdirectory ("${PROJECT_SOURCE_DIR}/src/tester")
 
 add_subdirectory ("${PROJECT_SOURCE_DIR}/testing/wasm-examples")
+add_subdirectory ("${PROJECT_SOURCE_DIR}/testing/benchmark")
