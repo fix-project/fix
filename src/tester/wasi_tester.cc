@@ -24,7 +24,7 @@ int main( int argc, char* argv[] )
   encode.push_back( wasm_name );
 
   for ( int i = 2; i < argc; i++ ) {
-    Name arg_name = runtime.add_blob( make_blob_str( argv[i], strlen( argv[i] ) + 1 ) );
+    Name arg_name = runtime.add_blob( string_view( argv[i], strlen( argv[i] ) + 1 ) );
     encode.push_back( arg_name );
   }
 

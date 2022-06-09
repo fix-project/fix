@@ -29,6 +29,7 @@ void Timer::summary( ostream& out ) const
   uint64_t accounted = 0;
 
   for ( unsigned int i = 0; i < num_categories; i++ ) {
+    if ( _records.at(i).count == 0 ) continue;
     out << "   " << _category_names.at( i ) << ": ";
     out << string( 32 - strlen( _category_names.at( i ) ), ' ' );
     out << fixed << setw( 6 ) << setprecision( 1 ) << 100 * _records.at( i ).total_ticks / double( elapsed ) << "%";

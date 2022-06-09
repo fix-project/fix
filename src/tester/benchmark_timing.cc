@@ -8,14 +8,21 @@
 #include "add.hh"
 #include "mmap.hh"
 #include "timer.hh"
+#include "name.hh"
+#include "runtimestorage.hh"
 
 using namespace std;
 
-static int N;
-static char* add_program_name;
+int N;
+char* add_program_name;
+Name add_fixpoint_function;
+Name add_wasi_function;
+Name blob_42;
+Name char_42;
 
-#define ADD_TEST( func )                                                                                           \
+#define ADD_TEST( func, message )                                                                                           \
   {                                                                                                                \
+    cout << message << endl; \
     for ( int i = 0; i < N; i++ ) {                                                                                \
       func( i );                                                                                                   \
     }                                                                                                              \
@@ -29,24 +36,37 @@ void virtual_add( int );
 void char_add( int );
 void virtual_char_add( int );
 void vfork_add( int );
-extern int add( int, int );
+void add_fixpoint( int );
+void add_wasi( int );
 
 int main( int argc, char* argv[] )
 {
-  if ( argc < 3 ) {
-    cerr << "Usage: " << argv[0] << " #_of_iterations path_to_add_program\n";
+  if ( argc < 5 ) {
+    cerr << "Usage: " << argv[0] << " #_of_iterations path_to_add_program path_to_add_fixpoint path_to_add_wasi\n";
   }
 
   N = atoi( argv[1] );
   add_program_name = argv[2];
+  
+  auto& runtime = RuntimeStorage::get_instance();
+  ReadOnlyFile add_fixpoint_content { argv[3] };
+  ReadOnlyFile add_wasi_content { argv[4] };
+  add_fixpoint_function = runtime.add_blob( string_view( add_fixpoint_content ) );
+  add_wasi_function = runtime.add_blob( string_view( add_wasi_content ) );
+  
+  blob_42 = runtime.add_blob( make_blob( 42 ) );
+  const char* arg_42 = "42";
+  char_42 = runtime.add_blob( string_view( arg_42, strlen( arg_42 ) + 1 ) ); 
 
   baseline_function();
 
-  ADD_TEST( static_add );
-  ADD_TEST( virtual_add );
-  ADD_TEST( char_add );
-  ADD_TEST( virtual_char_add );
-  ADD_TEST( vfork_add );
+  ADD_TEST( static_add, "Executing add statically linked..." );
+  ADD_TEST( virtual_add, "Executing add via virtual function call..." );
+  ADD_TEST( char_add, "Executing statically linked add with atoi..." );
+  ADD_TEST( virtual_char_add, "Executing virtual add with atoi..." );
+  ADD_TEST( vfork_add, "Executing add program..." );
+  ADD_TEST( add_fixpoint, "Executing add implemented in Fixpoint..." );
+  ADD_TEST( add_wasi, "Executing add program compiled through wasi..." );
   return 0;
 }
 
@@ -96,7 +116,7 @@ void virtual_char_add( int i )
   }
 }
 
-inline void vfork_add( int i )
+void vfork_add( int i )
 {
   char const* arg1 = "42";
   char const* arg2 = to_string( i ).c_str();
@@ -108,4 +128,44 @@ inline void vfork_add( int i )
   } else {
     waitpid( pid, &wstatus, 0 );
   }
+}
+
+void add_fixpoint( int i )
+{
+  auto& runtime = RuntimeStorage::get_instance();
+  Name arg2 = runtime.add_blob( make_blob( i ) );
+
+  vector<Name> encode;
+  encode.push_back( Name( "empty" ) );
+  encode.push_back( add_fixpoint_function );
+  encode.push_back( blob_42 );
+  encode.push_back( arg2 );
+
+  Name encode_name = runtime.add_tree( span_view<Name>( encode.data(), encode.size() ) );
+
+  Thunk thunk( encode_name );
+  Name thunk_name = runtime.add_thunk( thunk );
+  runtime.force_thunk( thunk_name );
+}
+
+void add_wasi( int i )
+{
+  auto& runtime = RuntimeStorage::get_instance();
+  const char* arg1_content = "add";
+  const char* arg2_content = to_string( i ).c_str();
+  Name arg1 = runtime.add_blob( string_view( arg1_content, strlen( arg1_content ) + 1 ) );
+  Name arg2 = runtime.add_blob( string_view( arg2_content, strlen( arg2_content ) + 1 ) );
+  
+  vector<Name> encode;
+  encode.push_back( Name( "empty" ) );
+  encode.push_back( add_wasi_function );
+  encode.push_back( arg1 );
+  encode.push_back( char_42 );
+  encode.push_back( arg2 );
+
+  Name encode_name = runtime.add_tree( span_view<Name>( encode.data(), encode.size() ) );
+
+  Thunk thunk( encode_name );
+  Name thunk_name = runtime.add_thunk( thunk );
+  runtime.force_thunk( thunk_name );
 }
