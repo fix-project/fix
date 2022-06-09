@@ -7,9 +7,9 @@
 
 #include "add.hh"
 #include "mmap.hh"
-#include "timer.hh"
 #include "name.hh"
 #include "runtimestorage.hh"
+#include "timer.hh"
 
 using namespace std;
 
@@ -20,11 +20,23 @@ Name add_wasi_function;
 Name blob_42;
 Name char_42;
 
-#define ADD_TEST( func, message )                                                                                           \
+#define ADD_TEST( func, message )                                                                                  \
   {                                                                                                                \
-    cout << message << endl; \
+    cout << endl;                                                                                                  \
+    cout << message << endl;                                                                                       \
     for ( int i = 0; i < N; i++ ) {                                                                                \
       func( i );                                                                                                   \
+    }                                                                                                              \
+    global_timer().summary( cout );                                                                                \
+    reset_global_timer();                                                                                          \
+  }
+
+#define ADD_TEST_NUM( func, message, cycle )                                                                       \
+  {                                                                                                                \
+    cout << endl;                                                                                                  \
+    cout << message << endl;                                                                                       \
+    for ( int i = 0; i < cycle; i++ ) {                                                                            \
+      func();                                                                                                      \
     }                                                                                                              \
     global_timer().summary( cout );                                                                                \
     reset_global_timer();                                                                                          \
@@ -36,6 +48,7 @@ void virtual_add( int );
 void char_add( int );
 void virtual_char_add( int );
 void vfork_add( int );
+void vfork_add_rr();
 void add_fixpoint( int );
 void add_wasi( int );
 
@@ -47,16 +60,16 @@ int main( int argc, char* argv[] )
 
   N = atoi( argv[1] );
   add_program_name = argv[2];
-  
+
   auto& runtime = RuntimeStorage::get_instance();
   ReadOnlyFile add_fixpoint_content { argv[3] };
   ReadOnlyFile add_wasi_content { argv[4] };
   add_fixpoint_function = runtime.add_blob( string_view( add_fixpoint_content ) );
   add_wasi_function = runtime.add_blob( string_view( add_wasi_content ) );
-  
+
   blob_42 = runtime.add_blob( make_blob( 42 ) );
   const char* arg_42 = "42";
-  char_42 = runtime.add_blob( string_view( arg_42, strlen( arg_42 ) + 1 ) ); 
+  char_42 = runtime.add_blob( string_view( arg_42, strlen( arg_42 ) + 1 ) );
 
   baseline_function();
 
@@ -65,6 +78,7 @@ int main( int argc, char* argv[] )
   ADD_TEST( char_add, "Executing statically linked add with atoi..." );
   ADD_TEST( virtual_char_add, "Executing virtual add with atoi..." );
   ADD_TEST( vfork_add, "Executing add program..." );
+  ADD_TEST_NUM( vfork_add_rr, "Executing add program rr...", 10 );
   ADD_TEST( add_fixpoint, "Executing add implemented in Fixpoint..." );
   ADD_TEST( add_wasi, "Executing add program compiled through wasi..." );
   return 0;
@@ -130,6 +144,23 @@ void vfork_add( int i )
   }
 }
 
+void vfork_add_rr()
+{
+  char const* sudo = "/usr/bin/sudo";
+  char const* rr = "rr";
+  char const* record = "record";
+  {
+    GlobalScopeTimer<Timer::Category::Execution> record_timer;
+    pid_t pid = vfork();
+    int wstatus;
+    if ( pid == 0 ) {
+      execl( sudo, sudo, rr, record, add_program_name, "1", "2", NULL );
+    } else {
+      waitpid( pid, &wstatus, 0 );
+    }
+  }
+}
+
 void add_fixpoint( int i )
 {
   auto& runtime = RuntimeStorage::get_instance();
@@ -155,7 +186,7 @@ void add_wasi( int i )
   const char* arg2_content = to_string( i ).c_str();
   Name arg1 = runtime.add_blob( string_view( arg1_content, strlen( arg1_content ) + 1 ) );
   Name arg2 = runtime.add_blob( string_view( arg2_content, strlen( arg2_content ) + 1 ) );
-  
+
   vector<Name> encode;
   encode.push_back( Name( "empty" ) );
   encode.push_back( add_wasi_function );
