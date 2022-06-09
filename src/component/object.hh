@@ -80,3 +80,13 @@ Blob make_blob( const T& t )
   memcpy( t_storage.get(), &t, sizeof( T ) );
   return { std::move( t_storage ), sizeof( T ) };
 }
+
+inline Blob make_blob_str( const char* t, uint32_t size )
+{
+  Blob_ptr t_storage { static_cast<char*>( malloc( size ) ) };
+  if ( not t_storage ) {
+    throw std::bad_alloc();
+  }
+  memcpy( t_storage.get(), t, size );
+  return { std::move( t_storage ), size };
+}

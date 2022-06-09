@@ -63,6 +63,7 @@ private:
 
   void write_attach_tree();
   void write_attach_blob();
+  void write_memory_size();
   void write_create_blob();
   void write_create_tree();
   void write_create_thunk();
@@ -107,6 +108,19 @@ void InitComposer::write_attach_blob()
     result_ << "  wasm_rt_memory_t* ro_mem = " << module_prefix_ << "Z_ro_mem_" << idx << "(("
             << state_info_type_name_ << "*)module_instance);" << endl;
     result_ << "  fixpoint_attach_blob(ro_handle, ro_mem);" << endl;
+    result_ << "}\n" << endl;
+  }
+}
+
+void InitComposer::write_memory_size()
+{
+  auto ro_mems = inspector_->GetExportedROMems();
+  for ( uint32_t idx : ro_mems ) {
+    result_ << "uint32_t Z_fixpointZ_size_ro_mem_" << idx
+            << "(struct Z_fixpoint_module_instance_t* module_instance) {" << endl;
+    result_ << "  wasm_rt_memory_t* ro_mem = " << module_prefix_ << "Z_ro_mem_" << idx << "(("
+            << state_info_type_name_ << "*)module_instance);" << endl;
+    result_ << "  return ro_mem->size;" << endl;
     result_ << "}\n" << endl;
   }
 }
@@ -188,6 +202,7 @@ string InitComposer::compose_header()
   write_init_read_only_mem_table();
   write_attach_tree();
   write_attach_blob();
+  write_memory_size();
   write_create_tree();
   write_create_blob();
   write_create_thunk();
