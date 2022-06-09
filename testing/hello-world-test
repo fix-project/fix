@@ -3,7 +3,7 @@
 use strict;
 
 if ((scalar @ARGV) != 2) {
-  die qq{Usage: $0 wasi_tester return3.wasm};
+  die qq{Usage: $0 wasi_tester helloworld.wasm};
 }
 
 my ($executable, $wasm) = @ARGV;
