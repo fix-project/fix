@@ -22,21 +22,11 @@ FetchContent_Declare(
   )
 FetchContent_MakeAvailable(wasm-tools)
 
-FetchContent_Declare(
-  fixpoint
-  GIT_REPOSITORY https://github.com/fixpointOS/fixpoint
-  GIT_TAG master
-  )
-FetchContent_MakeAvailable(fixpoint)
-  
 include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-src")
 include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-build")
 
 include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wasm-tools-src")
 include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/wasm-tools-build")
-
-include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/fixpoint-src")
-include_directories (SYSTEM "${CMAKE_BINARY_DIR}/_deps/fixpoint-build")
 
 include ( etc/cflags.cmake )
 include ( etc/clang_format.cmake )
