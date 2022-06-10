@@ -15,6 +15,7 @@ using namespace std;
 
 int N;
 char* add_program_name;
+char* add_cycle_program_name;
 Name add_fixpoint_function;
 Name add_wasi_function;
 Name blob_42;
@@ -54,16 +55,19 @@ void add_wasi( int );
 
 int main( int argc, char* argv[] )
 {
-  if ( argc < 5 ) {
-    cerr << "Usage: " << argv[0] << " #_of_iterations path_to_add_program path_to_add_fixpoint path_to_add_wasi\n";
+  if ( argc < 6 ) {
+    cerr
+      << "Usage: " << argv[0]
+      << " #_of_iterations path_to_add_program path_to_add_cycle_program path_to_add_fixpoint path_to_add_wasi\n";
   }
 
   N = atoi( argv[1] );
   add_program_name = argv[2];
+  add_cycle_program_name = argv[3];
 
   auto& runtime = RuntimeStorage::get_instance();
-  ReadOnlyFile add_fixpoint_content { argv[3] };
-  ReadOnlyFile add_wasi_content { argv[4] };
+  ReadOnlyFile add_fixpoint_content { argv[4] };
+  ReadOnlyFile add_wasi_content { argv[5] };
   add_fixpoint_function = runtime.add_blob( string_view( add_fixpoint_content ) );
   add_wasi_function = runtime.add_blob( string_view( add_wasi_content ) );
 
@@ -78,7 +82,7 @@ int main( int argc, char* argv[] )
   ADD_TEST( char_add, "Executing statically linked add with atoi..." );
   ADD_TEST( virtual_char_add, "Executing virtual add with atoi..." );
   ADD_TEST( vfork_add, "Executing add program..." );
-  ADD_TEST_NUM( vfork_add_rr, "Executing add program rr...", 10 );
+  ADD_TEST_NUM( vfork_add_rr, "Executing add program rr...", 1 );
   ADD_TEST( add_fixpoint, "Executing add implemented in Fixpoint..." );
   ADD_TEST( add_wasi, "Executing add program compiled through wasi..." );
   return 0;
@@ -149,12 +153,13 @@ void vfork_add_rr()
   char const* sudo = "/usr/bin/sudo";
   char const* rr = "rr";
   char const* record = "record";
+  char const* N_char = to_string( N ).c_str();
   {
     GlobalScopeTimer<Timer::Category::Execution> record_timer;
     pid_t pid = vfork();
     int wstatus;
     if ( pid == 0 ) {
-      execl( sudo, sudo, rr, record, add_program_name, "1", "2", NULL );
+      execl( sudo, sudo, rr, record, add_cycle_program_name, add_program_name, N_char, NULL );
     } else {
       waitpid( pid, &wstatus, 0 );
     }
