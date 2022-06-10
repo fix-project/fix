@@ -1,7 +1,7 @@
 enable_testing()
 
-add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^t_"
-                         COMMENT "Testing...")
+add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^t_"
+                                  COMMENT "Testing...")
 
 add_test(NAME t_return3 WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testing/return-test
