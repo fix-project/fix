@@ -118,24 +118,18 @@ Name RuntimeStorage::force( Name name )
   }
 }
 
-// XXX should force tree in-place rather than constructing new one
 Name RuntimeStorage::force_tree( Name name )
 {
-  const auto orig_tree = get_tree( name );
-  Tree_ptr new_tree { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * orig_tree.size() ) ) };
-  if ( not new_tree ) {
-    throw bad_alloc();
-  }
+  auto orig_tree = get_tree( name );
+
   for ( size_t i = 0; i < orig_tree.size(); ++i ) {
-    const auto& entry = orig_tree[i];
-    if ( entry.is_strict_tree_entry() ) {
-      new_tree.get()[i] = force( entry );
-    } else {
-      new_tree.get()[i] = entry;
+    auto entry = orig_tree[i];
+    if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
+      orig_tree.mutable_data()[i] = force( entry );
     }
   }
 
-  return add_tree( Tree( move( new_tree ), orig_tree.size() ) );
+  return name;
 }
 
 Name RuntimeStorage::force_thunk( Name name )
@@ -170,9 +164,6 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
 {
   Name forced_encode = force_tree( encode_name );
   Name forced_encode_thunk = Name::get_thunk_name( forced_encode );
-  if ( memoization_cache.contains( forced_encode_thunk ) ) {
-    return memoization_cache.at( forced_encode_thunk );
-  }
   Name function_name = get_tree( forced_encode ).at( 1 );
 
   if ( not function_name.is_blob() ) {
