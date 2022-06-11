@@ -15,4 +15,4 @@ jobs:
       - name: compile
         run: cmake --build build --parallel 8
       - name: test
-        run: cmake --build build --target check
+        run: cmake --build build --target flatware-check
