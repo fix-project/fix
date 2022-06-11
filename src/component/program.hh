@@ -12,6 +12,23 @@
 
 #include "timer.hh"
 
+#ifndef INIT_INSTANCE
+#define INIT_INSTANCE 16
+#endif
+
+struct InstanceCleanUp
+{
+  uint64_t address;
+
+  void operator()( char* ptr ) const
+  {
+    void ( *cleanup_func )( void* );
+    cleanup_func = reinterpret_cast<void ( * )( void* )>( address );
+    cleanup_func( ptr );
+    free( ptr );
+  }
+};
+
 class Program
 {
 private:
@@ -24,7 +41,16 @@ private:
   // Entry point of clean up function
   uint64_t cleanup_entry_;
   // size of instance
-  size_t instance_size_;
+  size_t instance_context_size_;
+  // Array of instances
+  std::vector<std::unique_ptr<char, InstanceCleanUp>> instances_;
+  // Index of the next available instance
+  size_t next_instance_;
+
+  struct Context
+  {
+    size_t memory_usage;
+  };
 
 public:
   Program( std::shared_ptr<char> code,
@@ -37,47 +63,55 @@ public:
     , init_entry_( init_entry )
     , main_entry_( main_entry )
     , cleanup_entry_( cleanup_entry )
-    , instance_size_( 0 )
+    , instance_context_size_( 0 )
+    , instances_()
+    , next_instance_( 0 )
   {
     size_t ( *size_func )( void );
     size_func = reinterpret_cast<size_t ( * )( void )>( code_.get() + instance_size_entry );
-    instance_size_ = size_func();
+    size_t instance_size = size_func();
+    instance_context_size_ = instance_size + sizeof( Context );
+    if ( instance_context_size_ % alignof( __m256i ) != 0 ) {
+      instance_context_size_ = ( instance_context_size_ / alignof( __m256i ) + 1 ) * alignof( __m256i );
+    }
 
     void ( *init_module_func )( void );
     init_module_func = reinterpret_cast<void ( * )( void )>( code_.get() + init_module_entry );
     init_module_func();
+
+    void ( *init_func )( void* );
+    init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
+    
+    for ( size_t i = 0; i < INIT_INSTANCE; i++ ) {
+      std::unique_ptr<char, InstanceCleanUp> instance { static_cast<char*>(
+        aligned_alloc( alignof( __m256i ), instance_context_size_ ) ) };
+      instance.get_deleter().address = reinterpret_cast<uint64_t>( code_.get() + cleanup_entry_ );
+      init_func( instance.get() );
+      instances_.push_back( std::move( instance ) );
+    }
   }
-
-  struct Context
-  {
-    Name return_value;
-    size_t memory_usage;
-  };
-
-  size_t get_instance_and_context_size() const { return instance_size_ + sizeof( Context ); }
 
   void populate_instance_and_context( string_span instance ) const
   {
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
     init_func( instance.mutable_data() );
-
-    Context* c = reinterpret_cast<Context*>( instance.mutable_data() + instance_size_ );
-    c->memory_usage = 0;
   }
 
-  __m256i execute( Name encode_name, string_span instance ) const
+  size_t get_instance_and_context_size() const { return instance_context_size_; }
+
+  __m256i execute( Name encode_name )
   {
-    GlobalScopeTimer<Timer::Category::Execution> record_timer;
     __m256i ( *main_func )( void*, __m256i );
     main_func = reinterpret_cast<__m256i ( * )( void*, __m256i )>( code_.get() + main_entry_ );
-    return main_func( instance.mutable_data(), encode_name );
+    __m256i result = main_func( instances_.at( next_instance_ ).get(), encode_name );
+    next_instance_++;
+    return result;
   }
 
-  void cleanup( string_span instance ) const
-  {
-    void ( *cleanup_func )( void* );
-    cleanup_func = reinterpret_cast<void ( * )( void* )>( code_.get() + cleanup_entry_ );
-    cleanup_func( instance.mutable_data() );
-  }
+  Program( const Program& ) = delete;
+  Program& operator=( const Program& ) = delete;
+
+  Program( Program&& ) = default;
+  Program& operator=( Program&& ) = default;
 };

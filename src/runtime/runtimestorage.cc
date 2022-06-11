@@ -178,16 +178,8 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
       function_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
   }
 
-  const Program& program = name_to_program_.at( function_name );
-  size_t instance_size = program.get_instance_and_context_size();
-  void* ptr = aligned_alloc( alignof( __m256i ), instance_size );
-  memset( ptr, 0, instance_size );
-  string_span instance { static_cast<const char*>( ptr ), instance_size };
-
-  program.populate_instance_and_context( instance );
-  __m256i output = program.execute( forced_encode, instance );
-  program.cleanup( instance );
-  free( ptr );
+  auto& program = name_to_program_.at( function_name );
+  __m256i output = program.execute( forced_encode );
 
   memoization_cache[forced_encode_thunk] = Name( output );
   return output;
