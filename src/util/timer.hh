@@ -126,7 +126,7 @@ public:
 };
 
 #elif TIME_FIXPOINT == 1
-
+#define INIT_INSTANCE 4096
 template<Timer::Category category>
 class GlobalScopeTimer
 {

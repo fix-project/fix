@@ -184,3 +184,20 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
   memoization_cache[forced_encode_thunk] = Name( output );
   return output;
 }
+
+void RuntimeStorage::populate_program( Name function_name )
+{
+  if ( not function_name.is_blob() ) {
+    throw runtime_error( "ENCODE functions not yet supported" );
+  }
+
+  if ( not name_to_program_.contains( function_name ) ) {
+    /* compile the Wasm to C and then to ELF */
+    const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
+
+    name_to_program_.insert_or_assign(
+      function_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+  }
+
+  return;
+}

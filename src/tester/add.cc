@@ -2,32 +2,56 @@
 #include <cstring>
 #include <stdlib.h>
 
-int add( int a, int b )
+int add( char* a, char* b )
 {
-  return a + b;
-}
-
-int add( const char* a, const char* b )
-{
-  return atoi( a ) + atoi( b );
-}
-
-int Base::add( int x, int y )
-{
+  uint8_t x;
+  uint8_t y;
+  memcpy( &x, a, 1 );
+  memcpy( &y, b, 1 );
   return x + y;
 }
 
-int Base::add_char( const char* x, const char* y )
+int Base::add( char* a, char* b )
 {
-  return atoi( x ) + atoi( y );
-}
-
-int Derived::add( int x, int y )
-{
+  uint8_t x;
+  uint8_t y;
+  memcpy( &x, a, 1 );
+  memcpy( &y, b, 1 );
   return x + y;
 }
 
-int Derived::add_char( const char* x, const char* y )
+template<int N>
+int Derived<N>::add( char* a, char* b )
 {
-  return atoi( x ) + atoi( y );
+  uint8_t x;
+  uint8_t y;
+  memcpy( &x, a, 1 );
+  memcpy( &y, b, 1 );
+  return x + y + N;
+}
+
+Base* make_derived()
+{
+  int x = rand();
+  if ( x % 10 == 0 ) {
+    return new Derived<0>( x );
+  } else if ( x % 10 == 1 ) {
+    return new Derived<1>( x );
+  } else if ( x % 10 == 2 ) {
+    return new Derived<2>( x );
+  } else if ( x % 10 == 3 ) {
+    return new Derived<3>( x );
+  } else if ( x % 10 == 4 ) {
+    return new Derived<4>( x );
+  } else if ( x % 10 == 5 ) {
+    return new Derived<5>( x );
+  } else if ( x % 10 == 6 ) {
+    return new Derived<6>( x );
+  } else if ( x % 10 == 7 ) {
+    return new Derived<7>( x );
+  } else if ( x % 10 == 8 ) {
+    return new Derived<8>( x );
+  } else {
+    return new Derived<9>( x );
+  }
 }

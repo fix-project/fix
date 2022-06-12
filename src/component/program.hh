@@ -43,7 +43,7 @@ private:
   // size of instance
   size_t instance_context_size_;
   // Array of instances
-  std::vector<std::unique_ptr<char, InstanceCleanUp>> instances_;
+  char* instances_;
   // Index of the next available instance
   size_t next_instance_;
 
@@ -81,13 +81,9 @@ public:
 
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
-    
+    instances_ = static_cast<char*>( aligned_alloc( alignof( __m256i ), instance_context_size_ * INIT_INSTANCE ) );
     for ( size_t i = 0; i < INIT_INSTANCE; i++ ) {
-      std::unique_ptr<char, InstanceCleanUp> instance { static_cast<char*>(
-        aligned_alloc( alignof( __m256i ), instance_context_size_ ) ) };
-      instance.get_deleter().address = reinterpret_cast<uint64_t>( code_.get() + cleanup_entry_ );
-      init_func( instance.get() );
-      instances_.push_back( std::move( instance ) );
+      init_func( instances_ + i * instance_context_size_ );
     }
   }
 
@@ -104,7 +100,9 @@ public:
   {
     __m256i ( *main_func )( void*, __m256i );
     main_func = reinterpret_cast<__m256i ( * )( void*, __m256i )>( code_.get() + main_entry_ );
-    __m256i result = main_func( instances_.at( next_instance_ ).get(), encode_name );
+    void* inst = instances_ + next_instance_ * instance_context_size_;
+
+    __m256i result = main_func( inst, encode_name );
     next_instance_++;
     return result;
   }
@@ -112,6 +110,46 @@ public:
   Program( const Program& ) = delete;
   Program& operator=( const Program& ) = delete;
 
-  Program( Program&& ) = default;
-  Program& operator=( Program&& ) = default;
+  Program( Program&& other )
+    : code_( other.code_ )
+    , init_entry_( other.init_entry_ )
+    , main_entry_( other.main_entry_ )
+    , cleanup_entry_( other.cleanup_entry_ )
+    , instance_context_size_( other.instance_context_size_ )
+    , instances_( other.instances_ )
+    , next_instance_( other.next_instance_ )
+  {
+    if ( this != &other ) {
+      other.instances_ = nullptr;
+    }
+  }
+
+  Program& operator=( Program&& other )
+  {
+    code_ = other.code_;
+    init_entry_ = other.init_entry_;
+    main_entry_ = other.main_entry_;
+    cleanup_entry_ = other.cleanup_entry_;
+    instance_context_size_ = other.instance_context_size_;
+    instances_ = other.instances_;
+    next_instance_ = other.next_instance_;
+
+    if ( this != &other ) {
+      other.instances_ = nullptr;
+    }
+
+    return *this;
+  }
+
+  ~Program()
+  {
+    if ( instances_ ) {
+      void ( *cleanup_func )( void* );
+      cleanup_func = reinterpret_cast<void ( * )( void* )>( code_.get() + cleanup_entry_ );
+      for ( size_t i = 0; i < INIT_INSTANCE; i++ ) {
+        cleanup_func( instances_ + i * instance_context_size_ );
+      }
+      free( instances_ );
+    }
+  }
 };

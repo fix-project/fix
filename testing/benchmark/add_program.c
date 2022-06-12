@@ -1,9 +1,13 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int main( int argc, char* argv[] )
 {
-  int a = atoi( argv[1] );
-  int b = atoi( argv[2] );
-  exit( a + b );
+  uint8_t a;
+  uint8_t b;
+  memcpy( &a, argv[1], 1 );
+  memcpy( &b, argv[2], 1 );
+  return a + b;
 }

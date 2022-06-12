@@ -90,4 +90,7 @@ public:
 
   // Evaluate an encode
   Name evaluate_encode( Name encode_name );
+
+  // Populate a program
+  void populate_program( Name function_name );
 };

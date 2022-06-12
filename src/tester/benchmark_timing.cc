@@ -13,20 +13,31 @@
 
 using namespace std;
 
-int N;
+struct addend
+{
+  char a[2];
+  char b[2];
+};
+
+Base* base_objects[INIT_INSTANCE];
+addend arguments[INIT_INSTANCE];
+
 char* add_program_name;
 char* add_cycle_program_name;
-Name add_fixpoint_function;
-Name add_wasi_function;
-Name blob_42;
-Name char_42;
+
+auto& runtime = RuntimeStorage::get_instance();
+Name add_fixpoint_thunk[INIT_INSTANCE];
+Name add_wasi_thunk[INIT_INSTANCE];
 
 #define ADD_TEST( func, message )                                                                                  \
   {                                                                                                                \
     cout << endl;                                                                                                  \
     cout << message << endl;                                                                                       \
-    for ( int i = 0; i < N; i++ ) {                                                                                \
-      func( i );                                                                                                   \
+    {                                                                                                              \
+      GlobalScopeTimer<Timer::Category::Execution> record_timer;                                                   \
+      for ( int i = 0; i < INIT_INSTANCE; i++ ) {                                                                  \
+        func( i );                                                                                                 \
+      }                                                                                                            \
     }                                                                                                              \
     global_timer().summary( cout );                                                                                \
     reset_global_timer();                                                                                          \
@@ -46,51 +57,106 @@ Name char_42;
 void baseline_function();
 void static_add( int );
 void virtual_add( int );
-void char_add( int );
-void virtual_char_add( int );
 void vfork_add( int );
 void vfork_add_rr();
 void add_fixpoint( int );
 void add_wasi( int );
 
+addend make_addend( int i )
+{
+  addend result;
+  result.a[0] = static_cast<char>( i / 254 + 1 );
+  result.b[0] = static_cast<char>( i % 254 + 1 );
+  result.a[1] = static_cast<char>( 0 );
+  result.b[1] = static_cast<char>( 0 );
+  return result;
+}
+
 int main( int argc, char* argv[] )
 {
-  if ( argc < 6 ) {
-    cerr
-      << "Usage: " << argv[0]
-      << " #_of_iterations path_to_add_program path_to_add_cycle_program path_to_add_fixpoint path_to_add_wasi\n";
+  if ( argc < 5 ) {
+    cerr << "Usage: " << argv[0]
+         << " path_to_add_program path_to_add_cycle_program path_to_add_fixpoint path_to_add_wasi\n";
   }
 
-  N = atoi( argv[1] );
-  add_program_name = argv[2];
-  add_cycle_program_name = argv[3];
+  add_program_name = argv[1];
+  add_cycle_program_name = argv[2];
 
-  auto& runtime = RuntimeStorage::get_instance();
-  ReadOnlyFile add_fixpoint_content { argv[4] };
-  ReadOnlyFile add_wasi_content { argv[5] };
-  add_fixpoint_function = runtime.add_blob( string_view( add_fixpoint_content ) );
-  add_wasi_function = runtime.add_blob( string_view( add_wasi_content ) );
+  ReadOnlyFile add_fixpoint_content { argv[3] };
+  ReadOnlyFile add_wasi_content { argv[4] };
+  Name add_fixpoint_function = runtime.add_blob( string_view( add_fixpoint_content ) );
+  Name add_wasi_function = runtime.add_blob( string_view( add_wasi_content ) );
+  runtime.populate_program( add_fixpoint_function );
+  runtime.populate_program( add_wasi_function );
 
-  blob_42 = runtime.add_blob( make_blob( 42 ) );
-  const char* arg_42 = "42";
-  char_42 = runtime.add_blob( string_view( arg_42, strlen( arg_42 ) + 1 ) );
+  const char* add_content = "add";
+  Name add_char = runtime.add_blob( string_view( add_content, strlen( add_content ) + 1 ) );
 
   baseline_function();
+  // Populate addends
+  for ( int i = 0; i < INIT_INSTANCE; i++ ) {
+    arguments[i] = make_addend( i );
+  }
+
+  // Populate derived objects
+  for ( int i = 0; i < INIT_INSTANCE; i++ ) {
+    base_objects[i] = make_derived();
+  }
+
+  // Populate encodes
+  for ( int i = 0; i < INIT_INSTANCE; i++ ) {
+    Name arg1 = runtime.add_blob( make_blob( string_view( arguments[i].a, 2 ) ) );
+    Name arg2 = runtime.add_blob( make_blob( string_view( arguments[i].b, 2 ) ) );
+
+    Tree_ptr fix_encode { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 4 ) ) };
+    if ( not fix_encode ) {
+      throw bad_alloc();
+    }
+    Tree_ptr wasi_encode { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 5 ) ) };
+    if ( not wasi_encode ) {
+      throw bad_alloc();
+    }
+
+    fix_encode.get()[0] = Name( "empty" );
+    fix_encode.get()[1] = add_fixpoint_function;
+    fix_encode.get()[2] = arg1;
+    fix_encode.get()[3] = arg2;
+
+    wasi_encode.get()[0] = Name( "empty" );
+    wasi_encode.get()[1] = add_wasi_function;
+    wasi_encode.get()[2] = add_char;
+    wasi_encode.get()[3] = arg1;
+    wasi_encode.get()[4] = arg2;
+
+    Name fix_encode_name = runtime.add_tree( { move( fix_encode ), 4 } );
+    Name wasi_encode_name = runtime.add_tree( { move( wasi_encode ), 5 } );
+
+    Thunk fix_thunk( fix_encode_name );
+    Name fix_thunk_name = runtime.add_thunk( fix_thunk );
+    Thunk wasi_thunk( wasi_encode_name );
+    Name wasi_thunk_name = runtime.add_thunk( wasi_thunk );
+
+    add_fixpoint_thunk[i] = fix_thunk_name;
+    add_wasi_thunk[i] = wasi_thunk_name;
+  }
 
   ADD_TEST( static_add, "Executing add statically linked..." );
   ADD_TEST( virtual_add, "Executing add via virtual function call..." );
-  ADD_TEST( char_add, "Executing statically linked add with atoi..." );
-  ADD_TEST( virtual_char_add, "Executing virtual add with atoi..." );
-  ADD_TEST( vfork_add, "Executing add program..." );
-  ADD_TEST_NUM( vfork_add_rr, "Executing add program rr...", 1 );
   ADD_TEST( add_fixpoint, "Executing add implemented in Fixpoint..." );
   ADD_TEST( add_wasi, "Executing add program compiled through wasi..." );
+  ADD_TEST( vfork_add, "Executing add program..." );
+  ADD_TEST_NUM( vfork_add_rr, "Executing add program rr...", 1 );
+
+  for ( int i = 0; i < INIT_INSTANCE; i++ ) {
+    delete ( base_objects[i] );
+  }
+
   return 0;
 }
 
 void baseline_function()
 {
-  for ( int i = 0; i < N; i++ ) {
+  for ( int i = 0; i < INIT_INSTANCE; i++ ) {
     GlobalScopeTimer<Timer::Category::Execution> record_timer;
   }
   set_time_baseline( global_timer().mean<Timer::Category::Execution>() );
@@ -99,50 +165,20 @@ void baseline_function()
 
 void static_add( int i )
 {
-  GlobalScopeTimer<Timer::Category::Execution> record_timer;
-  add( i, 42 );
+  add( arguments[i].a, arguments[i].b );
 }
 
 void virtual_add( int i )
 {
-  Base* ptr = new Derived( i, 42 );
-  {
-    GlobalScopeTimer<Timer::Category::Execution> record_timer;
-    ptr->add( i, 42 );
-  }
-  delete ptr;
-}
-
-void char_add( int i )
-{
-  char const* x = "42";
-  char const* y = to_string( i ).c_str();
-  {
-    GlobalScopeTimer<Timer::Category::Execution> record_timer;
-    add( x, y );
-  }
-}
-
-void virtual_char_add( int i )
-{
-  char const* x = "42";
-  char const* y = to_string( i ).c_str();
-  Base* ptr = new Derived( i, 42 );
-  {
-    GlobalScopeTimer<Timer::Category::Execution> record_timer;
-    ptr->add_char( x, y );
-  }
+  base_objects[i]->add( arguments[i].a, arguments[i].b );
 }
 
 void vfork_add( int i )
 {
-  char const* arg1 = "42";
-  char const* arg2 = to_string( i ).c_str();
-  GlobalScopeTimer<Timer::Category::Execution> record_timer;
   pid_t pid = vfork();
   int wstatus;
   if ( pid == 0 ) {
-    execl( add_program_name, "add", arg1, arg2, NULL );
+    execl( add_program_name, "add", arguments[i].a, arguments[i].b, NULL );
   } else {
     waitpid( pid, &wstatus, 0 );
   }
@@ -153,7 +189,7 @@ void vfork_add_rr()
   char const* sudo = "/usr/bin/sudo";
   char const* rr = "rr";
   char const* record = "record";
-  char const* N_char = to_string( N ).c_str();
+  char const* N_char = to_string( INIT_INSTANCE ).c_str();
   {
     GlobalScopeTimer<Timer::Category::Execution> record_timer;
     pid_t pid = vfork();
@@ -168,40 +204,10 @@ void vfork_add_rr()
 
 void add_fixpoint( int i )
 {
-  auto& runtime = RuntimeStorage::get_instance();
-  Name arg2 = runtime.add_blob( make_blob( i ) );
-
-  vector<Name> encode;
-  encode.push_back( Name( "empty" ) );
-  encode.push_back( add_fixpoint_function );
-  encode.push_back( blob_42 );
-  encode.push_back( arg2 );
-
-  Name encode_name = runtime.add_tree( span_view<Name>( encode.data(), encode.size() ) );
-
-  Thunk thunk( encode_name );
-  Name thunk_name = runtime.add_thunk( thunk );
-  runtime.force_thunk( thunk_name );
+  runtime.force_thunk( add_fixpoint_thunk[i] );
 }
 
 void add_wasi( int i )
 {
-  auto& runtime = RuntimeStorage::get_instance();
-  const char* arg1_content = "add";
-  const char* arg2_content = to_string( i ).c_str();
-  Name arg1 = runtime.add_blob( string_view( arg1_content, strlen( arg1_content ) + 1 ) );
-  Name arg2 = runtime.add_blob( string_view( arg2_content, strlen( arg2_content ) + 1 ) );
-
-  vector<Name> encode;
-  encode.push_back( Name( "empty" ) );
-  encode.push_back( add_wasi_function );
-  encode.push_back( arg1 );
-  encode.push_back( char_42 );
-  encode.push_back( arg2 );
-
-  Name encode_name = runtime.add_tree( span_view<Name>( encode.data(), encode.size() ) );
-
-  Thunk thunk( encode_name );
-  Name thunk_name = runtime.add_thunk( thunk );
-  runtime.force_thunk( thunk_name );
+  runtime.force_thunk( add_wasi_thunk[i] );
 }

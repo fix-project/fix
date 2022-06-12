@@ -6,8 +6,8 @@ int main( int argc, char* argv[] )
   char* add_program_name = argv[1];
   int N = atoi( argv[2] );
   for ( int i = 0; i < N; i++ ) {
-    char const* arg1 = "42";
-    char const* arg2 = "10086";
+    char const* arg1 = "a";
+    char const* arg2 = "b";
     pid_t pid = vfork();
     int wstatus;
     if ( pid == 0 ) {

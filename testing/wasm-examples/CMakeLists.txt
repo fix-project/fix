@@ -21,6 +21,17 @@ add_custom_command(
 add_custom_target(add_simple_wasm ALL DEPENDS add-simple.wasm)
 
 add_custom_command(
+  OUTPUT "add-simple-8.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/add-simple-8.wat
+          ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
+  COMMAND ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
+          --enable-multi-memory
+          ${CMAKE_CURRENT_SOURCE_DIR}/add-simple-8.wat
+          -o add-simple-8.wasm)
+
+add_custom_target(add_simple_8_wasm ALL DEPENDS add-simple-8.wasm)
+
+add_custom_command(
   OUTPUT "fib.wasm"
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/fib.wat
           ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
