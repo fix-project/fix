@@ -14,6 +14,7 @@
 #include "src/c-writer.h"
 
 #include "initcomposer.hh"
+#include "timer.hh"
 #include "wasminspector.hh"
 
 using namespace std;
@@ -89,6 +90,7 @@ void wabt_try( const string_view what, const Errors& errors, const Result value 
 
 tuple<string, string, string> wasm_to_c( const string_view wasm_content )
 {
+  GlobalScopeTimer<Timer::Category::Compiling> record_timer;
   Errors errors;
   Module module;
 

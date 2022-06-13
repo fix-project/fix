@@ -67,6 +67,7 @@ public:
     , instances_()
     , next_instance_( 0 )
   {
+    GlobalScopeTimer<Timer::Category::Populating> record_timer;
     size_t ( *size_func )( void );
     size_func = reinterpret_cast<size_t ( * )( void )>( code_.get() + instance_size_entry );
     size_t instance_size = size_func();
@@ -101,6 +102,10 @@ public:
     __m256i ( *main_func )( void*, __m256i );
     main_func = reinterpret_cast<__m256i ( * )( void*, __m256i )>( code_.get() + main_entry_ );
     void* inst = instances_ + next_instance_ * instance_context_size_;
+
+    // void ( *init_func )( void* );
+    // init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
+    // init_func( inst );
 
     __m256i result = main_func( inst, encode_name );
     next_instance_++;

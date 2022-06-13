@@ -43,7 +43,6 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
 __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 {
   GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
-
   if ( size > memory->size ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }

@@ -8,6 +8,7 @@
 #include <string>
 #include <type_traits>
 
+#include <iostream>
 #include <x86intrin.h>
 
 class Timer
@@ -43,14 +44,23 @@ public:
     CreateBlob,
     AttachTree,
     CreateTree,
+    Compiling,
+    Linking,
+    Populating,
     count
   };
 
   constexpr static size_t num_categories = static_cast<size_t>( Category::count );
 
-  constexpr static std::array<const char*, num_categories> _category_names {
-    { "Hash", "Execution", "Attach blob", "Create blob", "Attach tree", "Create tree" }
-  };
+  constexpr static std::array<const char*, num_categories> _category_names { { "Hash",
+                                                                               "Execution",
+                                                                               "Attach blob",
+                                                                               "Create blob",
+                                                                               "Attach tree",
+                                                                               "Create tree",
+                                                                               "Compiling Wasm to C",
+                                                                               "Linking C to Elf",
+                                                                               "Populating instances" } };
 
   static uint64_t baseline_;
 
@@ -65,6 +75,7 @@ public:
   void start()
   {
     if ( _current_category.has_value() ) {
+      std::cout << static_cast<size_t>( _current_category.value() ) << std::endl;
       abort();
     }
 
@@ -148,7 +159,7 @@ inline GlobalScopeTimer<Timer::Category::Execution>::~GlobalScopeTimer()
 }
 
 #elif TIME_FIXPOINT == 2
-
+#define INIT_INSTANCE 4096
 template<Timer::Category category>
 class GlobalScopeTimer
 {

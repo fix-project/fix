@@ -92,7 +92,10 @@ int main( int argc, char* argv[] )
   const char* add_content = "add";
   Name add_char = runtime.add_blob( string_view( add_content, strlen( add_content ) + 1 ) );
 
+#if TIME_FIXPOINT == 1
   baseline_function();
+#endif
+
   // Populate addends
   for ( int i = 0; i < INIT_INSTANCE; i++ ) {
     arguments[i] = make_addend( i );
