@@ -54,6 +54,12 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   return RuntimeStorage::get_instance().add_local_blob( Blob( move( data ), size ) );
 }
 
+__m256i create_blob_i32( uint32_t content )
+{
+  GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
+  return RuntimeStorage::get_instance().add_local_blob( make_blob( content ) );
+}
+
 __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
 {
   GlobalScopeTimer<Timer::Category::CreateTree> record_timer;

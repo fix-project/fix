@@ -12,5 +12,7 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size );
 
 __m256i create_blob( wasm_rt_memory_t* memory, size_t size );
 
+__m256i create_blob_i32( uint32_t content );
+
 __m256i create_thunk( __m256i ro_handle );
 }
