@@ -84,19 +84,9 @@ int main( int argc, char* argv[] )
   int cpid = fork();
   if ( cpid == 0 ) {
     const char* pid_char = to_string( pid ).c_str();
-    execl("/usr/bin/sudo", "sudo", "perf", "record", "-p", pid_char, NULL);
-    // execl( "/usr/bin/sudo",
-    //        "sudo",
-    //        "perf",
-    //        "record",
-    //        "--call-graph",
-    //        "dwarf",
-    //        "-e",
-    //        "cpu-clock,faults",
-    //        "-p",
-    //        pid_char,
-    //        NULL );
+    execl( "/usr/bin/sudo", "sudo", "perf", "record", "--call-graph", "dwarf", "-p", pid_char, NULL );
   } else {
+    setpgid( cpid, 0 );
     {
       GlobalScopeTimer<Timer::Category::Execution> record_timer;
       for ( int i = 0; i < INIT_INSTANCE; i++ ) {

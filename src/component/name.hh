@@ -90,13 +90,7 @@ public:
                                            | 0x01'00'00'00'00'00'00'00 ) };
   }
 
-  // template<typename H>
-  // friend H AbslHashValue( H h, const Name& name )
-  // {
-  //   return H::combine( std::move( h ), name.content_[0], name.content_[1], name.content_[2], name.content_[3] );
-  // }
-
-  friend bool operator==( const Name& lhs, const Name& rhs );
+  friend bool operator==( Name lhs, Name rhs );
   friend std::ostream& operator<<( std::ostream& s, const Name& name );
 
   friend struct NameHash;
@@ -107,5 +101,11 @@ struct NameHash
   std::size_t operator()( Name const& name ) const noexcept { return name.content_[0]; }
 };
 
-bool operator==( const Name& lhs, const Name& rhs );
+inline bool operator==( Name lhs, Name rhs )
+{
+  __m256i pcmp = _mm256_cmpeq_epi32( lhs.content_, rhs.content_ );
+  unsigned bitmask = _mm256_movemask_epi8( pcmp );
+  return ( bitmask == 0xffffffffU );
+}
+
 std::ostream& operator<<( std::ostream& s, const Name& name );

@@ -162,9 +162,8 @@ Name RuntimeStorage::reduce_thunk( Name name )
 
 Name RuntimeStorage::evaluate_encode( Name encode_name )
 {
-  Name forced_encode = force_tree( encode_name );
-  Name forced_encode_thunk = Name::get_thunk_name( forced_encode );
-  Name function_name = get_tree( forced_encode ).at( 1 );
+  force_tree( encode_name );
+  Name function_name = get_tree( encode_name ).at( 1 );
 
   if ( not function_name.is_blob() ) {
     throw runtime_error( "ENCODE functions not yet supported" );
@@ -179,9 +178,8 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
   }
 
   auto& program = name_to_program_.at( function_name );
-  __m256i output = program.execute( forced_encode );
+  __m256i output = program.execute( encode_name );
 
-  memoization_cache[forced_encode_thunk] = Name( output );
   return output;
 }
 
