@@ -30,19 +30,19 @@ private:
   // Maps a Wasm function Name to corresponding compiled Program
   absl::flat_hash_map<Name, Program, NameHash> name_to_program_;
 
-  // Stores literal name that are requested
-  std::vector<Name> literal_cache;
-
   // Unique id for local name
   uint32_t next_local_name_;
+
+  // Number of instances
+  size_t init_instances_;
 
   RuntimeStorage()
     : storage()
     , memoization_cache()
     , trace_cache()
     , name_to_program_()
-    , literal_cache()
     , next_local_name_( 0 )
+    , init_instances_( 16 )
   {
     wasm_rt_init();
   }
@@ -90,6 +90,9 @@ public:
 
   // Evaluate an encode
   Name evaluate_encode( Name encode_name );
+
+  void set_init_instances( size_t init_instances ) { init_instances_ = init_instances; }
+  size_t get_init_instances() const { return init_instances_; }
 
   // Populate a program
   void populate_program( Name function_name );

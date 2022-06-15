@@ -11,6 +11,8 @@
 #include "runtimestorage.hh"
 #include "timer.hh"
 
+#define INIT_INSTANCE 4096
+
 using namespace std;
 
 struct addend
@@ -65,8 +67,8 @@ void add_wasi( int );
 addend make_addend( int i )
 {
   addend result;
-  result.a[0] = static_cast<char>( i / 254 + 1 );
-  result.b[0] = static_cast<char>( i % 254 + 1 );
+  result.a[0] = static_cast<char>( i / 255 + 1 );
+  result.b[0] = static_cast<char>( i % 255 + 1 );
   result.a[1] = static_cast<char>( 0 );
   result.b[1] = static_cast<char>( 0 );
   return result;
@@ -78,6 +80,8 @@ int main( int argc, char* argv[] )
     cerr << "Usage: " << argv[0]
          << " path_to_add_program path_to_add_cycle_program path_to_add_fixpoint path_to_add_wasi\n";
   }
+
+  runtime.set_init_instances( INIT_INSTANCE );
 
   add_program_name = argv[1];
   add_cycle_program_name = argv[2];

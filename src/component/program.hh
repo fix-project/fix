@@ -12,10 +12,6 @@
 
 #include "timer.hh"
 
-#ifndef INIT_INSTANCE
-#define INIT_INSTANCE 16
-#endif
-
 struct InstanceCleanUp
 {
   uint64_t address;
@@ -42,6 +38,8 @@ private:
   uint64_t cleanup_entry_;
   // size of instance
   size_t instance_context_size_;
+  // number of init instances
+  size_t init_instances_;
   // Array of instances
   char* instances_;
   // Index of the next available instance
@@ -58,12 +56,14 @@ public:
            uint64_t main_entry,
            uint64_t cleanup_entry,
            uint64_t instance_size_entry,
-           uint64_t init_module_entry )
+           uint64_t init_module_entry,
+           size_t init_instances )
     : code_( code )
     , init_entry_( init_entry )
     , main_entry_( main_entry )
     , cleanup_entry_( cleanup_entry )
     , instance_context_size_( 0 )
+    , init_instances_( init_instances )
     , instances_()
     , next_instance_( 0 )
   {
@@ -82,8 +82,9 @@ public:
 
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
-    instances_ = static_cast<char*>( aligned_alloc( alignof( __m256i ), instance_context_size_ * INIT_INSTANCE ) );
-    for ( size_t i = 0; i < INIT_INSTANCE; i++ ) {
+    instances_
+      = static_cast<char*>( aligned_alloc( alignof( __m256i ), instance_context_size_ * init_instances_ ) );
+    for ( size_t i = 0; i < init_instances_; i++ ) {
       init_func( instances_ + i * instance_context_size_ );
     }
   }
@@ -121,6 +122,7 @@ public:
     , main_entry_( other.main_entry_ )
     , cleanup_entry_( other.cleanup_entry_ )
     , instance_context_size_( other.instance_context_size_ )
+    , init_instances_( other.init_instances_ )
     , instances_( other.instances_ )
     , next_instance_( other.next_instance_ )
   {
@@ -151,7 +153,7 @@ public:
     if ( instances_ ) {
       void ( *cleanup_func )( void* );
       cleanup_func = reinterpret_cast<void ( * )( void* )>( code_.get() + cleanup_entry_ );
-      for ( size_t i = 0; i < INIT_INSTANCE; i++ ) {
+      for ( size_t i = 0; i < init_instances_; i++ ) {
         cleanup_func( instances_ + i * instance_context_size_ );
       }
       free( instances_ );
