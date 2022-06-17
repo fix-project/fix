@@ -56,3 +56,29 @@ void Timer::summary( ostream& out ) const
   out << "\n   Unaccounted: " << string( 23, ' ' );
   out << 100 * unaccounted / double( elapsed ) << "%\n";
 }
+
+void Timer::average( ostream& out, int count ) const
+{
+  for ( unsigned int i = 0; i < num_categories; i++ ) {
+    if ( _records.at( i ).count == 0 )
+      continue;
+    out << "   " << _category_names.at( i ) << ": ";
+    out << string( 32 - strlen( _category_names.at( i ) ), ' ' );
+
+    if ( _records.at( i ).count > 0 ) {
+      out << "   [mean=";
+      out << fixed << setw( 6 )
+          << ( _records.at( i ).total_ticks - _records.at( i ).count * Timer::baseline_ ) / count;
+      out << "] ";
+    } else {
+      out << "                 ";
+    }
+
+    out << "[total= ";
+    out << fixed << setw( 6 ) << _records.at( i ).total_ticks;
+    out << "]";
+    out << " [count=" << fixed << setw( 6 ) << count << "]";
+
+    out << "\n";
+  }
+}

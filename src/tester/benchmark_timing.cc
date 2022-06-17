@@ -41,7 +41,7 @@ Name add_wasi_thunk[INIT_INSTANCE];
         func( i );                                                                                                 \
       }                                                                                                            \
     }                                                                                                              \
-    global_timer().summary( cout );                                                                                \
+    global_timer().average( cout, INIT_INSTANCE );                                                                 \
     reset_global_timer();                                                                                          \
   }
 
@@ -52,7 +52,7 @@ Name add_wasi_thunk[INIT_INSTANCE];
     for ( int i = 0; i < cycle; i++ ) {                                                                            \
       func();                                                                                                      \
     }                                                                                                              \
-    global_timer().summary( cout );                                                                                \
+    global_timer().average( cout, cycle );                                                                         \
     reset_global_timer();                                                                                          \
   }
 

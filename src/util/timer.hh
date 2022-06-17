@@ -108,6 +108,7 @@ public:
   }
 
   void summary( std::ostream& out ) const;
+  void average( std::ostream& out, int count ) const;
 };
 
 inline Timer& global_timer()
