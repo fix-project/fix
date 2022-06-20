@@ -12,21 +12,8 @@ using namespace std;
 Name RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 32 ) {
-    string hash = sha256::encode( blob );
-    Name name( hash, ContentType::Blob );
-    storage.put( name, move( blob ) );
-    return name;
-  } else {
-    return Name( blob );
-  }
-}
-
-Name RuntimeStorage::add_local_blob( Blob&& blob )
-{
-  if ( blob.size() > 32 ) {
-    Name name( next_local_name_, ContentType::Blob );
-    next_local_name_++;
-    storage.put( name, move( blob ) );
+    Name name( local_storage_.size(), ContentType::Blob );
+    local_storage_.push_back( move( blob ) );
     return name;
   } else {
     Name name( blob );
@@ -38,6 +25,13 @@ string_view RuntimeStorage::get_blob( Name name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
+  } else if ( name.is_local() ) {
+    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
+    if ( holds_alternative<Blob>( obj ) ) {
+      return get<Blob>( obj );
+    } else if ( holds_alternative<Name>( obj ) ) {
+      return get_blob( get<Name>( obj ) );
+    }
   } else {
     const Object& obj = storage.get( name );
     if ( holds_alternative<Blob>( obj ) ) {
@@ -52,6 +46,13 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
+  } else if ( name.is_local() ) {
+    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
+    if ( holds_alternative<Blob>( obj ) ) {
+      return get<Blob>( obj );
+    } else if ( holds_alternative<Name>( obj ) ) {
+      return get_blob( get<Name>( obj ) );
+    }
   } else {
     const Object& obj = storage.get( name );
     if ( holds_alternative<Blob>( obj ) ) {
@@ -64,26 +65,27 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
 
 Name RuntimeStorage::add_tree( Tree&& tree )
 {
-  string hash
-    = sha256::encode( string_view { reinterpret_cast<const char*>( tree.data() ), tree.size() * sizeof( Name ) } );
-  Name name( hash, ContentType::Tree );
-  storage.put( name, move( tree ) );
+  Name name( local_storage_.size(), ContentType::Tree );
+  local_storage_.push_back( move( tree ) );
   return name;
 }
 
-Name RuntimeStorage::add_local_tree( Tree&& tree )
-{
-  Name name( next_local_name_, ContentType::Tree );
-  next_local_name_++;
-  storage.put( name, move( tree ) );
-  return name;
-}
 span_view<Name> RuntimeStorage::get_tree( Name name )
 {
-  const Object& obj = storage.get( name );
-  if ( holds_alternative<Tree>( obj ) ) {
-    return get<Tree>( obj );
+  if ( name.is_local() ) {
+    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
+    if ( holds_alternative<Tree>( obj ) ) {
+      return get<Tree>( obj );
+    } else if ( holds_alternative<Name>( obj ) ) {
+      return get_tree( get<Name>( obj ) );
+    }
+  } else {
+    const Object& obj = storage.get( name );
+    if ( holds_alternative<Tree>( obj ) ) {
+      return get<Tree>( obj );
+    }
   }
+
   throw out_of_range( "Tree does not exist." );
 }
 
@@ -150,14 +152,14 @@ Name RuntimeStorage::force_thunk( Name name )
 
 Name RuntimeStorage::reduce_thunk( Name name )
 {
-  if ( memoization_cache.contains( name ) ) {
-    return memoization_cache.at( name );
-  } else {
-    Name encode_name = get_thunk_encode_name( name );
-    Name result = evaluate_encode( encode_name );
-    memoization_cache[name] = result;
-    return result;
-  }
+  // if ( memoization_cache.contains( name ) ) {
+  //  return memoization_cache.at( name );
+  //} else {
+  Name encode_name = get_thunk_encode_name( name );
+  Name result = evaluate_encode( encode_name );
+  //  memoization_cache[name] = result;
+  return result;
+  //}
 }
 
 Name RuntimeStorage::evaluate_encode( Name encode_name )

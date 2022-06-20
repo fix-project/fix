@@ -55,12 +55,14 @@ public:
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
 
-  Name( uint32_t local_id, ContentType content_type )
+  Name( size_t local_id, ContentType content_type )
   {
     uint8_t metadata = static_cast<uint8_t>( content_type );
-    __builtin_memcpy( (char*)&content_, &local_id, sizeof( uint32_t ) );
+    content_[0] = local_id;
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
+
+  size_t get_local_id() const { return content_[0]; }
 
   bool is_strict_tree_entry() const { return !( metadata() & 0x80 ); }
 

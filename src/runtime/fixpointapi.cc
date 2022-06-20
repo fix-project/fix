@@ -51,13 +51,12 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   memory->data = NULL;
   memory->pages = 0;
   memory->size = 0;
-  return RuntimeStorage::get_instance().add_local_blob( Blob( move( data ), size ) );
+  return RuntimeStorage::get_instance().add_blob( Blob( move( data ), size ) );
 }
 
 __m256i create_blob_i32( uint32_t content )
 {
   GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
-  // return RuntimeStorage::get_instance().add_local_blob( make_blob( content ) );
   return Name( std::string_view( reinterpret_cast<char*>( &content ), sizeof( uint32_t ) ) );
 }
 
@@ -75,7 +74,7 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
   Tree_ptr data { reinterpret_cast<Name*>( table->data ) };
   table->data = NULL;
   table->size = 0;
-  return RuntimeStorage::get_instance().add_local_tree( Tree( move( data ), size ) );
+  return RuntimeStorage::get_instance().add_tree( Tree( move( data ), size ) );
 }
 
 __m256i create_thunk( __m256i ro_handle )

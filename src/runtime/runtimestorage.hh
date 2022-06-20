@@ -31,7 +31,10 @@ private:
   absl::flat_hash_map<Name, Program, NameHash> name_to_program_;
 
   // Unique id for local name
-  uint32_t next_local_name_;
+  size_t next_local_name_;
+
+  // Storage for Object/Names with a local name
+  std::vector<ObjectOrName> local_storage_;
 
   // Number of instances
   size_t init_instances_;
@@ -42,6 +45,7 @@ private:
     , trace_cache()
     , name_to_program_()
     , next_local_name_( 0 )
+    , local_storage_()
     , init_instances_( 16 )
   {
     wasm_rt_init();
@@ -57,7 +61,6 @@ public:
 
   // add blob
   Name add_blob( Blob&& blob );
-  Name add_local_blob( Blob&& blob );
 
   // Return reference to blob content
   std::string_view get_blob( Name name );
@@ -65,7 +68,6 @@ public:
 
   // add Tree
   Name add_tree( Tree&& tree );
-  Name add_local_tree( Tree&& tree );
 
   // Return reference to Tree
   span_view<Name> get_tree( Name name );

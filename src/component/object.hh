@@ -66,6 +66,7 @@ static_assert( sizeof( __m256i ) == sizeof( Name ) );
 using Blob = Value<char, std::string_view>;
 using Tree = Value<Name, span_view<Name>>;
 using Object = std::variant<Blob, Tree>;
+using ObjectOrName = std::variant<Blob, Tree, Name>;
 
 using Blob_ptr = Blob::ptr_type;
 using Tree_ptr = Tree::ptr_type;
