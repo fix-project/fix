@@ -33,6 +33,8 @@ extern void attach_blob_ro_mem_0( externref )
   __attribute( ( import_module( "fixpoint" ), import_name( "attach_blob_ro_mem_0" ) ) );
 extern uint32_t size_ro_mem_0( void )
   __attribute( ( import_module( "fixpoint" ), import_name( "size_ro_mem_0" ) ) );
+extern externref create_blob_i32( uint32_t )
+  __attribute( ( import_module( "fixpoint" ), import_name( "create_blob_i32" ) ) );
 
 extern uint32_t get_program_i32( uint32_t )
   __attribute( ( import_module( "helper" ), import_name( "get_program_i32" ) ) );
@@ -62,8 +64,7 @@ externref fixpoint_apply( externref encode ) __attribute( ( export_name( "_fixpo
 
 __attribute( ( noreturn ) ) void proc_exit( uint32_t rval )
 {
-  // copying rval to rw_memories[0];
-  memory_copy_rw_0( &rval, sizeof( rval ) );
+  set_return( 0, create_blob_i32( rval ) );
   flatware_exit();
 }
 
@@ -131,14 +132,12 @@ uint32_t args_get( uint32_t argv_ptr, uint32_t argv_buf_ptr )
 
 externref fixpoint_apply( externref encode )
 {
-  const uint32_t zero = 0;
-  memory_copy_rw_0( &zero, sizeof( zero ) );
+  set_return( 0, create_blob_i32( 0 ) );
 
   attach_tree_ro_table_0( encode );
 
   run_start();
 
-  set_return( 0, create_blob_rw_mem_0( sizeof( uint32_t ) ) );
   set_return( 1, create_blob_rw_mem_1( stdout.offset ) );
 
   return create_tree_rw_table_0( 2 );
