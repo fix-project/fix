@@ -1,0 +1,33 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+if ((scalar @ARGV) != 2) {
+  die qq{Usage: $0 wasi_tester addarg.wasm};
+}
+
+my ($executable, $wasm) = @ARGV;
+
+sub check_add($$) {
+  my ($x, $y) = @_;
+  my $x_char = chr($x);
+  my $y_char = chr($y);
+  my $expected_answer = unpack q{l}, (pack q{l}, ($x + $y) % 2**32);
+  my $result = `$executable $wasm add $x_char $y_char 2>&1`;
+
+  if ($?) {
+    print STDERR qq{Got result:\n$result\n};
+    die qq{Failure in running $x + $y};
+  }
+
+  my ($answer) = $result =~ m{^The result is (.*)};
+
+  if ( $answer != $expected_answer ) {
+    print STDERR qq{Got result:\n$result\n};
+    die qq{Wrong answer to $x + $y ($answer)};
+  }
+}
+
+check_add(48, 48);
+check_add(49, 49);
+check_add(118, 57);
