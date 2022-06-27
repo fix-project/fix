@@ -93,7 +93,7 @@ public:
   }
 
   friend bool operator==( Name lhs, Name rhs );
-  friend std::ostream& operator<<( std::ostream& s, const Name& name );
+  friend std::ostream& operator<<( std::ostream& s, const Name name );
 
   friend struct NameHash;
 };
@@ -110,4 +110,4 @@ inline bool operator==( Name lhs, Name rhs )
   return ( bitmask == 0xffffffffU );
 }
 
-std::ostream& operator<<( std::ostream& s, const Name& name );
+std::ostream& operator<<( std::ostream& s, const Name name );

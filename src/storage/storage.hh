@@ -12,9 +12,9 @@ template<typename T>
 class Storage
 {
 public:
-  virtual const T& get( const Name& name ) = 0;
-  virtual T& getMutable( const Name& name ) = 0;
-  virtual void put( const Name& name, T&& content ) = 0;
+  virtual const T& get( const Name name ) = 0;
+  virtual T& getMutable( const Name name ) = 0;
+  virtual void put( const Name name, T&& content ) = 0;
   virtual ~Storage() {};
 };
 
@@ -30,11 +30,11 @@ public:
   {
   }
 
-  const T& get( const Name& name ) { return name_to_object_.at( name ); }
+  const T& get( const Name name ) { return name_to_object_.at( name ); }
 
-  T& getMutable( const Name& name ) { return const_cast<T&>( get( name ) ); }
+  T& getMutable( const Name name ) { return const_cast<T&>( get( name ) ); }
 
-  void put( const Name& name, T&& content )
+  void put( const Name name, T&& content )
   {
     name_to_object_.try_emplace( name, std::move( content ) );
     return;
@@ -42,5 +42,5 @@ public:
 
   size_t size() { return name_to_object_.size(); }
 
-  bool contains( const Name& name ) { return name_to_object_.contains( name ); }
+  bool contains( const Name name ) { return name_to_object_.contains( name ); }
 };

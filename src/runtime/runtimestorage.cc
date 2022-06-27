@@ -42,7 +42,7 @@ string_view RuntimeStorage::get_blob( Name name )
   throw out_of_range( "Blob does not exist." );
 }
 
-string_view RuntimeStorage::user_get_blob( const Name& name )
+string_view RuntimeStorage::user_get_blob( const Name name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
