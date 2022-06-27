@@ -1,2 +1,0 @@
-# WASI implementation in Fixpoint
-
