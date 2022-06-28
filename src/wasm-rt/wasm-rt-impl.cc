@@ -137,7 +137,9 @@ void wasm_rt_load_exception( uint32_t tag, uint32_t size, const void* values )
   g_active_exception_tag = tag;
   g_active_exception_size = size;
 
-  memcpy( g_active_exception, values, size );
+  if ( size ) {
+    memcpy( g_active_exception, values, size );
+  }
 }
 
 WASM_RT_NO_RETURN void wasm_rt_throw( void )
