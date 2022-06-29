@@ -1,8 +1,10 @@
+#include <chrono>
 #include <iostream>
 #include <stdlib.h>
 #include <string>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <thread>
 #include <unistd.h>
 
 #include "add.hh"
@@ -87,6 +89,7 @@ int main( int argc, char* argv[] )
     execl( "/usr/bin/sudo", "sudo", "perf", "record", "--call-graph", "dwarf", "-p", pid_char, NULL );
   } else {
     setpgid( cpid, 0 );
+    this_thread::sleep_for( chrono::seconds( 1 ) );
     {
       GlobalScopeTimer<Timer::Category::Execution> record_timer;
       for ( int i = 0; i < INIT_INSTANCE; i++ ) {
