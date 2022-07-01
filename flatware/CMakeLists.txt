@@ -25,7 +25,6 @@ add_executable(c-flatware.wasm "c-flatware.c")
 add_custom_command(
   OUTPUT "asm-flatware.wasm"
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/asm-flatware.wat
-          ${CMAKE_BINARY_DIR}/../../../_deps/wabt-build/wat2wasm
   COMMAND ${CMAKE_BINARY_DIR}/../../../_deps/wabt-build/wat2wasm
           --enable-multi-memory
 	  --enable-exceptions
@@ -48,7 +47,7 @@ add_custom_command(
 
 add_custom_target(
   flatware-with-exported-memory ALL
-  DEPENDS flatware_with_exported_memory.wasm
+  DEPENDS flatware_with_exported_memory.wasm wabt
 )
 
 add_custom_command(
