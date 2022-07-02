@@ -80,3 +80,14 @@ target_link_libraries(deserialization_test cryptopp wasmrt ${CLANG_LIBS} LLVM ab
 add_dependencies(deserialization_test wasm2c)
 target_link_libraries(deserialization_test add_obj)
 
+add_executable(storage_perf "storage_perf.cc")
+target_compile_definitions(storage_perf PUBLIC TIME_FIXPOINT=1)
+target_link_libraries(storage_perf component-timing)
+target_link_libraries(storage_perf util-timing)
+target_link_libraries(storage_perf absl::flat_hash_map)
+
+add_executable(storage_test "hash_map_test.cc")
+target_compile_definitions(storage_test PUBLIC TIME_FIXPOINT=1)
+target_link_libraries(storage_test component-timing)
+target_link_libraries(storage_test util-timing)
+target_link_libraries(storage_test absl::flat_hash_map)

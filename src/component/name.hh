@@ -20,6 +20,7 @@ class Name : public cookie_name
    * 1) if the name is a literal:     | strict/lazy | other/literal | 0 | size of the blob (5 bits)
    * 2) if the name is not a literal: | strict/lazy | other/literal | 0 | 0 | 0 | canonical/local | Blob/Tree/Thunk
    * (2 bits)
+   *    -- extra byte for size
    */
 
 public:

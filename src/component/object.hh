@@ -55,6 +55,8 @@ public:
   operator View() const { return { data_.get(), size_ }; }
   const T* data() const { return data_.get(); }
   uint32_t size() const { return size_; }
+  bool own() const { return data_.get_deleter().own; }
+  T* release() const { return data_.release(); }
 
 private:
   ptr_type data_;
