@@ -12,7 +12,7 @@ using namespace std;
 Name RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 32 ) {
-    Name name( local_storage_.size(), ContentType::Blob );
+    Name name( local_storage_.size(), blob.size(), ContentType::Blob );
     local_storage_.push_back( move( blob ) );
     return name;
   } else {
@@ -65,7 +65,7 @@ string_view RuntimeStorage::user_get_blob( const Name name )
 
 Name RuntimeStorage::add_tree( Tree&& tree )
 {
-  Name name( local_storage_.size(), ContentType::Tree );
+  Name name( local_storage_.size(), tree.size(), ContentType::Tree );
   local_storage_.push_back( move( tree ) );
   return name;
 }

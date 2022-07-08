@@ -40,11 +40,12 @@ public:
   Name( const std::array<char, 32>& input )
     : cookie_name( input ) {};
 
-  Name( std::string hash, ContentType content_type )
+  Name( std::string hash, size_t size, ContentType content_type )
   {
     assert( hash.size() == 32 );
     hash[31] = static_cast<char>( 0x04 | static_cast<uint8_t>( content_type ) );
     __builtin_memcpy( &content_, hash.data(), 32 );
+    content_[2] = size;
   }
 
   Name( std::string_view literal_content )
@@ -55,10 +56,11 @@ public:
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
 
-  Name( size_t local_id, ContentType content_type )
+  Name( size_t local_id, size_t size, ContentType content_type )
   {
     uint8_t metadata = static_cast<uint8_t>( content_type );
     content_[0] = local_id;
+    content_[2] = size;
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
 

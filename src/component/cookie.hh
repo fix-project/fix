@@ -41,7 +41,7 @@ protected:
 /**
  * cookie_name metadata:
  * if literal: | _ | other/literal | _ | size of the blob (5 bits)
- * otherwise:  | _ | other/literal | _ | 0 | 0 | canonical/local | Blob/Tree/Thunk (2 bits)
+ * if not literal:  | _ | other/literal | _ | 0 | 0 | canonical/local | Blob/Tree/Thunk (2 bits)
  * ( _ means the bit is not used/has no required value)
  */
 class cookie_name : public cookie
@@ -68,6 +68,12 @@ public:
   {
     assert( is_literal_blob() );
     return metadata() & 0x1f;
+  }
+
+  size_t get_size() const
+  {
+    assert( !is_literal_blob() );
+    return content_[2];
   }
 
   bool is_canonical() const
