@@ -60,16 +60,17 @@ include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-build")
 include_directories("${PROJECT_SOURCE_DIR}/src/util")
 include_directories("${PROJECT_SOURCE_DIR}/src/runtime")
 include_directories("${PROJECT_SOURCE_DIR}/src/component")
-include_directories("${PROJECT_SOURCE_DIR}/src/compiler")
 include_directories("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 include_directories("${PROJECT_SOURCE_DIR}/src/storage")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/util")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/runtime")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/component")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/compiler")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 
+set(FIXPOINT_LIBS runtime component util)
+set(FIXPOINT_LIBS_TIMING runtime-timing component-timing util-timing)
+set(FIXPOINT_LIBS_TIMING_2 runtime-timing-2 component-timing-2 util-timing-2)
 #add_subdirectory("${PROJECT_SOURCE_DIR}/src/storage") # only headers
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/tester")
