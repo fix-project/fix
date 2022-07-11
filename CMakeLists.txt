@@ -44,6 +44,7 @@ ExternalProject_Add(flatware
   SOURCE_DIR "${PROJECT_SOURCE_DIR}/flatware"
   INSTALL_COMMAND cmake -E echo "Skipping flatware install."
   DEPENDS wat2wasm
+  BUILD_ALWAYS true
   )
 
 include(etc/build_type.cmake)
