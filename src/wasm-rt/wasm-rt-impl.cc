@@ -309,6 +309,7 @@ void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
                                      uint32_t max_pages,
                                      bool hw_checked )
 {
+  memory->read_only = false;
   if ( initial_pages == 0 ) {
     memory->data = NULL;
     memory->size = 0;
@@ -498,7 +499,7 @@ double wasm_rt_fabs( double x )
 }
 #endif
 
-#define DEFINE_TABLE_OPS( type )                                                                                   \
+#define DEFINE_TABLE_ALLOCATE_OP( type )                                                                           \
   void wasm_rt_allocate_##type##_table(                                                                            \
     wasm_rt_##type##_table_t* table, uint32_t elements, uint32_t max_elements )                                    \
   {                                                                                                                \
@@ -509,7 +510,9 @@ double wasm_rt_fabs( double x )
       memset( ptr, 0, table->size * sizeof( wasm_rt_##type##_t ) );                                                \
       table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                       \
     }                                                                                                              \
-  }                                                                                                                \
+  }
+
+#define DEFINE_TABLE_GROW_OP( type )                                                                               \
   uint32_t wasm_rt_grow_##type##_table( wasm_rt_##type##_table_t* table, uint32_t delta, wasm_rt_##type##_t init ) \
   {                                                                                                                \
     uint32_t old_elems = table->size;                                                                              \
@@ -532,12 +535,26 @@ double wasm_rt_fabs( double x )
     return old_elems;                                                                                              \
   }
 
-DEFINE_TABLE_OPS( funcref )
+DEFINE_TABLE_ALLOCATE_OP( funcref )
+DEFINE_TABLE_GROW_OP( funcref )
 void wasm_rt_free_funcref_table( wasm_rt_funcref_table_t* table )
 {
   free( table->data );
 }
-DEFINE_TABLE_OPS( externref )
+
+void wasm_rt_allocate_externref_table( wasm_rt_externref_table_t* table, uint32_t elements, uint32_t max_elements )
+{
+  table->size = elements;
+  table->max_size = max_elements;
+  table->read_only = false;
+  if ( table->size != 0 ) {
+    void* ptr = aligned_alloc( alignof( wasm_rt_externref_t ), table->size * sizeof( wasm_rt_externref_t ) );
+    memset( ptr, 0, table->size * sizeof( wasm_rt_externref_t ) );
+    table->data = static_cast<wasm_rt_externref_t*>( ptr );
+  }
+}
+
+DEFINE_TABLE_GROW_OP( externref )
 void wasm_rt_free_externref_table( wasm_rt_externref_table_t* table )
 {
   if ( table->read_only )

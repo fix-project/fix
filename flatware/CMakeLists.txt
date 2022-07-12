@@ -9,12 +9,13 @@ FetchContent_Declare(
   wasm-tools
   GIT_REPOSITORY https://github.com/fixpointOS/wasm-tools
   GIT_TAG        main
-  )
+  BUILD_ALWAYS   true
+)
 FetchContent_MakeAvailable(wasm-tools)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BASE_C_FLAGS "${CMAKE_C_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-unused-command-line-argument -std=c17 -Os -target wasm32 -mreference-types")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unused-command-line-argument -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")
 
 set(CMAKE_C_COMPILER clang)
 set(CMAKE_C_COMPILER_TARGET "wasm32")

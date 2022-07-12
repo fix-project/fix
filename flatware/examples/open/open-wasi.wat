@@ -37,7 +37,7 @@
       unreachable
     end)
   (func $__original_main (type 9) (result i32)
-    (local i32 i32 i32 i32 i32 i32 i32 i32 i32)
+    (local i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32)
     global.get $__stack_pointer
     local.set 0
     i32.const 16
@@ -60,18 +60,59 @@
     local.get 4
     local.get 5
     call $fopen
-    drop
-    i32.const 0
     local.set 6
-    i32.const 16
-    local.set 7
     local.get 2
-    local.get 7
-    i32.add
-    local.set 8
-    local.get 8
-    global.set $__stack_pointer
     local.get 6
+    i32.store offset=4
+    local.get 2
+    i32.load offset=4
+    local.set 7
+    i32.const 0
+    local.set 8
+    local.get 7
+    local.set 9
+    local.get 8
+    local.set 10
+    local.get 9
+    local.get 10
+    i32.ne
+    local.set 11
+    i32.const 1
+    local.set 12
+    local.get 11
+    local.get 12
+    i32.and
+    local.set 13
+    block  ;; label = @1
+      block  ;; label = @2
+        local.get 13
+        i32.eqz
+        br_if 0 (;@2;)
+        i32.const 78
+        local.set 14
+        local.get 2
+        local.get 14
+        i32.store offset=12
+        br 1 (;@1;)
+      end
+      i32.const 10086
+      local.set 15
+      local.get 2
+      local.get 15
+      i32.store offset=12
+    end
+    local.get 2
+    i32.load offset=12
+    local.set 16
+    i32.const 16
+    local.set 17
+    local.get 2
+    local.get 17
+    i32.add
+    local.set 18
+    local.get 18
+    global.set $__stack_pointer
+    local.get 16
     return)
   (func $__wasi_fd_close (type 0) (param i32) (result i32)
     local.get 0
