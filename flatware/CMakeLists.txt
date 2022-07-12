@@ -44,21 +44,17 @@ add_custom_command(
           asm-flatware.wasm
           -o flatware_with_exported_memory.wasm
 )
-
-add_custom_target(
-  flatware-with-exported-memory ALL
-  DEPENDS flatware_with_exported_memory.wasm wabt
-)
+set_source_files_properties(asm-flatware.wasm PROPERTIES GENERATED TRUE)
 
 add_custom_command(
   OUTPUT "wasi_snapshot_preview1.wasm"
-  DEPENDS flatware-with-exported-memory
+  DEPENDS flatware_with_exported_memory.wasm
           ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/export-audit/export-audit
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/export-audit/export-audit
           --enable-multi-memory
           --enable-exceptions
           -r memory
-	  flatware_with_exported_memory.wasm
+          flatware_with_exported_memory.wasm
           wasi_snapshot_preview1.wasm
 )
 
