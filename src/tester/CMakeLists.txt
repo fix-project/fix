@@ -14,7 +14,7 @@ target_link_libraries(fib_tester ${FIXPOINT_LIBS})
 target_link_libraries(fib_tester cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
 add_dependencies(fib_tester wasm2c)
 
-add_executable(wasi_tester "wasi_tester.cc" "${CMAKE_BINARY_DIR}/_deps/wabt-build/CMakeFiles/wasm2c.dir/src/c-writer.cc.o")
+add_executable(wasi_tester "wasi_tester.cc" "option-parser.cc" "${CMAKE_BINARY_DIR}/_deps/wabt-build/CMakeFiles/wasm2c.dir/src/c-writer.cc.o")
 target_link_libraries(wasi_tester ${FIXPOINT_LIBS})
 target_link_libraries(wasi_tester cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
 add_dependencies(wasi_tester wasm2c)
