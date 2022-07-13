@@ -1,13 +1,18 @@
+#include <fcntl.h>
 #include <stdio.h>
+#include <sys/uio.h>
 
 int main()
 {
-  int result;
-  FILE* fd = fopen( "saskghasfg", "r" );
-  if ( fd != NULL ) {
-    return 78;
-  } else {
-    return 10086;
-  }
-  // fread( &result, 1, 1, fd );
+  char buf1[3];
+  char buf2[3];
+
+  struct iovec iovs[2] = { { .iov_base = buf1, .iov_len = 2 }, { .iov_base = buf2, .iov_len = 2 } };
+
+  int fd = open( "asdfasdf", O_RDONLY );
+
+  readv( fd, iovs, 2 );
+
+  printf( "Read %s and %s", buf1, buf2 );
+  return 0;
 }

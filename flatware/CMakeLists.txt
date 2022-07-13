@@ -20,7 +20,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-
 set(CMAKE_C_COMPILER clang)
 set(CMAKE_C_COMPILER_TARGET "wasm32")
 
-add_link_options(-nostdlib -Wl,--no-entry)
+add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
 add_executable(c-flatware.wasm "c-flatware.c")
 
 add_custom_command(

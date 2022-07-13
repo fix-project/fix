@@ -4,6 +4,7 @@ add_custom_command(
           ${CMAKE_CURRENT_SOURCE_DIR}/add-wasi.wasm
           ../../c-flatware.c
           ../../asm-flatware.wat
+          ../../asm-flatware.h
           wasi-snapshot 
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
           --enable-multi-memory
