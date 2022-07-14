@@ -19,7 +19,7 @@ sub check_return($) {
 
   my ($answer) = $result =~ m{^The result is (.*)};
 
-  if ( $answer != $expected_answer ) {
+  if ( !( $answer eq $expected_answer ) ) {
     print STDERR qq{Got result:\n$result\n};
     die qq{Wrong return value ($answer, was expecting $expected_answer)};
   }
