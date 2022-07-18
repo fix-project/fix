@@ -1,6 +1,7 @@
 #include "c-flatware.h"
 #include "api.h"
 #include "asm-flatware.h"
+#include "filesys.h"
 
 #include <stdbool.h>
 

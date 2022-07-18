@@ -21,7 +21,7 @@ set(CMAKE_C_COMPILER clang)
 set(CMAKE_C_COMPILER_TARGET "wasm32")
 
 add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
-add_executable(c-flatware.wasm "c-flatware.c")
+add_executable(c-flatware.wasm "c-flatware.c" "filesys.c")
 
 add_custom_command(
   OUTPUT "asm-flatware.wasm"
