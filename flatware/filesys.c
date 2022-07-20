@@ -1,6 +1,8 @@
 #include "filesys.h"
 #include "asm-flatware.h"
 
+#include <string.h>
+
 bool is_dir( __attribute__( ( unused ) ) int32_t ro_table_index )
 {
   return false;

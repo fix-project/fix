@@ -5,11 +5,11 @@ on: [push]
 jobs:
   build-ubuntu:
       runs-on: ubuntu-latest
-      container: ubuntu:rolling
+      container: ghcr.io/fixpointos/wasm_toolchain_docker:latest
       steps:
       - uses: actions/checkout@v1
-      - name: install-packages
-        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config zlib1g-dev cmake clang libclang-dev libcrypto++-dev lld
+      - shell: bash
+        run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - name: cmake
         run: cmake -S . -B out
       - name: compile
@@ -18,11 +18,11 @@ jobs:
         run: cmake --build out --target fixpoint-check
   sanitize:
       runs-on: ubuntu-latest
-      container: ubuntu:rolling
+      container: ghcr.io/fixpointos/wasm_toolchain_docker:latest
       steps:
       - uses: actions/checkout@v1
-      - name: install-packages
-        run:  apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install build-essential git pkg-config zlib1g-dev cmake clang libclang-dev libcrypto++-dev lld
+      - shell: bash
+        run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - name: cmake
         run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=DebugASan
       - name: compile

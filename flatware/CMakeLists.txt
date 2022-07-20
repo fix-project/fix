@@ -17,7 +17,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BASE_C_FLAGS "${CMAKE_C_FLAGS}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unused-command-line-argument -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")
 
-set(CMAKE_C_COMPILER clang)
+set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
 set(CMAKE_C_COMPILER_TARGET "wasm32")
 
 add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
