@@ -28,7 +28,7 @@ add_custom_command(
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/asm-flatware.wat
   COMMAND ${CMAKE_BINARY_DIR}/../../../_deps/wabt-build/wat2wasm
           --enable-multi-memory
-	  --enable-exceptions
+	        --enable-exceptions
           ${CMAKE_CURRENT_SOURCE_DIR}/asm-flatware.wat
           -o asm-flatware.wasm
 )
@@ -62,6 +62,16 @@ add_custom_command(
 add_custom_target(
   wasi-snapshot ALL
   DEPENDS wasi_snapshot_preview1.wasm
+)
+
+add_custom_target(import-check-flatware ALL
+  DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/import-check/import-check
+          wasi_snapshot_preview1.wasm
+  COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/import-check/import-check
+          --enable-multi-memory
+          --enable-exceptions
+          -e wasi_snapshot_preview1
+          wasi_snapshot_preview1.wasm
 )
 
 add_subdirectory ("examples")
