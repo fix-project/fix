@@ -57,3 +57,8 @@ target_link_libraries(benchmark_timing_perf ${FIXPOINT_LIBS_TIMING})
 target_link_libraries(benchmark_timing_perf cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
 add_dependencies(benchmark_timing_perf wasm2c)
 target_link_libraries(benchmark_timing_perf add_obj)
+
+add_executable(base64_test "base64_test.cc")
+target_link_libraries(base64_test component util)
+target_link_libraries(base64_test cryptopp)
+
