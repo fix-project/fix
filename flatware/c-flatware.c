@@ -168,6 +168,151 @@ int32_t fd_prestat_dir_name( int32_t fd, int32_t path, int32_t path_len )
   return 0;
 }
 
+int32_t fd_advise( __attribute__( ( unused ) ) int32_t fd,
+                   __attribute__( ( unused ) ) int64_t offset,
+                   __attribute__( ( unused ) ) int64_t len,
+                   __attribute__( ( unused ) ) int32_t advice )
+{
+  return 0;
+}
+
+int32_t fd_allocate( __attribute__( ( unused ) ) int32_t fd,
+                     __attribute__( ( unused ) ) int64_t offset,
+                     __attribute__( ( unused ) ) int64_t len )
+{
+  return 0;
+}
+
+int32_t fd_datasync( __attribute__( ( unused ) ) int32_t fd )
+{
+  return 0;
+}
+
+int32_t fd_filestat_get( __attribute__( ( unused ) ) int32_t fd, __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t fd_filestat_set_size( __attribute__( ( unused ) ) int32_t fd, __attribute__( ( unused ) ) int64_t size )
+{
+  return 0;
+}
+
+int32_t fd_filestat_set_times( __attribute__( ( unused ) ) int32_t fd,
+                               __attribute__( ( unused ) ) int64_t atim,
+                               __attribute__( ( unused ) ) int64_t mtim,
+                               __attribute__( ( unused ) ) int32_t fst_flags )
+{
+  return 0;
+}
+
+int32_t fd_pread( __attribute__( ( unused ) ) int32_t fd,
+                  __attribute__( ( unused ) ) int32_t iovs,
+                  __attribute__( ( unused ) ) int32_t iovs_len,
+                  __attribute__( ( unused ) ) int64_t offset,
+                  __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t fd_pwrite( __attribute__( ( unused ) ) int32_t fd,
+                   __attribute__( ( unused ) ) int32_t iovs,
+                   __attribute__( ( unused ) ) int32_t iovs_len,
+                   __attribute__( ( unused ) ) int64_t offset,
+                   __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t fd_readdir( __attribute__( ( unused ) ) int32_t fd,
+                    __attribute__( ( unused ) ) int32_t buf,
+                    __attribute__( ( unused ) ) int32_t buf_len,
+                    __attribute__( ( unused ) ) int64_t cookie,
+                    __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t fd_sync( __attribute__( ( unused ) ) int32_t fd )
+{
+  return 0;
+}
+
+int32_t fd_tell( __attribute__( ( unused ) ) int32_t fd, __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t path_create_directory( __attribute__( ( unused ) ) int32_t fd,
+                               __attribute__( ( unused ) ) int32_t path,
+                               __attribute__( ( unused ) ) int32_t path_len )
+{
+  return 0;
+}
+
+int32_t path_filestat_get( __attribute__( ( unused ) ) int32_t fd,
+                           __attribute__( ( unused ) ) int32_t flags,
+                           __attribute__( ( unused ) ) int32_t path,
+                           __attribute__( ( unused ) ) int32_t path_len,
+                           __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t path_link( __attribute__( ( unused ) ) int32_t old_fd,
+                   __attribute__( ( unused ) ) int32_t old_flags,
+                   __attribute__( ( unused ) ) int32_t old_path,
+                   __attribute__( ( unused ) ) int32_t old_path_len,
+                   __attribute__( ( unused ) ) int32_t new_fd,
+                   __attribute__( ( unused ) ) int32_t new_path,
+                   __attribute__( ( unused ) ) int32_t new_path_len )
+{
+  return 0;
+}
+
+int32_t path_readlink( __attribute__( ( unused ) ) int32_t fd,
+                       __attribute__( ( unused ) ) int32_t path,
+                       __attribute__( ( unused ) ) int32_t path_len,
+                       __attribute__( ( unused ) ) int32_t buf,
+                       __attribute__( ( unused ) ) int32_t buf_len,
+                       __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t path_remove_directory( __attribute__( ( unused ) ) int32_t fd,
+                               __attribute__( ( unused ) ) int32_t path,
+                               __attribute__( ( unused ) ) int32_t path_len )
+{
+  return 0;
+}
+
+int32_t path_rename( __attribute__( ( unused ) ) int32_t fd,
+                     __attribute__( ( unused ) ) int32_t old_path,
+                     __attribute__( ( unused ) ) int32_t old_path_len,
+                     __attribute__( ( unused ) ) int32_t new_fd,
+                     __attribute__( ( unused ) ) int32_t new_path,
+                     __attribute__( ( unused ) ) int32_t new_path_len )
+{
+  return 0;
+}
+
+int32_t path_symlink( __attribute__( ( unused ) ) int32_t old_path,
+                      __attribute__( ( unused ) ) int32_t old_path_len,
+                      __attribute__( ( unused ) ) int32_t fd,
+                      __attribute__( ( unused ) ) int32_t new_path,
+                      __attribute__( ( unused ) ) int32_t new_path_len )
+{
+  return 0;
+}
+
+int32_t path_unlink_file( __attribute__( ( unused ) ) int32_t fd,
+                          __attribute__( ( unused ) ) int32_t path,
+                          __attribute__( ( unused ) ) int32_t path_len )
+{
+  return 0;
+}
+
 int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
 {
   int32_t num = size_ro_table_0() - 2;
@@ -200,6 +345,17 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
   return 0;
 }
 
+int32_t environ_sizes_get( __attribute__( ( unused ) ) int32_t retptr0,
+                           __attribute__( ( unused ) ) int32_t retptr1 )
+{
+  return 0;
+}
+
+int32_t environ_get( __attribute__( ( unused ) ) int32_t environ, __attribute__( ( unused ) ) int32_t environ_buf )
+{
+  return 0;
+}
+
 int32_t path_open( __attribute__( ( unused ) ) int32_t fd,
                    __attribute__( ( unused ) ) int32_t dirflags,
                    __attribute__( ( unused ) ) int32_t path,
@@ -220,6 +376,36 @@ int32_t path_open( __attribute__( ( unused ) ) int32_t fd,
   fds[retfd].open = true;
 
   memory_copy_program( retptr0, &retfd, sizeof( retfd ) );
+  return 0;
+}
+
+int32_t clock_res_get( __attribute__( ( unused ) ) int32_t id, __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t clock_time_get( __attribute__( ( unused ) ) int32_t id,
+                        __attribute__( ( unused ) ) int64_t precision,
+                        __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t poll_oneoff( __attribute__( ( unused ) ) int32_t in,
+                     __attribute__( ( unused ) ) int32_t out,
+                     __attribute__( ( unused ) ) int32_t nsubscriptions,
+                     __attribute__( ( unused ) ) int32_t retptr0 )
+{
+  return 0;
+}
+
+int32_t sched_yield( void )
+{
+  return 0;
+}
+
+int32_t random_get( __attribute__( ( unused ) ) int32_t buf, __attribute__( ( unused ) ) int32_t buf_len )
+{
   return 0;
 }
 
