@@ -91,6 +91,12 @@ int main( int argc, char* argv[] )
     if ( blob_content.size() > 0 ) {
       cout << blob_content.data() << std::endl;
     }
+    auto trace_blob = runtime.user_get_blob( output_tree[2] );
+    if ( trace_blob.size() > 0 ) {
+      cout << "========== FLATWARE TRACE ==========";
+      cout << trace_blob.data() << endl;
+      cout << "====================================" << endl;
+    }
     return 0;
   }
 }
