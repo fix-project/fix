@@ -1,7 +1,15 @@
 add_custom_command(
+  OUTPUT "add-wasi.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/add_program.c
+  COMMAND $ENV{HOME}/wasm-toolchain/sysroot/bin/clang
+          ${CMAKE_CURRENT_SOURCE_DIR}/add_program.c
+          -o add-wasi.wasm
+)
+
+add_custom_command(
   OUTPUT "add-fixpoint.wasm"
   DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-          ${CMAKE_CURRENT_SOURCE_DIR}/add-wasi.wasm
+          add-wasi.wasm
           ../../c-flatware.c
           ../../asm-flatware.wat
           ../../asm-flatware.h
@@ -9,7 +17,7 @@ add_custom_command(
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
           --enable-multi-memory
           --enable-exceptions
-          ${CMAKE_CURRENT_SOURCE_DIR}/add-wasi.wasm
+          add-wasi.wasm
           ../../wasi_snapshot_preview1.wasm
           -m wasi_command
           -n wasi_snapshot_preview1
