@@ -7,6 +7,7 @@
   (memory $argmem (export "ro_mem_0") 0)
   (memory $fs (export "ro_mem_1") 0)
   (table $input (export "ro_table_0") 0 externref)
+  (table $ro_table_1 (export "ro_table_1") 0 externref)
   (table $return (export "rw_table_0") 2 externref)
   ;; rw_0
   (func (export "flatware_memory_to_rw_0") (param $offset i32) (param $ptr i32) (param $len i32)
@@ -82,6 +83,13 @@
   )
   (func (export "size_ro_table_0") (result i32)
     (table.size $input)
+  )
+  ;; ro_table_1
+  (func (export "get_ro_table_1") (param $index i32) (result externref)
+    (table.get $ro_table_1 (local.get $index))
+  )
+  (func (export "size_ro_table_1") (result i32)
+    (table.size $ro_table_1)
   )
   ;; rw_table_0
   (func (export "set_rw_table_0") (param $index i32) (param $val externref) 

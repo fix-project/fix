@@ -33,4 +33,9 @@ DEFINE_RO_MEM_OPS( 1 )
 DEFINE_RW_MEM_OPS( 0 )
 DEFINE_RW_MEM_OPS( 1 )
 DEFINE_RO_TABLE_OPS( 0 )
+DEFINE_RO_TABLE_OPS( 1 )
 DEFINE_RW_TABLE_OPS( 0 )
+
+static externref ( *get_ro_table_functions[] )( int32_t ) = { get_ro_table_0, get_ro_table_1 };
+
+externref get_ro_table( int32_t table_index, int32_t index ) __attribute__( ( __export_name__( "get_ro_table" ) ) );

@@ -421,3 +421,8 @@ externref fixpoint_apply( externref encode )
 
   return create_tree_rw_table_0( 2 );
 }
+
+externref get_ro_table( int32_t table_index, int32_t index )
+{
+  return get_ro_table_functions[table_index]( index );
+}
