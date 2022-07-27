@@ -62,3 +62,15 @@ add_executable(base64_test "base64_test.cc")
 target_link_libraries(base64_test component util)
 target_link_libraries(base64_test cryptopp)
 
+add_executable(serialization_test "serialization_test.cc" "${CMAKE_BINARY_DIR}/_deps/wabt-build/CMakeFiles/wasm2c.dir/src/c-writer.cc.o")
+target_link_libraries(serialization_test ${FIXPOINT_LIBS})
+target_link_libraries(serialization_test cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
+add_dependencies(serialization_test wasm2c)
+target_link_libraries(serialization_test add_obj)
+
+add_executable(deserialization_test "deserialization_test.cc" "${CMAKE_BINARY_DIR}/_deps/wabt-build/CMakeFiles/wasm2c.dir/src/c-writer.cc.o")
+target_link_libraries(deserialization_test ${FIXPOINT_LIBS})
+target_link_libraries(deserialization_test cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
+add_dependencies(deserialization_test wasm2c)
+target_link_libraries(deserialization_test add_obj)
+

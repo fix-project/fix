@@ -30,7 +30,7 @@ static uint8_t pos_of_char( const unsigned char chr )
     throw std::runtime_error( "Input is not valid base64-encoded data." );
 }
 
-static std::string encode( __m256i name_to_encode )
+__attribute__( ( unused ) ) static std::string encode( __m256i name_to_encode )
 {
   std::string ret;
   ret.reserve( 43 );

@@ -98,4 +98,10 @@ public:
 
   // Populate a program
   void populate_program( Name function_name );
+
+  Name local_to_storage( Name name );
+
+  std::string serialize( Name name );
+
+  void deserialize();
 };
