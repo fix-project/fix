@@ -360,6 +360,18 @@ int32_t path_filestat_get( int32_t fd, int32_t flags, int32_t path, int32_t path
   return 0;
 }
 
+int32_t path_filestat_set_times( int32_t fd,
+                                 int32_t flags,
+                                 int32_t path,
+                                 int32_t path_len,
+                                 int64_t atim,
+                                 int64_t mtim,
+                                 int32_t fst_flags )
+{
+  TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T64, atim, T64, mtim, T32, fst_flags, TEND );
+  return 0;
+}
+
 int32_t path_link( int32_t old_fd,
                    int32_t old_flags,
                    int32_t old_path,
@@ -541,6 +553,12 @@ int32_t sched_yield( void )
 int32_t random_get( int32_t buf, int32_t buf_len )
 {
   TRACE( T32, buf, T32, buf_len, TEND );
+  return 0;
+}
+
+int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
+{
+  TRACE( T32, fd, T32, flags, T32, retptr0, TEND );
   return 0;
 }
 
