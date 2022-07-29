@@ -7,6 +7,32 @@
 
 typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
+// XXX make sure this is false before committing
+static bool trace = false;
+static int32_t trace_offset = 0;
+
+#define TRACE()                                                                                                    \
+  if ( trace )                                                                                                     \
+  print_trace( __FUNCTION__ )
+
+static void print_trace( const char* f_name )
+{
+  static const char newline = '\n';
+  int32_t f_name_len = 0;
+
+  const char* tmp = f_name;
+  while ( *tmp ) {
+    f_name_len++;
+    tmp++;
+  }
+
+  flatware_memory_to_rw_2( trace_offset, &newline, 1 );
+  trace_offset++;
+
+  flatware_memory_to_rw_2( trace_offset, f_name, f_name_len );
+  trace_offset += f_name_len;
+}
+
 typedef struct filedesc
 {
   int32_t offset;
@@ -45,17 +71,20 @@ externref fixpoint_apply( externref encode ) __attribute( ( export_name( "_fixpo
 
 _Noreturn void proc_exit( int32_t rval )
 {
+  TRACE();
   set_rw_table_0( 0, create_blob_i32( rval ) );
   flatware_exit();
 }
 
 int32_t fd_close( __attribute__( ( unused ) ) int32_t fd )
 {
+  TRACE();
   return 0;
 }
 
 int32_t fd_fdstat_get( __attribute__( ( unused ) ) int32_t fd, __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -64,6 +93,7 @@ int32_t fd_seek( __attribute__( ( unused ) ) int32_t fd,
                  __attribute__( ( unused ) ) int32_t whence,
                  __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -75,6 +105,8 @@ int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   int32_t file_remaining;
   int32_t size_to_read;
   int32_t total_read = 0;
+
+  TRACE();
 
   if ( fd != 4 )
     return __WASI_ERRNO_BADF;
@@ -102,6 +134,8 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   int32_t iobuf_offset, iobuf_len;
   int32_t total_written = 0;
 
+  TRACE();
+
   if ( fd != STDOUT )
     return __WASI_ERRNO_BADF;
 
@@ -120,6 +154,7 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 
 int32_t fd_fdstat_set_flags( __attribute__( ( unused ) ) int32_t fd, __attribute__( ( unused ) ) int32_t fdflags )
 {
+  TRACE();
   return 0;
 }
 
@@ -131,6 +166,8 @@ int32_t fd_fdstat_set_flags( __attribute__( ( unused ) ) int32_t fd, __attribute
  */
 int32_t fd_prestat_get( int32_t fd, int32_t retptr0 )
 {
+  TRACE();
+
   // STDIN, STDOUT, STDERR
   if ( fd < 3 ) {
     return __WASI_ERRNO_PERM;
@@ -160,6 +197,8 @@ int32_t fd_prestat_dir_name( int32_t fd, int32_t path, int32_t path_len )
 {
   char str[] = ".";
 
+  TRACE();
+
   if ( fd != WORKINGDIR ) {
     return __WASI_ERRNO_PERM;
   }
@@ -173,6 +212,7 @@ int32_t fd_advise( __attribute__( ( unused ) ) int32_t fd,
                    __attribute__( ( unused ) ) int64_t len,
                    __attribute__( ( unused ) ) int32_t advice )
 {
+  TRACE();
   return 0;
 }
 
@@ -180,21 +220,25 @@ int32_t fd_allocate( __attribute__( ( unused ) ) int32_t fd,
                      __attribute__( ( unused ) ) int64_t offset,
                      __attribute__( ( unused ) ) int64_t len )
 {
+  TRACE();
   return 0;
 }
 
 int32_t fd_datasync( __attribute__( ( unused ) ) int32_t fd )
 {
+  TRACE();
   return 0;
 }
 
 int32_t fd_filestat_get( __attribute__( ( unused ) ) int32_t fd, __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
 int32_t fd_filestat_set_size( __attribute__( ( unused ) ) int32_t fd, __attribute__( ( unused ) ) int64_t size )
 {
+  TRACE();
   return 0;
 }
 
@@ -203,6 +247,7 @@ int32_t fd_filestat_set_times( __attribute__( ( unused ) ) int32_t fd,
                                __attribute__( ( unused ) ) int64_t mtim,
                                __attribute__( ( unused ) ) int32_t fst_flags )
 {
+  TRACE();
   return 0;
 }
 
@@ -212,6 +257,7 @@ int32_t fd_pread( __attribute__( ( unused ) ) int32_t fd,
                   __attribute__( ( unused ) ) int64_t offset,
                   __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -221,6 +267,7 @@ int32_t fd_pwrite( __attribute__( ( unused ) ) int32_t fd,
                    __attribute__( ( unused ) ) int64_t offset,
                    __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -230,16 +277,19 @@ int32_t fd_readdir( __attribute__( ( unused ) ) int32_t fd,
                     __attribute__( ( unused ) ) int64_t cookie,
                     __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
 int32_t fd_sync( __attribute__( ( unused ) ) int32_t fd )
 {
+  TRACE();
   return 0;
 }
 
 int32_t fd_tell( __attribute__( ( unused ) ) int32_t fd, __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -247,6 +297,7 @@ int32_t path_create_directory( __attribute__( ( unused ) ) int32_t fd,
                                __attribute__( ( unused ) ) int32_t path,
                                __attribute__( ( unused ) ) int32_t path_len )
 {
+  TRACE();
   return 0;
 }
 
@@ -256,6 +307,7 @@ int32_t path_filestat_get( __attribute__( ( unused ) ) int32_t fd,
                            __attribute__( ( unused ) ) int32_t path_len,
                            __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -267,6 +319,7 @@ int32_t path_link( __attribute__( ( unused ) ) int32_t old_fd,
                    __attribute__( ( unused ) ) int32_t new_path,
                    __attribute__( ( unused ) ) int32_t new_path_len )
 {
+  TRACE();
   return 0;
 }
 
@@ -277,6 +330,7 @@ int32_t path_readlink( __attribute__( ( unused ) ) int32_t fd,
                        __attribute__( ( unused ) ) int32_t buf_len,
                        __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -284,6 +338,7 @@ int32_t path_remove_directory( __attribute__( ( unused ) ) int32_t fd,
                                __attribute__( ( unused ) ) int32_t path,
                                __attribute__( ( unused ) ) int32_t path_len )
 {
+  TRACE();
   return 0;
 }
 
@@ -294,6 +349,7 @@ int32_t path_rename( __attribute__( ( unused ) ) int32_t fd,
                      __attribute__( ( unused ) ) int32_t new_path,
                      __attribute__( ( unused ) ) int32_t new_path_len )
 {
+  TRACE();
   return 0;
 }
 
@@ -303,6 +359,7 @@ int32_t path_symlink( __attribute__( ( unused ) ) int32_t old_path,
                       __attribute__( ( unused ) ) int32_t new_path,
                       __attribute__( ( unused ) ) int32_t new_path_len )
 {
+  TRACE();
   return 0;
 }
 
@@ -310,6 +367,7 @@ int32_t path_unlink_file( __attribute__( ( unused ) ) int32_t fd,
                           __attribute__( ( unused ) ) int32_t path,
                           __attribute__( ( unused ) ) int32_t path_len )
 {
+  TRACE();
   return 0;
 }
 
@@ -317,6 +375,9 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
 {
   int32_t num = size_ro_table_0() - 2;
   int32_t size = 0;
+
+  TRACE();
+
   memory_copy_program( num_argument_ptr, &num, 4 );
 
   // Actual arguments
@@ -334,6 +395,8 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
   int32_t size;
   int32_t addr = argv_buf_ptr;
 
+  TRACE();
+
   for ( int32_t i = 2; i < size_ro_table_0(); i++ ) {
     attach_blob_ro_mem_0( get_ro_table_0( i ) );
     size = size_ro_mem_0();
@@ -348,11 +411,13 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 int32_t environ_sizes_get( __attribute__( ( unused ) ) int32_t retptr0,
                            __attribute__( ( unused ) ) int32_t retptr1 )
 {
+  TRACE();
   return 0;
 }
 
 int32_t environ_get( __attribute__( ( unused ) ) int32_t environ, __attribute__( ( unused ) ) int32_t environ_buf )
 {
+  TRACE();
   return 0;
 }
 
@@ -368,6 +433,9 @@ int32_t path_open( __attribute__( ( unused ) ) int32_t fd,
 {
   __wasi_fd_t retfd;
   externref fs = get_ro_table_0( 2 );
+
+  TRACE();
+
   attach_blob_ro_mem_1( fs );
 
   retfd = 4;
@@ -381,6 +449,7 @@ int32_t path_open( __attribute__( ( unused ) ) int32_t fd,
 
 int32_t clock_res_get( __attribute__( ( unused ) ) int32_t id, __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -388,6 +457,7 @@ int32_t clock_time_get( __attribute__( ( unused ) ) int32_t id,
                         __attribute__( ( unused ) ) int64_t precision,
                         __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
@@ -396,16 +466,19 @@ int32_t poll_oneoff( __attribute__( ( unused ) ) int32_t in,
                      __attribute__( ( unused ) ) int32_t nsubscriptions,
                      __attribute__( ( unused ) ) int32_t retptr0 )
 {
+  TRACE();
   return 0;
 }
 
 int32_t sched_yield( void )
 {
+  TRACE();
   return 0;
 }
 
 int32_t random_get( __attribute__( ( unused ) ) int32_t buf, __attribute__( ( unused ) ) int32_t buf_len )
 {
+  TRACE();
   return 0;
 }
 
@@ -415,9 +488,13 @@ externref fixpoint_apply( externref encode )
 
   attach_tree_ro_table_0( encode );
 
+  // TODO set `trace` here based on encode environment variables
+
   run_start();
 
   set_rw_table_0( 1, create_blob_rw_mem_1( fds[1].offset ) );
+
+  set_rw_table_0( 2, create_blob_rw_mem_2( trace_offset ) );
 
   return create_tree_rw_table_0( 2 );
 }

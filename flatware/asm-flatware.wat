@@ -4,11 +4,12 @@
   (import "wasi_command" "_start" (func $start))
   (memory $mymem0 (export "rw_mem_0") 1)
   (memory $mymem1 (export "rw_mem_1") 1)
+  (memory $trace_mem (export "rw_mem_2") 1)
   (memory $argmem (export "ro_mem_0") 0)
   (memory $fs (export "ro_mem_1") 0)
   (table $input (export "ro_table_0") 0 externref)
   (table $ro_table_1 (export "ro_table_1") 0 externref)
-  (table $return (export "rw_table_0") 2 externref)
+  (table $return (export "rw_table_0") 3 externref)
   ;; rw_0
   (func (export "flatware_memory_to_rw_0") (param $offset i32) (param $ptr i32) (param $len i32)
     (memory.copy $flatware_mem $mymem0
@@ -31,6 +32,20 @@
   )
   (func (export "program_memory_to_rw_1") (param $offset i32) (param $ptr i32) (param $len i32)
     (memory.copy $program_mem $mymem1
+    (local.get $offset)
+    (local.get $ptr)
+    (local.get $len))
+  )
+
+  ;; rw_2: trace_mem
+  (func (export "flatware_memory_to_rw_2") (param $offset i32) (param $ptr i32) (param $len i32)
+    (memory.copy $flatware_mem $trace_mem
+    (local.get $offset)
+    (local.get $ptr)
+    (local.get $len))
+  )
+  (func (export "program_memory_to_rw_2") (param $offset i32) (param $ptr i32) (param $len i32)
+    (memory.copy $program_mem $trace_mem
     (local.get $offset)
     (local.get $ptr)
     (local.get $len))
