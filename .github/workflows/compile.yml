@@ -5,7 +5,7 @@ on: [push]
 jobs:
   build-ubuntu:
       runs-on: ubuntu-latest
-      container: ghcr.io/fixpointos/wasm_toolchain_docker:latest
+      container: ghcr.io/fix-project/wasm_toolchain_docker:latest
       steps:
       - uses: actions/checkout@v1
       - shell: bash
@@ -18,7 +18,7 @@ jobs:
         run: cmake --build out --target fixpoint-check
   sanitize:
       runs-on: ubuntu-latest
-      container: ghcr.io/fixpointos/wasm_toolchain_docker:latest
+      container: ghcr.io/fix-project/wasm_toolchain_docker:latest
       steps:
       - uses: actions/checkout@v1
       - shell: bash

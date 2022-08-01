@@ -1,3 +1,3 @@
 # Fixpoint OS
 
-[![Compiles](https://github.com/fixpointOS/fixpoint/workflows/Compile/badge.svg?event=push)](https://github.com/fixpointOS/fixpoint/actions)
+[![Compiles](https://github.com/fix-project/fix/workflows/Compile/badge.svg?event=push)](https://github.com/fix-project/fix/actions)

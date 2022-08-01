@@ -7,7 +7,7 @@ project(flatware)
 include(FetchContent)
 FetchContent_Declare(
   wasm-tools
-  GIT_REPOSITORY https://github.com/fixpointOS/wasm-tools
+  GIT_REPOSITORY https://github.com/fix-project/wasm-tools
   GIT_TAG        main
   BUILD_ALWAYS   true
 )
