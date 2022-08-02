@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 
+#include "base64.hh"
 #include "mmap.hh"
 #include "name.hh"
 #include "option-parser.hh"
@@ -15,9 +16,11 @@ using namespace std;
 
 static bool pretty_print = false;
 static const char* s_infile;
+static string home_directory_64;
 static std::vector<const char*> arguments;
 
-static const char s_description[] = R"(./wasi_tester path_to_wasi_wasm_file [options] [list_of_arguments])";
+static const char s_description[]
+  = R"(./wasi_tester path_to_wasi_wasm_file [options] [base64_home_directory_name] [list_of_arguments])";
 
 static void ParseOptions( int argc, char* argv[] )
 {
@@ -25,6 +28,11 @@ static void ParseOptions( int argc, char* argv[] )
   parser.AddOption( "pretty-print", "format exit code to string", []() { pretty_print = true; } );
   parser.AddArgument(
     "filename", OptionParser::ArgumentCount::One, []( const char* argument ) { s_infile = argument; } );
+  parser.AddOption( 'h',
+                    "home-directory",
+                    "HOMEDIR",
+                    "base64 encoded name of the home directory for this wasi program",
+                    []( const char* argument ) { home_directory_64 = string( argument ); } );
   parser.AddArgument( "arguments", OptionParser::ArgumentCount::ZeroOrMore, []( const char* argument ) {
     arguments.push_back( argument );
   } );
@@ -71,6 +79,12 @@ int main( int argc, char* argv[] )
   for ( const char* argument : arguments ) {
     Name arg_name = runtime.add_blob( string_view( argument, strlen( argument ) + 1 ) );
     encode.push_back( arg_name );
+  }
+
+  if ( home_directory_64.length() != 0 ) {
+    runtime.deserialize();
+    Name home_dir = base64::decode( home_directory_64 );
+    encode.push_back( home_dir );
   }
 
   Name encode_name = runtime.add_tree( span_view<Name>( encode.data(), encode.size() ) );
