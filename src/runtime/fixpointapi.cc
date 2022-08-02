@@ -82,4 +82,16 @@ __m256i create_thunk( __m256i ro_handle )
   Name encode( ro_handle );
   return Name::get_thunk_name( encode );
 }
+
+uint32_t value_type( __m256i handle )
+{
+  Name object( handle );
+  if ( object.is_blob() ) {
+    return 0;
+  } else if ( object.is_tree() ) {
+    return 1;
+  } else {
+    return 2;
+  }
+}
 }

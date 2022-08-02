@@ -27,6 +27,7 @@ typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
 extern externref create_blob_i32( int32_t )
   __attribute( ( import_module( "fixpoint" ), import_name( "create_blob_i32" ) ) );
+extern int32_t value_type( externref ) __attribute( ( import_module( "fixpoint" ), import_name( "value_type" ) ) );
 
 DEFINE_RO_MEM_OPS( 0 )
 DEFINE_RO_MEM_OPS( 1 )

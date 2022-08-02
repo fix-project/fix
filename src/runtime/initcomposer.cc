@@ -66,6 +66,7 @@ private:
   void write_memory_size();
   void write_create_blob();
   void write_create_blob_i32();
+  void write_value_type();
   void write_create_tree();
   void write_create_thunk();
   void write_init_read_only_mem_table();
@@ -149,6 +150,15 @@ void InitComposer::write_create_blob_i32()
   result_ << "}\n" << endl;
 }
 
+void InitComposer::write_value_type()
+{
+  result_ << "extern uint32_t fixpoint_value_type( __m256i );" << endl;
+  result_ << "uint32_t Z_fixpointZ_value_type"
+          << "(struct Z_fixpoint_module_instance_t* module_instance, __m256i handle ) {" << endl;
+  result_ << "  return fixpoint_value_type( handle );" << endl;
+  result_ << "}\n" << endl;
+}
+
 void InitComposer::write_create_tree()
 {
   auto rw_tables = inspector_->GetExportedRWTables();
@@ -216,6 +226,7 @@ string InitComposer::compose_header()
   write_create_tree();
   write_create_blob();
   write_create_blob_i32();
+  write_value_type();
   write_create_thunk();
 
   result_ << "void initProgram(void* ptr) {" << endl;
