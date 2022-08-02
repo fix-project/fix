@@ -11,6 +11,7 @@ add_custom_command(
   DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
           helloworld-wasi.wasm
           ../../c-flatware.c
+          ../../filesys.c
           ../../asm-flatware.wat
           ../../asm-flatware.h
           wasi-snapshot

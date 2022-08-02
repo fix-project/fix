@@ -15,13 +15,30 @@ FetchContent_MakeAvailable(wasm-tools)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BASE_C_FLAGS "${CMAKE_C_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unused-command-line-argument -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")
 
 set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
 set(CMAKE_C_COMPILER_TARGET "wasm32")
 
 add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
-add_executable(c-flatware.wasm "c-flatware.c" "filesys.c")
+# add_executable(c-flatware.wasm "c-flatware.c" "filesys.c")
+
+add_library(filesys_obj OBJECT "filesys.c")
+add_library(c_flatware_obj OBJECT "c-flatware.c")
+add_custom_command(
+  OUTPUT  "c-flatware.wasm"
+  DEPENDS filesys_obj
+          c_flatware_obj
+          filesys.c
+          c-flatware.c
+  COMMAND $ENV{HOME}/wasm-toolchain/sysroot/bin/wasm-ld
+          ${CMAKE_BINARY_DIR}/CMakeFiles/filesys_obj.dir/filesys.c.o
+          ${CMAKE_BINARY_DIR}/CMakeFiles/c_flatware_obj.dir/c-flatware.c.o
+          $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc.a
+          -o c-flatware.wasm
+          --no-entry
+          --allow-undefined
+)
 
 add_custom_command(
   OUTPUT "asm-flatware.wasm"

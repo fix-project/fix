@@ -9,7 +9,7 @@ int main()
 
   struct iovec iovs[2] = { { .iov_base = buf1, .iov_len = 2 }, { .iov_base = buf2, .iov_len = 2 } };
 
-  int fd = open( "asdfasdf", O_RDONLY );
+  int fd = open( "fixpoint", O_RDONLY );
 
   readv( fd, iovs, 2 );
 

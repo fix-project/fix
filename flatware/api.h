@@ -16,6 +16,9 @@
  * [WASI]: https://github.com/WebAssembly/WASI/
  */
 
+#ifndef __wasi_api_h
+#define __wasi_api_h
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -2033,4 +2036,6 @@ extern "C"
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

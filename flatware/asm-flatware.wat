@@ -7,8 +7,12 @@
   (memory $trace_mem (export "rw_mem_2") 1)
   (memory $argmem (export "ro_mem_0") 0)
   (memory $fs (export "ro_mem_1") 0)
+  (memory $fs_data (export "ro_mem_2") 0)
   (table $input (export "ro_table_0") 0 externref)
-  (table $ro_table_1 (export "ro_table_1") 0 externref)
+  (table $args (export "ro_table_1") 0 externref)
+  (table $ro_table_2 (export "ro_table_2") 0 externref)
+  (table $ro_table_3 (export "ro_table_3") 0 externref)
+  (table $ro_table_4 (export "ro_table_4") 0 externref)
   (table $return (export "rw_table_0") 3 externref)
   ;; rw_0
   (func (export "flatware_memory_to_rw_0") (param $offset i32) (param $ptr i32) (param $len i32)
@@ -65,6 +69,12 @@
     (local.get $ptr)
     (local.get $len))
   )
+  (func (export "program_memory_to_flatware_memory") (param $offset i32) (param $ptr i32) (param $len i32)
+    (memory.copy $program_mem $flatware_mem
+    (local.get $offset)
+    (local.get $ptr)
+    (local.get $len))
+  )
   ;; ro_0
   (func (export "ro_0_to_program_memory") (param $offset i32) (param $ptr i32) (param $len i32)
     (memory.copy $argmem $program_mem
@@ -91,7 +101,19 @@
     (local.get $ptr)
     (local.get $len))
   )
-
+  ;; ro_2
+  (func (export "ro_2_to_program_memory") (param $offset i32) (param $ptr i32) (param $len i32)
+    (memory.copy $fs_data $program_mem
+    (local.get $offset)
+    (local.get $ptr)
+    (local.get $len))
+  )
+  (func (export "ro_2_to_flatware_memory") (param $offset i32) (param $ptr i32) (param $len i32)
+    (memory.copy $fs_data $flatware_mem
+    (local.get $offset)
+    (local.get $ptr)
+    (local.get $len))
+  )
   ;; ro_table_0
   (func (export "get_ro_table_0") (param $index i32) (result externref)
     (table.get $input (local.get $index))
@@ -101,10 +123,31 @@
   )
   ;; ro_table_1
   (func (export "get_ro_table_1") (param $index i32) (result externref)
-    (table.get $ro_table_1 (local.get $index))
+    (table.get $args (local.get $index))
   )
   (func (export "size_ro_table_1") (result i32)
-    (table.size $ro_table_1)
+    (table.size $args)
+  )
+  ;; ro_table_2
+  (func (export "get_ro_table_2") (param $index i32) (result externref)
+    (table.get $ro_table_2 (local.get $index))
+  )
+  (func (export "size_ro_table_2") (result i32)
+    (table.size $ro_table_2)
+  )
+  ;; ro_table_3
+  (func (export "get_ro_table_3") (param $index i32) (result externref)
+    (table.get $ro_table_3 (local.get $index))
+  )
+  (func (export "size_ro_table_3") (result i32)
+    (table.size $ro_table_3)
+  )
+  ;; ro_table_4
+  (func (export "get_ro_table_4") (param $index i32) (result externref)
+    (table.get $ro_table_4 (local.get $index))
+  )
+  (func (export "size_ro_table_4") (result i32)
+    (table.size $ro_table_4)
   )
   ;; rw_table_0
   (func (export "set_rw_table_0") (param $index i32) (param $val externref) 
