@@ -76,10 +76,13 @@ int main( int argc, char* argv[] )
   encode.push_back( Name( "empty" ) );
   encode.push_back( wasm_name );
 
+  vector<Name> args;
   for ( const char* argument : arguments ) {
     Name arg_name = runtime.add_blob( string_view( argument, strlen( argument ) + 1 ) );
-    encode.push_back( arg_name );
+    args.push_back( arg_name );
   }
+  Name args_name = runtime.add_tree( span_view<Name>( args.data(), args.size() ) );
+  encode.push_back( args_name );
 
   if ( home_directory_64.length() != 0 ) {
     runtime.deserialize();

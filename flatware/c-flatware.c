@@ -8,18 +8,43 @@
 
 typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
-// XXX make sure this is false before committing
-static bool trace = false;
-static int32_t trace_offset = 0;
+typedef struct filedesc
+{
+  int32_t offset;
+  int32_t size;
+  bool open;
+  char pad[7];
+  __wasi_fdstat_t stat;
+} filedesc;
+
+enum
+{
+  STDIN,
+  STDOUT,
+  STDERR,
+  WORKINGDIR
+};
+
+#define MAX_FD 15
+static filedesc fds[MAX_FD + 1] = {
+  { .open = true, .size = -1, .offset = 0 }, // STDIN
+  { .open = true, .size = -1, .offset = 0 }, // STDOUT
+  { .open = true, .size = -1, .offset = 0 }, // STDERR
+  { .open = true, .size = -1, .offset = 0 }, // WORKINGDIR
+};
+
+#define DO_TRACE 0
 
 // for each value, first pass the width (T32 or T64), then pass the value
 // to specify the end, pass TEND
 // this is important because we need to know the size of each value when getting it with `va_arg`
 // e.g. TRACE( T32, 0xdeadbeef, T64, 0xdeadeeffeedface, TEND )
 //      TRACE( TEND ) for no values passed
-#define TRACE( ... )                                                                                               \
-  if ( trace )                                                                                                     \
-  print_trace( __FUNCTION__, __VA_ARGS__ )
+#if DO_TRACE
+#define TRACE( ... ) print_trace( __FUNCTION__, __VA_ARGS__ )
+#else
+#define TRACE( ... ) dummy_trace( __FUNCTION__, __VA_ARGS__ )
+#endif
 
 typedef enum trace_val_size
 {
@@ -31,12 +56,6 @@ typedef enum trace_val_size
 // must be <= 16
 #define TRACE_RADIX 10
 
-static void write_trace( const char* str, int32_t len )
-{
-  flatware_memory_to_rw_2( trace_offset, str, len );
-  trace_offset += len;
-}
-
 static int32_t strlen( const char* str )
 {
   int32_t len = 0;
@@ -45,6 +64,12 @@ static int32_t strlen( const char* str )
     str++;
   }
   return len;
+}
+
+void write_trace( const char* str, int32_t len )
+{
+  flatware_memory_to_rw_2( fds[STDERR].offset, str, len );
+  fds[STDERR].offset += len;
 }
 
 static void write_int( uint64_t val )
@@ -64,6 +89,10 @@ static void write_int( uint64_t val )
   write_trace( &nums[val], 1 );
 }
 
+#if DO_TRACE
+#else
+__attribute__( ( unused ) )
+#endif
 static void print_trace( const char* f_name, ... )
 {
   const char chars[] = "\n( ), -";
@@ -111,45 +140,21 @@ static void print_trace( const char* f_name, ... )
   write_trace( &chars[2], 2 );
 }
 
-typedef struct filedesc
+#if DO_TRACE
+__attribute__( ( unused ) )
+#else
+#endif
+static void
+dummy_trace( __attribute__( ( unused ) ) const char* f_name, ... )
 {
-  int32_t offset;
-  int32_t size;
-  bool open;
-  char pad[3];
-} filedesc;
-
-enum
-{
-  STDIN,
-  STDOUT,
-  STDERR,
-  WORKINGDIR
-};
-
-static filedesc fds[16] = {
-  { .open = true, .size = -1, .offset = 0 }, // STDIN
-  { .open = true, .size = -1, .offset = 0 }, // STDOUT
-  { .open = true, .size = -1, .offset = 0 }, // STDERR
-  { .open = true, .size = -1, .offset = 0 }, // WORKINGDIR
-};
-
-extern void memory_copy_program( int32_t, const void*, int32_t )
-  __attribute( ( import_module( "asm-flatware" ), import_name( "memory_copy_program" ) ) );
-extern int32_t get_program_i32( int32_t )
-  __attribute( ( import_module( "asm-flatware" ), import_name( "get_program_i32" ) ) );
-extern void set_program_i32( int32_t, int32_t )
-  __attribute( ( import_module( "asm-flatware" ), import_name( "set_program_i32" ) ) );
-
-extern void run_start( void ) __attribute( ( import_module( "asm-flatware" ), import_name( "run-start" ) ) );
-__attribute( ( noreturn ) ) void flatware_exit( void )
-  __attribute( ( import_module( "asm-flatware" ), import_name( "exit" ) ) );
+}
 
 externref fixpoint_apply( externref encode ) __attribute( ( export_name( "_fixpoint_apply" ) ) );
 
 _Noreturn void proc_exit( int32_t rval )
 {
   TRACE( T32, rval, TEND );
+
   set_rw_table_0( 0, create_blob_i32( rval ) );
   flatware_exit();
 }
@@ -157,18 +162,54 @@ _Noreturn void proc_exit( int32_t rval )
 int32_t fd_close( int32_t fd )
 {
   TRACE( T32, fd, TEND );
+
+  if ( fd <= 3 || fd > MAX_FD || fds[fd].open == false )
+    return __WASI_ERRNO_BADF;
+
+  fds[fd].open = false;
+
   return 0;
 }
 
 int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
 {
+  __wasi_fdstat_t stat;
+
   TRACE( T32, fd, T32, retptr0, TEND );
+
+  if ( fd > MAX_FD || fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( fd > 3 ) {
+    memory_copy_program( retptr0, &fds[fd].stat, sizeof( fds[fd].stat ) );
+    return 0;
+  }
+
+  stat.fs_filetype = __WASI_FILETYPE_UNKNOWN;
+  stat.fs_flags = __WASI_FDFLAGS_APPEND;
+  stat.fs_rights_base = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
+  if ( fd == STDOUT )
+    stat.fs_rights_base |= __WASI_RIGHTS_FD_WRITE;
+  stat.fs_rights_inheriting = stat.fs_rights_base;
+
+  memory_copy_program( retptr0, &stat, sizeof( stat ) );
   return 0;
 }
 
 int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
 {
   TRACE( T32, fd, T64, offset, T32, whence, T32, retptr0, TEND );
+
+  if ( fd != 4 )
+    return __WASI_ERRNO_BADF;
+
+  if ( fds[fd].offset + offset + whence >= fds[fd].size ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
+  fds[fd].offset += offset + whence;
+  memory_copy_program( retptr0, &fds[fd].offset, sizeof( fds[fd].offset ) );
   return 0;
 }
 
@@ -230,6 +271,14 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
 {
   TRACE( T32, fd, T32, fdflags, TEND );
+
+  if ( fd <= 3 || fd > MAX_FD || fds[fd].open == false )
+    return __WASI_ERRNO_BADF;
+
+  if ( !( fds[fd].stat.fs_rights_base & __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS ) )
+    return __WASI_ERRNO_PERM;
+
+  fds[fd].stat.fs_flags = (__wasi_fdflags_t)fdflags;
   return 0;
 }
 
@@ -285,78 +334,91 @@ int32_t fd_prestat_dir_name( int32_t fd, int32_t path, int32_t path_len )
 int32_t fd_advise( int32_t fd, int64_t offset, int64_t len, int32_t advice )
 {
   TRACE( T32, fd, T64, offset, T64, len, T32, advice, TEND );
+
   return 0;
 }
 
 int32_t fd_allocate( int32_t fd, int64_t offset, int64_t len )
 {
   TRACE( T32, fd, T64, offset, T64, len, TEND );
+
   return 0;
 }
 
 int32_t fd_datasync( int32_t fd )
 {
   TRACE( T32, fd, TEND );
+
   return 0;
 }
 
 int32_t fd_filestat_get( int32_t fd, int32_t retptr0 )
 {
   TRACE( T32, fd, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t fd_filestat_set_size( int32_t fd, int64_t size )
 {
   TRACE( T32, fd, T64, size, TEND );
+
   return 0;
 }
 
 int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t fst_flags )
 {
   TRACE( T32, fd, T64, atim, T64, mtim, T32, fst_flags, TEND );
+
   return 0;
 }
 
 int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
   TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
   TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t fd_readdir( int32_t fd, int32_t buf, int32_t buf_len, int64_t cookie, int32_t retptr0 )
 {
   TRACE( T32, fd, T32, buf, T32, buf_len, T64, cookie, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t fd_sync( int32_t fd )
 {
   TRACE( T32, fd, TEND );
+
   return 0;
 }
 
 int32_t fd_tell( int32_t fd, int32_t retptr0 )
 {
   TRACE( T32, fd, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t path_create_directory( int32_t fd, int32_t path, int32_t path_len )
 {
   TRACE( T32, fd, T32, path, T32, path_len, TEND );
+
   return 0;
 }
 
 int32_t path_filestat_get( int32_t fd, int32_t flags, int32_t path, int32_t path_len, int32_t retptr0 )
 {
   TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T32, retptr0, TEND );
+
   return 0;
 }
 
@@ -369,6 +431,7 @@ int32_t path_filestat_set_times( int32_t fd,
                                  int32_t fst_flags )
 {
   TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T64, atim, T64, mtim, T32, fst_flags, TEND );
+
   return 0;
 }
 
@@ -401,12 +464,14 @@ int32_t path_link( int32_t old_fd,
 int32_t path_readlink( int32_t fd, int32_t path, int32_t path_len, int32_t buf, int32_t buf_len, int32_t retptr0 )
 {
   TRACE( T32, fd, T32, path, T32, path_len, T32, buf, T32, buf_len, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t path_remove_directory( int32_t fd, int32_t path, int32_t path_len )
 {
   TRACE( T32, fd, T32, path, T32, path_len, TEND );
+
   return 0;
 }
 
@@ -418,33 +483,40 @@ int32_t path_rename( int32_t fd,
                      int32_t new_path_len )
 {
   TRACE( T32, fd, T32, old_path, T32, old_path_len, T32, new_fd, T32, new_path, T32, new_path_len, TEND );
+
   return 0;
 }
 
 int32_t path_symlink( int32_t old_path, int32_t old_path_len, int32_t fd, int32_t new_path, int32_t new_path_len )
 {
   TRACE( T32, old_path, T32, old_path_len, T32, fd, T32, new_path, T32, new_path_len, TEND );
+
   return 0;
 }
 
 int32_t path_unlink_file( int32_t fd, int32_t path, int32_t path_len )
 {
   TRACE( T32, fd, T32, path, T32, path_len, TEND );
+
   return 0;
 }
 
 int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
 {
-  int32_t num = size_ro_table_0() - 2;
+  int32_t num;
   int32_t size = 0;
 
   TRACE( T32, num_argument_ptr, T32, size_argument_ptr, TEND );
 
+  attach_tree_ro_table_1( get_ro_table_0( 2 ) );
+
+  num = size_ro_table_1();
+
   memory_copy_program( num_argument_ptr, &num, 4 );
 
   // Actual arguments
-  for ( int32_t i = 2; i < size_ro_table_0(); i++ ) {
-    attach_blob_ro_mem_0( get_ro_table_0( i ) );
+  for ( int32_t i = 0; i < num; i++ ) {
+    attach_blob_ro_mem_0( get_ro_table_1( i ) );
     size += size_ro_mem_0();
   }
 
@@ -459,10 +531,12 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 
   TRACE( T32, argv_ptr, T32, argv_buf_ptr, TEND );
 
-  for ( int32_t i = 2; i < size_ro_table_0(); i++ ) {
-    attach_blob_ro_mem_0( get_ro_table_0( i ) );
+  attach_tree_ro_table_1( get_ro_table_0( 2 ) );
+
+  for ( int32_t i = 0; i < size_ro_table_1(); i++ ) {
+    attach_blob_ro_mem_0( get_ro_table_1( i ) );
     size = size_ro_mem_0();
-    memory_copy_program( argv_ptr + ( i - 2 ) * 4, &addr, 4 );
+    memory_copy_program( argv_ptr + i * 4, &addr, 4 );
     ro_0_to_program_memory( addr, 0, size );
     addr += size;
   }
@@ -473,12 +547,14 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 int32_t environ_sizes_get( int32_t retptr0, int32_t retptr1 )
 {
   TRACE( T32, retptr0, T32, retptr1, TEND );
+
   return 0;
 }
 
 int32_t environ_get( int32_t environ, int32_t environ_buf )
 {
   TRACE( T32, environ, T32, environ_buf, TEND );
+
   return 0;
 }
 
@@ -493,7 +569,6 @@ int32_t path_open( int32_t fd,
                    int32_t retptr0 )
 {
   __wasi_fd_t retfd;
-  externref fs = get_ro_table_0( 2 );
 
   TRACE( T32,
          fd,
@@ -515,12 +590,36 @@ int32_t path_open( int32_t fd,
          retptr0,
          TEND );
 
-  attach_blob_ro_mem_1( fs );
+  // XXX TEMPORARY
+  // attach_tree_ro_table_4( get_ro_table_3( 2 ) );
+  // attach_tree_ro_table_4( get_ro_table_4( 0 ) );
+  // fs = get_ro_table_4( 2 );
+  // attach_blob_ro_mem_1( fs );
 
-  retfd = 4;
+  for ( retfd = 4; retfd < MAX_FD; retfd++ ) {
+    if ( fds[retfd].open == false )
+      break;
+  }
+
+  // TRACE( T32, find_file( path, path_len, fd, retfd ) );
+  if ( retfd != find_file( path, path_len, fd, retfd ) ) {
+    TRACE( T32, retfd );
+    return __WASI_ERRNO_NOENT;
+  } else {
+    attach_blob_ro_mem_1( get_ro_table( retfd, 2 ) );
+  }
+
+  if ( retfd >= MAX_FD )
+    return __WASI_ERRNO_NFILE;
+
   fds[retfd].offset = 0;
   fds[retfd].size = size_ro_mem_1() - 1;
   fds[retfd].open = true;
+
+  fds[retfd].stat.fs_filetype = __WASI_FILETYPE_REGULAR_FILE;
+  fds[retfd].stat.fs_flags = __WASI_FDFLAGS_APPEND;
+  fds[retfd].stat.fs_rights_base = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
+  fds[retfd].stat.fs_rights_inheriting = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
 
   memory_copy_program( retptr0, &retfd, sizeof( retfd ) );
   return 0;
@@ -529,36 +628,42 @@ int32_t path_open( int32_t fd,
 int32_t clock_res_get( int32_t id, int32_t retptr0 )
 {
   TRACE( T32, id, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t clock_time_get( int32_t id, int64_t precision, int32_t retptr0 )
 {
   TRACE( T32, id, T64, precision, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t poll_oneoff( int32_t in, int32_t out, int32_t nsubscriptions, int32_t retptr0 )
 {
   TRACE( T32, in, T32, out, T32, nsubscriptions, T32, retptr0, TEND );
+
   return 0;
 }
 
 int32_t sched_yield( void )
 {
   TRACE( TEND );
+
   return 0;
 }
 
 int32_t random_get( int32_t buf, int32_t buf_len )
 {
   TRACE( T32, buf, T32, buf_len, TEND );
+
   return 0;
 }
 
 int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
 {
   TRACE( T32, fd, T32, flags, T32, retptr0, TEND );
+
   return 0;
 }
 
@@ -570,16 +675,25 @@ externref fixpoint_apply( externref encode )
 
   // TODO set `trace` here based on encode environment variables
 
+  // Attach working directory to table 3 if exists
+  if ( size_ro_table_0() >= 4 ) {
+    attach_tree_ro_table_3( get_ro_table_0( 3 ) );
+  }
   run_start();
 
-  set_rw_table_0( 1, create_blob_rw_mem_1( fds[1].offset ) );
+  set_rw_table_0( 1, create_blob_rw_mem_1( fds[STDOUT].offset ) );
 
-  set_rw_table_0( 2, create_blob_rw_mem_2( trace_offset ) );
+  set_rw_table_0( 2, create_blob_rw_mem_2( fds[STDERR].offset ) );
 
-  return create_tree_rw_table_0( 2 );
+  return create_tree_rw_table_0( 3 );
 }
 
 externref get_ro_table( int32_t table_index, int32_t index )
 {
   return get_ro_table_functions[table_index]( index );
+}
+
+void attach_tree_ro_table( int32_t table_index, externref handle )
+{
+  attach_tree_ro_table_functions[table_index]( handle );
 }
