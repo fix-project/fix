@@ -25,8 +25,8 @@ enum
   WORKINGDIR
 };
 
-#define MAX_FD 15
-static filedesc fds[MAX_FD + 1] = {
+#define N_FDS 16
+static filedesc fds[N_FDS] = {
   { .open = true, .size = -1, .offset = 0 }, // STDIN
   { .open = true, .size = -1, .offset = 0 }, // STDOUT
   { .open = true, .size = -1, .offset = 0 }, // STDERR
@@ -163,7 +163,7 @@ int32_t fd_close( int32_t fd )
 {
   TRACE( T32, fd, TEND );
 
-  if ( fd <= 3 || fd > MAX_FD || fds[fd].open == false )
+  if ( fd <= 3 || fd >= N_FDS || fds[fd].open == false )
     return __WASI_ERRNO_BADF;
 
   fds[fd].open = false;
@@ -177,7 +177,7 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
 
   TRACE( T32, fd, T32, retptr0, TEND );
 
-  if ( fd > MAX_FD || fds[fd].open == false ) {
+  if ( fd >= N_FDS || fds[fd].open == false ) {
     return __WASI_ERRNO_BADF;
   }
 
@@ -272,7 +272,7 @@ int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
 {
   TRACE( T32, fd, T32, fdflags, TEND );
 
-  if ( fd <= 3 || fd > MAX_FD || fds[fd].open == false )
+  if ( fd <= 3 || fd >= N_FDS || fds[fd].open == false )
     return __WASI_ERRNO_BADF;
 
   if ( !( fds[fd].stat.fs_rights_base & __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS ) )
@@ -596,7 +596,7 @@ int32_t path_open( int32_t fd,
   // fs = get_ro_table_4( 2 );
   // attach_blob_ro_mem_1( fs );
 
-  for ( retfd = 4; retfd < MAX_FD; retfd++ ) {
+  for ( retfd = 4; retfd < N_FDS; retfd++ ) {
     if ( fds[retfd].open == false )
       break;
   }
@@ -609,7 +609,7 @@ int32_t path_open( int32_t fd,
     attach_blob_ro_mem_1( get_ro_table( retfd, 2 ) );
   }
 
-  if ( retfd >= MAX_FD )
+  if ( retfd >= N_FDS )
     return __WASI_ERRNO_NFILE;
 
   fds[retfd].offset = 0;
