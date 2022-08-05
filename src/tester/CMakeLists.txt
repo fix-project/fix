@@ -68,6 +68,12 @@ target_link_libraries(serialization_test cryptopp wasmrt ${CLANG_LIBS} LLVM absl
 add_dependencies(serialization_test wasm2c)
 target_link_libraries(serialization_test add_obj)
 
+add_executable(serialization_test_deep "serialization_test_deep.cc" "${CMAKE_BINARY_DIR}/_deps/wabt-build/CMakeFiles/wasm2c.dir/src/c-writer.cc.o")
+target_link_libraries(serialization_test_deep ${FIXPOINT_LIBS})
+target_link_libraries(serialization_test_deep cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
+add_dependencies(serialization_test_deep wasm2c)
+target_link_libraries(serialization_test_deep add_obj)
+
 add_executable(deserialization_test "deserialization_test.cc" "${CMAKE_BINARY_DIR}/_deps/wabt-build/CMakeFiles/wasm2c.dir/src/c-writer.cc.o")
 target_link_libraries(deserialization_test ${FIXPOINT_LIBS})
 target_link_libraries(deserialization_test cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
