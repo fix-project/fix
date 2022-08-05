@@ -69,7 +69,7 @@ int32_t find_local_file( struct substring path, int32_t curr_fd, bool should_be_
     attach_tree_ro_table( desired_fd, subdirent );
     name = get_name( desired_fd );
 
-    if ( strcmp( name, path.ptr ) == 0 ) {
+    if ( strncmp( name, path.ptr, path.len ) == 0 && strlen( name ) == path.len ) {
       attach_tree_ro_table( desired_fd, subdirent );
       if ( !is_dir( desired_fd ) && should_be_dir ) {
         return -1;
@@ -89,7 +89,6 @@ int32_t lookup( struct substring path, int32_t curr_fd, int32_t desired_fd )
     void* slash_ptr = memchr( path.ptr, '/', path.len );
     if ( slash_ptr ) {
       const size_t component_len = (size_t)( (char*)slash_ptr - (char*)path.ptr );
-
       const struct substring curr_component = { path.ptr, component_len };
       const struct substring rest_of_path = { (char*)slash_ptr + 1, path.len - component_len - 1 };
 
