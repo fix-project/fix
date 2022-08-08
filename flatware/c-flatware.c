@@ -42,14 +42,14 @@ static filedesc fds[N_FDS] = {
 //      FUNC_TRACE( TEND ) for no values passed
 #if DO_TRACE
 #define FUNC_TRACE( ... ) print_trace( __FUNCTION__, __VA_ARGS__ )
-// #define RET_TRACE( val ) write_ret( val )
-// #define RAW_TRACE( str, n ) write_trace( str, n )
-// #define INT_TRACE( val ) write_int( val )
+#define RET_TRACE( val ) write_ret( val )
+#define RAW_TRACE( str, n ) write_trace( str, n )
+#define INT_TRACE( val ) write_int( val )
 #else
 #define FUNC_TRACE( ... ) dummy_trace( 0, __VA_ARGS__ )
-// #define RET_TRACE( val ) dummy_trace( 0, val )
-// #define RAW_TRACE( str, n ) dummy_trace( 0, str, n )
-// #define INT_TRACE( val ) dummy_trace( 0, val )
+#define RET_TRACE( val ) dummy_trace( 0, val )
+#define RAW_TRACE( str, n ) dummy_trace( 0, str, n )
+#define INT_TRACE( val ) dummy_trace( 0, val )
 #endif
 
 typedef enum trace_val_size
@@ -108,7 +108,6 @@ static void write_int( int64_t val )
   write_uint( (uint64_t)val );
 }
 
-/*
 #if DO_TRACE
 #else
 __attribute__( ( unused ) )
@@ -118,7 +117,6 @@ static void write_ret( int64_t val )
   write_trace( " -> ", 4 );
   write_int( val );
 }
-*/
 
 #if DO_TRACE
 #else
@@ -236,7 +234,9 @@ int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
   }
 
   fds[fd].offset += offset + whence;
+
   memory_copy_program( retptr0, &fds[fd].offset, sizeof( fds[fd].offset ) );
+  RET_TRACE( fds[fd].offset );
   return 0;
 }
 
@@ -269,6 +269,7 @@ int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   }
 
   memory_copy_program( retptr0, &total_read, sizeof( total_read ) );
+  RET_TRACE( total_read );
   return 0;
 }
 
@@ -292,6 +293,7 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   }
 
   memory_copy_program( retptr0, &total_written, sizeof( total_written ) );
+  RET_TRACE( total_written );
   return 0;
 }
 
@@ -540,6 +542,7 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
   num = size_ro_table_1();
 
   memory_copy_program( num_argument_ptr, &num, 4 );
+  RET_TRACE( num );
 
   // Actual arguments
   for ( int32_t i = 0; i < num; i++ ) {
@@ -548,6 +551,8 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
   }
 
   memory_copy_program( size_argument_ptr, &size, 4 );
+  RAW_TRACE( ", ", 2 );
+  INT_TRACE( size );
   return 0;
 }
 
@@ -647,6 +652,7 @@ int32_t path_open( int32_t fd,
   fds[retfd].stat.fs_rights_inheriting = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
 
   memory_copy_program( retptr0, &retfd, sizeof( retfd ) );
+  RET_TRACE( retfd );
   return 0;
 }
 
