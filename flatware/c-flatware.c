@@ -38,12 +38,18 @@ static filedesc fds[N_FDS] = {
 // for each value, first pass the width (T32 or T64), then pass the value
 // to specify the end, pass TEND
 // this is important because we need to know the size of each value when getting it with `va_arg`
-// e.g. TRACE( T32, 0xdeadbeef, T64, 0xdeadeeffeedface, TEND )
-//      TRACE( TEND ) for no values passed
+// e.g. FUNC_TRACE( T32, 0xdeadbeef, T64, 0xdeadbeeffeedface, TEND )
+//      FUNC_TRACE( TEND ) for no values passed
 #if DO_TRACE
-#define TRACE( ... ) print_trace( __FUNCTION__, __VA_ARGS__ )
+#define FUNC_TRACE( ... ) print_trace( __FUNCTION__, __VA_ARGS__ )
+// #define RET_TRACE( val ) write_ret( val )
+// #define RAW_TRACE( str, n ) write_trace( str, n )
+// #define INT_TRACE( val ) write_int( val )
 #else
-#define TRACE( ... ) dummy_trace( __FUNCTION__, __VA_ARGS__ )
+#define FUNC_TRACE( ... ) dummy_trace( 0, __VA_ARGS__ )
+// #define RET_TRACE( val ) dummy_trace( 0, val )
+// #define RAW_TRACE( str, n ) dummy_trace( 0, str, n )
+// #define INT_TRACE( val ) dummy_trace( 0, val )
 #endif
 
 typedef enum trace_val_size
@@ -66,13 +72,13 @@ static int32_t strlen( const char* str )
   return len;
 }
 
-void write_trace( const char* str, int32_t len )
+static void write_trace( const char* str, int32_t len )
 {
   flatware_memory_to_rw_2( fds[STDERR].offset, str, len );
   fds[STDERR].offset += len;
 }
 
-static void write_int( uint64_t val )
+static void write_uint( uint64_t val )
 {
   const char nums[] = "0123456789abcdef";
   uint64_t div = 1;
@@ -93,9 +99,34 @@ static void write_int( uint64_t val )
 #else
 __attribute__( ( unused ) )
 #endif
+static void write_int( int64_t val )
+{
+  if ( val < 0 ) {
+    write_trace( "-", 1 );
+    val = -val;
+  }
+  write_uint( (uint64_t)val );
+}
+
+/*
+#if DO_TRACE
+#else
+__attribute__( ( unused ) )
+#endif
+static void write_ret( int64_t val )
+{
+  write_trace( " -> ", 4 );
+  write_int( val );
+}
+*/
+
+#if DO_TRACE
+#else
+__attribute__( ( unused ) )
+#endif
 static void print_trace( const char* f_name, ... )
 {
-  const char chars[] = "\n( ), -";
+  const char chars[] = "\n( ), ";
   va_list vargs;
   trace_val_size v;
 
@@ -122,11 +153,7 @@ static void print_trace( const char* f_name, ... )
     else
       break;
 
-    if ( val < 0 ) {
-      write_trace( &chars[6], 1 );
-      val = -val;
-    }
-    write_int( (uint64_t)val );
+    write_int( val );
 
     v = va_arg( vargs, trace_val_size );
     if ( v != TEND ) {
@@ -145,7 +172,7 @@ __attribute__( ( unused ) )
 #else
 #endif
 static void
-dummy_trace( __attribute__( ( unused ) ) const char* f_name, ... )
+dummy_trace( __attribute__( ( unused ) ) int reqd_arg, ... )
 {
 }
 
@@ -153,7 +180,7 @@ externref fixpoint_apply( externref encode ) __attribute( ( export_name( "_fixpo
 
 _Noreturn void proc_exit( int32_t rval )
 {
-  TRACE( T32, rval, TEND );
+  FUNC_TRACE( T32, rval, TEND );
 
   set_rw_table_0( 0, create_blob_i32( rval ) );
   flatware_exit();
@@ -161,7 +188,7 @@ _Noreturn void proc_exit( int32_t rval )
 
 int32_t fd_close( int32_t fd )
 {
-  TRACE( T32, fd, TEND );
+  FUNC_TRACE( T32, fd, TEND );
 
   if ( fd <= 3 || fd >= N_FDS || fds[fd].open == false )
     return __WASI_ERRNO_BADF;
@@ -175,7 +202,7 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
 {
   __wasi_fdstat_t stat;
 
-  TRACE( T32, fd, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
   if ( fd >= N_FDS || fds[fd].open == false ) {
     return __WASI_ERRNO_BADF;
@@ -199,7 +226,7 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
 
 int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
 {
-  TRACE( T32, fd, T64, offset, T32, whence, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T64, offset, T32, whence, T32, retptr0, TEND );
 
   if ( fd != 4 )
     return __WASI_ERRNO_BADF;
@@ -222,7 +249,7 @@ int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   int32_t size_to_read;
   int32_t total_read = 0;
 
-  TRACE( T32, fd, T32, iovs, T32, iovs_len, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T32, retptr0, TEND );
 
   if ( fd != 4 )
     return __WASI_ERRNO_BADF;
@@ -250,7 +277,7 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   int32_t iobuf_offset, iobuf_len;
   int32_t total_written = 0;
 
-  TRACE( T32, fd, T32, iovs, T32, iovs_len, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T32, retptr0, TEND );
 
   if ( fd != STDOUT )
     return __WASI_ERRNO_BADF;
@@ -270,7 +297,7 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 
 int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
 {
-  TRACE( T32, fd, T32, fdflags, TEND );
+  FUNC_TRACE( T32, fd, T32, fdflags, TEND );
 
   if ( fd <= 3 || fd >= N_FDS || fds[fd].open == false )
     return __WASI_ERRNO_BADF;
@@ -290,7 +317,7 @@ int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
  */
 int32_t fd_prestat_get( int32_t fd, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
   // STDIN, STDOUT, STDERR
   if ( fd < 3 ) {
@@ -321,7 +348,7 @@ int32_t fd_prestat_dir_name( int32_t fd, int32_t path, int32_t path_len )
 {
   char str[] = ".";
 
-  TRACE( T32, fd, T32, path, T32, path_len, TEND );
+  FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
 
   if ( fd != WORKINGDIR ) {
     return __WASI_ERRNO_PERM;
@@ -333,91 +360,91 @@ int32_t fd_prestat_dir_name( int32_t fd, int32_t path, int32_t path_len )
 
 int32_t fd_advise( int32_t fd, int64_t offset, int64_t len, int32_t advice )
 {
-  TRACE( T32, fd, T64, offset, T64, len, T32, advice, TEND );
+  FUNC_TRACE( T32, fd, T64, offset, T64, len, T32, advice, TEND );
 
   return 0;
 }
 
 int32_t fd_allocate( int32_t fd, int64_t offset, int64_t len )
 {
-  TRACE( T32, fd, T64, offset, T64, len, TEND );
+  FUNC_TRACE( T32, fd, T64, offset, T64, len, TEND );
 
   return 0;
 }
 
 int32_t fd_datasync( int32_t fd )
 {
-  TRACE( T32, fd, TEND );
+  FUNC_TRACE( T32, fd, TEND );
 
   return 0;
 }
 
 int32_t fd_filestat_get( int32_t fd, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t fd_filestat_set_size( int32_t fd, int64_t size )
 {
-  TRACE( T32, fd, T64, size, TEND );
+  FUNC_TRACE( T32, fd, T64, size, TEND );
 
   return 0;
 }
 
 int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t fst_flags )
 {
-  TRACE( T32, fd, T64, atim, T64, mtim, T32, fst_flags, TEND );
+  FUNC_TRACE( T32, fd, T64, atim, T64, mtim, T32, fst_flags, TEND );
 
   return 0;
 }
 
 int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t fd_readdir( int32_t fd, int32_t buf, int32_t buf_len, int64_t cookie, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, buf, T32, buf_len, T64, cookie, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, buf, T32, buf_len, T64, cookie, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t fd_sync( int32_t fd )
 {
-  TRACE( T32, fd, TEND );
+  FUNC_TRACE( T32, fd, TEND );
 
   return 0;
 }
 
 int32_t fd_tell( int32_t fd, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t path_create_directory( int32_t fd, int32_t path, int32_t path_len )
 {
-  TRACE( T32, fd, T32, path, T32, path_len, TEND );
+  FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
 
   return 0;
 }
 
 int32_t path_filestat_get( int32_t fd, int32_t flags, int32_t path, int32_t path_len, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T32, retptr0, TEND );
 
   return 0;
 }
@@ -430,7 +457,7 @@ int32_t path_filestat_set_times( int32_t fd,
                                  int64_t mtim,
                                  int32_t fst_flags )
 {
-  TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T64, atim, T64, mtim, T32, fst_flags, TEND );
+  FUNC_TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T64, atim, T64, mtim, T32, fst_flags, TEND );
 
   return 0;
 }
@@ -443,34 +470,34 @@ int32_t path_link( int32_t old_fd,
                    int32_t new_path,
                    int32_t new_path_len )
 {
-  TRACE( T32,
-         old_fd,
-         T32,
-         old_flags,
-         T32,
-         old_path,
-         T32,
-         old_path_len,
-         T32,
-         new_fd,
-         T32,
-         new_path,
-         T32,
-         new_path_len,
-         TEND );
+  FUNC_TRACE( T32,
+              old_fd,
+              T32,
+              old_flags,
+              T32,
+              old_path,
+              T32,
+              old_path_len,
+              T32,
+              new_fd,
+              T32,
+              new_path,
+              T32,
+              new_path_len,
+              TEND );
   return 0;
 }
 
 int32_t path_readlink( int32_t fd, int32_t path, int32_t path_len, int32_t buf, int32_t buf_len, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, path, T32, path_len, T32, buf, T32, buf_len, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, path, T32, path_len, T32, buf, T32, buf_len, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t path_remove_directory( int32_t fd, int32_t path, int32_t path_len )
 {
-  TRACE( T32, fd, T32, path, T32, path_len, TEND );
+  FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
 
   return 0;
 }
@@ -482,21 +509,21 @@ int32_t path_rename( int32_t fd,
                      int32_t new_path,
                      int32_t new_path_len )
 {
-  TRACE( T32, fd, T32, old_path, T32, old_path_len, T32, new_fd, T32, new_path, T32, new_path_len, TEND );
+  FUNC_TRACE( T32, fd, T32, old_path, T32, old_path_len, T32, new_fd, T32, new_path, T32, new_path_len, TEND );
 
   return 0;
 }
 
 int32_t path_symlink( int32_t old_path, int32_t old_path_len, int32_t fd, int32_t new_path, int32_t new_path_len )
 {
-  TRACE( T32, old_path, T32, old_path_len, T32, fd, T32, new_path, T32, new_path_len, TEND );
+  FUNC_TRACE( T32, old_path, T32, old_path_len, T32, fd, T32, new_path, T32, new_path_len, TEND );
 
   return 0;
 }
 
 int32_t path_unlink_file( int32_t fd, int32_t path, int32_t path_len )
 {
-  TRACE( T32, fd, T32, path, T32, path_len, TEND );
+  FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
 
   return 0;
 }
@@ -506,7 +533,7 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
   int32_t num;
   int32_t size = 0;
 
-  TRACE( T32, num_argument_ptr, T32, size_argument_ptr, TEND );
+  FUNC_TRACE( T32, num_argument_ptr, T32, size_argument_ptr, TEND );
 
   attach_tree_ro_table_1( get_ro_table_0( 2 ) );
 
@@ -529,7 +556,7 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
   int32_t size;
   int32_t addr = argv_buf_ptr;
 
-  TRACE( T32, argv_ptr, T32, argv_buf_ptr, TEND );
+  FUNC_TRACE( T32, argv_ptr, T32, argv_buf_ptr, TEND );
 
   attach_tree_ro_table_1( get_ro_table_0( 2 ) );
 
@@ -546,14 +573,14 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 
 int32_t environ_sizes_get( int32_t retptr0, int32_t retptr1 )
 {
-  TRACE( T32, retptr0, T32, retptr1, TEND );
+  FUNC_TRACE( T32, retptr0, T32, retptr1, TEND );
 
   return 0;
 }
 
 int32_t environ_get( int32_t environ, int32_t environ_buf )
 {
-  TRACE( T32, environ, T32, environ_buf, TEND );
+  FUNC_TRACE( T32, environ, T32, environ_buf, TEND );
 
   return 0;
 }
@@ -570,25 +597,25 @@ int32_t path_open( int32_t fd,
 {
   __wasi_fd_t retfd;
 
-  TRACE( T32,
-         fd,
-         T32,
-         dirflags,
-         T32,
-         path,
-         T32,
-         path_len,
-         T32,
-         oflags,
-         T64,
-         fs_rights_base,
-         T64,
-         fs_rights_inheriting,
-         T32,
-         fdflags,
-         T32,
-         retptr0,
-         TEND );
+  FUNC_TRACE( T32,
+              fd,
+              T32,
+              dirflags,
+              T32,
+              path,
+              T32,
+              path_len,
+              T32,
+              oflags,
+              T64,
+              fs_rights_base,
+              T64,
+              fs_rights_inheriting,
+              T32,
+              fdflags,
+              T32,
+              retptr0,
+              TEND );
 
   // XXX TEMPORARY
   // attach_tree_ro_table_4( get_ro_table_3( 2 ) );
@@ -601,9 +628,7 @@ int32_t path_open( int32_t fd,
       break;
   }
 
-  // TRACE( T32, find_file( path, path_len, fd, retfd ) );
-  if ( retfd != find_file( path, path_len, fd, retfd ) ) {
-    TRACE( T32, retfd );
+  if ( find_file( path, path_len, fd, retfd ) != retfd ) {
     return __WASI_ERRNO_NOENT;
   } else {
     attach_blob_ro_mem_1( get_ro_table( retfd, 2 ) );
@@ -627,42 +652,42 @@ int32_t path_open( int32_t fd,
 
 int32_t clock_res_get( int32_t id, int32_t retptr0 )
 {
-  TRACE( T32, id, T32, retptr0, TEND );
+  FUNC_TRACE( T32, id, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t clock_time_get( int32_t id, int64_t precision, int32_t retptr0 )
 {
-  TRACE( T32, id, T64, precision, T32, retptr0, TEND );
+  FUNC_TRACE( T32, id, T64, precision, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t poll_oneoff( int32_t in, int32_t out, int32_t nsubscriptions, int32_t retptr0 )
 {
-  TRACE( T32, in, T32, out, T32, nsubscriptions, T32, retptr0, TEND );
+  FUNC_TRACE( T32, in, T32, out, T32, nsubscriptions, T32, retptr0, TEND );
 
   return 0;
 }
 
 int32_t sched_yield( void )
 {
-  TRACE( TEND );
+  FUNC_TRACE( TEND );
 
   return 0;
 }
 
 int32_t random_get( int32_t buf, int32_t buf_len )
 {
-  TRACE( T32, buf, T32, buf_len, TEND );
+  FUNC_TRACE( T32, buf, T32, buf_len, TEND );
 
   return 0;
 }
 
 int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
 {
-  TRACE( T32, fd, T32, flags, T32, retptr0, TEND );
+  FUNC_TRACE( T32, fd, T32, flags, T32, retptr0, TEND );
 
   return 0;
 }
@@ -672,8 +697,6 @@ externref fixpoint_apply( externref encode )
   set_rw_table_0( 0, create_blob_i32( 0 ) );
 
   attach_tree_ro_table_0( encode );
-
-  // TODO set `trace` here based on encode environment variables
 
   // Attach working directory to table 3 if exists
   if ( size_ro_table_0() >= 4 ) {

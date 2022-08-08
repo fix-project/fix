@@ -69,4 +69,3 @@ static void ( *attach_tree_ro_table_functions[] )( externref ) = { attach_tree_r
 externref get_ro_table( int32_t table_index, int32_t index ) __attribute__( ( __export_name__( "get_ro_table" ) ) );
 void attach_tree_ro_table( int32_t table_index, externref name )
   __attribute__( ( __export_name__( "attach_tree_ro_table" ) ) );
-void write_trace( const char* str, int32_t len );
