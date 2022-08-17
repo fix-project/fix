@@ -33,7 +33,7 @@ static filedesc fds[N_FDS] = {
   { .open = true, .size = -1, .offset = 0 }, // WORKINGDIR
 };
 
-#define DO_TRACE 0
+#define DO_TRACE 1
 
 // for each value, first pass the width (T32 or T64), then pass the value
 // to specify the end, pass TEND
@@ -601,6 +601,7 @@ int32_t path_open( int32_t fd,
                    int32_t retptr0 )
 {
   __wasi_fd_t retfd;
+  int32_t result;
 
   FUNC_TRACE( T32,
               fd,
@@ -633,7 +634,9 @@ int32_t path_open( int32_t fd,
       break;
   }
 
-  if ( find_file( path, path_len, fd, retfd ) != retfd ) {
+  result = find_file( path, path_len, fd, retfd );
+  if ( result != retfd ) {
+    RET_TRACE( result );
     return __WASI_ERRNO_NOENT;
   } else {
     attach_blob_ro_mem_1( get_ro_table( retfd, 2 ) );

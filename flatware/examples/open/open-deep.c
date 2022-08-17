@@ -13,6 +13,20 @@ int main()
 
   readv( fd, iovs, 2 );
 
-  printf( "Read %s and %s", buf1, buf2 );
+  printf( "Read %s and %s\n", buf1, buf2 );
+ 
+  int fd_2 = open( "a/b/hello/greeter.txt", O_RDONLY );
+  
+  printf( "fd_2 = %d", fd_2 );
+
+  int fd_3 = open( "a/b/i-dont-exist", O_RDONLY );
+
+  printf( "fd_3 = %d", fd_3 );
+
+  // fd_3 should be negative, since it shouldn't be able to find the file
+  if ( fd_3 >= 0 ) { 
+    return -1;
+  }
+
   return 0;
 }

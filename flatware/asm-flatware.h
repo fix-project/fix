@@ -57,15 +57,19 @@ DEFINE_RO_TABLE_OPS( 1 )
 DEFINE_RO_TABLE_OPS( 2 )
 DEFINE_RO_TABLE_OPS( 3 )
 DEFINE_RO_TABLE_OPS( 4 )
+DEFINE_RO_TABLE_OPS( 5 )
+DEFINE_RO_TABLE_OPS( 6 )
 DEFINE_RW_TABLE_OPS( 0 )
 
 static externref ( *get_ro_table_functions[] )( int32_t )
-  = { get_ro_table_0, get_ro_table_1, get_ro_table_2, get_ro_table_3, get_ro_table_4 };
+  = { get_ro_table_0, get_ro_table_1, get_ro_table_2, get_ro_table_3, get_ro_table_4, get_ro_table_5, get_ro_table_6 };
 static void ( *attach_tree_ro_table_functions[] )( externref ) = { attach_tree_ro_table_0,
                                                                    attach_tree_ro_table_1,
                                                                    attach_tree_ro_table_2,
                                                                    attach_tree_ro_table_3,
-                                                                   attach_tree_ro_table_4 };
+                                                                   attach_tree_ro_table_4,
+                                                                   attach_tree_ro_table_5,
+                                                                   attach_tree_ro_table_6 };
 externref get_ro_table( int32_t table_index, int32_t index ) __attribute__( ( __export_name__( "get_ro_table" ) ) );
 void attach_tree_ro_table( int32_t table_index, externref name )
   __attribute__( ( __export_name__( "attach_tree_ro_table" ) ) );

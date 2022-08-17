@@ -112,6 +112,7 @@ int32_t find_file( int32_t path, // offset into main memory of sloth program, ne
 {
   char* buf;
   struct substring my_path;
+  int32_t result;
 
   buf = (char*)malloc( (unsigned long)path_len );
 
@@ -119,5 +120,9 @@ int32_t find_file( int32_t path, // offset into main memory of sloth program, ne
 
   my_path = ( struct substring ) { buf, strlen( buf ) };
 
-  return lookup( my_path, curr_fd, desired_fd );
+  result = lookup( my_path, curr_fd, desired_fd );
+
+  free( buf );
+  
+  return result;
 }

@@ -14,7 +14,7 @@ using namespace std;
 
 Name RuntimeStorage::add_blob( Blob&& blob )
 {
-  if ( blob.size() > 32 ) {
+  if ( blob.size() > 31 ) {
     Name name( local_storage_.size(), blob.size(), ContentType::Blob );
     local_storage_.push_back( move( blob ) );
     return name;
