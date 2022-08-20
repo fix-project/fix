@@ -20,7 +20,9 @@ int main()
   string a_file_1_content = "Hello, this is a_1.txt!";
   string a_file_2_content = "Hello, this is a_2.txt!";
 
-  string directory_b_name = "b";       // b contains 2 directories: hello and c
+  string directory_b_name = "b"; // b contains 1 file: b_1.txt AND 2 directories: hello and c
+  string b_file_1_name = "b_1.txt";
+  string b_file_1_content = "this is b_1.txt!";
   string b_directory_1_name = "hello"; // hello contains 1 file: greeter.txt
   string hello_file_1_name = "greeter.txt";
   string hello_file_1_content = "Hi, I am greeter.txt";
@@ -61,7 +63,12 @@ int main()
   Name b_directory_1_dirent_name
     = runtime.add_tree( span_view<Name>( b_directory_1_dirent.data(), b_directory_1_dirent.size() ) );
 
-  vector<Name> b_content { directory_c_dirent_name, b_directory_1_dirent_name };
+  Name b_file_1_name_blob = runtime.add_blob( string_view( b_file_1_name ) );
+  Name b_file_1_content_blob = runtime.add_blob( string_view( b_file_1_content ) );
+  vector<Name> b_file_1_dirent = { b_file_1_name_blob, file_permission_blob, b_file_1_content_blob };
+  Name b_file_1_dirent_name = runtime.add_tree( span_view<Name>( b_file_1_dirent.data(), b_file_1_dirent.size() ) );
+
+  vector<Name> b_content { b_file_1_dirent_name, directory_c_dirent_name, b_directory_1_dirent_name };
   Name b_content_tree = runtime.add_tree( span_view<Name>( b_content.data(), b_content.size() ) );
 
   Name directory_b_name_blob = runtime.add_blob( string_view( directory_b_name ) );

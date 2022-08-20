@@ -14,10 +14,11 @@ bool is_dir( int32_t ro_table_index )
   return false;
 }
 
-const char* get_name( int32_t ro_table_index )
+struct substring get_name( int32_t ro_table_index )
 {
   int blob_size;
   char* buf;
+  struct substring name;
 
   externref ret = get_ro_table( ro_table_index, 0 );
 
@@ -29,7 +30,9 @@ const char* get_name( int32_t ro_table_index )
 
   ro_2_to_flatware_memory( buf, 0, blob_size );
 
-  return buf;
+  name.ptr = (char*)buf;
+  name.len = (size_t)blob_size;
+  return name;
 }
 
 uint64_t get_permissions( int32_t ro_table_index )
@@ -54,7 +57,7 @@ externref get_content( int32_t ro_table_index )
   return get_ro_table( ro_table_index, 2 );
 }
 
-int32_t find_local_file( struct substring path, int32_t curr_fd, bool should_be_dir, int32_t desired_fd )
+int32_t find_local_file( struct substring path, int32_t curr_fd, bool must_be_dir, int32_t desired_fd )
 {
   externref dirent_content;
   int32_t num_of_dirents;
@@ -64,23 +67,23 @@ int32_t find_local_file( struct substring path, int32_t curr_fd, bool should_be_
   num_of_dirents = size_ro_table_2();
 
   for ( int i = 0; i < num_of_dirents; i++ ) {
-    const char* name;
+    struct substring name;
     externref subdirent = get_ro_table( 2, i );
     attach_tree_ro_table( desired_fd, subdirent );
     name = get_name( desired_fd );
 
-    if ( strncmp( name, path.ptr, path.len ) == 0 && strlen( name ) == path.len ) {
+    if ( memcmp( name.ptr, path.ptr, path.len ) == 0 && name.len == path.len ) {
       attach_tree_ro_table( desired_fd, subdirent );
-      if ( !is_dir( desired_fd ) && should_be_dir ) {
+      if ( !is_dir( desired_fd ) && must_be_dir ) {
         return -1;
-      } else if ( is_dir( desired_fd ) && !should_be_dir ) {
+      } else if ( is_dir( desired_fd ) && !must_be_dir ) { // hmmmmm, not necessary? can open file or dir
         return -1;
       }
       return desired_fd;
     }
   }
 
-  return -1; // not found
+  return ( 0 - (int32_t)path.len );
 }
 
 int32_t lookup( struct substring path, int32_t curr_fd, int32_t desired_fd )
@@ -94,7 +97,8 @@ int32_t lookup( struct substring path, int32_t curr_fd, int32_t desired_fd )
 
       curr_fd = find_local_file( curr_component, curr_fd, true, desired_fd );
       if ( curr_fd < 0 ) {
-        return -1;
+        // return curr_fd;
+        return ( 0 - (int32_t)( component_len ) );
       }
       path = rest_of_path;
       continue;
@@ -118,11 +122,11 @@ int32_t find_file( int32_t path, // offset into main memory of sloth program, ne
 
   program_memory_to_flatware_memory( buf, path, path_len );
 
-  my_path = ( struct substring ) { buf, strlen( buf ) };
+  my_path = ( struct substring ) { buf, (size_t)path_len };
 
   result = lookup( my_path, curr_fd, desired_fd );
 
   free( buf );
-  
+
   return result;
 }

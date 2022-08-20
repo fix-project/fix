@@ -623,18 +623,13 @@ int32_t path_open( int32_t fd,
               retptr0,
               TEND );
 
-  // XXX TEMPORARY
-  // attach_tree_ro_table_4( get_ro_table_3( 2 ) );
-  // attach_tree_ro_table_4( get_ro_table_4( 0 ) );
-  // fs = get_ro_table_4( 2 );
-  // attach_blob_ro_mem_1( fs );
-
   for ( retfd = 4; retfd < N_FDS; retfd++ ) {
     if ( fds[retfd].open == false )
       break;
   }
 
   result = find_file( path, path_len, fd, retfd );
+
   if ( result != retfd ) {
     RET_TRACE( result );
     return __WASI_ERRNO_NOENT;

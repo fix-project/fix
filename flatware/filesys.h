@@ -12,7 +12,7 @@ typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
 bool is_dir( int32_t ro_table_index );
 
-const char* get_name( int32_t ro_table_index );
+struct substring get_name( int32_t ro_table_index );
 
 uint64_t get_permissions( int32_t ro_table_index );
 

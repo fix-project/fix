@@ -34,7 +34,7 @@ FetchContent_MakeAvailable(wabt)
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp
-  GIT_TAG        master
+  GIT_TAG        20220623.0
   )
 set(ABSL_PROPAGATE_CXX_STD on)
 FetchContent_MakeAvailable(absl)

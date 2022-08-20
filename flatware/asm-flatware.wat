@@ -15,6 +15,7 @@
   (table $ro_table_4 (export "ro_table_4") 0 externref)
   (table $ro_table_5 (export "ro_table_5") 0 externref)
   (table $ro_table_6 (export "ro_table_6") 0 externref)
+  (table $ro_table_7 (export "ro_table_7") 0 externref)
   (table $return (export "rw_table_0") 3 externref)
   ;; rw_0
   (func (export "flatware_memory_to_rw_0") (param $offset i32) (param $ptr i32) (param $len i32)
@@ -164,6 +165,13 @@
   )
   (func (export "size_ro_table_6") (result i32)
     (table.size $ro_table_6)
+  )
+  ;; ro_table_7
+  (func (export "get_ro_table_7") (param $index i32) (result externref)
+    (table.get $ro_table_7 (local.get $index))
+  )
+  (func (export "size_ro_table_7") (result i32)
+    (table.size $ro_table_7)
   )
   ;; rw_table_0
   (func (export "set_rw_table_0") (param $index i32) (param $val externref) 
