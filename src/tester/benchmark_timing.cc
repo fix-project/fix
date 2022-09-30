@@ -119,7 +119,11 @@ int main( int argc, char* argv[] )
     if ( not fix_encode ) {
       throw bad_alloc();
     }
-    Tree_ptr wasi_encode { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 5 ) ) };
+    Tree_ptr wasi_args { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 3 ) ) };
+    if ( not wasi_args ) {
+      throw bad_alloc();
+    }
+    Tree_ptr wasi_encode { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 3 ) ) };
     if ( not wasi_encode ) {
       throw bad_alloc();
     }
@@ -129,21 +133,27 @@ int main( int argc, char* argv[] )
     fix_encode.get()[2] = arg1;
     fix_encode.get()[3] = arg2;
 
-    wasi_encode.get()[0] = Name( "empty" );
-    wasi_encode.get()[1] = add_wasi_function;
-    wasi_encode.get()[2] = add_char;
-    wasi_encode.get()[3] = arg1;
-    wasi_encode.get()[4] = arg2;
-
     Name fix_encode_name = runtime.add_tree( { move( fix_encode ), 4 } );
-    Name wasi_encode_name = runtime.add_tree( { move( wasi_encode ), 5 } );
 
     Thunk fix_thunk( fix_encode_name );
     Name fix_thunk_name = runtime.add_thunk( fix_thunk );
+
+    add_fixpoint_thunk[i] = fix_thunk_name;
+
+    wasi_args.get()[0] = add_char;
+    wasi_args.get()[1] = arg1;
+    wasi_args.get()[2] = arg2;
+    Name wasi_args_name = runtime.add_tree( { move( wasi_args ), 3 } );
+
+    wasi_encode.get()[0] = Name( "empty" );
+    wasi_encode.get()[1] = add_wasi_function;
+    wasi_encode.get()[2] = wasi_args_name;
+
+    Name wasi_encode_name = runtime.add_tree( { move( wasi_encode ), 3 } );
+
     Thunk wasi_thunk( wasi_encode_name );
     Name wasi_thunk_name = runtime.add_thunk( wasi_thunk );
 
-    add_fixpoint_thunk[i] = fix_thunk_name;
     add_wasi_thunk[i] = wasi_thunk_name;
   }
 
