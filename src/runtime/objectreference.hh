@@ -25,9 +25,8 @@ public:
   {
     __m256i name_only = Name::name_only( name );
     if ( !accessible ) {
-      return __m256i {
-        name_only[0], name_only[1], name_only[2], static_cast<int64_t>( name_only[3] | 0x80'00'00'00'00'00'00'00 )
-      };
+      __m256i mask = _mm256_set_epi64x( 0x80'00'00'00'00'00'00'00, 0, 0, 0 );
+      return _mm256_or_si256( mask, name );
     } else {
       return name_only;
     }
@@ -35,8 +34,7 @@ public:
 
   static Name object_reference_name_only( ObjectReference ref )
   {
-    return __m256i {
-      ref.content_[0], ref.content_[1], ref.content_[2], ref.content_[3] & 0x5f'ff'ff'ff'ff'ff'ff'ff
-    };
+    __m256i mask = _mm256_set_epi64x( 0xa0'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_andnot_si256( mask, ref );
   }
 };

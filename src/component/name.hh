@@ -64,52 +64,60 @@ public:
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
 
-  size_t get_local_id() const { return content_[0]; }
+  size_t get_local_id() const { return _mm256_extract_epi64( content_, 0 ); };
 
   bool is_strict_tree_entry() const { return !( metadata() & 0x80 ); }
 
   static Name name_only( Name name )
   {
-    return __m256i {
-      name.content_[0], name.content_[1], name.content_[2], name.content_[3] & 0x7f'ff'ff'ff'ff'ff'ff'ff
-    };
+    __m256i mask = _mm256_set_epi64x( 0x80'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_or_si256( mask, name );
   }
 
   static Name get_thunk_name( Name name )
   {
     assert( name.is_tree() );
-    return __m256i { name.content_[0],
-                     name.content_[1],
-                     name.content_[2],
-                     ( name.content_[3] | 0x02'00'00'00'00'00'00'00 ) & ~( 0x01'00'00'00'00'00'00'00 ) };
+    __m256i mask = _mm256_set_epi64x( 0x01'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_or_si256( mask, name );
   }
 
   static Name get_encode_name( Name name )
   {
     assert( name.is_thunk() );
-    return __m256i { name.content_[0],
-                     name.content_[1],
-                     name.content_[2],
-                     static_cast<int64_t>( ( name.content_[3] & ~( 0x02'00'00'00'00'00'00'00 ) )
-                                           | 0x01'00'00'00'00'00'00'00 ) };
+    __m256i mask = _mm256_set_epi64x( 0x01'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_andnot_si256( mask, name );
   }
 
   friend bool operator==( Name lhs, Name rhs );
   friend std::ostream& operator<<( std::ostream& s, const Name name );
 
+  template<typename H>
+  friend H AbslHashValue( H h, const Name& name )
+  {
+    return H::combine( std::move( h ), _mm256_extract_epi64( name.content_, 0 ) );
+  }
+
   friend struct NameHash;
+  friend struct AbslHash;
 };
 
 struct NameHash
 {
-  std::size_t operator()( Name const& name ) const noexcept { return name.content_[0]; }
+  std::size_t operator()( Name const& name ) const noexcept { return _mm256_extract_epi64( name.content_, 0 ); }
+};
+
+struct AbslHash
+{
+  std::size_t operator()( Name const& name ) const noexcept
+  {
+    return absl::Hash<uint64_t> {}( _mm256_extract_epi64( name.content_, 0 ) );
+  }
 };
 
 inline bool operator==( Name lhs, Name rhs )
 {
-  __m256i pcmp = _mm256_cmpeq_epi32( lhs.content_, rhs.content_ );
-  unsigned bitmask = _mm256_movemask_epi8( pcmp );
-  return ( bitmask == 0xffffffffU );
+  __m256i pxor = _mm256_xor_si256( lhs, rhs );
+  return _mm256_testz_si256( pxor, pxor );
 }
 
 std::ostream& operator<<( std::ostream& s, const Name name );

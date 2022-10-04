@@ -7,9 +7,9 @@
 
 enum class ContentType : uint8_t
 {
-  Blob,
   Tree,
-  Thunk
+  Thunk,
+  Blob
 };
 
 class cookie

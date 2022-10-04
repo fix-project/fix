@@ -57,7 +57,7 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
 __m256i create_blob_i32( uint32_t content )
 {
   GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
-  return Name( std::string_view( reinterpret_cast<char*>( &content ), sizeof( uint32_t ) ) );
+  return _mm256_set_epi32( 0x44'00'00'00, 0, 0, 0, 0, 0, 0, content );
 }
 
 __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
@@ -86,9 +86,9 @@ __m256i create_thunk( __m256i ro_handle )
 uint32_t value_type( __m256i handle )
 {
   Name object( handle );
-  if ( object.is_blob() ) {
+  if ( object.is_tree() ) {
     return 0;
-  } else if ( object.is_tree() ) {
+  } else if ( object.is_thunk() ) {
     return 1;
   } else {
     return 2;
