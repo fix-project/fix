@@ -133,7 +133,7 @@ Elf_Info load_program( const string_view program_content )
   return res;
 }
 
-Program link_program( const string_view program_content )
+Program* link_program( const string_view program_content )
 {
 #if TIME_FIXPOINT == 2
   global_timer().start<Timer::Category::Linking>();
@@ -232,11 +232,11 @@ Program link_program( const string_view program_content )
 #if TIME_FIXPOINT == 2
   global_timer().stop<Timer::Category::Linking>();
 #endif
-  return Program( code,
-                  init_entry,
-                  main_entry,
-                  cleanup_entry,
-                  instance_size_entry,
-                  init_module_entry,
-                  RuntimeStorage::get_instance().get_init_instances() );
+  return new Program( code,
+                      init_entry,
+                      main_entry,
+                      cleanup_entry,
+                      instance_size_entry,
+                      init_module_entry,
+                      RuntimeStorage::get_instance().get_init_instances() );
 }

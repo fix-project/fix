@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "ccompiler.hh"
+#include "hash_map.hh"
 #include "name.hh"
 #include "object.hh"
 #include "program.hh"
@@ -28,7 +29,8 @@ private:
   absl::flat_hash_map<Name, std::string, NameHash> trace_cache;
 
   // Maps a Wasm function Name to corresponding compiled Program
-  absl::flat_hash_map<Name, Program, NameHash> name_to_program_;
+  // absl::flat_hash_map<Name, Program, NameHash> name_to_program_;
+  Table<NameHash> name_to_program_;
 
   // Unique id for local name
   size_t next_local_name_;
@@ -49,6 +51,7 @@ private:
     , init_instances_( 16 )
   {
     wasm_rt_init();
+    name_to_program_.reserve( 4 );
   }
 
 public:
@@ -57,6 +60,18 @@ public:
   {
     static RuntimeStorage runtime_instance;
     return runtime_instance;
+  }
+
+  ~RuntimeStorage()
+  {
+    for ( size_t i = 0; i < name_to_program_.get_capacity(); i++ ) {
+      auto rh = name_to_program_.get_raw_info()[i].rh;
+      if ( rh != 255 ) {
+        auto ptr = name_to_program_.get_raw_vector()[i].ptr_;
+        Program* program = reinterpret_cast<Program*>( ptr );
+        delete ( program );
+      }
+    }
   }
 
   // add blob
@@ -70,9 +85,7 @@ public:
   Name add_tree( Tree&& tree );
 
   // Return reference to Tree
-  span_view<Name> get_tree( Name name );
-
-  // add Thunk
+  span_view<Name> get_tree( Name name ); // add Thunk
   Name add_thunk( Thunk thunk );
 
   // Return encode name referred to by thunk

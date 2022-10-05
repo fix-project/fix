@@ -174,16 +174,16 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
     throw runtime_error( "ENCODE functions not yet supported" );
   }
 
-  if ( not name_to_program_.contains( function_name ) ) {
-    /* compile the Wasm to C and then to ELF */
+  auto ptr = name_to_program_.get_ptr( function_name );
+  if ( ptr == 0 ) {
     const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
-
-    name_to_program_.insert_or_assign(
-      function_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+    ptr = reinterpret_cast<size_t>(
+      link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+    name_to_program_.put_ptr( function_name, ptr );
   }
 
-  auto& program = name_to_program_.at( function_name );
-  __m256i output = program.execute( encode_name );
+  Program* program = reinterpret_cast<Program*>( ptr );
+  __m256i output = program->execute( encode_name );
 
   return output;
 }
@@ -194,12 +194,12 @@ void RuntimeStorage::populate_program( Name function_name )
     throw runtime_error( "ENCODE functions not yet supported" );
   }
 
-  if ( not name_to_program_.contains( function_name ) ) {
-    /* compile the Wasm to C and then to ELF */
+  auto ptr = name_to_program_.get_ptr( function_name );
+  if ( ptr == 0 ) {
     const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
-
-    name_to_program_.insert_or_assign(
-      function_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+    name_to_program_.put_ptr( function_name,
+                              reinterpret_cast<size_t>( link_program(
+                                c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) ) );
   }
 
   return;

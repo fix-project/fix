@@ -34,9 +34,9 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
   }
 
   target_memory->data = (uint8_t*)const_cast<char*>( blob.data() );
-  target_memory->pages = blob.size() / getpagesize();
-  target_memory->max_pages = blob.size() / getpagesize();
+  target_memory->pages = ( blob.size() >> 12 ) + 1;
   target_memory->size = blob.size();
+  return;
 }
 
 // module_instance points to the WASM instance

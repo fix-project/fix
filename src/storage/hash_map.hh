@@ -149,4 +149,9 @@ public:
   size_t insert_blob( Name name, Blob&& blob ) { return insert_ptr( name, blob.release(), blob.own() ); }
 
   size_t insert_tree( Name name, Tree&& tree ) { return insert_ptr( name, tree.release(), tree.own() ); }
+
+  std::vector<mPair>& get_raw_vector() { return pairs_; }
+  std::vector<mInfo>& get_raw_info() { return infos_; }
+
+  size_t get_capacity() { return capacity_; }
 };

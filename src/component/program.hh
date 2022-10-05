@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <sys/mman.h>
 #include <vector>
 
 #include "name.hh"
@@ -84,6 +85,7 @@ public:
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
     instances_
       = static_cast<char*>( aligned_alloc( alignof( __m256i ), instance_context_size_ * init_instances_ ) );
+    memset( instances_, 0, instance_context_size_ * init_instances_ );
     for ( size_t i = 0; i < init_instances_; i++ ) {
       init_func( instances_ + i * instance_context_size_ );
     }
