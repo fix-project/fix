@@ -1,7 +1,7 @@
 #include <string>
 
-#include "src/error.h"
-#include "src/ir.h"
+#include "wabt/error.h"
+#include "wabt/ir.h"
 
 #include "wasminspector.hh"
 

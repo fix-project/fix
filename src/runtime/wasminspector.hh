@@ -3,12 +3,12 @@
 #include <map>
 #include <set>
 
-#include "src/cast.h"
-#include "src/common.h"
-#include "src/error.h"
-#include "src/expr-visitor.h"
-#include "src/ir.h"
-#include "src/wast-lexer.h"
+#include "wabt/cast.h"
+#include "wabt/common.h"
+#include "wabt/error.h"
+#include "wabt/expr-visitor.h"
+#include "wabt/ir.h"
+#include "wabt/wast-lexer.h"
 
 namespace wasminspector {
 

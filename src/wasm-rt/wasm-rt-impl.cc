@@ -48,32 +48,31 @@ typedef struct FuncType
 } FuncType;
 
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER
-bool g_signal_handler_installed = false;
-char* g_alt_stack;
+static bool g_signal_handler_installed = false;
+static char* g_alt_stack;
 #else
 uint32_t wasm_rt_call_stack_depth;
-uint32_t g_saved_call_stack_depth;
+uint32_t wasm_rt_saved_call_stack_depth;
 #endif
 
-jmp_buf g_jmp_buf;
-FuncType* g_func_types;
-uint32_t g_func_type_count;
+static FuncType* g_func_types;
+static uint32_t g_func_type_count;
 
-uint32_t g_tag_count;
+jmp_buf wasm_rt_jmp_buf;
 
-uint32_t g_active_exception_tag;
-void* g_active_exception;
-uint32_t g_active_exception_size;
+static uint32_t g_active_exception_tag;
+static uint8_t g_active_exception[MAX_EXCEPTION_SIZE];
+static uint32_t g_active_exception_size;
 
-jmp_buf* g_unwind_target;
+static jmp_buf* g_unwind_target;
 
 void wasm_rt_trap( wasm_rt_trap_t code )
 {
   assert( code != WASM_RT_TRAP_NONE );
 #if !WASM_RT_MEMCHECK_SIGNAL_HANDLER
-  wasm_rt_call_stack_depth = g_saved_call_stack_depth;
+  wasm_rt_call_stack_depth = wasm_rt_saved_call_stack_depth;
 #endif
-  WASM_RT_LONGJMP( g_jmp_buf, code );
+  WASM_RT_LONGJMP( wasm_rt_jmp_buf, code );
 }
 
 static bool func_types_are_equal( FuncType* a, FuncType* b )
@@ -124,10 +123,12 @@ uint32_t wasm_rt_register_func_type( uint32_t param_count, uint32_t result_count
 
 uint32_t wasm_rt_register_tag( uint32_t size )
 {
+  static uint32_t s_tag_count = 0;
+
   if ( size > MAX_EXCEPTION_SIZE ) {
     wasm_rt_trap( WASM_RT_TRAP_EXHAUSTION );
   }
-  return g_tag_count++;
+  return s_tag_count++;
 }
 
 void wasm_rt_load_exception( uint32_t tag, uint32_t size, const void* values )
@@ -147,14 +148,12 @@ WASM_RT_NO_RETURN void wasm_rt_throw( void )
   WASM_RT_LONGJMP( *g_unwind_target, WASM_RT_TRAP_UNCAUGHT_EXCEPTION );
 }
 
-jmp_buf* wasm_rt_push_unwind_target( jmp_buf* target )
+WASM_RT_UNWIND_TARGET* wasm_rt_get_unwind_target( void )
 {
-  jmp_buf* prev_target = g_unwind_target;
-  g_unwind_target = target;
-  return prev_target;
+  return g_unwind_target;
 }
 
-void wasm_rt_pop_unwind_target( jmp_buf* target )
+void wasm_rt_set_unwind_target( WASM_RT_UNWIND_TARGET* target )
 {
   g_unwind_target = target;
 }
@@ -423,86 +422,11 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
 #endif
 }
 
-#ifdef _WIN32
-static float quiet_nanf( float x )
-{
-  uint32_t tmp;
-  memcpy( &tmp, &x, 4 );
-  tmp |= 0x7fc00000lu;
-  memcpy( &x, &tmp, 4 );
-  return x;
-}
-
-static double quiet_nan( double x )
-{
-  uint64_t tmp;
-  memcpy( &tmp, &x, 8 );
-  tmp |= 0x7ff8000000000000llu;
-  memcpy( &x, &tmp, 8 );
-  return x;
-}
-
-double wasm_rt_trunc( double x )
-{
-  if ( isnan( x ) ) {
-    return quiet_nan( x );
-  }
-  return trunc( x );
-}
-
-float wasm_rt_truncf( float x )
-{
-  if ( isnan( x ) ) {
-    return quiet_nanf( x );
-  }
-  return truncf( x );
-}
-
-float wasm_rt_nearbyintf( float x )
-{
-  if ( isnan( x ) ) {
-    return quiet_nanf( x );
-  }
-  return nearbyintf( x );
-}
-
-double wasm_rt_nearbyint( double x )
-{
-  if ( isnan( x ) ) {
-    return quiet_nan( x );
-  }
-  return nearbyint( x );
-}
-
-float wasm_rt_fabsf( float x )
-{
-  if ( isnan( x ) ) {
-    uint32_t tmp;
-    memcpy( &tmp, &x, 4 );
-    tmp = tmp & ~( 1 << 31 );
-    memcpy( &x, &tmp, 4 );
-    return x;
-  }
-  return fabsf( x );
-}
-
-double wasm_rt_fabs( double x )
-{
-  if ( isnan( x ) ) {
-    uint64_t tmp;
-    memcpy( &tmp, &x, 8 );
-    tmp = tmp & ~( 1ll << 63 );
-    memcpy( &x, &tmp, 8 );
-    return x;
-  }
-  return fabs( x );
-}
-#endif
-
-#define DEFINE_TABLE_ALLOCATE_OP( type )                                                                           \
+#define DEFINE_TABLE_OPS( type )                                                                                   \
   void wasm_rt_allocate_##type##_table(                                                                            \
     wasm_rt_##type##_table_t* table, uint32_t elements, uint32_t max_elements )                                    \
   {                                                                                                                \
+    table->read_only = false;                                                                                      \
     table->size = elements;                                                                                        \
     table->max_size = max_elements;                                                                                \
     if ( table->size != 0 ) {                                                                                      \
@@ -510,9 +434,13 @@ double wasm_rt_fabs( double x )
       memset( ptr, 0, table->size * sizeof( wasm_rt_##type##_t ) );                                                \
       table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                       \
     }                                                                                                              \
-  }
-
-#define DEFINE_TABLE_GROW_OP( type )                                                                               \
+  }                                                                                                                \
+  void wasm_rt_free_##type##_table( wasm_rt_##type##_table_t* table )                                              \
+  {                                                                                                                \
+    if ( table->read_only )                                                                                        \
+      return;                                                                                                      \
+    free( table->data );                                                                                           \
+  }                                                                                                                \
   uint32_t wasm_rt_grow_##type##_table( wasm_rt_##type##_table_t* table, uint32_t delta, wasm_rt_##type##_t init ) \
   {                                                                                                                \
     uint32_t old_elems = table->size;                                                                              \
@@ -535,32 +463,8 @@ double wasm_rt_fabs( double x )
     return old_elems;                                                                                              \
   }
 
-DEFINE_TABLE_ALLOCATE_OP( funcref )
-DEFINE_TABLE_GROW_OP( funcref )
-void wasm_rt_free_funcref_table( wasm_rt_funcref_table_t* table )
-{
-  free( table->data );
-}
-
-void wasm_rt_allocate_externref_table( wasm_rt_externref_table_t* table, uint32_t elements, uint32_t max_elements )
-{
-  table->size = elements;
-  table->max_size = max_elements;
-  table->read_only = false;
-  if ( table->size != 0 ) {
-    void* ptr = aligned_alloc( alignof( wasm_rt_externref_t ), table->size * sizeof( wasm_rt_externref_t ) );
-    memset( ptr, 0, table->size * sizeof( wasm_rt_externref_t ) );
-    table->data = static_cast<wasm_rt_externref_t*>( ptr );
-  }
-}
-
-DEFINE_TABLE_GROW_OP( externref )
-void wasm_rt_free_externref_table( wasm_rt_externref_table_t* table )
-{
-  if ( table->read_only )
-    return;
-  free( table->data );
-}
+DEFINE_TABLE_OPS( funcref )
+DEFINE_TABLE_OPS( externref )
 
 const char* wasm_rt_strerror( wasm_rt_trap_t trap )
 {

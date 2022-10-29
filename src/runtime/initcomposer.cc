@@ -2,8 +2,8 @@
 
 #include <sstream>
 
-#include "src/c-writer.h"
-#include "src/error.h"
+#include "wabt/c-writer.h"
+#include "wabt/error.h"
 
 using namespace std;
 using namespace wabt;
@@ -30,7 +30,7 @@ string MangleName( string_view name )
 
 string MangleStateInfoTypeName( const string& wasm_name )
 {
-  return MangleName( wasm_name ) + "_module_instance_t";
+  return MangleName( wasm_name ) + "_instance_t";
 }
 
 class InitComposer
@@ -92,9 +92,9 @@ void InitComposer::write_attach_tree()
   auto ro_tables = inspector_->GetExportedROTables();
   for ( uint32_t idx : ro_tables ) {
     result_ << "void Z_fixpointZ_attach_tree_ro_table_" << idx
-            << "(struct Z_fixpoint_module_instance_t* module_instance, __m256i ro_handle) {" << endl;
+            << "(struct Z_fixpoint_instance_t* instance, __m256i ro_handle) {" << endl;
     result_ << "  wasm_rt_externref_table_t* ro_table = " << module_prefix_ << "Z_ro_table_" << idx << "(("
-            << state_info_type_name_ << "*)module_instance);" << endl;
+            << state_info_type_name_ << "*)instance);" << endl;
     result_ << "  fixpoint_attach_tree(ro_handle, ro_table);" << endl;
     result_ << "}\n" << endl;
   }
@@ -106,9 +106,9 @@ void InitComposer::write_attach_blob()
   result_ << "extern void fixpoint_attach_blob(__m256i, wasm_rt_memory_t*);" << endl;
   for ( uint32_t idx : ro_mems ) {
     result_ << "void Z_fixpointZ_attach_blob_ro_mem_" << idx
-            << "(struct Z_fixpoint_module_instance_t* module_instance, __m256i ro_handle) {" << endl;
+            << "(struct Z_fixpoint_instance_t* instance, __m256i ro_handle) {" << endl;
     result_ << "  wasm_rt_memory_t* ro_mem = " << module_prefix_ << "Z_ro_mem_" << idx << "(("
-            << state_info_type_name_ << "*)module_instance);" << endl;
+            << state_info_type_name_ << "*)instance);" << endl;
     result_ << "  fixpoint_attach_blob(ro_handle, ro_mem);" << endl;
     result_ << "}\n" << endl;
   }
@@ -119,9 +119,9 @@ void InitComposer::write_memory_size()
   auto ro_mems = inspector_->GetExportedROMems();
   for ( uint32_t idx : ro_mems ) {
     result_ << "uint32_t Z_fixpointZ_size_ro_mem_" << idx
-            << "(struct Z_fixpoint_module_instance_t* module_instance) {" << endl;
+            << "(struct Z_fixpoint_instance_t* instance) {" << endl;
     result_ << "  wasm_rt_memory_t* ro_mem = " << module_prefix_ << "Z_ro_mem_" << idx << "(("
-            << state_info_type_name_ << "*)module_instance);" << endl;
+            << state_info_type_name_ << "*)instance);" << endl;
     result_ << "  return ro_mem->size;" << endl;
     result_ << "}\n" << endl;
   }
@@ -133,9 +133,9 @@ void InitComposer::write_create_blob()
   result_ << "extern __m256i fixpoint_create_blob( wasm_rt_memory_t*, uint32_t );" << endl;
   for ( uint32_t idx : rw_mems ) {
     result_ << "__m256i Z_fixpointZ_create_blob_rw_mem_" << idx
-            << "(struct Z_fixpoint_module_instance_t* module_instance, uint32_t size) {" << endl;
+            << "(struct Z_fixpoint_instance_t* instance, uint32_t size) {" << endl;
     result_ << "  wasm_rt_memory_t* rw_mem = " << module_prefix_ << "Z_rw_mem_" << idx << "(("
-            << state_info_type_name_ << "*)module_instance);" << endl;
+            << state_info_type_name_ << "*)instance);" << endl;
     result_ << "  return fixpoint_create_blob(rw_mem, size);" << endl;
     result_ << "}\n" << endl;
   }
@@ -145,7 +145,7 @@ void InitComposer::write_create_blob_i32()
 {
   result_ << "extern __m256i fixpoint_create_blob_i32( uint32_t );" << endl;
   result_ << "__m256i Z_fixpointZ_create_blob_i32"
-          << "(struct Z_fixpoint_module_instance_t* module_instance, uint32_t content) {" << endl;
+          << "(struct Z_fixpoint_instance_t* instance, uint32_t content) {" << endl;
   result_ << "  return fixpoint_create_blob_i32( content );" << endl;
   result_ << "}\n" << endl;
 }
@@ -154,7 +154,7 @@ void InitComposer::write_value_type()
 {
   result_ << "extern uint32_t fixpoint_value_type( __m256i );" << endl;
   result_ << "uint32_t Z_fixpointZ_value_type"
-          << "(struct Z_fixpoint_module_instance_t* module_instance, __m256i handle ) {" << endl;
+          << "(struct Z_fixpoint_instance_t* instance, __m256i handle ) {" << endl;
   result_ << "  return fixpoint_value_type( handle );" << endl;
   result_ << "}\n" << endl;
 }
@@ -165,9 +165,9 @@ void InitComposer::write_create_tree()
   result_ << "extern __m256i fixpoint_create_tree( wasm_rt_externref_table_t*, uint32_t );" << endl;
   for ( auto rw_table : rw_tables ) {
     result_ << "__m256i Z_fixpointZ_create_tree_rw_table_" << rw_table
-            << "(struct Z_fixpoint_module_instance_t* module_instance, uint32_t size) {" << endl;
+            << "(struct Z_fixpoint_instance_t* instance, uint32_t size) {" << endl;
     result_ << "  wasm_rt_externref_table_t* rw_table = " << module_prefix_ << "Z_rw_table_" << rw_table << "(("
-            << state_info_type_name_ << "*)module_instance);" << endl;
+            << state_info_type_name_ << "*)instance);" << endl;
     result_ << "  return fixpoint_create_tree(rw_table, size);" << endl;
     result_ << "}\n" << endl;
   }
@@ -177,7 +177,7 @@ void InitComposer::write_create_thunk()
 {
   result_ << "extern __m256i fixpoint_create_thunk(__m256i);" << endl;
   result_ << "__m256i " << module_prefix_
-          << "Z_fixpointZ_create_thunk(struct Z_fixpoint_module_instance_t* module_instance, __m256i handle) {"
+          << "Z_fixpointZ_create_thunk(struct Z_fixpoint_instance_t* instance, __m256i handle) {"
           << endl;
   result_ << "  return fixpoint_create_thunk(handle);" << endl;
   result_ << "}\n" << endl;
@@ -185,18 +185,17 @@ void InitComposer::write_create_thunk()
 
 void InitComposer::write_init_read_only_mem_table()
 {
-  result_ << "void init_mems(" << state_info_type_name_ << "* module_instance) {" << endl;
+  result_ << "void init_mems(" << state_info_type_name_ << "* instance) {" << endl;
   for ( const auto& ro_mem : inspector_->GetExportedROMems() ) {
-    result_ << "  " << module_prefix_ << "Z_ro_mem_" << ro_mem << "(module_instance)->read_only = true;" << endl;
+    result_ << "  " << module_prefix_ << "Z_ro_mem_" << ro_mem << "(instance)->read_only = true;" << endl;
   }
   result_ << "  return;" << endl;
   result_ << "}" << endl;
   result_ << endl;
 
-  result_ << "void init_tables(" << state_info_type_name_ << "* module_instance) {" << endl;
+  result_ << "void init_tabs(" << state_info_type_name_ << "* instance) {" << endl;
   for ( const auto& ro_table : inspector_->GetExportedROTables() ) {
-    result_ << "  " << module_prefix_ << "Z_ro_table_" << ro_table << "(module_instance)->read_only = true;"
-            << endl;
+    result_ << "  " << module_prefix_ << "Z_ro_table_" << ro_table << "(instance)->read_only = true;" << endl;
   }
   result_ << "  return;" << endl;
   result_ << "}" << endl;
@@ -231,10 +230,9 @@ string InitComposer::compose_header()
 
   result_ << "void initProgram(void* ptr) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_ << "*)ptr;" << endl;
-  result_ << "  " << module_prefix_ << "_instantiate(instance, (struct Z_fixpoint_module_instance_t*)instance);"
-          << endl;
+  result_ << "  " << module_prefix_ << "_instantiate(instance, (struct Z_fixpoint_instance_t*)instance);" << endl;
   result_ << "  init_mems(instance);" << endl;
-  result_ << "  init_tables(instance);" << endl;
+  result_ << "  init_tabs(instance);" << endl;
   result_ << "  return;" << endl;
   result_ << "}" << endl;
 

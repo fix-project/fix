@@ -52,8 +52,8 @@ include(etc/cflags.cmake)
 include(etc/clang_format.cmake)
 include(etc/tests.cmake)
 
-include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-src")
-include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-build")
+include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-src/include")
+include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-build/include")
 
 include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-src")
 include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-build")
