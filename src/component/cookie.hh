@@ -96,13 +96,13 @@ public:
   bool is_tree() const
   {
     assert( not is_literal_blob() );
-    return ( ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Tree ) );
+    return ( !is_literal_blob() && ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Tree ) );
   }
 
   bool is_thunk() const
   {
     assert( not is_literal_blob() );
-    return ( ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Thunk ) );
+    return ( !is_literal_blob() && ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Thunk ) );
   }
 
   ContentType get_content_type() const

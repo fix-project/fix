@@ -7,7 +7,7 @@ bool is_dir( int32_t ro_table_index )
 {
   externref ret = get_content( ro_table_index );
 
-  if ( value_type( ret ) == 1 ) { // if is tree
+  if ( value_type( ret ) == 0 ) { // if is tree
     return true;
   }
 
