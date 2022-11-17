@@ -59,7 +59,16 @@ int main()
 
   if (fd_5 >= 0) {
     return -1;
-  } 
+  }
+
+  // try to open a file with a prefix that exists 
+  int fd_6 = open("a/a_1.txt.txt", O_RDONLY); 
+
+  printf("fd_6 = %d\n", fd_6);
+  
+  if (fd_6 >= 0) {
+    return -1;
+  }
 
   return 0;
 }
