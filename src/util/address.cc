@@ -3,6 +3,7 @@
 #include "exception.hh"
 
 #include <arpa/inet.h>
+#include <array>
 #include <cstring>
 #include <memory>
 #include <netdb.h>
