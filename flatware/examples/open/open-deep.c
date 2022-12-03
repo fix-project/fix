@@ -70,5 +70,14 @@ int main()
     return -1;
   }
 
+  //see if case sensitive
+  int fd_7 = open("a/A_1.txt", O_RDONLY);
+
+  printf("fd_7 = %d\n", fd_7);
+
+  if (fd_7 >= 0) {
+    return -1;
+  } 
+
   return 0;
 }
