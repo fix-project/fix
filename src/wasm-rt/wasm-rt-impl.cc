@@ -39,6 +39,8 @@
 #define PAGE_SIZE 65536
 #define MAX_EXCEPTION_SIZE PAGE_SIZE
 
+#include <stdexcept>
+
 typedef struct FuncType
 {
   wasm_rt_type_t* params;
@@ -69,10 +71,7 @@ static jmp_buf* g_unwind_target;
 void wasm_rt_trap( wasm_rt_trap_t code )
 {
   assert( code != WASM_RT_TRAP_NONE );
-#if !WASM_RT_MEMCHECK_SIGNAL_HANDLER
-  wasm_rt_call_stack_depth = wasm_rt_saved_call_stack_depth;
-#endif
-  WASM_RT_LONGJMP( wasm_rt_jmp_buf, code );
+  throw std::runtime_error( wasm_rt_strerror( code ) );
 }
 
 static bool func_types_are_equal( FuncType* a, FuncType* b )

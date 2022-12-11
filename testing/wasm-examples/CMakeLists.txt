@@ -41,3 +41,14 @@ add_custom_command(
           -o fib.wasm)
 
 add_custom_target(fib_wasm ALL DEPENDS fib.wasm)
+
+add_custom_command(
+  OUTPUT "trap.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/trap.wat
+          ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
+  COMMAND ${CMAKE_BINARY_DIR}/_deps/wabt-build/wat2wasm
+          --enable-multi-memory
+          ${CMAKE_CURRENT_SOURCE_DIR}/trap.wat
+          -o trap.wasm)
+
+add_custom_target(trap_wasm ALL DEPENDS trap.wasm)
