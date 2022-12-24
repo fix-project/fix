@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdlib>
 #include <limits>
 #include <memory>
@@ -7,6 +8,7 @@
 #include <string_view>
 #include <variant>
 
+#include "exception.hh"
 #include "name.hh"
 #include "spans.hh"
 #include "thunk.hh"
@@ -45,6 +47,13 @@ public:
     }
   }
 
+  Value( const uint32_t size )
+    : data_( notnull( "aligned_alloc", static_cast<T*>( aligned_alloc( alignof( T ), size * sizeof( T ) ) ) ) )
+    , size_( size )
+  {
+    /* XXX should probably not leave uninitialized */
+  }
+
   Value( const Value& ) = delete;
   Value& operator=( const Value& ) = delete;
 
@@ -54,6 +63,16 @@ public:
   operator View() const { return { data_.get(), size_ }; }
   const T* data() const { return data_.get(); }
   uint32_t size() const { return size_; }
+
+  T& at( const uint32_t N )
+  {
+    if ( N >= size() ) {
+      throw std::out_of_range( "Value::at: " + std::to_string( N ) + " >= " + std::to_string( size() ) );
+    }
+    return *( data_.get() + N );
+  }
+
+  T& operator[]( const size_t N ) const { return *( data() + N ); }
 
 private:
   ptr_type data_;

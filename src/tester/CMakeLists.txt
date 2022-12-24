@@ -13,6 +13,11 @@ target_link_libraries(wasi_tester ${FIXPOINT_LIBS})
 target_link_libraries(wasi_tester cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
 add_dependencies(wasi_tester wasm2c)
 
+add_executable(stateless-tester "stateless-tester.cc")
+target_link_libraries(stateless-tester ${FIXPOINT_LIBS})
+target_link_libraries(stateless-tester cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
+add_dependencies(stateless-tester wasm2c)
+
 add_executable(wasm_to_c_tester "wasm_to_c_tester.cc")
 target_link_libraries(wasm_to_c_tester ${FIXPOINT_LIBS})
 target_link_libraries(wasm_to_c_tester ${CLANG_LIBS} LLVM wabt)
