@@ -118,8 +118,7 @@ void InitComposer::write_memory_size()
 {
   auto ro_mems = inspector_->GetExportedROMems();
   for ( uint32_t idx : ro_mems ) {
-    result_ << "uint32_t Z_fixpointZ_size_ro_mem_" << idx
-            << "(struct Z_fixpoint_instance_t* instance) {" << endl;
+    result_ << "uint32_t Z_fixpointZ_size_ro_mem_" << idx << "(struct Z_fixpoint_instance_t* instance) {" << endl;
     result_ << "  wasm_rt_memory_t* ro_mem = " << module_prefix_ << "Z_ro_mem_" << idx << "(("
             << state_info_type_name_ << "*)instance);" << endl;
     result_ << "  return ro_mem->size;" << endl;
@@ -177,8 +176,7 @@ void InitComposer::write_create_thunk()
 {
   result_ << "extern __m256i fixpoint_create_thunk(__m256i);" << endl;
   result_ << "__m256i " << module_prefix_
-          << "Z_fixpointZ_create_thunk(struct Z_fixpoint_instance_t* instance, __m256i handle) {"
-          << endl;
+          << "Z_fixpointZ_create_thunk(struct Z_fixpoint_instance_t* instance, __m256i handle) {" << endl;
   result_ << "  return fixpoint_create_thunk(handle);" << endl;
   result_ << "}\n" << endl;
 }

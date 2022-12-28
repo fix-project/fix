@@ -19,7 +19,7 @@ int main()
     return -1;
   }
   readv( fd, iovs, 2 );
-  
+
   printf( "Read %s and %s\n", buf1, buf2 );
 
   // open a second file in same program
@@ -53,31 +53,31 @@ int main()
   }
 
   // try to open a directory that does not exist
-  int fd_5 = open("a/b/i-dont-exist", O_RDONLY);
+  int fd_5 = open( "a/b/i-dont-exist", O_RDONLY );
 
-  printf("fd_5 = %d\n", fd_5);
+  printf( "fd_5 = %d\n", fd_5 );
 
-  if (fd_5 >= 0) {
+  if ( fd_5 >= 0 ) {
     return -1;
   }
 
-  // try to open a file with a prefix that exists 
-  int fd_6 = open("a/a_1.txt.txt", O_RDONLY); 
+  // try to open a file with a prefix that exists
+  int fd_6 = open( "a/a_1.txt.txt", O_RDONLY );
 
-  printf("fd_6 = %d\n", fd_6);
-  
-  if (fd_6 >= 0) {
+  printf( "fd_6 = %d\n", fd_6 );
+
+  if ( fd_6 >= 0 ) {
     return -1;
   }
 
-  //see if case sensitive
-  int fd_7 = open("a/A_1.txt", O_RDONLY);
+  // see if case sensitive
+  int fd_7 = open( "a/A_1.txt", O_RDONLY );
 
-  printf("fd_7 = %d\n", fd_7);
+  printf( "fd_7 = %d\n", fd_7 );
 
-  if (fd_7 >= 0) {
+  if ( fd_7 >= 0 ) {
     return -1;
-  } 
+  }
 
   return 0;
 }
