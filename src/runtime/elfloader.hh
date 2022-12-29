@@ -46,8 +46,7 @@ struct Elf_Info
     , func_map()
     , idx_to_offset()
     , relocation_tables()
-  {
-  }
+  {}
 };
 
 Elf_Info load_program( const std::string_view program_content );

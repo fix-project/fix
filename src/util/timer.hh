@@ -169,12 +169,10 @@ public:
 
 template<>
 inline GlobalScopeTimer<Timer::Category::Execution>::GlobalScopeTimer()
-{
-}
+{}
 
 template<>
 inline GlobalScopeTimer<Timer::Category::Execution>::~GlobalScopeTimer()
-{
-}
+{}
 
 #endif

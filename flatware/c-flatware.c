@@ -171,8 +171,7 @@ __attribute__( ( unused ) )
 #endif
 static void
 dummy_trace( __attribute__( ( unused ) ) int reqd_arg, ... )
-{
-}
+{}
 
 externref fixpoint_apply( externref encode ) __attribute( ( export_name( "_fixpoint_apply" ) ) );
 

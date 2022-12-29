@@ -47,14 +47,12 @@ FileDescriptor::FDWrapper::~FDWrapper()
 //! \param[in] fd is the file descriptor number returned by [open(2)](\ref man2::open) or similar
 FileDescriptor::FileDescriptor( const int fd )
   : _internal_fd( make_shared<FDWrapper>( fd ) )
-{
-}
+{}
 
 //! Private constructor used by duplicate()
 FileDescriptor::FileDescriptor( shared_ptr<FDWrapper> other_shared_ptr )
   : _internal_fd( move( other_shared_ptr ) )
-{
-}
+{}
 
 //! \returns a copy of this FileDescriptor
 FileDescriptor FileDescriptor::duplicate() const

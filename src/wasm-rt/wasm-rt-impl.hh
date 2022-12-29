@@ -20,12 +20,11 @@
 #include "wasm-rt.h"
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-  /** A setjmp buffer used for handling traps. */
-  extern jmp_buf wasm_rt_jmp_buf;
+/** A setjmp buffer used for handling traps. */
+extern jmp_buf wasm_rt_jmp_buf;
 
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
 #define WASM_RT_LONGJMP( buf, val ) siglongjmp( buf, val )

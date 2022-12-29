@@ -13,8 +13,7 @@ using namespace std;
 //! \param[in] type is as described in [socket(7)](\ref man7::socket)
 Socket::Socket( const int domain, const int type )
   : FileDescriptor( CheckSystemCall( "socket", socket( domain, type, 0 ) ) )
-{
-}
+{}
 
 // construct from file descriptor
 //! \param[in] fd is the FileDescriptor from which to construct

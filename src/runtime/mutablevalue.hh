@@ -17,8 +17,7 @@ public:
 
   MTreeEntry( const __m256i val )
     : cookie_name( val )
-  {
-  }
+  {}
 
   bool is_accessible() const { return !( metadata() & 0x80 ); }
 
@@ -28,14 +27,13 @@ public:
   {
     if ( entry.is_intended_strict() ) {
       return __m256i {
-        entry.content_[0], entry.content_[1], entry.content_[2], entry.content_[3] & 0x5f'ff'ff'ff'ff'ff'ff'ff
-      };
+        entry.content_[0], entry.content_[1], entry.content_[2], entry.content_[3] & 0x5f'ff'ff'ff'ff'ff'ff'ff };
     } else {
-      return __m256i { entry.content_[0],
-                       entry.content_[1],
-                       entry.content_[2],
-                       static_cast<int64_t>( ( entry.content_[3] & 0x5f'ff'ff'ff'ff'ff'ff'ff )
-                                             | 0x80'00'00'00'00'00'00'00 ) };
+      return __m256i {
+        entry.content_[0],
+        entry.content_[1],
+        entry.content_[2],
+        static_cast<int64_t>( ( entry.content_[3] & 0x5f'ff'ff'ff'ff'ff'ff'ff ) | 0x80'00'00'00'00'00'00'00 ) };
     }
   }
 };

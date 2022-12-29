@@ -93,16 +93,14 @@ static inline addrinfo make_hints( const int ai_flags, const int ai_family )
 //! \param[in] service name (from `/etc/services`, e.g., "http" is port 80)
 Address::Address( const string& hostname, const string& service )
   : Address( hostname, service, make_hints( AI_ALL, AF_INET ) )
-{
-}
+{}
 
 //! \param[in] ip address as a dotted quad ("1.1.1.1")
 //! \param[in] port number
 Address::Address( const string& ip, const uint16_t port )
   // tell getaddrinfo that we don't want to resolve anything
   : Address( ip, ::to_string( port ), make_hints( AI_NUMERICHOST | AI_NUMERICSERV, AF_INET ) )
-{
-}
+{}
 
 // accessors
 pair<string, uint16_t> Address::ip_port() const

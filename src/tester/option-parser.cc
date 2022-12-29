@@ -33,15 +33,13 @@ OptionParser::Option::Option( char short_name_,
   , has_argument( has_argument_ == HasArgument::Yes )
   , help( help_ )
   , callback( callback_ )
-{
-}
+{}
 
 OptionParser::Argument::Argument( const std::string& name_, ArgumentCount count_, const Callback& callback_ )
   : name( name_ )
   , count( count_ )
   , callback( callback_ )
-{
-}
+{}
 
 OptionParser::OptionParser( const char* program_name, const char* description )
   : program_name_( program_name )

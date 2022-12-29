@@ -10,8 +10,7 @@ public:
   virtual ~Base() = default;
   Base( int a )
     : a_( a )
-  {
-  }
+  {}
 };
 
 template<int N>
@@ -21,8 +20,7 @@ public:
   int add( char* a, char* b ) override;
   Derived( int a )
     : Base( a )
-  {
-  }
+  {}
 };
 
 template class Derived<0>;

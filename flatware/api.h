@@ -33,37 +33,36 @@ _Static_assert( _Alignof( uint64_t ) == 8, "non-wasi data layout" );
 _Static_assert( _Alignof( void* ) == 4, "non-wasi data layout" );
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 // TODO: Encoding this in witx.
 #define __WASI_DIRCOOKIE_START ( UINT64_C( 0 ) )
-  typedef __SIZE_TYPE__ __wasi_size_t;
+typedef __SIZE_TYPE__ __wasi_size_t;
 
-  _Static_assert( sizeof( __wasi_size_t ) == 4, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_size_t ) == 4, "witx calculated align" );
+_Static_assert( sizeof( __wasi_size_t ) == 4, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_size_t ) == 4, "witx calculated align" );
 
-  /**
-   * Non-negative file size or length of a region within a file.
-   */
-  typedef uint64_t __wasi_filesize_t;
+/**
+ * Non-negative file size or length of a region within a file.
+ */
+typedef uint64_t __wasi_filesize_t;
 
-  _Static_assert( sizeof( __wasi_filesize_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_filesize_t ) == 8, "witx calculated align" );
+_Static_assert( sizeof( __wasi_filesize_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_filesize_t ) == 8, "witx calculated align" );
 
-  /**
-   * Timestamp in nanoseconds.
-   */
-  typedef uint64_t __wasi_timestamp_t;
+/**
+ * Timestamp in nanoseconds.
+ */
+typedef uint64_t __wasi_timestamp_t;
 
-  _Static_assert( sizeof( __wasi_timestamp_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_timestamp_t ) == 8, "witx calculated align" );
+_Static_assert( sizeof( __wasi_timestamp_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_timestamp_t ) == 8, "witx calculated align" );
 
-  /**
-   * Identifiers for clocks.
-   */
-  typedef uint32_t __wasi_clockid_t;
+/**
+ * Identifiers for clocks.
+ */
+typedef uint32_t __wasi_clockid_t;
 
 /**
  * The clock measuring real time. Time value zero corresponds with
@@ -89,16 +88,16 @@ extern "C"
  */
 #define __WASI_CLOCKID_THREAD_CPUTIME_ID ( UINT32_C( 3 ) )
 
-  _Static_assert( sizeof( __wasi_clockid_t ) == 4, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_clockid_t ) == 4, "witx calculated align" );
+_Static_assert( sizeof( __wasi_clockid_t ) == 4, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_clockid_t ) == 4, "witx calculated align" );
 
-  /**
-   * Error codes returned by functions.
-   * Not all of these error codes are returned by the functions provided by this
-   * API; some are used in higher-level library layers, and others are provided
-   * merely for alignment with POSIX.
-   */
-  typedef uint16_t __wasi_errno_t;
+/**
+ * Error codes returned by functions.
+ * Not all of these error codes are returned by the functions provided by this
+ * API; some are used in higher-level library layers, and others are provided
+ * merely for alignment with POSIX.
+ */
+typedef uint16_t __wasi_errno_t;
 
 /**
  * No error occurred. System call completed successfully.
@@ -485,13 +484,13 @@ extern "C"
  */
 #define __WASI_ERRNO_NOTCAPABLE ( UINT16_C( 76 ) )
 
-  _Static_assert( sizeof( __wasi_errno_t ) == 2, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_errno_t ) == 2, "witx calculated align" );
+_Static_assert( sizeof( __wasi_errno_t ) == 2, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_errno_t ) == 2, "witx calculated align" );
 
-  /**
-   * File descriptor rights, determining which actions may be performed.
-   */
-  typedef uint64_t __wasi_rights_t;
+/**
+ * File descriptor rights, determining which actions may be performed.
+ */
+typedef uint64_t __wasi_rights_t;
 
 /**
  * The right to invoke `fd_datasync`.
@@ -655,70 +654,70 @@ extern "C"
  */
 #define __WASI_RIGHTS_SOCK_ACCEPT ( (__wasi_rights_t)( 1 << 29 ) )
 
+/**
+ * A file descriptor handle.
+ */
+typedef int __wasi_fd_t;
+
+_Static_assert( sizeof( __wasi_fd_t ) == 4, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_fd_t ) == 4, "witx calculated align" );
+
+/**
+ * A region of memory for scatter/gather reads.
+ */
+typedef struct __wasi_iovec_t
+{
   /**
-   * A file descriptor handle.
+   * The address of the buffer to be filled.
    */
-  typedef int __wasi_fd_t;
-
-  _Static_assert( sizeof( __wasi_fd_t ) == 4, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_fd_t ) == 4, "witx calculated align" );
-
-  /**
-   * A region of memory for scatter/gather reads.
-   */
-  typedef struct __wasi_iovec_t
-  {
-    /**
-     * The address of the buffer to be filled.
-     */
-    uint8_t* buf;
-
-    /**
-     * The length of the buffer to be filled.
-     */
-    __wasi_size_t buf_len;
-
-  } __wasi_iovec_t;
-
-  _Static_assert( sizeof( __wasi_iovec_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_iovec_t ) == 4, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_iovec_t, buf ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_iovec_t, buf_len ) == 4, "witx calculated offset" );
+  uint8_t* buf;
 
   /**
-   * A region of memory for scatter/gather writes.
+   * The length of the buffer to be filled.
    */
-  typedef struct __wasi_ciovec_t
-  {
-    /**
-     * The address of the buffer to be written.
-     */
-    const uint8_t* buf;
+  __wasi_size_t buf_len;
 
-    /**
-     * The length of the buffer to be written.
-     */
-    __wasi_size_t buf_len;
+} __wasi_iovec_t;
 
-  } __wasi_ciovec_t;
+_Static_assert( sizeof( __wasi_iovec_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_iovec_t ) == 4, "witx calculated align" );
+_Static_assert( offsetof( __wasi_iovec_t, buf ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_iovec_t, buf_len ) == 4, "witx calculated offset" );
 
-  _Static_assert( sizeof( __wasi_ciovec_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_ciovec_t ) == 4, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_ciovec_t, buf ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_ciovec_t, buf_len ) == 4, "witx calculated offset" );
+/**
+ * A region of memory for scatter/gather writes.
+ */
+typedef struct __wasi_ciovec_t
+{
+  /**
+   * The address of the buffer to be written.
+   */
+  const uint8_t* buf;
 
   /**
-   * Relative offset within a file.
+   * The length of the buffer to be written.
    */
-  typedef int64_t __wasi_filedelta_t;
+  __wasi_size_t buf_len;
 
-  _Static_assert( sizeof( __wasi_filedelta_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_filedelta_t ) == 8, "witx calculated align" );
+} __wasi_ciovec_t;
 
-  /**
-   * The position relative to which to set the offset of the file descriptor.
-   */
-  typedef uint8_t __wasi_whence_t;
+_Static_assert( sizeof( __wasi_ciovec_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_ciovec_t ) == 4, "witx calculated align" );
+_Static_assert( offsetof( __wasi_ciovec_t, buf ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_ciovec_t, buf_len ) == 4, "witx calculated offset" );
+
+/**
+ * Relative offset within a file.
+ */
+typedef int64_t __wasi_filedelta_t;
+
+_Static_assert( sizeof( __wasi_filedelta_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_filedelta_t ) == 8, "witx calculated align" );
+
+/**
+ * The position relative to which to set the offset of the file descriptor.
+ */
+typedef uint8_t __wasi_whence_t;
 
 /**
  * Seek relative to start-of-file.
@@ -735,39 +734,39 @@ extern "C"
  */
 #define __WASI_WHENCE_END ( UINT8_C( 2 ) )
 
-  _Static_assert( sizeof( __wasi_whence_t ) == 1, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_whence_t ) == 1, "witx calculated align" );
+_Static_assert( sizeof( __wasi_whence_t ) == 1, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_whence_t ) == 1, "witx calculated align" );
 
-  /**
-   * A reference to the offset of a directory entry.
-   *
-   * The value 0 signifies the start of the directory.
-   */
-  typedef uint64_t __wasi_dircookie_t;
+/**
+ * A reference to the offset of a directory entry.
+ *
+ * The value 0 signifies the start of the directory.
+ */
+typedef uint64_t __wasi_dircookie_t;
 
-  _Static_assert( sizeof( __wasi_dircookie_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_dircookie_t ) == 8, "witx calculated align" );
+_Static_assert( sizeof( __wasi_dircookie_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_dircookie_t ) == 8, "witx calculated align" );
 
-  /**
-   * The type for the `dirent::d_namlen` field of `dirent` struct.
-   */
-  typedef uint32_t __wasi_dirnamlen_t;
+/**
+ * The type for the `dirent::d_namlen` field of `dirent` struct.
+ */
+typedef uint32_t __wasi_dirnamlen_t;
 
-  _Static_assert( sizeof( __wasi_dirnamlen_t ) == 4, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_dirnamlen_t ) == 4, "witx calculated align" );
+_Static_assert( sizeof( __wasi_dirnamlen_t ) == 4, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_dirnamlen_t ) == 4, "witx calculated align" );
 
-  /**
-   * File serial number that is unique within its file system.
-   */
-  typedef uint64_t __wasi_inode_t;
+/**
+ * File serial number that is unique within its file system.
+ */
+typedef uint64_t __wasi_inode_t;
 
-  _Static_assert( sizeof( __wasi_inode_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_inode_t ) == 8, "witx calculated align" );
+_Static_assert( sizeof( __wasi_inode_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_inode_t ) == 8, "witx calculated align" );
 
-  /**
-   * The type of a file descriptor or file.
-   */
-  typedef uint8_t __wasi_filetype_t;
+/**
+ * The type of a file descriptor or file.
+ */
+typedef uint8_t __wasi_filetype_t;
 
 /**
  * The type of the file descriptor or file is unknown or is different from any of the other types specified.
@@ -809,48 +808,48 @@ extern "C"
  */
 #define __WASI_FILETYPE_SYMBOLIC_LINK ( UINT8_C( 7 ) )
 
-  _Static_assert( sizeof( __wasi_filetype_t ) == 1, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_filetype_t ) == 1, "witx calculated align" );
+_Static_assert( sizeof( __wasi_filetype_t ) == 1, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_filetype_t ) == 1, "witx calculated align" );
+
+/**
+ * A directory entry.
+ */
+typedef struct __wasi_dirent_t
+{
+  /**
+   * The offset of the next directory entry stored in this directory.
+   */
+  __wasi_dircookie_t d_next;
 
   /**
-   * A directory entry.
+   * The serial number of the file referred to by this directory entry.
    */
-  typedef struct __wasi_dirent_t
-  {
-    /**
-     * The offset of the next directory entry stored in this directory.
-     */
-    __wasi_dircookie_t d_next;
-
-    /**
-     * The serial number of the file referred to by this directory entry.
-     */
-    __wasi_inode_t d_ino;
-
-    /**
-     * The length of the name of the directory entry.
-     */
-    __wasi_dirnamlen_t d_namlen;
-
-    /**
-     * The type of the file referred to by this directory entry.
-     */
-    __wasi_filetype_t d_type;
-
-    char pad[3];
-  } __wasi_dirent_t;
-
-  _Static_assert( sizeof( __wasi_dirent_t ) == 24, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_dirent_t ) == 8, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_dirent_t, d_next ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_dirent_t, d_ino ) == 8, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_dirent_t, d_namlen ) == 16, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_dirent_t, d_type ) == 20, "witx calculated offset" );
+  __wasi_inode_t d_ino;
 
   /**
-   * File or memory access pattern advisory information.
+   * The length of the name of the directory entry.
    */
-  typedef uint8_t __wasi_advice_t;
+  __wasi_dirnamlen_t d_namlen;
+
+  /**
+   * The type of the file referred to by this directory entry.
+   */
+  __wasi_filetype_t d_type;
+
+  char pad[3];
+} __wasi_dirent_t;
+
+_Static_assert( sizeof( __wasi_dirent_t ) == 24, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_dirent_t ) == 8, "witx calculated align" );
+_Static_assert( offsetof( __wasi_dirent_t, d_next ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_dirent_t, d_ino ) == 8, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_dirent_t, d_namlen ) == 16, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_dirent_t, d_type ) == 20, "witx calculated offset" );
+
+/**
+ * File or memory access pattern advisory information.
+ */
+typedef uint8_t __wasi_advice_t;
 
 /**
  * The application has no advice to give on its behavior with respect to the specified data.
@@ -882,13 +881,13 @@ extern "C"
  */
 #define __WASI_ADVICE_NOREUSE ( UINT8_C( 5 ) )
 
-  _Static_assert( sizeof( __wasi_advice_t ) == 1, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_advice_t ) == 1, "witx calculated align" );
+_Static_assert( sizeof( __wasi_advice_t ) == 1, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_advice_t ) == 1, "witx calculated align" );
 
-  /**
-   * File descriptor flags.
-   */
-  typedef uint16_t __wasi_fdflags_t;
+/**
+ * File descriptor flags.
+ */
+typedef uint16_t __wasi_fdflags_t;
 
 /**
  * Append mode: Data written to the file is always appended to the file's end.
@@ -917,58 +916,58 @@ extern "C"
  */
 #define __WASI_FDFLAGS_SYNC ( (__wasi_fdflags_t)( 1 << 4 ) )
 
+/**
+ * File descriptor attributes.
+ */
+typedef struct __wasi_fdstat_t
+{
   /**
-   * File descriptor attributes.
+   * File type.
    */
-  typedef struct __wasi_fdstat_t
-  {
-    /**
-     * File type.
-     */
-    __wasi_filetype_t fs_filetype;
+  __wasi_filetype_t fs_filetype;
 
-    char pad_0[1];
-
-    /**
-     * File descriptor flags.
-     */
-    __wasi_fdflags_t fs_flags;
-
-    char pad_1[4];
-
-    /**
-     * Rights that apply to this file descriptor.
-     */
-    __wasi_rights_t fs_rights_base;
-
-    /**
-     * Maximum set of rights that may be installed on new file descriptors that
-     * are created through this file descriptor, e.g., through `path_open`.
-     */
-    __wasi_rights_t fs_rights_inheriting;
-
-  } __wasi_fdstat_t;
-
-  _Static_assert( sizeof( __wasi_fdstat_t ) == 24, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_fdstat_t ) == 8, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_fdstat_t, fs_filetype ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_fdstat_t, fs_flags ) == 2, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_fdstat_t, fs_rights_base ) == 8, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_fdstat_t, fs_rights_inheriting ) == 16, "witx calculated offset" );
+  char pad_0[1];
 
   /**
-   * Identifier for a device containing a file system. Can be used in combination
-   * with `inode` to uniquely identify a file or directory in the filesystem.
+   * File descriptor flags.
    */
-  typedef uint64_t __wasi_device_t;
+  __wasi_fdflags_t fs_flags;
 
-  _Static_assert( sizeof( __wasi_device_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_device_t ) == 8, "witx calculated align" );
+  char pad_1[4];
 
   /**
-   * Which file time attributes to adjust.
+   * Rights that apply to this file descriptor.
    */
-  typedef uint16_t __wasi_fstflags_t;
+  __wasi_rights_t fs_rights_base;
+
+  /**
+   * Maximum set of rights that may be installed on new file descriptors that
+   * are created through this file descriptor, e.g., through `path_open`.
+   */
+  __wasi_rights_t fs_rights_inheriting;
+
+} __wasi_fdstat_t;
+
+_Static_assert( sizeof( __wasi_fdstat_t ) == 24, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_fdstat_t ) == 8, "witx calculated align" );
+_Static_assert( offsetof( __wasi_fdstat_t, fs_filetype ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_fdstat_t, fs_flags ) == 2, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_fdstat_t, fs_rights_base ) == 8, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_fdstat_t, fs_rights_inheriting ) == 16, "witx calculated offset" );
+
+/**
+ * Identifier for a device containing a file system. Can be used in combination
+ * with `inode` to uniquely identify a file or directory in the filesystem.
+ */
+typedef uint64_t __wasi_device_t;
+
+_Static_assert( sizeof( __wasi_device_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_device_t ) == 8, "witx calculated align" );
+
+/**
+ * Which file time attributes to adjust.
+ */
+typedef uint16_t __wasi_fstflags_t;
 
 /**
  * Adjust the last data access timestamp to the value stored in `filestat::atim`.
@@ -990,20 +989,20 @@ extern "C"
  */
 #define __WASI_FSTFLAGS_MTIM_NOW ( (__wasi_fstflags_t)( 1 << 3 ) )
 
-  /**
-   * Flags determining the method of how paths are resolved.
-   */
-  typedef uint32_t __wasi_lookupflags_t;
+/**
+ * Flags determining the method of how paths are resolved.
+ */
+typedef uint32_t __wasi_lookupflags_t;
 
 /**
  * As long as the resolved path corresponds to a symbolic link, it is expanded.
  */
 #define __WASI_LOOKUPFLAGS_SYMLINK_FOLLOW ( (__wasi_lookupflags_t)( 1 << 0 ) )
 
-  /**
-   * Open flags used by `path_open`.
-   */
-  typedef uint16_t __wasi_oflags_t;
+/**
+ * Open flags used by `path_open`.
+ */
+typedef uint16_t __wasi_oflags_t;
 
 /**
  * Create file if it does not exist.
@@ -1025,88 +1024,88 @@ extern "C"
  */
 #define __WASI_OFLAGS_TRUNC ( (__wasi_oflags_t)( 1 << 3 ) )
 
+/**
+ * Number of hard links to an inode.
+ */
+typedef uint64_t __wasi_linkcount_t;
+
+_Static_assert( sizeof( __wasi_linkcount_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_linkcount_t ) == 8, "witx calculated align" );
+
+/**
+ * File attributes.
+ */
+typedef struct __wasi_filestat_t
+{
   /**
-   * Number of hard links to an inode.
+   * Device ID of device containing the file.
    */
-  typedef uint64_t __wasi_linkcount_t;
-
-  _Static_assert( sizeof( __wasi_linkcount_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_linkcount_t ) == 8, "witx calculated align" );
-
-  /**
-   * File attributes.
-   */
-  typedef struct __wasi_filestat_t
-  {
-    /**
-     * Device ID of device containing the file.
-     */
-    __wasi_device_t dev;
-
-    /**
-     * File serial number.
-     */
-    __wasi_inode_t ino;
-
-    /**
-     * File type.
-     */
-    __wasi_filetype_t filetype;
-
-    char pad[7];
-
-    /**
-     * Number of hard links to the file.
-     */
-    __wasi_linkcount_t nlink;
-
-    /**
-     * For regular files, the file size in bytes. For symbolic links, the length in bytes of the pathname contained
-     * in the symbolic link.
-     */
-    __wasi_filesize_t size;
-
-    /**
-     * Last data access timestamp.
-     */
-    __wasi_timestamp_t atim;
-
-    /**
-     * Last data modification timestamp.
-     */
-    __wasi_timestamp_t mtim;
-
-    /**
-     * Last file status change timestamp.
-     */
-    __wasi_timestamp_t ctim;
-
-  } __wasi_filestat_t;
-
-  _Static_assert( sizeof( __wasi_filestat_t ) == 64, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_filestat_t ) == 8, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_filestat_t, dev ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_filestat_t, ino ) == 8, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_filestat_t, filetype ) == 16, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_filestat_t, nlink ) == 24, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_filestat_t, size ) == 32, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_filestat_t, atim ) == 40, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_filestat_t, mtim ) == 48, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_filestat_t, ctim ) == 56, "witx calculated offset" );
+  __wasi_device_t dev;
 
   /**
-   * User-provided value that may be attached to objects that is retained when
-   * extracted from the implementation.
+   * File serial number.
    */
-  typedef uint64_t __wasi_userdata_t;
-
-  _Static_assert( sizeof( __wasi_userdata_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_userdata_t ) == 8, "witx calculated align" );
+  __wasi_inode_t ino;
 
   /**
-   * Type of a subscription to an event or its occurrence.
+   * File type.
    */
-  typedef uint8_t __wasi_eventtype_t;
+  __wasi_filetype_t filetype;
+
+  char pad[7];
+
+  /**
+   * Number of hard links to the file.
+   */
+  __wasi_linkcount_t nlink;
+
+  /**
+   * For regular files, the file size in bytes. For symbolic links, the length in bytes of the pathname contained
+   * in the symbolic link.
+   */
+  __wasi_filesize_t size;
+
+  /**
+   * Last data access timestamp.
+   */
+  __wasi_timestamp_t atim;
+
+  /**
+   * Last data modification timestamp.
+   */
+  __wasi_timestamp_t mtim;
+
+  /**
+   * Last file status change timestamp.
+   */
+  __wasi_timestamp_t ctim;
+
+} __wasi_filestat_t;
+
+_Static_assert( sizeof( __wasi_filestat_t ) == 64, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_filestat_t ) == 8, "witx calculated align" );
+_Static_assert( offsetof( __wasi_filestat_t, dev ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_filestat_t, ino ) == 8, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_filestat_t, filetype ) == 16, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_filestat_t, nlink ) == 24, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_filestat_t, size ) == 32, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_filestat_t, atim ) == 40, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_filestat_t, mtim ) == 48, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_filestat_t, ctim ) == 56, "witx calculated offset" );
+
+/**
+ * User-provided value that may be attached to objects that is retained when
+ * extracted from the implementation.
+ */
+typedef uint64_t __wasi_userdata_t;
+
+_Static_assert( sizeof( __wasi_userdata_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_userdata_t ) == 8, "witx calculated align" );
+
+/**
+ * Type of a subscription to an event or its occurrence.
+ */
+typedef uint8_t __wasi_eventtype_t;
 
 /**
  * The time value of clock `subscription_clock::id` has
@@ -1126,85 +1125,85 @@ extern "C"
  */
 #define __WASI_EVENTTYPE_FD_WRITE ( UINT8_C( 2 ) )
 
-  _Static_assert( sizeof( __wasi_eventtype_t ) == 1, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_eventtype_t ) == 1, "witx calculated align" );
+_Static_assert( sizeof( __wasi_eventtype_t ) == 1, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_eventtype_t ) == 1, "witx calculated align" );
 
-  /**
-   * The state of the file descriptor subscribed to with
-   * `eventtype::fd_read` or `eventtype::fd_write`.
-   */
-  typedef uint16_t __wasi_eventrwflags_t;
+/**
+ * The state of the file descriptor subscribed to with
+ * `eventtype::fd_read` or `eventtype::fd_write`.
+ */
+typedef uint16_t __wasi_eventrwflags_t;
 
 /**
  * The peer of this socket has closed or disconnected.
  */
 #define __WASI_EVENTRWFLAGS_FD_READWRITE_HANGUP ( (__wasi_eventrwflags_t)( 1 << 0 ) )
 
+/**
+ * The contents of an `event` when type is `eventtype::fd_read` or
+ * `eventtype::fd_write`.
+ */
+typedef struct __wasi_event_fd_readwrite_t
+{
   /**
-   * The contents of an `event` when type is `eventtype::fd_read` or
-   * `eventtype::fd_write`.
+   * The number of bytes available for reading or writing.
    */
-  typedef struct __wasi_event_fd_readwrite_t
-  {
-    /**
-     * The number of bytes available for reading or writing.
-     */
-    __wasi_filesize_t nbytes;
-
-    /**
-     * The state of the file descriptor.
-     */
-    __wasi_eventrwflags_t flags;
-
-    char pad[6];
-  } __wasi_event_fd_readwrite_t;
-
-  _Static_assert( sizeof( __wasi_event_fd_readwrite_t ) == 16, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_event_fd_readwrite_t ) == 8, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_event_fd_readwrite_t, nbytes ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_event_fd_readwrite_t, flags ) == 8, "witx calculated offset" );
+  __wasi_filesize_t nbytes;
 
   /**
-   * An event that occurred.
+   * The state of the file descriptor.
    */
-  typedef struct __wasi_event_t
-  {
-    /**
-     * User-provided value that got attached to `subscription::userdata`.
-     */
-    __wasi_userdata_t userdata;
+  __wasi_eventrwflags_t flags;
 
-    /**
-     * If non-zero, an error that occurred while processing the subscription request.
-     */
-    __wasi_errno_t error;
+  char pad[6];
+} __wasi_event_fd_readwrite_t;
 
-    /**
-     * The type of event that occured
-     */
-    __wasi_eventtype_t type;
+_Static_assert( sizeof( __wasi_event_fd_readwrite_t ) == 16, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_event_fd_readwrite_t ) == 8, "witx calculated align" );
+_Static_assert( offsetof( __wasi_event_fd_readwrite_t, nbytes ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_event_fd_readwrite_t, flags ) == 8, "witx calculated offset" );
 
-    char pad[5];
-    /**
-     * The contents of the event, if it is an `eventtype::fd_read` or
-     * `eventtype::fd_write`. `eventtype::clock` events ignore this field.
-     */
-    __wasi_event_fd_readwrite_t fd_readwrite;
-
-  } __wasi_event_t;
-
-  _Static_assert( sizeof( __wasi_event_t ) == 32, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_event_t ) == 8, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_event_t, userdata ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_event_t, error ) == 8, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_event_t, type ) == 10, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_event_t, fd_readwrite ) == 16, "witx calculated offset" );
+/**
+ * An event that occurred.
+ */
+typedef struct __wasi_event_t
+{
+  /**
+   * User-provided value that got attached to `subscription::userdata`.
+   */
+  __wasi_userdata_t userdata;
 
   /**
-   * Flags determining how to interpret the timestamp provided in
-   * `subscription_clock::timeout`.
+   * If non-zero, an error that occurred while processing the subscription request.
    */
-  typedef uint16_t __wasi_subclockflags_t;
+  __wasi_errno_t error;
+
+  /**
+   * The type of event that occured
+   */
+  __wasi_eventtype_t type;
+
+  char pad[5];
+  /**
+   * The contents of the event, if it is an `eventtype::fd_read` or
+   * `eventtype::fd_write`. `eventtype::clock` events ignore this field.
+   */
+  __wasi_event_fd_readwrite_t fd_readwrite;
+
+} __wasi_event_t;
+
+_Static_assert( sizeof( __wasi_event_t ) == 32, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_event_t ) == 8, "witx calculated align" );
+_Static_assert( offsetof( __wasi_event_t, userdata ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_event_t, error ) == 8, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_event_t, type ) == 10, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_event_t, fd_readwrite ) == 16, "witx calculated offset" );
+
+/**
+ * Flags determining how to interpret the timestamp provided in
+ * `subscription_clock::timeout`.
+ */
+typedef uint16_t __wasi_subclockflags_t;
 
 /**
  * If set, treat the timestamp provided in
@@ -1215,116 +1214,115 @@ extern "C"
  */
 #define __WASI_SUBCLOCKFLAGS_SUBSCRIPTION_CLOCK_ABSTIME ( (__wasi_subclockflags_t)( 1 << 0 ) )
 
+/**
+ * The contents of a `subscription` when type is `eventtype::clock`.
+ */
+typedef struct __wasi_subscription_clock_t
+{
   /**
-   * The contents of a `subscription` when type is `eventtype::clock`.
+   * The clock against which to compare the timestamp.
    */
-  typedef struct __wasi_subscription_clock_t
-  {
-    /**
-     * The clock against which to compare the timestamp.
-     */
-    __wasi_clockid_t id;
+  __wasi_clockid_t id;
 
-    char pad_0[4];
-
-    /**
-     * The absolute or relative timestamp.
-     */
-    __wasi_timestamp_t timeout;
-
-    /**
-     * The amount of time that the implementation may wait additionally
-     * to coalesce with other events.
-     */
-    __wasi_timestamp_t precision;
-
-    /**
-     * Flags specifying whether the timeout is absolute or relative
-     */
-    __wasi_subclockflags_t flags;
-
-    char pad_1[6];
-
-  } __wasi_subscription_clock_t;
-
-  _Static_assert( sizeof( __wasi_subscription_clock_t ) == 32, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_subscription_clock_t ) == 8, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_subscription_clock_t, id ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_subscription_clock_t, timeout ) == 8, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_subscription_clock_t, precision ) == 16, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_subscription_clock_t, flags ) == 24, "witx calculated offset" );
+  char pad_0[4];
 
   /**
-   * The contents of a `subscription` when type is type is
-   * `eventtype::fd_read` or `eventtype::fd_write`.
+   * The absolute or relative timestamp.
    */
-  typedef struct __wasi_subscription_fd_readwrite_t
-  {
-    /**
-     * The file descriptor on which to wait for it to become ready for reading or writing.
-     */
-    __wasi_fd_t file_descriptor;
-
-  } __wasi_subscription_fd_readwrite_t;
-
-  _Static_assert( sizeof( __wasi_subscription_fd_readwrite_t ) == 4, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_subscription_fd_readwrite_t ) == 4, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_subscription_fd_readwrite_t, file_descriptor ) == 0, "witx calculated offset" );
+  __wasi_timestamp_t timeout;
 
   /**
-   * The contents of a `subscription`.
+   * The amount of time that the implementation may wait additionally
+   * to coalesce with other events.
    */
-  typedef union __wasi_subscription_u_u_t
-  {
-    __wasi_subscription_clock_t clock;
-    __wasi_subscription_fd_readwrite_t fd_read;
-    __wasi_subscription_fd_readwrite_t fd_write;
-  } __wasi_subscription_u_u_t;
-  typedef struct __wasi_subscription_u_t
-  {
-    uint8_t tag;
-    char pad[7];
-    __wasi_subscription_u_u_t u;
-  } __wasi_subscription_u_t;
-
-  _Static_assert( sizeof( __wasi_subscription_u_t ) == 40, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_subscription_u_t ) == 8, "witx calculated align" );
+  __wasi_timestamp_t precision;
 
   /**
-   * Subscription to an event.
+   * Flags specifying whether the timeout is absolute or relative
    */
-  typedef struct __wasi_subscription_t
-  {
-    /**
-     * User-provided value that is attached to the subscription in the
-     * implementation and returned through `event::userdata`.
-     */
-    __wasi_userdata_t userdata;
+  __wasi_subclockflags_t flags;
 
-    /**
-     * The type of the event to which to subscribe, and its contents
-     */
-    __wasi_subscription_u_t u;
+  char pad_1[6];
 
-  } __wasi_subscription_t;
+} __wasi_subscription_clock_t;
 
-  _Static_assert( sizeof( __wasi_subscription_t ) == 48, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_subscription_t ) == 8, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_subscription_t, userdata ) == 0, "witx calculated offset" );
-  _Static_assert( offsetof( __wasi_subscription_t, u ) == 8, "witx calculated offset" );
+_Static_assert( sizeof( __wasi_subscription_clock_t ) == 32, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_subscription_clock_t ) == 8, "witx calculated align" );
+_Static_assert( offsetof( __wasi_subscription_clock_t, id ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_subscription_clock_t, timeout ) == 8, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_subscription_clock_t, precision ) == 16, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_subscription_clock_t, flags ) == 24, "witx calculated offset" );
+
+/**
+ * The contents of a `subscription` when type is type is
+ * `eventtype::fd_read` or `eventtype::fd_write`.
+ */
+typedef struct __wasi_subscription_fd_readwrite_t
+{
+  /**
+   * The file descriptor on which to wait for it to become ready for reading or writing.
+   */
+  __wasi_fd_t file_descriptor;
+
+} __wasi_subscription_fd_readwrite_t;
+
+_Static_assert( sizeof( __wasi_subscription_fd_readwrite_t ) == 4, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_subscription_fd_readwrite_t ) == 4, "witx calculated align" );
+_Static_assert( offsetof( __wasi_subscription_fd_readwrite_t, file_descriptor ) == 0, "witx calculated offset" );
+
+/**
+ * The contents of a `subscription`.
+ */
+typedef union __wasi_subscription_u_u_t {
+  __wasi_subscription_clock_t clock;
+  __wasi_subscription_fd_readwrite_t fd_read;
+  __wasi_subscription_fd_readwrite_t fd_write;
+} __wasi_subscription_u_u_t;
+typedef struct __wasi_subscription_u_t
+{
+  uint8_t tag;
+  char pad[7];
+  __wasi_subscription_u_u_t u;
+} __wasi_subscription_u_t;
+
+_Static_assert( sizeof( __wasi_subscription_u_t ) == 40, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_subscription_u_t ) == 8, "witx calculated align" );
+
+/**
+ * Subscription to an event.
+ */
+typedef struct __wasi_subscription_t
+{
+  /**
+   * User-provided value that is attached to the subscription in the
+   * implementation and returned through `event::userdata`.
+   */
+  __wasi_userdata_t userdata;
 
   /**
-   * Exit code generated by a process when exiting.
+   * The type of the event to which to subscribe, and its contents
    */
-  typedef uint32_t __wasi_exitcode_t;
+  __wasi_subscription_u_t u;
 
-  _Static_assert( sizeof( __wasi_exitcode_t ) == 4, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_exitcode_t ) == 4, "witx calculated align" );
+} __wasi_subscription_t;
 
-  /**
-   * Flags provided to `sock_recv`.
-   */
-  typedef uint16_t __wasi_riflags_t;
+_Static_assert( sizeof( __wasi_subscription_t ) == 48, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_subscription_t ) == 8, "witx calculated align" );
+_Static_assert( offsetof( __wasi_subscription_t, userdata ) == 0, "witx calculated offset" );
+_Static_assert( offsetof( __wasi_subscription_t, u ) == 8, "witx calculated offset" );
+
+/**
+ * Exit code generated by a process when exiting.
+ */
+typedef uint32_t __wasi_exitcode_t;
+
+_Static_assert( sizeof( __wasi_exitcode_t ) == 4, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_exitcode_t ) == 4, "witx calculated align" );
+
+/**
+ * Flags provided to `sock_recv`.
+ */
+typedef uint16_t __wasi_riflags_t;
 
 /**
  * Returns the message without removing it from the socket's receive queue.
@@ -1336,29 +1334,29 @@ extern "C"
  */
 #define __WASI_RIFLAGS_RECV_WAITALL ( (__wasi_riflags_t)( 1 << 1 ) )
 
-  /**
-   * Flags returned by `sock_recv`.
-   */
-  typedef uint16_t __wasi_roflags_t;
+/**
+ * Flags returned by `sock_recv`.
+ */
+typedef uint16_t __wasi_roflags_t;
 
 /**
  * Returned by `sock_recv`: Message data has been truncated.
  */
 #define __WASI_ROFLAGS_RECV_DATA_TRUNCATED ( (__wasi_roflags_t)( 1 << 0 ) )
 
-  /**
-   * Flags provided to `sock_send`. As there are currently no flags
-   * defined, it must be set to zero.
-   */
-  typedef uint16_t __wasi_siflags_t;
+/**
+ * Flags provided to `sock_send`. As there are currently no flags
+ * defined, it must be set to zero.
+ */
+typedef uint16_t __wasi_siflags_t;
 
-  _Static_assert( sizeof( __wasi_siflags_t ) == 2, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_siflags_t ) == 2, "witx calculated align" );
+_Static_assert( sizeof( __wasi_siflags_t ) == 2, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_siflags_t ) == 2, "witx calculated align" );
 
-  /**
-   * Which channels on a socket to shut down.
-   */
-  typedef uint8_t __wasi_sdflags_t;
+/**
+ * Which channels on a socket to shut down.
+ */
+typedef uint8_t __wasi_sdflags_t;
 
 /**
  * Disables further receive operations.
@@ -1370,206 +1368,411 @@ extern "C"
  */
 #define __WASI_SDFLAGS_WR ( (__wasi_sdflags_t)( 1 << 1 ) )
 
-  /**
-   * Identifiers for preopened capabilities.
-   */
-  typedef uint8_t __wasi_preopentype_t;
+/**
+ * Identifiers for preopened capabilities.
+ */
+typedef uint8_t __wasi_preopentype_t;
 
 /**
  * A pre-opened directory.
  */
 #define __WASI_PREOPENTYPE_DIR ( UINT8_C( 0 ) )
 
-  _Static_assert( sizeof( __wasi_preopentype_t ) == 1, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_preopentype_t ) == 1, "witx calculated align" );
+_Static_assert( sizeof( __wasi_preopentype_t ) == 1, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_preopentype_t ) == 1, "witx calculated align" );
 
+/**
+ * The contents of a $prestat when type is `preopentype::dir`.
+ */
+typedef struct __wasi_prestat_dir_t
+{
   /**
-   * The contents of a $prestat when type is `preopentype::dir`.
+   * The length of the directory name for use with `fd_prestat_dir_name`.
    */
-  typedef struct __wasi_prestat_dir_t
-  {
-    /**
-     * The length of the directory name for use with `fd_prestat_dir_name`.
-     */
-    __wasi_size_t pr_name_len;
+  __wasi_size_t pr_name_len;
 
-  } __wasi_prestat_dir_t;
+} __wasi_prestat_dir_t;
 
-  _Static_assert( sizeof( __wasi_prestat_dir_t ) == 4, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_prestat_dir_t ) == 4, "witx calculated align" );
-  _Static_assert( offsetof( __wasi_prestat_dir_t, pr_name_len ) == 0, "witx calculated offset" );
+_Static_assert( sizeof( __wasi_prestat_dir_t ) == 4, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_prestat_dir_t ) == 4, "witx calculated align" );
+_Static_assert( offsetof( __wasi_prestat_dir_t, pr_name_len ) == 0, "witx calculated offset" );
 
-  /**
-   * Information about a pre-opened capability.
-   */
-  typedef union __wasi_prestat_u_t
-  {
-    __wasi_prestat_dir_t dir;
-  } __wasi_prestat_u_t;
-  typedef struct __wasi_prestat_t
-  {
-    uint8_t tag;
-    char pad[3];
-    __wasi_prestat_u_t u;
-  } __wasi_prestat_t;
+/**
+ * Information about a pre-opened capability.
+ */
+typedef union __wasi_prestat_u_t {
+  __wasi_prestat_dir_t dir;
+} __wasi_prestat_u_t;
+typedef struct __wasi_prestat_t
+{
+  uint8_t tag;
+  char pad[3];
+  __wasi_prestat_u_t u;
+} __wasi_prestat_t;
 
-  _Static_assert( sizeof( __wasi_prestat_t ) == 8, "witx calculated size" );
-  _Static_assert( _Alignof( __wasi_prestat_t ) == 4, "witx calculated align" );
+_Static_assert( sizeof( __wasi_prestat_t ) == 8, "witx calculated size" );
+_Static_assert( _Alignof( __wasi_prestat_t ) == 4, "witx calculated align" );
 
-  /**
-   * @defgroup wasi_snapshot_preview1
-   * @{
-   */
+/**
+ * @defgroup wasi_snapshot_preview1
+ * @{
+ */
 
+/**
+ * Read command-line argument data.
+ * The size of the array should match that returned by `args_sizes_get`.
+ * Each argument is expected to be `\0` terminated.
+ */
+__wasi_errno_t __wasi_args_get( uint8_t** argv, uint8_t* argv_buf ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return command-line argument data sizes.
+ * @return
+ * Returns the number of arguments and the size of the argument string
+ * data, or an error.
+ */
+__wasi_errno_t __wasi_args_sizes_get( __wasi_size_t* retptr0, __wasi_size_t* retptr1 )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Read environment variable data.
+ * The sizes of the buffers should match that returned by `environ_sizes_get`.
+ * Key/value pairs are expected to be joined with `=`s, and terminated with `\0`s.
+ */
+__wasi_errno_t __wasi_environ_get( uint8_t** environ, uint8_t* environ_buf )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return environment variable data sizes.
+ * @return
+ * Returns the number of environment variable arguments and the size of the
+ * environment variable data.
+ */
+__wasi_errno_t __wasi_environ_sizes_get( __wasi_size_t* retptr0, __wasi_size_t* retptr1 )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return the resolution of a clock.
+ * Implementations are required to provide a non-zero value for supported clocks. For unsupported clocks,
+ * return `errno::inval`.
+ * Note: This is similar to `clock_getres` in POSIX.
+ * @return
+ * The resolution of the clock, or an error if one happened.
+ */
+__wasi_errno_t __wasi_clock_res_get(
   /**
-   * Read command-line argument data.
-   * The size of the array should match that returned by `args_sizes_get`.
-   * Each argument is expected to be `\0` terminated.
+   * The clock for which to return the resolution.
    */
-  __wasi_errno_t __wasi_args_get( uint8_t** argv, uint8_t* argv_buf ) __attribute__( ( __warn_unused_result__ ) );
+  __wasi_clockid_t id,
+  __wasi_timestamp_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return the time value of a clock.
+ * Note: This is similar to `clock_gettime` in POSIX.
+ * @return
+ * The time value of the clock.
+ */
+__wasi_errno_t __wasi_clock_time_get(
   /**
-   * Return command-line argument data sizes.
-   * @return
-   * Returns the number of arguments and the size of the argument string
-   * data, or an error.
+   * The clock for which to return the time.
    */
-  __wasi_errno_t __wasi_args_sizes_get( __wasi_size_t* retptr0, __wasi_size_t* retptr1 )
-    __attribute__( ( __warn_unused_result__ ) );
+  __wasi_clockid_t id,
   /**
-   * Read environment variable data.
-   * The sizes of the buffers should match that returned by `environ_sizes_get`.
-   * Key/value pairs are expected to be joined with `=`s, and terminated with `\0`s.
+   * The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
    */
-  __wasi_errno_t __wasi_environ_get( uint8_t** environ, uint8_t* environ_buf )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Return environment variable data sizes.
-   * @return
-   * Returns the number of environment variable arguments and the size of the
-   * environment variable data.
-   */
-  __wasi_errno_t __wasi_environ_sizes_get( __wasi_size_t* retptr0, __wasi_size_t* retptr1 )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Return the resolution of a clock.
-   * Implementations are required to provide a non-zero value for supported clocks. For unsupported clocks,
-   * return `errno::inval`.
-   * Note: This is similar to `clock_getres` in POSIX.
-   * @return
-   * The resolution of the clock, or an error if one happened.
-   */
-  __wasi_errno_t __wasi_clock_res_get(
-    /**
-     * The clock for which to return the resolution.
-     */
-    __wasi_clockid_t id,
-    __wasi_timestamp_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Return the time value of a clock.
-   * Note: This is similar to `clock_gettime` in POSIX.
-   * @return
-   * The time value of the clock.
-   */
-  __wasi_errno_t __wasi_clock_time_get(
-    /**
-     * The clock for which to return the time.
-     */
-    __wasi_clockid_t id,
-    /**
-     * The maximum lag (exclusive) that the returned time value may have, compared to its actual value.
-     */
-    __wasi_timestamp_t precision,
-    __wasi_timestamp_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Provide file advisory information on a file descriptor.
-   * Note: This is similar to `posix_fadvise` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_advise( __wasi_fd_t fd,
+  __wasi_timestamp_t precision,
+  __wasi_timestamp_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Provide file advisory information on a file descriptor.
+ * Note: This is similar to `posix_fadvise` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_advise( __wasi_fd_t fd,
+                                 /**
+                                  * The offset within the file to which the advisory applies.
+                                  */
+                                 __wasi_filesize_t offset,
+                                 /**
+                                  * The length of the region to which the advisory applies.
+                                  */
+                                 __wasi_filesize_t len,
+                                 /**
+                                  * The advice.
+                                  */
+                                 __wasi_advice_t advice ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Force the allocation of space in a file.
+ * Note: This is similar to `posix_fallocate` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_allocate( __wasi_fd_t fd,
                                    /**
-                                    * The offset within the file to which the advisory applies.
+                                    * The offset at which to start the allocation.
                                     */
                                    __wasi_filesize_t offset,
                                    /**
-                                    * The length of the region to which the advisory applies.
+                                    * The length of the area that is allocated.
                                     */
-                                   __wasi_filesize_t len,
-                                   /**
-                                    * The advice.
-                                    */
-                                   __wasi_advice_t advice ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Force the allocation of space in a file.
-   * Note: This is similar to `posix_fallocate` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_allocate( __wasi_fd_t fd,
-                                     /**
-                                      * The offset at which to start the allocation.
-                                      */
-                                     __wasi_filesize_t offset,
-                                     /**
-                                      * The length of the area that is allocated.
-                                      */
-                                     __wasi_filesize_t len ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Close a file descriptor.
-   * Note: This is similar to `close` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_close( __wasi_fd_t fd ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Synchronize the data of a file to disk.
-   * Note: This is similar to `fdatasync` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_datasync( __wasi_fd_t fd ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Get the attributes of a file descriptor.
-   * Note: This returns similar flags to `fsync(fd, F_GETFL)` in POSIX, as well as additional fields.
-   * @return
-   * The buffer where the file descriptor's attributes are stored.
-   */
-  __wasi_errno_t __wasi_fd_fdstat_get( __wasi_fd_t fd, __wasi_fdstat_t* retptr0 )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Adjust the flags associated with a file descriptor.
-   * Note: This is similar to `fcntl(fd, F_SETFL, flags)` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_fdstat_set_flags( __wasi_fd_t fd,
+                                   __wasi_filesize_t len ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Close a file descriptor.
+ * Note: This is similar to `close` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_close( __wasi_fd_t fd ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Synchronize the data of a file to disk.
+ * Note: This is similar to `fdatasync` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_datasync( __wasi_fd_t fd ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Get the attributes of a file descriptor.
+ * Note: This returns similar flags to `fsync(fd, F_GETFL)` in POSIX, as well as additional fields.
+ * @return
+ * The buffer where the file descriptor's attributes are stored.
+ */
+__wasi_errno_t __wasi_fd_fdstat_get( __wasi_fd_t fd, __wasi_fdstat_t* retptr0 )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Adjust the flags associated with a file descriptor.
+ * Note: This is similar to `fcntl(fd, F_SETFL, flags)` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_fdstat_set_flags( __wasi_fd_t fd,
+                                           /**
+                                            * The desired values of the file descriptor flags.
+                                            */
+                                           __wasi_fdflags_t flags ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Adjust the rights associated with a file descriptor.
+ * This can only be used to remove rights, and returns `errno::notcapable` if called in a way that would attempt
+ * to add rights
+ */
+__wasi_errno_t __wasi_fd_fdstat_set_rights( __wasi_fd_t fd,
+                                            /**
+                                             * The desired rights of the file descriptor.
+                                             */
+                                            __wasi_rights_t fs_rights_base,
+                                            __wasi_rights_t fs_rights_inheriting )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return the attributes of an open file.
+ * @return
+ * The buffer where the file's attributes are stored.
+ */
+__wasi_errno_t __wasi_fd_filestat_get( __wasi_fd_t fd, __wasi_filestat_t* retptr0 )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Adjust the size of an open file. If this increases the file's size, the extra bytes are filled with zeros.
+ * Note: This is similar to `ftruncate` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_filestat_set_size( __wasi_fd_t fd,
+                                            /**
+                                             * The desired file size.
+                                             */
+                                            __wasi_filesize_t size ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Adjust the timestamps of an open file or directory.
+ * Note: This is similar to `futimens` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_filestat_set_times( __wasi_fd_t fd,
                                              /**
-                                              * The desired values of the file descriptor flags.
+                                              * The desired values of the data access timestamp.
                                               */
-                                             __wasi_fdflags_t flags ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Adjust the rights associated with a file descriptor.
-   * This can only be used to remove rights, and returns `errno::notcapable` if called in a way that would attempt
-   * to add rights
-   */
-  __wasi_errno_t __wasi_fd_fdstat_set_rights( __wasi_fd_t fd,
-                                              /**
-                                               * The desired rights of the file descriptor.
-                                               */
-                                              __wasi_rights_t fs_rights_base,
-                                              __wasi_rights_t fs_rights_inheriting )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Return the attributes of an open file.
-   * @return
-   * The buffer where the file's attributes are stored.
-   */
-  __wasi_errno_t __wasi_fd_filestat_get( __wasi_fd_t fd, __wasi_filestat_t* retptr0 )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Adjust the size of an open file. If this increases the file's size, the extra bytes are filled with zeros.
-   * Note: This is similar to `ftruncate` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_filestat_set_size( __wasi_fd_t fd,
-                                              /**
-                                               * The desired file size.
-                                               */
-                                              __wasi_filesize_t size ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Adjust the timestamps of an open file or directory.
-   * Note: This is similar to `futimens` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_filestat_set_times( __wasi_fd_t fd,
+                                             __wasi_timestamp_t atim,
+                                             /**
+                                              * The desired values of the data modification timestamp.
+                                              */
+                                             __wasi_timestamp_t mtim,
+                                             /**
+                                              * A bitmask indicating which timestamps to adjust.
+                                              */
+                                             __wasi_fstflags_t fst_flags )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Read from a file descriptor, without using and updating the file descriptor's offset.
+ * Note: This is similar to `preadv` in POSIX.
+ * @return
+ * The number of bytes read.
+ */
+__wasi_errno_t __wasi_fd_pread( __wasi_fd_t fd,
+                                /**
+                                 * List of scatter/gather vectors in which to store data.
+                                 */
+                                const __wasi_iovec_t* iovs,
+                                /**
+                                 * The length of the array pointed to by `iovs`.
+                                 */
+                                size_t iovs_len,
+                                /**
+                                 * The offset within the file at which to read.
+                                 */
+                                __wasi_filesize_t offset,
+                                __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return a description of the given preopened file descriptor.
+ * @return
+ * The buffer where the description is stored.
+ */
+__wasi_errno_t __wasi_fd_prestat_get( __wasi_fd_t fd, __wasi_prestat_t* retptr0 )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return a description of the given preopened file descriptor.
+ */
+__wasi_errno_t __wasi_fd_prestat_dir_name( __wasi_fd_t fd,
+                                           /**
+                                            * A buffer into which to write the preopened directory name.
+                                            */
+                                           uint8_t* path,
+                                           __wasi_size_t path_len ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Write to a file descriptor, without using and updating the file descriptor's offset.
+ * Note: This is similar to `pwritev` in POSIX.
+ * @return
+ * The number of bytes written.
+ */
+__wasi_errno_t __wasi_fd_pwrite( __wasi_fd_t fd,
+                                 /**
+                                  * List of scatter/gather vectors from which to retrieve data.
+                                  */
+                                 const __wasi_ciovec_t* iovs,
+                                 /**
+                                  * The length of the array pointed to by `iovs`.
+                                  */
+                                 size_t iovs_len,
+                                 /**
+                                  * The offset within the file at which to write.
+                                  */
+                                 __wasi_filesize_t offset,
+                                 __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Read from a file descriptor.
+ * Note: This is similar to `readv` in POSIX.
+ * @return
+ * The number of bytes read.
+ */
+__wasi_errno_t __wasi_fd_read( __wasi_fd_t fd,
+                               /**
+                                * List of scatter/gather vectors to which to store data.
+                                */
+                               const __wasi_iovec_t* iovs,
+                               /**
+                                * The length of the array pointed to by `iovs`.
+                                */
+                               size_t iovs_len,
+                               __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Read directory entries from a directory.
+ * When successful, the contents of the output buffer consist of a sequence of
+ * directory entries. Each directory entry consists of a `dirent` object,
+ * followed by `dirent::d_namlen` bytes holding the name of the directory
+ * entry.
+ * This function fills the output buffer as much as possible, potentially
+ * truncating the last directory entry. This allows the caller to grow its
+ * read buffer size in case it's too small to fit a single large directory
+ * entry, or skip the oversized directory entry.
+ * @return
+ * The number of bytes stored in the read buffer. If less than the size of the read buffer, the end of the
+ * directory has been reached.
+ */
+__wasi_errno_t __wasi_fd_readdir( __wasi_fd_t fd,
+                                  /**
+                                   * The buffer where directory entries are stored
+                                   */
+                                  uint8_t* buf,
+                                  __wasi_size_t buf_len,
+                                  /**
+                                   * The location within the directory to start reading
+                                   */
+                                  __wasi_dircookie_t cookie,
+                                  __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Atomically replace a file descriptor by renumbering another file descriptor.
+ * Due to the strong focus on thread safety, this environment does not provide
+ * a mechanism to duplicate or renumber a file descriptor to an arbitrary
+ * number, like `dup2()`. This would be prone to race conditions, as an actual
+ * file descriptor with the same number could be allocated by a different
+ * thread at the same time.
+ * This function provides a way to atomically renumber file descriptors, which
+ * would disappear if `dup2()` were to be removed entirely.
+ */
+__wasi_errno_t __wasi_fd_renumber( __wasi_fd_t fd,
+                                   /**
+                                    * The file descriptor to overwrite.
+                                    */
+                                   __wasi_fd_t to ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Move the offset of a file descriptor.
+ * Note: This is similar to `lseek` in POSIX.
+ * @return
+ * The new offset of the file descriptor, relative to the start of the file.
+ */
+__wasi_errno_t __wasi_fd_seek( __wasi_fd_t fd,
+                               /**
+                                * The number of bytes to move.
+                                */
+                               __wasi_filedelta_t offset,
+                               /**
+                                * The base from which the offset is relative.
+                                */
+                               __wasi_whence_t whence,
+                               __wasi_filesize_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Synchronize the data and metadata of a file to disk.
+ * Note: This is similar to `fsync` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_sync( __wasi_fd_t fd ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return the current offset of a file descriptor.
+ * Note: This is similar to `lseek(fd, 0, SEEK_CUR)` in POSIX.
+ * @return
+ * The current offset of the file descriptor, relative to the start of the file.
+ */
+__wasi_errno_t __wasi_fd_tell( __wasi_fd_t fd, __wasi_filesize_t* retptr0 )
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Write to a file descriptor.
+ * Note: This is similar to `writev` in POSIX.
+ */
+__wasi_errno_t __wasi_fd_write( __wasi_fd_t fd,
+                                /**
+                                 * List of scatter/gather vectors from which to retrieve data.
+                                 */
+                                const __wasi_ciovec_t* iovs,
+                                /**
+                                 * The length of the array pointed to by `iovs`.
+                                 */
+                                size_t iovs_len,
+                                __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Create a directory.
+ * Note: This is similar to `mkdirat` in POSIX.
+ */
+__wasi_errno_t __wasi_path_create_directory( __wasi_fd_t fd,
+                                             /**
+                                              * The path at which to create the directory.
+                                              */
+                                             const char* path ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Return the attributes of a file or directory.
+ * Note: This is similar to `stat` in POSIX.
+ * @return
+ * The buffer where the file's attributes are stored.
+ */
+__wasi_errno_t __wasi_path_filestat_get( __wasi_fd_t fd,
+                                         /**
+                                          * Flags determining the method of how the path is resolved.
+                                          */
+                                         __wasi_lookupflags_t flags,
+                                         /**
+                                          * The path of the file or directory to inspect.
+                                          */
+                                         const char* path,
+                                         __wasi_filestat_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Adjust the timestamps of a file or directory.
+ * Note: This is similar to `utimensat` in POSIX.
+ */
+__wasi_errno_t __wasi_path_filestat_set_times( __wasi_fd_t fd,
+                                               /**
+                                                * Flags determining the method of how the path is resolved.
+                                                */
+                                               __wasi_lookupflags_t flags,
+                                               /**
+                                                * The path of the file or directory to operate on.
+                                                */
+                                               const char* path,
                                                /**
                                                 * The desired values of the data access timestamp.
                                                 */
@@ -1582,224 +1785,100 @@ extern "C"
                                                 * A bitmask indicating which timestamps to adjust.
                                                 */
                                                __wasi_fstflags_t fst_flags )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Read from a file descriptor, without using and updating the file descriptor's offset.
-   * Note: This is similar to `preadv` in POSIX.
-   * @return
-   * The number of bytes read.
-   */
-  __wasi_errno_t __wasi_fd_pread( __wasi_fd_t fd,
-                                  /**
-                                   * List of scatter/gather vectors in which to store data.
-                                   */
-                                  const __wasi_iovec_t* iovs,
-                                  /**
-                                   * The length of the array pointed to by `iovs`.
-                                   */
-                                  size_t iovs_len,
-                                  /**
-                                   * The offset within the file at which to read.
-                                   */
-                                  __wasi_filesize_t offset,
-                                  __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Return a description of the given preopened file descriptor.
-   * @return
-   * The buffer where the description is stored.
-   */
-  __wasi_errno_t __wasi_fd_prestat_get( __wasi_fd_t fd, __wasi_prestat_t* retptr0 )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Return a description of the given preopened file descriptor.
-   */
-  __wasi_errno_t __wasi_fd_prestat_dir_name( __wasi_fd_t fd,
-                                             /**
-                                              * A buffer into which to write the preopened directory name.
-                                              */
-                                             uint8_t* path,
-                                             __wasi_size_t path_len ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Write to a file descriptor, without using and updating the file descriptor's offset.
-   * Note: This is similar to `pwritev` in POSIX.
-   * @return
-   * The number of bytes written.
-   */
-  __wasi_errno_t __wasi_fd_pwrite( __wasi_fd_t fd,
-                                   /**
-                                    * List of scatter/gather vectors from which to retrieve data.
-                                    */
-                                   const __wasi_ciovec_t* iovs,
-                                   /**
-                                    * The length of the array pointed to by `iovs`.
-                                    */
-                                   size_t iovs_len,
-                                   /**
-                                    * The offset within the file at which to write.
-                                    */
-                                   __wasi_filesize_t offset,
-                                   __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Read from a file descriptor.
-   * Note: This is similar to `readv` in POSIX.
-   * @return
-   * The number of bytes read.
-   */
-  __wasi_errno_t __wasi_fd_read( __wasi_fd_t fd,
+  __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Create a hard link.
+ * Note: This is similar to `linkat` in POSIX.
+ */
+__wasi_errno_t __wasi_path_link( __wasi_fd_t old_fd,
                                  /**
-                                  * List of scatter/gather vectors to which to store data.
+                                  * Flags determining the method of how the path is resolved.
                                   */
-                                 const __wasi_iovec_t* iovs,
+                                 __wasi_lookupflags_t old_flags,
                                  /**
-                                  * The length of the array pointed to by `iovs`.
+                                  * The source path from which to link.
                                   */
-                                 size_t iovs_len,
-                                 __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Read directory entries from a directory.
-   * When successful, the contents of the output buffer consist of a sequence of
-   * directory entries. Each directory entry consists of a `dirent` object,
-   * followed by `dirent::d_namlen` bytes holding the name of the directory
-   * entry.
-   * This function fills the output buffer as much as possible, potentially
-   * truncating the last directory entry. This allows the caller to grow its
-   * read buffer size in case it's too small to fit a single large directory
-   * entry, or skip the oversized directory entry.
-   * @return
-   * The number of bytes stored in the read buffer. If less than the size of the read buffer, the end of the
-   * directory has been reached.
-   */
-  __wasi_errno_t __wasi_fd_readdir( __wasi_fd_t fd,
-                                    /**
-                                     * The buffer where directory entries are stored
-                                     */
-                                    uint8_t* buf,
-                                    __wasi_size_t buf_len,
-                                    /**
-                                     * The location within the directory to start reading
-                                     */
-                                    __wasi_dircookie_t cookie,
-                                    __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Atomically replace a file descriptor by renumbering another file descriptor.
-   * Due to the strong focus on thread safety, this environment does not provide
-   * a mechanism to duplicate or renumber a file descriptor to an arbitrary
-   * number, like `dup2()`. This would be prone to race conditions, as an actual
-   * file descriptor with the same number could be allocated by a different
-   * thread at the same time.
-   * This function provides a way to atomically renumber file descriptors, which
-   * would disappear if `dup2()` were to be removed entirely.
-   */
-  __wasi_errno_t __wasi_fd_renumber( __wasi_fd_t fd,
+                                 const char* old_path,
+                                 /**
+                                  * The working directory at which the resolution of the new path starts.
+                                  */
+                                 __wasi_fd_t new_fd,
+                                 /**
+                                  * The destination path at which to create the hard link.
+                                  */
+                                 const char* new_path ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Open a file or directory.
+ * The returned file descriptor is not guaranteed to be the lowest-numbered
+ * file descriptor not currently open; it is randomized to prevent
+ * applications from depending on making assumptions about indexes, since this
+ * is error-prone in multi-threaded contexts. The returned file descriptor is
+ * guaranteed to be less than 2**31.
+ * Note: This is similar to `openat` in POSIX.
+ * @return
+ * The file descriptor of the file that has been opened.
+ */
+__wasi_errno_t __wasi_path_open( __wasi_fd_t fd,
+                                 /**
+                                  * Flags determining the method of how the path is resolved.
+                                  */
+                                 __wasi_lookupflags_t dirflags,
+                                 /**
+                                  * The relative path of the file or directory to open, relative to the
+                                  * `path_open::fd` directory.
+                                  */
+                                 const char* path,
+                                 /**
+                                  * The method by which to open the file.
+                                  */
+                                 __wasi_oflags_t oflags,
+                                 /**
+                                  * The initial rights of the newly created file descriptor. The
+                                  * implementation is allowed to return a file descriptor with fewer rights
+                                  * than specified, if and only if those rights do not apply to the type of
+                                  * file being opened.
+                                  * The *base* rights are rights that will apply to operations using the file
+                                  * descriptor itself, while the *inheriting* rights are rights that apply to
+                                  * file descriptors derived from it.
+                                  */
+                                 __wasi_rights_t fs_rights_base,
+                                 __wasi_rights_t fs_rights_inheriting,
+                                 __wasi_fdflags_t fdflags,
+                                 __wasi_fd_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Read the contents of a symbolic link.
+ * Note: This is similar to `readlinkat` in POSIX.
+ * @return
+ * The number of bytes placed in the buffer.
+ */
+__wasi_errno_t __wasi_path_readlink( __wasi_fd_t fd,
                                      /**
-                                      * The file descriptor to overwrite.
+                                      * The path of the symbolic link from which to read.
                                       */
-                                     __wasi_fd_t to ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Move the offset of a file descriptor.
-   * Note: This is similar to `lseek` in POSIX.
-   * @return
-   * The new offset of the file descriptor, relative to the start of the file.
-   */
-  __wasi_errno_t __wasi_fd_seek( __wasi_fd_t fd,
-                                 /**
-                                  * The number of bytes to move.
-                                  */
-                                 __wasi_filedelta_t offset,
-                                 /**
-                                  * The base from which the offset is relative.
-                                  */
-                                 __wasi_whence_t whence,
-                                 __wasi_filesize_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Synchronize the data and metadata of a file to disk.
-   * Note: This is similar to `fsync` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_sync( __wasi_fd_t fd ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Return the current offset of a file descriptor.
-   * Note: This is similar to `lseek(fd, 0, SEEK_CUR)` in POSIX.
-   * @return
-   * The current offset of the file descriptor, relative to the start of the file.
-   */
-  __wasi_errno_t __wasi_fd_tell( __wasi_fd_t fd, __wasi_filesize_t* retptr0 )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Write to a file descriptor.
-   * Note: This is similar to `writev` in POSIX.
-   */
-  __wasi_errno_t __wasi_fd_write( __wasi_fd_t fd,
-                                  /**
-                                   * List of scatter/gather vectors from which to retrieve data.
-                                   */
-                                  const __wasi_ciovec_t* iovs,
-                                  /**
-                                   * The length of the array pointed to by `iovs`.
-                                   */
-                                  size_t iovs_len,
-                                  __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Create a directory.
-   * Note: This is similar to `mkdirat` in POSIX.
-   */
-  __wasi_errno_t __wasi_path_create_directory( __wasi_fd_t fd,
-                                               /**
-                                                * The path at which to create the directory.
-                                                */
-                                               const char* path ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Return the attributes of a file or directory.
-   * Note: This is similar to `stat` in POSIX.
-   * @return
-   * The buffer where the file's attributes are stored.
-   */
-  __wasi_errno_t __wasi_path_filestat_get( __wasi_fd_t fd,
-                                           /**
-                                            * Flags determining the method of how the path is resolved.
-                                            */
-                                           __wasi_lookupflags_t flags,
-                                           /**
-                                            * The path of the file or directory to inspect.
-                                            */
-                                           const char* path,
-                                           __wasi_filestat_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Adjust the timestamps of a file or directory.
-   * Note: This is similar to `utimensat` in POSIX.
-   */
-  __wasi_errno_t __wasi_path_filestat_set_times( __wasi_fd_t fd,
-                                                 /**
-                                                  * Flags determining the method of how the path is resolved.
-                                                  */
-                                                 __wasi_lookupflags_t flags,
-                                                 /**
-                                                  * The path of the file or directory to operate on.
-                                                  */
-                                                 const char* path,
-                                                 /**
-                                                  * The desired values of the data access timestamp.
-                                                  */
-                                                 __wasi_timestamp_t atim,
-                                                 /**
-                                                  * The desired values of the data modification timestamp.
-                                                  */
-                                                 __wasi_timestamp_t mtim,
-                                                 /**
-                                                  * A bitmask indicating which timestamps to adjust.
-                                                  */
-                                                 __wasi_fstflags_t fst_flags )
-    __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Create a hard link.
-   * Note: This is similar to `linkat` in POSIX.
-   */
-  __wasi_errno_t __wasi_path_link( __wasi_fd_t old_fd,
+                                     const char* path,
+                                     /**
+                                      * The buffer to which to write the contents of the symbolic link.
+                                      */
+                                     uint8_t* buf,
+                                     __wasi_size_t buf_len,
+                                     __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Remove a directory.
+ * Return `errno::notempty` if the directory is not empty.
+ * Note: This is similar to `unlinkat(fd, path, AT_REMOVEDIR)` in POSIX.
+ */
+__wasi_errno_t __wasi_path_remove_directory( __wasi_fd_t fd,
+                                             /**
+                                              * The path to a directory to remove.
+                                              */
+                                             const char* path ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Rename a file or directory.
+ * Note: This is similar to `renameat` in POSIX.
+ */
+__wasi_errno_t __wasi_path_rename( __wasi_fd_t fd,
                                    /**
-                                    * Flags determining the method of how the path is resolved.
-                                    */
-                                   __wasi_lookupflags_t old_flags,
-                                   /**
-                                    * The source path from which to link.
+                                    * The source path of the file or directory to rename.
                                     */
                                    const char* old_path,
                                    /**
@@ -1807,232 +1886,150 @@ extern "C"
                                     */
                                    __wasi_fd_t new_fd,
                                    /**
-                                    * The destination path at which to create the hard link.
+                                    * The destination path to which to rename the file or directory.
                                     */
                                    const char* new_path ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Create a symbolic link.
+ * Note: This is similar to `symlinkat` in POSIX.
+ */
+__wasi_errno_t __wasi_path_symlink(
   /**
-   * Open a file or directory.
-   * The returned file descriptor is not guaranteed to be the lowest-numbered
-   * file descriptor not currently open; it is randomized to prevent
-   * applications from depending on making assumptions about indexes, since this
-   * is error-prone in multi-threaded contexts. The returned file descriptor is
-   * guaranteed to be less than 2**31.
-   * Note: This is similar to `openat` in POSIX.
-   * @return
-   * The file descriptor of the file that has been opened.
+   * The contents of the symbolic link.
    */
-  __wasi_errno_t __wasi_path_open( __wasi_fd_t fd,
-                                   /**
-                                    * Flags determining the method of how the path is resolved.
-                                    */
-                                   __wasi_lookupflags_t dirflags,
-                                   /**
-                                    * The relative path of the file or directory to open, relative to the
-                                    * `path_open::fd` directory.
-                                    */
-                                   const char* path,
-                                   /**
-                                    * The method by which to open the file.
-                                    */
-                                   __wasi_oflags_t oflags,
-                                   /**
-                                    * The initial rights of the newly created file descriptor. The
-                                    * implementation is allowed to return a file descriptor with fewer rights
-                                    * than specified, if and only if those rights do not apply to the type of
-                                    * file being opened.
-                                    * The *base* rights are rights that will apply to operations using the file
-                                    * descriptor itself, while the *inheriting* rights are rights that apply to
-                                    * file descriptors derived from it.
-                                    */
-                                   __wasi_rights_t fs_rights_base,
-                                   __wasi_rights_t fs_rights_inheriting,
-                                   __wasi_fdflags_t fdflags,
-                                   __wasi_fd_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+  const char* old_path,
+  __wasi_fd_t fd,
   /**
-   * Read the contents of a symbolic link.
-   * Note: This is similar to `readlinkat` in POSIX.
-   * @return
-   * The number of bytes placed in the buffer.
+   * The destination path at which to create the symbolic link.
    */
-  __wasi_errno_t __wasi_path_readlink( __wasi_fd_t fd,
-                                       /**
-                                        * The path of the symbolic link from which to read.
-                                        */
-                                       const char* path,
-                                       /**
-                                        * The buffer to which to write the contents of the symbolic link.
-                                        */
-                                       uint8_t* buf,
-                                       __wasi_size_t buf_len,
-                                       __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+  const char* new_path ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Unlink a file.
+ * Return `errno::isdir` if the path refers to a directory.
+ * Note: This is similar to `unlinkat(fd, path, 0)` in POSIX.
+ */
+__wasi_errno_t __wasi_path_unlink_file( __wasi_fd_t fd,
+                                        /**
+                                         * The path to a file to unlink.
+                                         */
+                                        const char* path ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Concurrently poll for the occurrence of a set of events.
+ * @return
+ * The number of events stored.
+ */
+__wasi_errno_t __wasi_poll_oneoff(
   /**
-   * Remove a directory.
-   * Return `errno::notempty` if the directory is not empty.
-   * Note: This is similar to `unlinkat(fd, path, AT_REMOVEDIR)` in POSIX.
+   * The events to which to subscribe.
    */
-  __wasi_errno_t __wasi_path_remove_directory( __wasi_fd_t fd,
-                                               /**
-                                                * The path to a directory to remove.
-                                                */
-                                               const char* path ) __attribute__( ( __warn_unused_result__ ) );
+  const __wasi_subscription_t* in,
   /**
-   * Rename a file or directory.
-   * Note: This is similar to `renameat` in POSIX.
+   * The events that have occurred.
    */
-  __wasi_errno_t __wasi_path_rename( __wasi_fd_t fd,
+  __wasi_event_t* out,
+  /**
+   * Both the number of subscriptions and events.
+   */
+  __wasi_size_t nsubscriptions,
+  __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Terminate the process normally. An exit code of 0 indicates successful
+ * termination of the program. The meanings of other values is dependent on
+ * the environment.
+ */
+_Noreturn void __wasi_proc_exit(
+  /**
+   * The exit code returned by the process.
+   */
+  __wasi_exitcode_t rval );
+/**
+ * Temporarily yield execution of the calling thread.
+ * Note: This is similar to `sched_yield` in POSIX.
+ */
+__wasi_errno_t __wasi_sched_yield( void ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Write high-quality random data into a buffer.
+ * This function blocks when the implementation is unable to immediately
+ * provide sufficient high-quality random data.
+ * This function may execute slowly, so when large mounts of random data are
+ * required, it's advisable to use this function to seed a pseudo-random
+ * number generator, rather than to provide the random data directly.
+ */
+__wasi_errno_t __wasi_random_get(
+  /**
+   * The buffer to fill with random data.
+   */
+  uint8_t* buf,
+  __wasi_size_t buf_len ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Accept a new incoming connection.
+ * Note: This is similar to `accept` in POSIX.
+ * @return
+ * New socket connection
+ */
+__wasi_errno_t __wasi_sock_accept(
+  /**
+   * The listening socket.
+   */
+  __wasi_fd_t fd,
+  /**
+   * The desired values of the file descriptor flags.
+   */
+  __wasi_fdflags_t flags,
+  __wasi_fd_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Receive a message from a socket.
+ * Note: This is similar to `recv` in POSIX, though it also supports reading
+ * the data into multiple buffers in the manner of `readv`.
+ * @return
+ * Number of bytes stored in ri_data and message flags.
+ */
+__wasi_errno_t __wasi_sock_recv( __wasi_fd_t fd,
+                                 /**
+                                  * List of scatter/gather vectors to which to store data.
+                                  */
+                                 const __wasi_iovec_t* ri_data,
+                                 /**
+                                  * The length of the array pointed to by `ri_data`.
+                                  */
+                                 size_t ri_data_len,
+                                 /**
+                                  * Message flags.
+                                  */
+                                 __wasi_riflags_t ri_flags,
+                                 __wasi_size_t* retptr0,
+                                 __wasi_roflags_t* retptr1 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Send a message on a socket.
+ * Note: This is similar to `send` in POSIX, though it also supports writing
+ * the data from multiple buffers in the manner of `writev`.
+ * @return
+ * Number of bytes transmitted.
+ */
+__wasi_errno_t __wasi_sock_send( __wasi_fd_t fd,
+                                 /**
+                                  * List of scatter/gather vectors to which to retrieve data
+                                  */
+                                 const __wasi_ciovec_t* si_data,
+                                 /**
+                                  * The length of the array pointed to by `si_data`.
+                                  */
+                                 size_t si_data_len,
+                                 /**
+                                  * Message flags.
+                                  */
+                                 __wasi_siflags_t si_flags,
+                                 __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
+/**
+ * Shut down socket send and receive channels.
+ * Note: This is similar to `shutdown` in POSIX.
+ */
+__wasi_errno_t __wasi_sock_shutdown( __wasi_fd_t fd,
                                      /**
-                                      * The source path of the file or directory to rename.
+                                      * Which channels on the socket to shut down.
                                       */
-                                     const char* old_path,
-                                     /**
-                                      * The working directory at which the resolution of the new path starts.
-                                      */
-                                     __wasi_fd_t new_fd,
-                                     /**
-                                      * The destination path to which to rename the file or directory.
-                                      */
-                                     const char* new_path ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Create a symbolic link.
-   * Note: This is similar to `symlinkat` in POSIX.
-   */
-  __wasi_errno_t __wasi_path_symlink(
-    /**
-     * The contents of the symbolic link.
-     */
-    const char* old_path,
-    __wasi_fd_t fd,
-    /**
-     * The destination path at which to create the symbolic link.
-     */
-    const char* new_path ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Unlink a file.
-   * Return `errno::isdir` if the path refers to a directory.
-   * Note: This is similar to `unlinkat(fd, path, 0)` in POSIX.
-   */
-  __wasi_errno_t __wasi_path_unlink_file( __wasi_fd_t fd,
-                                          /**
-                                           * The path to a file to unlink.
-                                           */
-                                          const char* path ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Concurrently poll for the occurrence of a set of events.
-   * @return
-   * The number of events stored.
-   */
-  __wasi_errno_t __wasi_poll_oneoff(
-    /**
-     * The events to which to subscribe.
-     */
-    const __wasi_subscription_t* in,
-    /**
-     * The events that have occurred.
-     */
-    __wasi_event_t* out,
-    /**
-     * Both the number of subscriptions and events.
-     */
-    __wasi_size_t nsubscriptions,
-    __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Terminate the process normally. An exit code of 0 indicates successful
-   * termination of the program. The meanings of other values is dependent on
-   * the environment.
-   */
-  _Noreturn void __wasi_proc_exit(
-    /**
-     * The exit code returned by the process.
-     */
-    __wasi_exitcode_t rval );
-  /**
-   * Temporarily yield execution of the calling thread.
-   * Note: This is similar to `sched_yield` in POSIX.
-   */
-  __wasi_errno_t __wasi_sched_yield( void ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Write high-quality random data into a buffer.
-   * This function blocks when the implementation is unable to immediately
-   * provide sufficient high-quality random data.
-   * This function may execute slowly, so when large mounts of random data are
-   * required, it's advisable to use this function to seed a pseudo-random
-   * number generator, rather than to provide the random data directly.
-   */
-  __wasi_errno_t __wasi_random_get(
-    /**
-     * The buffer to fill with random data.
-     */
-    uint8_t* buf,
-    __wasi_size_t buf_len ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Accept a new incoming connection.
-   * Note: This is similar to `accept` in POSIX.
-   * @return
-   * New socket connection
-   */
-  __wasi_errno_t __wasi_sock_accept(
-    /**
-     * The listening socket.
-     */
-    __wasi_fd_t fd,
-    /**
-     * The desired values of the file descriptor flags.
-     */
-    __wasi_fdflags_t flags,
-    __wasi_fd_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Receive a message from a socket.
-   * Note: This is similar to `recv` in POSIX, though it also supports reading
-   * the data into multiple buffers in the manner of `readv`.
-   * @return
-   * Number of bytes stored in ri_data and message flags.
-   */
-  __wasi_errno_t __wasi_sock_recv( __wasi_fd_t fd,
-                                   /**
-                                    * List of scatter/gather vectors to which to store data.
-                                    */
-                                   const __wasi_iovec_t* ri_data,
-                                   /**
-                                    * The length of the array pointed to by `ri_data`.
-                                    */
-                                   size_t ri_data_len,
-                                   /**
-                                    * Message flags.
-                                    */
-                                   __wasi_riflags_t ri_flags,
-                                   __wasi_size_t* retptr0,
-                                   __wasi_roflags_t* retptr1 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Send a message on a socket.
-   * Note: This is similar to `send` in POSIX, though it also supports writing
-   * the data from multiple buffers in the manner of `writev`.
-   * @return
-   * Number of bytes transmitted.
-   */
-  __wasi_errno_t __wasi_sock_send( __wasi_fd_t fd,
-                                   /**
-                                    * List of scatter/gather vectors to which to retrieve data
-                                    */
-                                   const __wasi_ciovec_t* si_data,
-                                   /**
-                                    * The length of the array pointed to by `si_data`.
-                                    */
-                                   size_t si_data_len,
-                                   /**
-                                    * Message flags.
-                                    */
-                                   __wasi_siflags_t si_flags,
-                                   __wasi_size_t* retptr0 ) __attribute__( ( __warn_unused_result__ ) );
-  /**
-   * Shut down socket send and receive channels.
-   * Note: This is similar to `shutdown` in POSIX.
-   */
-  __wasi_errno_t __wasi_sock_shutdown( __wasi_fd_t fd,
-                                       /**
-                                        * Which channels on the socket to shut down.
-                                        */
-                                       __wasi_sdflags_t how ) __attribute__( ( __warn_unused_result__ ) );
-  /** @} */
+                                     __wasi_sdflags_t how ) __attribute__( ( __warn_unused_result__ ) );
+/** @} */
 
 #ifdef __cplusplus
 }

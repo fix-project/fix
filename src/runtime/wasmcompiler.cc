@@ -28,8 +28,7 @@ public:
   WABT_DISALLOW_COPY_AND_ASSIGN( MemoryStringStream )
   explicit MemoryStringStream( Stream* log_stream = nullptr )
     : Stream( log_stream )
-  {
-  }
+  {}
 
   std::string&& ReleaseStringBuf() { return move( buf_ ); }
   std::string_view Buf() { return { buf_ }; }

@@ -33,8 +33,7 @@ public:
   Value( ptr_type&& data, const uint32_t size )
     : data_( std::move( data ) )
     , size_( size )
-  {
-  }
+  {}
 
   Value( View str )
     : data_( const_cast<T*>( str.data() ) )

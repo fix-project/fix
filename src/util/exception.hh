@@ -14,8 +14,7 @@ public:
     : system_error( error_code, category )
     , attempt_and_error_( std::string( s_attempt ) + ": " + std::system_error::what() )
     , error_code_( error_code )
-  {
-  }
+  {}
 
   const char* what() const noexcept override { return attempt_and_error_.c_str(); }
 
@@ -27,8 +26,7 @@ class unix_error : public tagged_error
 public:
   unix_error( const std::string_view s_attempt, const int s_errno = errno )
     : tagged_error( std::system_category(), s_attempt, s_errno )
-  {
-  }
+  {}
 };
 
 inline int CheckSystemCall( const std::string_view s_attempt, const int return_value )

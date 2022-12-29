@@ -44,8 +44,7 @@ public:
     , module_prefix_( MangleName( wasm_name ) )
     , result_()
     , inspector_( inspector )
-  {
-  }
+  {}
 
   InitComposer( const InitComposer& ) = default;
   InitComposer& operator=( const InitComposer& ) = default;

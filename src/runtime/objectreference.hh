@@ -14,8 +14,7 @@ public:
 
   ObjectReference( const __m256i val )
     : cookie_name( val )
-  {
-  }
+  {}
 
   operator __m256i() const { return content_; }
 

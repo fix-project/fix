@@ -27,8 +27,7 @@ private:
 public:
   InMemoryStorage()
     : name_to_object_()
-  {
-  }
+  {}
 
   const T& get( const Name name ) { return name_to_object_.at( name ); }
 
