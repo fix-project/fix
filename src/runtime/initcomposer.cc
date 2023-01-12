@@ -174,7 +174,7 @@ void InitComposer::write_create_tree()
 void InitComposer::write_create_thunk()
 {
   result_ << "extern __m256i fixpoint_create_thunk(__m256i);" << endl;
-  result_ << "__m256i " << module_prefix_
+  result_ << "__m256i "
           << "Z_fixpointZ_create_thunk(struct Z_fixpoint_instance_t* instance, __m256i handle) {" << endl;
   result_ << "  return fixpoint_create_thunk(handle);" << endl;
   result_ << "}\n" << endl;

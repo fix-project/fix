@@ -15,6 +15,13 @@ add_test(NAME t_add_simple WORKING_DIRECTORY
   ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/add-simple.wasm
 )
 
+add_test(NAME t_fib WORKING_DIRECTORY
+  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testing/fib-test
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/fib_tester
+  ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/fib.wasm
+  ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/add-simple.wasm
+)
+
 add_test(NAME t_return3 WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/flatware/testing/return-test
   ${CMAKE_CURRENT_BINARY_DIR}/src/tester/wasi_tester
