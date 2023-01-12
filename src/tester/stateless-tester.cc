@@ -113,6 +113,18 @@ Name parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
     return runtime.add_tree( move( the_tree ) );
   }
 
+  if ( str.starts_with( "thunk:" ) ) {
+    args.remove_prefix( 1 );
+    const string_view str1 { args[0] };
+    if ( !str1.starts_with( "tree:" ) ) {
+      throw runtime_error( "thunk not refering a tree" );
+    }
+
+    Name tree_name = parse_args( args, open_files );
+    Thunk the_thunk( tree_name );
+    return runtime.add_thunk( the_thunk );
+  }
+
   throw runtime_error( "unknown object syntax: \"" + string( str ) + "\"" );
 }
 
@@ -185,7 +197,7 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
     stream << "\n";
   } else if ( pp.name.is_tree() ) {
     const auto view = runtime.get_tree( pp.name );
-    stream << ( terminal ? "\033[1;32mTree\033[m" : "Blob" ) << " (" << view.size() << " entr"
+    stream << ( terminal ? "\033[1;32mTree\033[m" : "Tree" ) << " (" << view.size() << " entr"
            << ( view.size() != 1 ? "ies" : "y" ) << "):\n";
     for ( unsigned int i = 0; i < view.size(); ++i ) {
       for ( unsigned int j = 0; j < pp.level + 1; ++j ) {
@@ -193,6 +205,13 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
       }
       stream << to_string( i ) << ". " << pretty_print( view.at( i ), pp.level + 1 );
     }
+  } else if ( pp.name.is_thunk() ) {
+    Name encode_name = runtime.get_thunk_encode_name( pp.name );
+    stream << ( terminal ? "\033[1;36mThunk\033[m" : "Thunk" ) << ":\n";
+    for ( unsigned int i = 0; i < pp.level + 1; ++i ) {
+      stream << "  ";
+    }
+    stream << pretty_print( encode_name, pp.level + 1 );
   } else {
     throw runtime_error( "can't pretty-print object" );
   }
