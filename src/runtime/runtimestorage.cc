@@ -241,9 +241,7 @@ Name RuntimeStorage::local_to_storage( Name name )
 
         for ( size_t i = 0; i < orig_tree.size(); ++i ) {
           auto entry = orig_tree[i];
-          if ( entry.is_local() ) {
-            orig_tree.mutable_data()[i] = local_to_storage( entry );
-          }
+          orig_tree.mutable_data()[i] = local_to_storage( entry );
         }
         string_view view( reinterpret_cast<char*>( orig_tree.mutable_data() ), orig_tree.size() * sizeof( Name ) );
         Name new_name( sha256::encode( view ), orig_tree.size(), ContentType::Tree );
