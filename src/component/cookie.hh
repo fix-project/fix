@@ -90,13 +90,13 @@ public:
 
   bool is_tree() const
   {
-    assert( not is_literal_blob() );
+    // assert( not is_literal_blob() );
     return ( !is_literal_blob() && ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Tree ) );
   }
 
   bool is_thunk() const
   {
-    assert( not is_literal_blob() );
+    // assert( not is_literal_blob() );
     return ( !is_literal_blob() && ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Thunk ) );
   }
 
