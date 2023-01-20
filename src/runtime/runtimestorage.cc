@@ -155,12 +155,13 @@ Name RuntimeStorage::force_thunk( Name name )
 
 Name RuntimeStorage::reduce_thunk( Name name )
 {
-  // if ( memoization_cache.contains( name ) ) {
-  //  return memoization_cache.at( name );
-  //} else {
   Name encode_name = get_thunk_encode_name( name );
+  // Name canonical_name = local_to_storage( encode_name );
+  // if ( memoization_cache.contains( canonical_name ) ) {
+  //   return memoization_cache.at( canonical_name );
+  // } else {
   Name result = evaluate_encode( encode_name );
-  //  memoization_cache[name] = result;
+  // memoization_cache.insert_or_assign( canonical_name, result );
   return result;
   //}
 }
@@ -174,15 +175,17 @@ Name RuntimeStorage::evaluate_encode( Name encode_name )
     throw runtime_error( "ENCODE functions not yet supported" );
   }
 
-  if ( not name_to_program_.contains( function_name ) ) {
+  Name canonical_name = local_to_storage( function_name );
+
+  if ( not name_to_program_.contains( canonical_name ) ) {
     /* compile the Wasm to C and then to ELF */
     const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
 
     name_to_program_.insert_or_assign(
-      function_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+      canonical_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
   }
 
-  auto& program = name_to_program_.at( function_name );
+  auto& program = name_to_program_.at( canonical_name );
   __m256i output = program.execute( encode_name );
 
   return output;
@@ -220,9 +223,10 @@ Name RuntimeStorage::local_to_storage( Name name )
         return new_name;
       } else if ( holds_alternative<Blob>( obj ) ) {
         string_view blob = get<Blob>( obj );
-        Name new_name( sha256::encode( blob ), blob.size(), ContentType::Blob );
+        Name new_name( sha256::encode( blob ), blob.size(), name.get_metadata() );
         storage.put( new_name, move( get<Blob>( local_storage_.at( name.get_local_id() ) ) ) );
         local_storage_.at( name.get_local_id() ) = new_name;
+
         return new_name;
       } else {
         throw runtime_error( "Name type does not match content type" );
@@ -243,10 +247,12 @@ Name RuntimeStorage::local_to_storage( Name name )
           auto entry = orig_tree[i];
           orig_tree.mutable_data()[i] = local_to_storage( entry );
         }
+
         string_view view( reinterpret_cast<char*>( orig_tree.mutable_data() ), orig_tree.size() * sizeof( Name ) );
-        Name new_name( sha256::encode( view ), orig_tree.size(), ContentType::Tree );
+        Name new_name( sha256::encode( view ), orig_tree.size(), name.get_metadata() );
         storage.put( new_name, move( get<Tree>( local_storage_.at( name.get_local_id() ) ) ) );
         local_storage_.at( name.get_local_id() ) = new_name;
+
         return new_name;
 
       } else {
@@ -256,7 +262,7 @@ Name RuntimeStorage::local_to_storage( Name name )
     }
 
     case ContentType::Thunk: {
-      return local_to_storage( Name::get_encode_name( name ) );
+      return Name::get_thunk_name( local_to_storage( Name::get_encode_name( name ) ) );
       break;
     }
 
