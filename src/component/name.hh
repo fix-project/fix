@@ -46,6 +46,14 @@ public:
     content_[2] = size;
   }
 
+  Name( std::string hash, size_t size, const uint8_t metadata )
+  {
+    assert( hash.size() == 32 );
+    hash[31] = static_cast<char>( 0x04 | metadata );
+    __builtin_memcpy( &content_, hash.data(), 32 );
+    content_[2] = size;
+  }
+
   Name( std::string_view literal_content )
   {
     assert( literal_content.size() < 32 );
@@ -65,6 +73,8 @@ public:
   size_t get_local_id() const { return _mm256_extract_epi64( content_, 0 ); };
 
   bool is_strict_tree_entry() const { return !( metadata() & 0x80 ); }
+
+  uint8_t get_metadata() { return metadata(); }
 
   static Name name_only( Name name )
   {
