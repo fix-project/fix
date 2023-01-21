@@ -67,21 +67,16 @@ public:
 
   size_t get_size() const
   {
-    assert( !is_literal_blob() );
-    return content_[2];
+    if ( is_literal_blob() ) {
+      return literal_blob_len();
+    } else {
+      return content_[2];
+    }
   }
 
-  bool is_canonical() const
-  {
-    assert( not is_literal_blob() );
-    return metadata() & 0x04;
-  }
+  bool is_canonical() const { return !is_literal_blob() && metadata() & 0x04; }
 
-  bool is_local() const
-  {
-    assert( not is_literal_blob() );
-    return !is_canonical();
-  }
+  bool is_local() const { return !is_literal_blob() && !is_canonical(); }
 
   bool is_blob() const
   {
@@ -90,13 +85,11 @@ public:
 
   bool is_tree() const
   {
-    // assert( not is_literal_blob() );
     return ( !is_literal_blob() && ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Tree ) );
   }
 
   bool is_thunk() const
   {
-    // assert( not is_literal_blob() );
     return ( !is_literal_blob() && ( metadata() & 0x03 ) == static_cast<uint8_t>( ContentType::Thunk ) );
   }
 
