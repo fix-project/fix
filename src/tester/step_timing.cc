@@ -45,8 +45,6 @@ int main( int argc, char* argv[] )
     cerr << "Usage: " << argv[0] << " path_to_add_fixpoint path_to_add_wasi\n";
   }
 
-  runtime.set_init_instances( INIT_INSTANCE );
-
   ReadOnlyFile add_fixpoint_content { argv[1] };
   ReadOnlyFile add_wasi_content { argv[2] };
 

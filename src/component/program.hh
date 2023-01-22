@@ -38,12 +38,6 @@ private:
   uint64_t cleanup_entry_;
   // size of instance
   size_t instance_context_size_;
-  // number of init instances
-  size_t init_instances_;
-  // Array of instances
-  char* instances_;
-  // Index of the next available instance
-  size_t next_instance_;
 
   struct Context
   {
@@ -56,16 +50,12 @@ public:
            uint64_t main_entry,
            uint64_t cleanup_entry,
            uint64_t instance_size_entry,
-           uint64_t init_module_entry,
-           size_t init_instances )
+           uint64_t init_module_entry )
     : code_( code )
     , init_entry_( init_entry )
     , main_entry_( main_entry )
     , cleanup_entry_( cleanup_entry )
     , instance_context_size_( 0 )
-    , init_instances_( init_instances )
-    , instances_()
-    , next_instance_( 0 )
   {
     GlobalScopeTimer<Timer::Category::Populating> record_timer;
     size_t ( *size_func )( void );
@@ -79,14 +69,6 @@ public:
     void ( *init_module_func )( void );
     init_module_func = reinterpret_cast<void ( * )( void )>( code_.get() + init_module_entry );
     init_module_func();
-
-    void ( *init_func )( void* );
-    init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
-    instances_
-      = static_cast<char*>( aligned_alloc( alignof( __m256i ), instance_context_size_ * init_instances_ ) );
-    for ( size_t i = 0; i < init_instances_; i++ ) {
-      init_func( instances_ + i * instance_context_size_ );
-    }
   }
 
   void populate_instance_and_context( string_span instance ) const
@@ -100,16 +82,22 @@ public:
 
   __m256i execute( Name encode_name )
   {
+    void ( *init_func )( void* );
+    init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
+
+    char* instance = static_cast<char*>( aligned_alloc( alignof( __m256i ), instance_context_size_ ) );
+    init_func( instance );
+
     __m256i ( *main_func )( void*, __m256i );
     main_func = reinterpret_cast<__m256i ( * )( void*, __m256i )>( code_.get() + main_entry_ );
-    void* inst = instances_ + next_instance_ * instance_context_size_;
 
-    // void ( *init_func )( void* );
-    // init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
-    // init_func( inst );
+    __m256i result = main_func( instance, encode_name );
 
-    __m256i result = main_func( inst, encode_name );
-    next_instance_++;
+    void ( *cleanup_func )( void* );
+    cleanup_func = reinterpret_cast<void ( * )( void* )>( code_.get() + cleanup_entry_ );
+    cleanup_func( instance );
+    free( instance );
+
     return result;
   }
 
@@ -122,14 +110,7 @@ public:
     , main_entry_( other.main_entry_ )
     , cleanup_entry_( other.cleanup_entry_ )
     , instance_context_size_( other.instance_context_size_ )
-    , init_instances_( other.init_instances_ )
-    , instances_( other.instances_ )
-    , next_instance_( other.next_instance_ )
-  {
-    if ( this != &other ) {
-      other.instances_ = nullptr;
-    }
-  }
+  {}
 
   Program& operator=( Program&& other )
   {
@@ -138,25 +119,9 @@ public:
     main_entry_ = other.main_entry_;
     cleanup_entry_ = other.cleanup_entry_;
     instance_context_size_ = other.instance_context_size_;
-    instances_ = other.instances_;
-    next_instance_ = other.next_instance_;
-
-    if ( this != &other ) {
-      other.instances_ = nullptr;
-    }
 
     return *this;
   }
 
-  ~Program()
-  {
-    if ( instances_ ) {
-      void ( *cleanup_func )( void* );
-      cleanup_func = reinterpret_cast<void ( * )( void* )>( code_.get() + cleanup_entry_ );
-      for ( size_t i = 0; i < init_instances_; i++ ) {
-        cleanup_func( instances_ + i * instance_context_size_ );
-      }
-      free( instances_ );
-    }
-  }
+  ~Program() {}
 };

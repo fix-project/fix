@@ -81,8 +81,6 @@ int main( int argc, char* argv[] )
          << " path_to_add_program path_to_add_cycle_program path_to_add_fixpoint path_to_add_wasi\n";
   }
 
-  runtime.set_init_instances( INIT_INSTANCE );
-
   add_program_name = argv[1];
   add_cycle_program_name = argv[2];
 

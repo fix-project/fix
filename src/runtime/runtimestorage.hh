@@ -36,9 +36,6 @@ private:
   // Storage for Object/Names with a local name
   std::vector<ObjectOrName> local_storage_;
 
-  // Number of instances
-  size_t init_instances_;
-
   RuntimeStorage()
     : storage()
     , memoization_cache()
@@ -46,7 +43,6 @@ private:
     , name_to_program_()
     , next_local_name_( 0 )
     , local_storage_()
-    , init_instances_( 16 )
   {
     wasm_rt_init();
   }
@@ -92,9 +88,6 @@ public:
 
   // Evaluate an encode
   Name evaluate_encode( Name encode_name );
-
-  void set_init_instances( size_t init_instances ) { init_instances_ = init_instances; }
-  size_t get_init_instances() const { return init_instances_; }
 
   // Populate a program
   void populate_program( Name function_name );

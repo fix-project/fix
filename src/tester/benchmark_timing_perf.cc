@@ -45,7 +45,6 @@ int main( int argc, char* argv[] )
     cerr << "Usage: " << argv[0] << " path_to_add_fixpoint\n";
   }
   global_timer().start<Timer::Category::Execution>();
-  runtime.set_init_instances( INIT_INSTANCE );
 
   ReadOnlyFile add_fixpoint_content { argv[1] };
   Name add_fixpoint_function = runtime.add_blob( string_view( add_fixpoint_content ) );
