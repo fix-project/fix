@@ -1,16 +1,21 @@
 #pragma once
 
+#include <condition_variable>
 #include <map>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 
 #include "ccompiler.hh"
+#include "concurrent_flat_hash_map.hh"
+#include "concurrent_queue.hh"
+#include "concurrent_storage.hh"
+#include "concurrent_vector.hh"
 #include "name.hh"
 #include "object.hh"
 #include "program.hh"
 #include "spans.hh"
-#include "storage.hh"
 #include "wasmcompiler.hh"
 
 #include "absl/container/flat_hash_map.h"
@@ -22,19 +27,33 @@ private:
   InMemoryStorage<Object> storage;
 
   // Memorization Cache: maps a Thunk to the Name of a reduction of the original Thunk
-  absl::flat_hash_map<Name, Name, NameHash> memoization_cache;
+  concurrent_flat_hash_map<Name> memoization_cache;
 
   // Trace Cache: maps a Name to a human-readable string
-  absl::flat_hash_map<Name, std::string, NameHash> trace_cache;
+  concurrent_flat_hash_map<std::string> trace_cache;
 
   // Maps a Wasm function Name to corresponding compiled Program
-  absl::flat_hash_map<Name, Program, NameHash> name_to_program_;
+  concurrent_flat_hash_map<Program> name_to_program_;
 
   // Unique id for local name
   size_t next_local_name_;
 
   // Storage for Object/Names with a local name
-  std::vector<ObjectOrName> local_storage_;
+  concurrent_vector<ObjectOrName> local_storage_;
+
+  concurrent_queue<std::tuple<Name, Name*, std::atomic<size_t>*>> ready_evaluate_;
+
+  std::vector<std::thread> threads_;
+
+  size_t num_threads_;
+
+  bool threads_active_;
+
+  std::condition_variable to_workers_;
+  std::condition_variable to_producer_;
+
+  std::mutex to_workers_mutex_;
+  std::mutex to_producer_mutex_;
 
   RuntimeStorage()
     : storage()
@@ -43,8 +62,33 @@ private:
     , name_to_program_()
     , next_local_name_( 0 )
     , local_storage_()
+    , ready_evaluate_()
+    , threads_()
+    , num_threads_( 128 )
+    , threads_active_( true )
+    , to_workers_()
+    , to_producer_()
+    , to_workers_mutex_()
+    , to_producer_mutex_()
   {
     wasm_rt_init();
+    llvm_init();
+
+    threads_.resize( num_threads_ );
+
+    for ( size_t i = 0; i < num_threads_; ++i ) {
+      threads_.at( i ) = std::thread( &RuntimeStorage::worker, this );
+    }
+  }
+
+  ~RuntimeStorage()
+  {
+    threads_active_ = false;
+    to_workers_.notify_all();
+
+    for ( size_t i = 0; i < num_threads_; ++i ) {
+      threads_[i].join();
+    }
   }
 
 public:
@@ -76,6 +120,11 @@ public:
 
   // force the object refered to by a name
   Name force( Name name );
+
+  void compute_job( std::tuple<Name, Name*, std::atomic<size_t>*> job );
+
+  // Thread execution
+  void worker();
 
   // force a Tree
   Name force_tree( Name tree_name );
