@@ -22,16 +22,19 @@ using namespace std;
 using namespace clang;
 using namespace llvm;
 
-string c_to_elf( const string_view c_content,
-                 const string_view h_content,
-                 const string_view fixpoint_header,
-                 const string_view wasm_rt_content )
+void llvm_init()
 {
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmPrinters();
   llvm::InitializeAllAsmParsers();
+}
 
+string c_to_elf( const string_view c_content,
+                 const string_view h_content,
+                 const string_view fixpoint_header,
+                 const string_view wasm_rt_content )
+{
   // Create compiler instance
   clang::CompilerInstance compilerInstance;
 
