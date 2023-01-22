@@ -36,7 +36,6 @@ int main( int argc, char* argv[] )
 
   ReadOnlyFile wasm_content { argv[1] };
 
-  runtime.set_init_instances( INIT_INSTANCE );
   Name add_name = runtime.add_blob( string_view( wasm_content ) );
   runtime.populate_program( add_name );
 

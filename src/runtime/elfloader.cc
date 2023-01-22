@@ -234,11 +234,5 @@ Program link_program( const string_view program_content )
 #if TIME_FIXPOINT == 2
   global_timer().stop<Timer::Category::Linking>();
 #endif
-  return Program( code,
-                  init_entry,
-                  main_entry,
-                  cleanup_entry,
-                  instance_size_entry,
-                  init_module_entry,
-                  RuntimeStorage::get_instance().get_init_instances() );
+  return Program( code, init_entry, main_entry, cleanup_entry, instance_size_entry, init_module_entry );
 }
