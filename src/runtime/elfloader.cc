@@ -29,6 +29,8 @@ const static map<string, uint64_t> library_func_map
       { "wasm_rt_free_memory_sw_checked", (uint64_t)wasm_rt_free_memory_sw_checked },
       { "wasm_rt_free_funcref_table", (uint64_t)wasm_rt_free_funcref_table },
       { "wasm_rt_free_externref_table", (uint64_t)wasm_rt_free_externref_table },
+      { "wasm_rt_grow_funcref_table", (uint64_t)wasm_rt_grow_funcref_table },
+      { "wasm_rt_grow_externref_table", (uint64_t)wasm_rt_grow_externref_table },
       { "wasm_rt_init", (uint64_t)wasm_rt_init },
       { "wasm_rt_free", (uint64_t)wasm_rt_free },
       { "wasm_rt_is_initialized", (uint64_t)wasm_rt_is_initialized },
