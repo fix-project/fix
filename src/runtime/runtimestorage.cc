@@ -145,7 +145,7 @@ Name RuntimeStorage::force_thunk( Name name )
     switch ( new_name.get_content_type() ) {
       case ContentType::Blob:
       case ContentType::Tree:
-        return force(new_name);
+        return force( new_name );
 
       default:
         current_name = new_name;
