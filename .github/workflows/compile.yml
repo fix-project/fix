@@ -11,7 +11,6 @@ jobs:
         run: sudo apt update && sudo apt install clang-format
       - name: run clang-format
         run: ./etc/clang-format-diff.sh
-
   build-ubuntu:
       runs-on: ubuntu-latest
       container: ghcr.io/fix-project/wasm_toolchain_docker:latest
