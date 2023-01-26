@@ -1,10 +1,12 @@
+;; Module defining memory and memory interface for the map function.
+
 (module
   (table $rw_table_0 (export "rw_table_0") 1000 externref)
   (table $rw_table_1 (export "rw_table_1") 10 externref)
   (table $ro_table_0 (export "ro_table_0") 0 externref) 
   (memory $rw_mem_0  (export "rw_mem_0")   1)
   (memory $ro_mem_0  (export "ro_mem_0")   0)
-    ;; rw_table_0
+  
   (func (export "set_rw_table_0") (param $index i32) (param $val externref) 
     (table.set $rw_table_0 (local.get $index) (local.get $val))
   )
@@ -38,7 +40,6 @@
     (local.get $size)
     (memory.grow $rw_mem_0)
   )
-
 
   (func (export "set_rw_table_1") (param $index i32) (param $val externref) 
     (table.set $rw_table_1 (local.get $index) (local.get $val))

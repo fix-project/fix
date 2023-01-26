@@ -5,10 +5,14 @@ int32_t add_2( int32_t x )
   return x + 2;
 }
 
+/* _fixpoint_apply takes an encode with the follow structure:
+- resource limits
+- this program
+- add_flag: if 1, the program executes add_2, else execute map
+- [optional] x: if add_flag, returns x + 2
+*/
 __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply( externref encode )
 {
-  // Encode: resource_limits, wasm_module, 0 for main or 1 for add_2, [arg for add_2]
-
   attach_tree_ro_table_0( encode );
   attach_blob_ro_mem_0( get_ro_table_0( 2 ) );
   uint32_t add_flag = get_ro_mem_0( 0 );

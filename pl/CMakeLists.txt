@@ -19,48 +19,47 @@ set(CMAKE_CXX_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang++)
 
 add_link_options( -nostdlib -Wl,--no-entry -Wl,--allow-undefined, -Wl, -Werror, -Wunused-parameter)
 
-add_library(test_obj OBJECT "test.cc")
-# add_library(map_obj OBJECT "map.cc")
+add_library(add_2_obj OBJECT "add_2.cc")
 
 add_custom_command(
-  OUTPUT  "test.wasm"
-  DEPENDS test_obj
-          test.cc
+  OUTPUT  "add_2.wasm"
+  DEPENDS add_2_obj
+          add_2.cc
   COMMAND $ENV{HOME}/wasm-toolchain/sysroot/bin/wasm-ld
-          ${CMAKE_BINARY_DIR}/CMakeFiles/test_obj.dir/test.cc.o
+          ${CMAKE_BINARY_DIR}/CMakeFiles/add_2_obj.dir/add_2.cc.o
           $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc++.a
-          -o test.wasm
+          -o add_2.wasm
           --no-entry
           --allow-undefined
 )
 
 add_custom_command(
-  OUTPUT "vector.wasm"
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/vector.wat
+  OUTPUT "map_memory.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/map_memory.wat
   COMMAND ${CMAKE_BINARY_DIR}/../../../_deps/wabt-build/wat2wasm
           --enable-multi-memory
 	        --enable-exceptions
-          ${CMAKE_CURRENT_SOURCE_DIR}/vector.wat
-          -o vector.wasm
+          ${CMAKE_CURRENT_SOURCE_DIR}/map_memory.wat
+          -o map_memory.wasm
 )
 
 add_custom_command(
-    OUTPUT "test-memory.wasm"
+    OUTPUT "add_2_map.wasm"
     DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-    test.wasm
-    vector.wasm
+    add_2.wasm
+    map_memory.wasm
     COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
     --enable-multi-memory
     --enable-exceptions
-    test.wasm
-    vector.wasm
-    -o test-memory.wasm
+    add_2.wasm
+    map_memory.wasm
+    -o add_2_map.wasm
     )
 
 add_custom_target(
         pl-test ALL
-        DEPENDS test.wasm
-                vector.wasm
-                test-memory.wasm
+        DEPENDS add_2.wasm
+                map_memory.wasm
+                add_2_map.wasm
       )
   
