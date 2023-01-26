@@ -8,6 +8,13 @@ namespace wasminspector {
 
 using namespace wabt;
 
+wabt::Error createErrorWithMessage( string message )
+{
+  wabt::Error error = wabt::Error();
+  error.message = message;
+  return error;
+}
+
 WasmInspector::WasmInspector( Module* module, Errors* errors )
   : errors_( errors )
   , current_module_( module )
@@ -161,12 +168,16 @@ Result WasmInspector::ValidateImports()
       case ExternalKind::Memory:
       case ExternalKind::Func: {
         if ( import->module_name != "fixpoint" ) {
+          string message = "ValidateImports: module name is not fixpoint";
+          errors_->push_back( createErrorWithMessage( message ) );
           return Result::Error;
         }
         break;
       }
 
       default:
+        string message = "ValidateImports: ExternalKind not found";
+        errors_->push_back( createErrorWithMessage( message ) );
         return Result::Error;
     }
   }
@@ -203,6 +214,8 @@ Result WasmInspector::CheckMemoryAccess( Var* memidx )
        == exported_ro_mem_.end() ) {
     return Result::Ok;
   } else {
+    string message = "Error in CheckMemoryAccess";
+    errors_->push_back( createErrorWithMessage( message ) );
     return Result::Error;
   }
 }
@@ -216,4 +229,5 @@ Result WasmInspector::CheckTableAccess( Var* tableidx )
     return Result::Error;
   }
 }
+
 } // namespace wasminspector
