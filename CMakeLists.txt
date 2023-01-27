@@ -47,6 +47,14 @@ ExternalProject_Add(flatware
   BUILD_ALWAYS true
   )
 
+include(ExternalProject)
+ExternalProject_Add(pl
+    SOURCE_DIR "${PROJECT_SOURCE_DIR}/pl"
+    INSTALL_COMMAND cmake -E echo "Skipping pl install."
+    DEPENDS wat2wasm
+    BUILD_ALWAYS true
+    )
+  
 include(etc/build_type.cmake)
 include(etc/cflags.cmake)
 include(etc/clang_format.cmake)
