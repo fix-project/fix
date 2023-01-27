@@ -55,7 +55,6 @@ ExternalProject_Add(pl
     BUILD_ALWAYS true
     )
   
-
 include(etc/build_type.cmake)
 include(etc/cflags.cmake)
 include(etc/clang_format.cmake)
