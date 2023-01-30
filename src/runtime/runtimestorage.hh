@@ -62,7 +62,7 @@ private:
     , next_local_name_( 0 )
     , local_storage_()
     , workers_()
-    , num_workers_( 128 )
+    , num_workers_( 16 )
     , to_workers_()
     , to_workers_mutex_()
     , threads_active_( false )
