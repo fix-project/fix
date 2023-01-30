@@ -7,9 +7,7 @@
 #include <thread>
 #include <unordered_map>
 
-
 #include "ccompiler.hh"
-#include "worker.hh"
 #include "concurrent_flat_hash_map.hh"
 #include "concurrent_storage.hh"
 #include "concurrent_vector.hh"
@@ -18,6 +16,7 @@
 #include "program.hh"
 #include "spans.hh"
 #include "wasmcompiler.hh"
+#include "worker.hh"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -45,7 +44,7 @@ private:
   concurrent_vector<ObjectOrName> local_storage_;
 
   std::vector<std::unique_ptr<RuntimeWorker>> workers_;
-  
+
   size_t num_workers_;
 
   std::condition_variable to_workers_;
@@ -72,7 +71,7 @@ private:
 
     for ( size_t i = 0; i <= num_workers_; ++i ) {
       std::unique_ptr<RuntimeWorker> worker = std::make_unique<RuntimeWorker>( i, *this );
-      workers_.push_back( std::move( worker) );
+      workers_.push_back( std::move( worker ) );
     }
 
     threads_active_ = true;
@@ -83,8 +82,8 @@ private:
   {
     threads_active_ = false;
     to_workers_.notify_all();
-    
-    for ( size_t i = 1; i <= num_workers_; ++i) {
+
+    for ( size_t i = 1; i <= num_workers_; ++i ) {
       ( *workers_.at( i ) ).thread_.join();
     }
   }
