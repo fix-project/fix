@@ -5,16 +5,16 @@
 
 #include "base64.hh"
 
-#include "wasm-rt-content.h"
 #include "object.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
+#include "wasm-rt-content.h"
 
 using namespace std;
 
-bool RuntimeStorage::steal_work( Job& job, size_t tid)
+bool RuntimeStorage::steal_work( Job& job, size_t tid )
 {
-  for (size_t i = 0; i < num_workers_; ++i) {
+  for ( size_t i = 0; i < num_workers_; ++i ) {
     if ( workers_.at( ( i + tid ) % num_workers_ )->jobs_.pop( job ) ) {
       return true;
     }
@@ -147,7 +147,7 @@ Name RuntimeStorage::local_to_storage( Name name )
         Name new_name = get<Name>( obj );
         assert( !new_name.is_local() );
 
-	// TODO if we realize the obj has already been observed we need to update our store to account for that
+        // TODO if we realize the obj has already been observed we need to update our store to account for that
 
         return new_name;
       } else if ( holds_alternative<Blob>( obj ) ) {

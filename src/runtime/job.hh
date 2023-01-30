@@ -3,14 +3,13 @@
 #include "name.hh"
 #include <atomic>
 
-struct Job {
+struct Job
+{
   Name name;
   Name* entry;
   std::atomic<size_t>* pending_jobs;
 
-  Job( Name name,
-       Name* entry,
-       std::atomic<size_t>* pending_jobs )
+  Job( Name name, Name* entry, std::atomic<size_t>* pending_jobs )
     : name( name )
     , entry( entry )
     , pending_jobs( pending_jobs )
@@ -22,4 +21,3 @@ struct Job {
     , pending_jobs()
   {}
 };
-

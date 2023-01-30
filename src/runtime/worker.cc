@@ -1,6 +1,6 @@
-#include "wasm-rt-content.h"
 #include "worker.hh"
 #include "runtimestorage.hh"
+#include "wasm-rt-content.h"
 
 Name RuntimeWorker::force_thunk( Name name )
 {
@@ -24,17 +24,17 @@ Name RuntimeWorker::force( Name name )
     return name;
   } else {
     switch ( name.get_content_type() ) {
-    case ContentType::Blob:
-      return name;
+      case ContentType::Blob:
+        return name;
 
-    case ContentType::Tree:
-      return force_tree( name );
+      case ContentType::Tree:
+        return force_tree( name );
 
-    case ContentType::Thunk:
-      return force_thunk( name );
+      case ContentType::Thunk:
+        return force_thunk( name );
 
-    default:
-      throw std::runtime_error( "Invalid content type." );
+      default:
+        throw std::runtime_error( "Invalid content type." );
     }
   }
 }
@@ -70,10 +70,11 @@ Name RuntimeWorker::force_tree( Name name ) // Accept Job
     }
   }
 
-  while (pending_jobs != 0) {
+  while ( pending_jobs != 0 ) {
     Job job;
-    bool work = dequeue_job(job);
-    if (work) compute_job(job);
+    bool work = dequeue_job( job );
+    if ( work )
+      compute_job( job );
   }
 
   return name;
@@ -93,7 +94,8 @@ Name RuntimeWorker::evaluate_encode( Name encode_name ) // Include Job
   Name canonical_name = runtimestorage_.local_to_storage( function_name );
   if ( not runtimestorage_.name_to_program_.contains( canonical_name ) ) {
     /* compile the Wasm to C and then to ELF */
-    const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( runtimestorage_.get_blob( function_name ) );
+    const auto [c_header, h_header, fixpoint_header]
+      = wasmcompiler::wasm_to_c( runtimestorage_.get_blob( function_name ) );
 
     Program program = link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) );
 
@@ -111,18 +113,18 @@ void RuntimeWorker::compute_job( Job& job )
   Name name = job.name;
   if ( !name.is_literal_blob() ) {
     switch ( name.get_content_type() ) {
-    case ContentType::Blob:
-      break;
-    case ContentType::Tree:
-      name = force_tree( name );
-      break;
+      case ContentType::Blob:
+        break;
+      case ContentType::Tree:
+        name = force_tree( name );
+        break;
 
-    case ContentType::Thunk:
-      name = force_thunk( name );
-      break;
+      case ContentType::Thunk:
+        name = force_thunk( name );
+        break;
 
-    default:
-      throw std::runtime_error( "Invalid content type." );
+      default:
+        throw std::runtime_error( "Invalid content type." );
     }
   }
 
@@ -130,35 +132,35 @@ void RuntimeWorker::compute_job( Job& job )
   ( *job.pending_jobs )--;
 }
 
-void RuntimeWorker::work() {
+void RuntimeWorker::work()
+{
   // Wait till all threads have been primed before computation can begin
   {
     std::unique_lock<std::mutex> conditional_lock( runtimestorage_.to_workers_mutex_ );
-    runtimestorage_.to_workers_.wait( conditional_lock, [this] {
-      return runtimestorage_.threads_active_;
-    } );
+    runtimestorage_.to_workers_.wait( conditional_lock, [this] { return runtimestorage_.threads_active_; } );
   }
-      
+
   while ( runtimestorage_.threads_active_ ) {
     Job job;
-    bool work = dequeue_job(job);
-    if (work) compute_job(job);
+    bool work = dequeue_job( job );
+    if ( work )
+      compute_job( job );
   }
 }
 
 void RuntimeWorker::queue_job( Job job )
 {
   // Add the job to our local queue and alert the runtime this job is READY
-  //mgmt_.set_job_status( std::get<0>(job), JobManager::PENDING );
+  // mgmt_.set_job_status( std::get<0>(job), JobManager::PENDING );
   jobs_.push( std::move( job ) );
 }
 
-bool RuntimeWorker::dequeue_job( Job &job )
+bool RuntimeWorker::dequeue_job( Job& job )
 {
   // Try to pop of the local queue, steal work if that fails, return false if no work can be found
   bool contains = jobs_.pop( job );
   if ( !contains ) {
-    contains = runtimestorage_.steal_work( job, thread_id_);
+    contains = runtimestorage_.steal_work( job, thread_id_ );
   }
   return contains;
 }
