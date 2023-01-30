@@ -4,13 +4,28 @@
 #include <iostream>
 
 #include "base64.hh"
-#include "elfloader.hh"
+
+#include "wasm-rt-content.h"
 #include "object.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
-#include "wasm-rt-content.h"
 
 using namespace std;
+
+bool RuntimeStorage::steal_work( Job& job, size_t tid)
+{
+  for (size_t i = 0; i < num_workers_; ++i) {
+    if ( workers_.at( ( i + tid ) % num_workers_ )->jobs_.pop( job ) ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Name RuntimeStorage::force_thunk( Name name )
+{
+  return workers_.at( 0 )->force_thunk( name );
+}
 
 Name RuntimeStorage::add_blob( Blob&& blob )
 {
@@ -102,159 +117,6 @@ Name RuntimeStorage::get_thunk_encode_name( Name thunk_name )
   return Name::get_encode_name( thunk_name );
 }
 
-Name RuntimeStorage::force( Name name )
-{
-  if ( name.is_literal_blob() ) {
-    return name;
-  } else {
-    switch ( name.get_content_type() ) {
-      case ContentType::Blob:
-        return name;
-
-      case ContentType::Tree:
-        return force_tree( name );
-
-      case ContentType::Thunk:
-        return force_thunk( name );
-
-      default:
-        throw runtime_error( "Invalid content type." );
-    }
-  }
-}
-
-void RuntimeStorage::compute_job( std::tuple<Name, Name*, std::atomic<size_t>*> job )
-{
-  Name name = std::get<0>( job );
-  if ( !name.is_literal_blob() ) {
-    switch ( name.get_content_type() ) {
-      case ContentType::Blob:
-        break;
-      case ContentType::Tree:
-        name = force_tree( name );
-        break;
-
-      case ContentType::Thunk:
-        name = force_thunk( name );
-        break;
-
-      default:
-        throw runtime_error( "Invalid content type." );
-    }
-  }
-
-  ( *std::get<1>( job ) ) = name;
-  ( *std::get<2>( job ) )--;
-  to_producer_.notify_all();
-}
-
-void RuntimeStorage::worker()
-{
-  while ( true ) {
-    std::tuple<Name, Name*, std::atomic<size_t>*> job;
-    {
-      std::unique_lock<std::mutex> conditional_lock( to_workers_mutex_ );
-      to_workers_.wait( conditional_lock,
-                        [this, &job] { return !threads_active_ || ready_evaluate_.front_pop( job ); } );
-    }
-
-    if ( !threads_active_ ) {
-      break;
-    }
-    compute_job( job );
-  }
-}
-
-Name RuntimeStorage::force_tree( Name name )
-{
-  auto orig_tree = get_tree( name );
-
-  std::atomic<size_t> pending_jobs = orig_tree.size();
-
-  for ( size_t i = 0; i < orig_tree.size(); ++i ) {
-    auto entry = orig_tree[i];
-    if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-      ready_evaluate_.push( std::make_tuple( entry, &( orig_tree.mutable_data()[i] ), &pending_jobs ) );
-      to_workers_.notify_one();
-    } else {
-      pending_jobs--;
-    }
-  }
-
-  // Don't waste time waiting for sub-jobs to complete--compute some jobs
-  while ( true ) {
-    std::tuple<Name, Name*, std::atomic<size_t>*> job;
-
-    {
-      std::unique_lock<std::mutex> conditional_lock( to_producer_mutex_ );
-      to_producer_.wait( conditional_lock, [this, &pending_jobs, &job] {
-        return pending_jobs == 0 || ready_evaluate_.front_pop( job );
-      } );
-    }
-
-    if ( pending_jobs == 0 ) {
-      return name;
-    }
-
-    compute_job( job );
-  }
-}
-
-Name RuntimeStorage::force_thunk( Name name )
-{
-  Name current_name = name;
-  while ( true ) {
-    Name new_name = reduce_thunk( current_name );
-    switch ( new_name.get_content_type() ) {
-      case ContentType::Blob:
-      case ContentType::Tree:
-        return force( new_name );
-
-      default:
-        current_name = new_name;
-    }
-  }
-}
-
-Name RuntimeStorage::reduce_thunk( Name name )
-{
-  Name encode_name = get_thunk_encode_name( name );
-  // Name canonical_name = local_to_storage( encode_name );
-  // if ( memoization_cache.contains( canonical_name ) ) {
-  //   return memoization_cache.at( canonical_name );
-  // } else {
-  Name result = evaluate_encode( encode_name );
-  // memoization_cache.insert_or_assign( canonical_name, result );
-  return result;
-  //}
-}
-
-Name RuntimeStorage::evaluate_encode( Name encode_name )
-{
-  force_tree( encode_name );
-  Name function_name = get_tree( encode_name ).at( 1 );
-
-  if ( not function_name.is_blob() ) {
-    throw runtime_error( "ENCODE functions not yet supported" );
-  }
-
-  Name canonical_name = local_to_storage( function_name );
-
-  if ( not name_to_program_.contains( canonical_name ) ) {
-    /* compile the Wasm to C and then to ELF */
-    const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
-
-    Program program = link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) );
-
-    name_to_program_.insert_or_assign( canonical_name, std::move( program ) );
-  }
-
-  auto& program = name_to_program_.at( canonical_name );
-  __m256i output = program.execute( encode_name );
-
-  return output;
-}
-
 void RuntimeStorage::populate_program( Name function_name )
 {
   if ( not function_name.is_blob() ) {
@@ -284,6 +146,9 @@ Name RuntimeStorage::local_to_storage( Name name )
       if ( holds_alternative<Name>( obj ) ) {
         Name new_name = get<Name>( obj );
         assert( !new_name.is_local() );
+
+	// TODO if we realize the obj has already been observed we need to update our store to account for that
+
         return new_name;
       } else if ( holds_alternative<Blob>( obj ) ) {
         string_view blob = get<Blob>( obj );
