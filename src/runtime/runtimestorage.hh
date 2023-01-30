@@ -7,9 +7,10 @@
 #include <thread>
 #include <unordered_map>
 
+
 #include "ccompiler.hh"
+#include "worker.hh"
 #include "concurrent_flat_hash_map.hh"
-#include "concurrent_queue.hh"
 #include "concurrent_storage.hh"
 #include "concurrent_vector.hh"
 #include "name.hh"
@@ -23,6 +24,8 @@
 class RuntimeStorage
 {
 private:
+  friend class RuntimeWorker;
+
   // Storage: maps a Name to the contents of the corresponding Object
   InMemoryStorage<Object> storage;
 
@@ -41,19 +44,15 @@ private:
   // Storage for Object/Names with a local name
   concurrent_vector<ObjectOrName> local_storage_;
 
-  concurrent_queue<std::tuple<Name, Name*, std::atomic<size_t>*>> ready_evaluate_;
-
-  std::vector<std::thread> threads_;
-
-  size_t num_threads_;
-
-  bool threads_active_;
+  std::vector<std::unique_ptr<RuntimeWorker>> workers_;
+  
+  size_t num_workers_;
 
   std::condition_variable to_workers_;
-  std::condition_variable to_producer_;
 
   std::mutex to_workers_mutex_;
-  std::mutex to_producer_mutex_;
+
+  bool threads_active_;
 
   RuntimeStorage()
     : storage()
@@ -62,32 +61,31 @@ private:
     , name_to_program_()
     , next_local_name_( 0 )
     , local_storage_()
-    , ready_evaluate_()
-    , threads_()
-    , num_threads_( 1 )
-    , threads_active_( true )
+    , workers_()
+    , num_workers_( 128 )
     , to_workers_()
-    , to_producer_()
     , to_workers_mutex_()
-    , to_producer_mutex_()
+    , threads_active_( false )
   {
     wasm_rt_init();
     llvm_init();
 
-    threads_.resize( num_threads_ );
-
-    for ( size_t i = 0; i < num_threads_; ++i ) {
-      threads_.at( i ) = std::thread( &RuntimeStorage::worker, this );
+    for ( size_t i = 0; i <= num_workers_; ++i ) {
+      std::unique_ptr<RuntimeWorker> worker = std::make_unique<RuntimeWorker>( i, *this );
+      workers_.push_back( std::move( worker) );
     }
+
+    threads_active_ = true;
+    to_workers_.notify_all();
   }
 
   ~RuntimeStorage()
   {
     threads_active_ = false;
     to_workers_.notify_all();
-
-    for ( size_t i = 0; i < num_threads_; ++i ) {
-      threads_[i].join();
+    
+    for ( size_t i = 1; i <= num_workers_; ++i) {
+      ( *workers_.at( i ) ).thread_.join();
     }
   }
 
@@ -98,6 +96,10 @@ public:
     static RuntimeStorage runtime_instance;
     return runtime_instance;
   }
+
+  bool steal_work( Job& job, size_t tid );
+
+  Name entry_force_thunk( Name name );
 
   // add blob
   Name add_blob( Blob&& blob );
@@ -115,28 +117,10 @@ public:
   // add Thunk
   Name add_thunk( Thunk thunk );
 
+  Name force_thunk( Name name );
+
   // Return encode name referred to by thunk
   Name get_thunk_encode_name( Name thunk_name );
-
-  // force the object refered to by a name
-  Name force( Name name );
-
-  void compute_job( std::tuple<Name, Name*, std::atomic<size_t>*> job );
-
-  // Thread execution
-  void worker();
-
-  // force a Tree
-  Name force_tree( Name tree_name );
-
-  // force a Thunk
-  Name force_thunk( Name thunk_name );
-
-  // Reduce a Thunk by one step
-  Name reduce_thunk( Name thunk_name );
-
-  // Evaluate an encode
-  Name evaluate_encode( Name encode_name );
 
   // Populate a program
   void populate_program( Name function_name );
