@@ -18,6 +18,8 @@ private:
 
   boost::lockfree::queue<Job> jobs_;
 
+  // TODO can place a map of locally active jobs here
+
   std::thread thread_;
 
   size_t thread_id_;
@@ -26,7 +28,7 @@ private:
 
 public:
   RuntimeWorker( size_t thread_id, RuntimeStorage& runtimestorage )
-    : jobs_()
+    : jobs_( 0 )
     , thread_()
     , thread_id_( thread_id )
     , runtimestorage_( runtimestorage )
