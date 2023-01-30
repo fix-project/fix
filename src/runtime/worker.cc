@@ -85,8 +85,6 @@ Name RuntimeWorker::evaluate_encode( Name encode_name ) // Include Job
   force_tree( encode_name );
   Name function_name = runtimestorage_.get_tree( encode_name ).at( 1 );
 
-  // TODO still need to create a new tree instead of updating in place
-
   if ( not function_name.is_blob() ) {
     throw std::runtime_error( "ENCODE functions not yet supported" );
   }
