@@ -14,10 +14,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(wasm-tools)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -nostdlib -mreference-types -I ~/wasm-toolchain/wasix/include")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -mreference-types -I ~/wasm-toolchain/wasix/include -fno-exceptions")
 set(CMAKE_CXX_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang++)
 
-add_link_options( -nostdlib -Wl,--no-entry -Wl,--allow-undefined, -Wl, -Werror, -Wunused-parameter)
+add_link_options( -Wl,--no-entry -Wl,--allow-undefined, -Wl, -Werror, -Wunused-parameter, -fno-exceptions)
 
 add_library(add_2_obj OBJECT "add_2.cc")
 
@@ -28,6 +28,9 @@ add_custom_command(
   COMMAND $ENV{HOME}/wasm-toolchain/sysroot/bin/wasm-ld
           ${CMAKE_BINARY_DIR}/CMakeFiles/add_2_obj.dir/add_2.cc.o
           $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc++.a
+          $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc.a
+          $ENV{HOME}/wasm-toolchain/sysroot/lib/clang/16.0.0/lib/wasi/libclang_rt.builtins-wasm32.a
+          $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc++abi.a
           -o add_2.wasm
           --no-entry
           --allow-undefined
@@ -44,7 +47,17 @@ add_custom_command(
 )
 
 add_custom_command(
-    OUTPUT "add_2_map.wasm"
+  OUTPUT "wasi_snapshot_preview1.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/map_memory.wat
+  COMMAND ${CMAKE_BINARY_DIR}/../../../_deps/wabt-build/wat2wasm
+          --enable-multi-memory
+	        --enable-exceptions
+          ${CMAKE_CURRENT_SOURCE_DIR}/wasi_snapshot_preview1.wat
+          -o wasi_snapshot_preview1.wasm
+)
+
+add_custom_command(
+    OUTPUT "tmp.wasm"
     DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
     add_2.wasm
     map_memory.wasm
@@ -53,13 +66,28 @@ add_custom_command(
     --enable-exceptions
     add_2.wasm
     map_memory.wasm
+    -o tmp.wasm
+)
+
+add_custom_command(
+    OUTPUT "add_2_map.wasm"
+    DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+    tmp.wasm
+    wasi_snapshot_preview1.wasm
+    COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+    --enable-multi-memory
+    --enable-exceptions
+    tmp.wasm
+    wasi_snapshot_preview1.wasm
     -o add_2_map.wasm
-    )
+)
 
 add_custom_target(
         pl-test ALL
         DEPENDS add_2.wasm
                 map_memory.wasm
+                wasi_snapshot_preview1.wasm
+                tmp.wasm
                 add_2_map.wasm
       )
   
