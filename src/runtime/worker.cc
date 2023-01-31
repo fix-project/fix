@@ -52,20 +52,22 @@ Name RuntimeWorker::reduce_thunk( Name name )
   //}
 }
 
-Name RuntimeWorker::force_tree( Name name ) // Accept Job
+Name RuntimeWorker::force_tree( Name name )
 {
-  // TODO need to be creating a new tree
   auto orig_tree = runtimestorage_.get_tree( name );
 
   std::atomic<size_t> pending_jobs = orig_tree.size();
 
-  // Could just push all jobs all let it get taken care of by the pop
+  Name new_name = runtimestorage_.add_tree( std::move( Tree( orig_tree.size() ) ) );
+  auto tree = runtimestorage_.get_tree( new_name );
+
   for ( size_t i = 0; i < orig_tree.size(); ++i ) {
     auto entry = orig_tree[i];
 
     if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-      queue_job( std::move( Job( entry, &( orig_tree.mutable_data()[i] ), &pending_jobs ) ) );
+      queue_job( std::move( Job( entry, &( tree.mutable_data()[i] ), &pending_jobs ) ) );
     } else {
+      tree.mutable_data()[i] = entry;
       pending_jobs--;
     }
   }
@@ -77,12 +79,12 @@ Name RuntimeWorker::force_tree( Name name ) // Accept Job
       compute_job( job );
   }
 
-  return name;
+  return new_name;
 }
 
-Name RuntimeWorker::evaluate_encode( Name encode_name ) // Include Job
+Name RuntimeWorker::evaluate_encode( Name name )
 {
-  force_tree( encode_name );
+  Name encode_name = force_tree( name );
   Name function_name = runtimestorage_.get_tree( encode_name ).at( 1 );
 
   if ( not function_name.is_blob() ) {
@@ -148,8 +150,6 @@ void RuntimeWorker::work()
 
 void RuntimeWorker::queue_job( Job job )
 {
-  // Add the job to our local queue and alert the runtime this job is READY
-  // mgmt_.set_job_status( std::get<0>(job), JobManager::PENDING );
   jobs_.push( std::move( job ) );
 }
 

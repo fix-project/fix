@@ -27,15 +27,11 @@ public:
     return vector_.size();
   }
 
-  void push_back( const T& value )
+  size_t push_back( T&& value )
   {
     std::unique_lock lock( vector_mutex_ );
+    size_t local_id = vector_.size();
     vector_.push_back( std::move( value ) );
-  }
-
-  void push_back( T&& value )
-  {
-    std::unique_lock lock( vector_mutex_ );
-    vector_.push_back( std::move( value ) );
+    return local_id;
   }
 };

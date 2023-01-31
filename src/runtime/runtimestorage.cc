@@ -14,8 +14,8 @@ using namespace std;
 
 bool RuntimeStorage::steal_work( Job& job, size_t tid )
 {
-  for ( size_t i = 0; i < num_workers_; ++i ) {
-    if ( workers_.at( ( i + tid ) % num_workers_ )->jobs_.pop( job ) ) {
+  for ( size_t i = 0; i <= num_workers_; ++i ) {
+    if ( workers_[( i + tid ) % ( num_workers_ + 1 ) ]->jobs_.pop( job ) ) {
       return true;
     }
   }
@@ -30,8 +30,8 @@ Name RuntimeStorage::force_thunk( Name name )
 Name RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 31 ) {
-    Name name( local_storage_.size(), blob.size(), ContentType::Blob );
-    local_storage_.push_back( move( blob ) );
+    size_t local_id = local_storage_.push_back( move( blob ) );
+    Name name( local_id, blob.size(), ContentType::Blob );
     return name;
   } else {
     Name name( blob );
@@ -83,8 +83,8 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
 
 Name RuntimeStorage::add_tree( Tree&& tree )
 {
-  Name name( local_storage_.size(), tree.size(), ContentType::Tree );
-  local_storage_.push_back( move( tree ) );
+  size_t local_id = local_storage_.push_back( move( tree ) );
+  Name name( local_id, tree.size(), ContentType::Tree );
   return name;
 }
 
@@ -146,8 +146,6 @@ Name RuntimeStorage::local_to_storage( Name name )
       if ( holds_alternative<Name>( obj ) ) {
         Name new_name = get<Name>( obj );
         assert( !new_name.is_local() );
-
-        // TODO if we realize the obj has already been observed we need to update our store to account for that
 
         return new_name;
       } else if ( holds_alternative<Blob>( obj ) ) {
