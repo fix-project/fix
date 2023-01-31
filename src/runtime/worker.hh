@@ -18,8 +18,6 @@ private:
 
   boost::lockfree::queue<Job> jobs_;
 
-  // TODO can place a map of locally active jobs here
-
   std::thread thread_;
 
   size_t thread_id_;
