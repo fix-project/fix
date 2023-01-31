@@ -442,24 +442,24 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
   }                                                                                                                \
   uint32_t wasm_rt_grow_##type##_table( wasm_rt_##type##_table_t* table, uint32_t delta, wasm_rt_##type##_t init ) \
   {                                                                                                                \
-    uint32_t old_elems = table->size;                                                                              \
-    uint64_t new_elems = (uint64_t)table->size + delta;                                                            \
-    if ( new_elems == 0 ) {                                                                                        \
+    uint32_t old_length = table->size;                                                                             \
+    wasm_rt_##type##_t* old_data = table->data;                                                                    \
+    uint64_t new_length = (uint64_t)table->size + delta;                                                           \
+    if ( new_length == 0 ) {                                                                                       \
       return 0;                                                                                                    \
     }                                                                                                              \
-    if ( ( new_elems < old_elems ) || ( new_elems > table->max_size ) ) {                                          \
+    if ( ( new_length < old_length ) || ( new_length > table->max_size ) ) {                                       \
       return (uint32_t)-1;                                                                                         \
     }                                                                                                              \
-    void* new_data = realloc( table->data, new_elems * sizeof( wasm_rt_##type##_t ) );                             \
-    if ( !new_data ) {                                                                                             \
-      return (uint32_t)-1;                                                                                         \
-    }                                                                                                              \
-    table->data = static_cast<wasm_rt_##type##_t*>( new_data );                                                    \
-    table->size = new_elems;                                                                                       \
-    for ( uint32_t i = old_elems; i < new_elems; i++ ) {                                                           \
+    void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), new_length * sizeof( wasm_rt_##type##_t ) );         \
+    table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                         \
+    memcpy( table->data, old_data, old_length * sizeof( wasm_rt_##type##_t ) );                                    \
+    table->size = new_length;                                                                                      \
+    for ( uint32_t i = old_length; i < new_length; i++ ) {                                                         \
       table->data[i] = init;                                                                                       \
     }                                                                                                              \
-    return old_elems;                                                                                              \
+    free( old_data );                                                                                              \
+    return old_length;                                                                                             \
   }
 
 DEFINE_TABLE_OPS( funcref )

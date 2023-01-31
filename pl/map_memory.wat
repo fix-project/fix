@@ -28,14 +28,14 @@
   )
 
   ;; Grows rw_table_1 by $size and initializes new values to $init_val. 
-  ;; Returns the old length.
+  ;; Returns the old length or -1 for failure.
   (func (export "grow_rw_table_1") (param $size i32) (param $init_val externref ) (result i32)
     (local.get $init_val)
     (local.get $size)
     (table.grow $rw_table_1)
   )
 
-  ;; Grows rw_mem_0 by $size and returns the old length.
+  ;; Grows rw_mem_0 by $size and returns the old length or -1 for failure.
   (func (export "grow_rw_mem_0") (param $size i32) (result i32)
     (local.get $size)
     (memory.grow $rw_mem_0)
