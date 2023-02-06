@@ -202,18 +202,8 @@ Name RuntimeStorage::force_tree( Name name )
 
 Name RuntimeStorage::force_thunk( Name name )
 {
-  Name current_name = name;
-  while ( true ) {
-    Name new_name = reduce_thunk( current_name );
-    switch ( new_name.get_content_type() ) {
-      case ContentType::Blob:
-      case ContentType::Tree:
-        return force( new_name );
-
-      default:
-        current_name = new_name;
-    }
-  }
+  name = reduce_thunk( name );
+  return force( name );
 }
 
 Name RuntimeStorage::reduce_thunk( Name name )
