@@ -130,3 +130,12 @@ int32_t find_file( int32_t path, // offset into main memory of sloth program, ne
 
   return result;
 }
+
+int32_t create_file(int32_t path, // offset into main memory of sloth program, needs to be copied to flatware memory
+                    int32_t path_len,
+                    int32_t curr_fd,
+                    int32_t desired_fd )
+{
+  //TODO 
+  return -1;
+}

@@ -79,5 +79,8 @@ int main()
     return -1;
   }
 
+  //int fd_8 = open( "a/b/new_file.txt", O_WRONLY );
+  //printf( "fd_8 = %d\n", fd_8 );
+
   return 0;
 }
