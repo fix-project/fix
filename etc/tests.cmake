@@ -22,19 +22,19 @@ add_test(NAME t_open WORKING_DIRECTORY
 
 add_test(NAME t_addblob WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testing/add-test
-  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/add_tester
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
   ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/addblob.wasm
 )
 
 add_test(NAME t_add_simple WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testing/add-test
-  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/add_tester
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
   ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/add-simple.wasm
 )
 
 add_test(NAME t_fib WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testing/fib-test
-  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/fib_tester
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
   ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/fib.wasm
   ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/add-simple.wasm
 )

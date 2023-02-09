@@ -1,13 +1,3 @@
-add_executable(add_tester "add_tester.cc")
-target_link_libraries(add_tester ${FIXPOINT_LIBS})
-target_link_libraries(add_tester cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
-add_dependencies(add_tester wasm2c)
-
-add_executable(fib_tester "fib_tester.cc")
-target_link_libraries(fib_tester ${FIXPOINT_LIBS})
-target_link_libraries(fib_tester cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
-add_dependencies(fib_tester wasm2c)
-
 add_executable(wasi_tester "wasi_tester.cc" "option-parser.cc")
 target_link_libraries(wasi_tester ${FIXPOINT_LIBS})
 target_link_libraries(wasi_tester cryptopp wasmrt ${CLANG_LIBS} LLVM absl::flat_hash_map wabt)
