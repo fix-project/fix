@@ -1,23 +1,28 @@
 #pragma once
 
-#include "name.hh"
 #include <atomic>
+
+#include "name.hh"
+
+#define NONE 0x00
+#define APPLY 0x01
+#define FORCE 0x02
+#define EVAL 0x03
+#define LINK 0x04
+#define CHILD 0x05
 
 struct Job
 {
   Name name;
-  Name* entry;
-  std::atomic<size_t>* pending_jobs;
+  Name hash;
 
-  Job( Name name, Name* entry, std::atomic<size_t>* pending_jobs )
+  Job( Name name, Name hash )
     : name( name )
-    , entry( entry )
-    , pending_jobs( pending_jobs )
+    , hash( hash )
   {}
 
   Job()
     : name()
-    , entry()
-    , pending_jobs()
+    , hash()
   {}
 };

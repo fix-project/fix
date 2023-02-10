@@ -8,9 +8,10 @@
 #include <unordered_map>
 
 #include "ccompiler.hh"
-#include "concurrent_flat_hash_map.hh"
 #include "concurrent_storage.hh"
 #include "concurrent_vector.hh"
+#include "entry.hh"
+#include "fixcache.hh"
 #include "name.hh"
 #include "object.hh"
 #include "program.hh"
@@ -24,21 +25,15 @@ class RuntimeStorage
 {
 private:
   friend class RuntimeWorker;
+  friend class Job;
 
   // Storage: maps a Name to the contents of the corresponding Object
   InMemoryStorage<Object> storage;
 
-  // Memorization Cache: maps a Thunk to the Name of a reduction of the original Thunk
-  concurrent_flat_hash_map<Name> memoization_cache;
-
-  // Trace Cache: maps a Name to a human-readable string
-  concurrent_flat_hash_map<std::string> trace_cache;
+  fixcache fix_cache_;
 
   // Maps a Wasm function Name to corresponding compiled Program
-  concurrent_flat_hash_map<Program> name_to_program_;
-
-  // Unique id for local name
-  size_t next_local_name_;
+  InMemoryStorage<Program> name_to_program_;
 
   // Storage for Object/Names with a local name
   concurrent_vector<ObjectOrName> local_storage_;
@@ -47,43 +42,39 @@ private:
 
   size_t num_workers_;
 
-  std::condition_variable to_workers_;
+  std::atomic<bool> threads_active_;
 
-  std::mutex to_workers_mutex_;
-
-  bool threads_active_;
+  std::atomic<size_t> work_;
 
   RuntimeStorage()
     : storage()
-    , memoization_cache()
-    , trace_cache()
+    , fix_cache_()
     , name_to_program_()
-    , next_local_name_( 0 )
     , local_storage_()
     , workers_()
-    , num_workers_( 2 )
-    , to_workers_()
-    , to_workers_mutex_()
+    , num_workers_( 16 )
     , threads_active_( false )
+    , work_( 0 )
   {
     wasm_rt_init();
     llvm_init();
 
-    for ( size_t i = 0; i <= num_workers_; ++i ) {
+    for ( size_t i = 0; i < num_workers_; ++i ) {
       std::unique_ptr<RuntimeWorker> worker = std::make_unique<RuntimeWorker>( i, *this );
       workers_.push_back( std::move( worker ) );
     }
 
     threads_active_ = true;
-    to_workers_.notify_all();
+    threads_active_.notify_one();
   }
 
   ~RuntimeStorage()
   {
     threads_active_ = false;
-    to_workers_.notify_all();
+    work_ = 1;
+    work_.notify_all();
 
-    for ( size_t i = 1; i <= num_workers_; ++i ) {
+    for ( size_t i = 0; i < num_workers_; ++i ) {
       ( *workers_.at( i ) ).thread_.join();
     }
   }
@@ -98,8 +89,6 @@ public:
 
   bool steal_work( Job& job, size_t tid );
 
-  Name entry_force_thunk( Name name );
-
   // add blob
   Name add_blob( Blob&& blob );
 
@@ -113,9 +102,12 @@ public:
   // Return reference to Tree
   span_view<Name> get_tree( Name name );
 
+  ObjectOrName& get_tree_obj( Name name );
+
   // add Thunk
   Name add_thunk( Thunk thunk );
 
+  // Blocking force operations
   Name force_thunk( Name name );
 
   // Return encode name referred to by thunk

@@ -9,6 +9,7 @@
 #include <variant>
 
 #include "exception.hh"
+#include "job.hh"
 #include "name.hh"
 #include "spans.hh"
 #include "thunk.hh"

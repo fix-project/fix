@@ -1,10 +1,10 @@
+#include "base64.hh"
 #include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
-#include "base64.hh"
-
+#include "job.hh"
 #include "object.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
@@ -14,8 +14,9 @@ using namespace std;
 
 bool RuntimeStorage::steal_work( Job& job, size_t tid )
 {
-  for ( size_t i = 0; i <= num_workers_; ++i ) {
-    if ( workers_[( i + tid ) % ( num_workers_ + 1 ) ]->jobs_.pop( job ) ) {
+  // Starting at the next thread index after the current thread--look to steal work
+  for ( size_t i = 0; i < num_workers_; ++i ) {
+    if ( workers_[( i + tid + 1 ) % num_workers_]->jobs_.pop( job ) ) {
       return true;
     }
   }
@@ -24,7 +25,18 @@ bool RuntimeStorage::steal_work( Job& job, size_t tid )
 
 Name RuntimeStorage::force_thunk( Name name )
 {
-  return workers_.at( 0 )->force_thunk( name );
+  auto hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) );
+  Name desired( hash, false, { FORCE } );
+  Name operations( hash, true, { FORCE } );
+
+  fix_cache_.insert_or_update( desired, Name(), 1 );
+
+  workers_[0].get()->queue_job( Job( name, operations ) );
+
+  std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
+  ( pending.get() )->wait( 1 );
+
+  return fix_cache_.get_name( desired );
 }
 
 Name RuntimeStorage::add_blob( Blob&& blob )
@@ -98,7 +110,7 @@ span_view<Name> RuntimeStorage::get_tree( Name name )
       return get_tree( get<Name>( obj ) );
     }
   } else {
-    const Object& obj = storage.get( name );
+    const Object& obj = storage.get( name ); // TODO This will need to be better protected
     if ( holds_alternative<Tree>( obj ) ) {
       return get<Tree>( obj );
     }
@@ -127,8 +139,8 @@ void RuntimeStorage::populate_program( Name function_name )
     /* compile the Wasm to C and then to ELF */
     const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
 
-    name_to_program_.insert_or_assign(
-      function_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+    name_to_program_.put( function_name,
+                          link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
   }
 
   return;
