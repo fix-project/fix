@@ -1,164 +1,235 @@
-#include "worker.hh"
+#include <string_view>
+
+#include "job.hh"
+#include "name.hh"
 #include "runtimestorage.hh"
+#include "sha256.hh"
 #include "wasm-rt-content.h"
 
-Name RuntimeWorker::force_thunk( Name name )
+void RuntimeWorker::queue_job( Job job )
 {
-  Name current_name = name;
-  while ( true ) {
-    Name new_name = reduce_thunk( current_name );
-    switch ( new_name.get_content_type() ) {
-      case ContentType::Blob:
-      case ContentType::Tree:
-        return force( new_name );
+  runtimestorage_.work_++;
+  jobs_.push( std::move( job ) );
+  runtimestorage_.work_.notify_one();
+}
 
-      default:
-        current_name = new_name;
+bool RuntimeWorker::dequeue_job( Job& job )
+{
+  // Try to pop off the local queue, steal work if that fails, return false if no work can be found
+  bool work = jobs_.pop( job );
+
+  if ( !work )
+    work = runtimestorage_.steal_work( job, thread_id_ );
+
+  if ( work )
+    runtimestorage_.work_--;
+
+  return work;
+}
+
+void RuntimeWorker::eval( Name hash, Name name )
+{
+  switch ( name.get_content_type() ) {
+    case ContentType::Blob: {
+      progress( hash, name );
+      break;
+    }
+
+    case ContentType::Tree: {
+      auto orig_tree = runtimestorage_.get_tree( name );
+      Name new_name = runtimestorage_.add_tree( std::move( Tree( orig_tree.size() ) ) );
+      Name nhash(
+        sha256::encode( std::string_view( reinterpret_cast<const char*>( &new_name ), 32 ) ), false, { EVAL } );
+
+      runtimestorage_.fix_cache_.insert_or_update( nhash, hash, orig_tree.size() );
+
+      std::shared_ptr<std::atomic<int64_t>> pending = runtimestorage_.fix_cache_.get_pending( nhash );
+      span_view<Name> tree = runtimestorage_.get_tree( new_name );
+
+      for ( size_t i = 0; i < orig_tree.size(); ++i ) {
+        auto entry = orig_tree[i];
+        tree.mutable_data()[i] = entry;
+
+        if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
+          // TODO need "atomic cache insert next"
+          auto entry_hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &entry ), 32 ) );
+
+          Name desired( entry_hash, false, { FORCE } );
+          Name operations( entry_hash, true, { FORCE } );
+          runtimestorage_.fix_cache_.insert_next( desired, new_name, 0 );
+
+          queue_job( Job( entry, operations ) );
+        } else {
+          ( *( pending.get() ) )--;
+        }
+      }
+
+      int64_t last_job = 0;
+      if ( pending.get()->compare_exchange_strong( last_job, -1 ) ) {
+        update_parent( new_name );
+        progress( hash, new_name );
+      }
+      break;
+    }
+
+    case ContentType::Thunk: {
+      auto name_hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) );
+
+      Name desired( name_hash, false, { EVAL, FORCE } );
+      Name operations( name_hash, true, { FORCE, EVAL } );
+      runtimestorage_.fix_cache_.insert_or_update( desired, hash, 0 );
+
+      progress( operations, name );
+
+      // return eval(force(name))
+      break;
+    }
+
+    default: {
+      throw std::runtime_error( "Invalid content type." );
     }
   }
 }
 
-Name RuntimeWorker::force( Name name )
+void RuntimeWorker::force( Name hash, Name name )
 {
-  if ( name.is_literal_blob() ) {
-    return name;
-  } else {
-    switch ( name.get_content_type() ) {
-      case ContentType::Blob:
-        return name;
+  switch ( name.get_content_type() ) {
+    case ContentType::Thunk: {
+      Name encode_name = Name::get_encode_name( name );
 
-      case ContentType::Tree:
-        return force_tree( name );
+      auto encode_hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &encode_name ), 32 ) );
+      Name desired( encode_hash, false, { EVAL, APPLY, FORCE } );
+      Name operations( encode_hash, true, { FORCE, APPLY, EVAL } );
+      runtimestorage_.fix_cache_.insert_or_update( desired, hash, 0 );
 
-      case ContentType::Thunk:
-        return force_thunk( name );
+      progress( operations, encode_name );
 
-      default:
-        throw std::runtime_error( "Invalid content type." );
+      // return force(apply(eval(encode_name)))
+      break;
+    }
+
+    case ContentType::Blob:
+    case ContentType::Tree: {
+      progress( hash, name );
+      break;
+    }
+    default: {
+      throw std::runtime_error( "Invalid content type." );
     }
   }
 }
 
-Name RuntimeWorker::reduce_thunk( Name name )
+void RuntimeWorker::apply( Name hash, Name name )
 {
-  Name encode_name = runtimestorage_.get_thunk_encode_name( name );
-  // Name canonical_name = local_to_storage( encode_name );
-  // if ( memoization_cache.contains( canonical_name ) ) {
-  //   return memoization_cache.at( canonical_name );
-  // } else {
-  Name result = evaluate_encode( encode_name );
-  // memoization_cache.insert_or_assign( canonical_name, result );
-  return result;
-  //}
-}
-
-Name RuntimeWorker::force_tree( Name name )
-{
-  auto orig_tree = runtimestorage_.get_tree( name );
-
-  std::atomic<size_t> pending_jobs = orig_tree.size();
-
-  Name new_name = runtimestorage_.add_tree( std::move( Tree( orig_tree.size() ) ) );
-  auto tree = runtimestorage_.get_tree( new_name );
-
-  for ( size_t i = 0; i < orig_tree.size(); ++i ) {
-    auto entry = orig_tree[i];
-
-    if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-      queue_job( std::move( Job( entry, &( tree.mutable_data()[i] ), &pending_jobs ) ) );
-    } else {
-      tree.mutable_data()[i] = entry;
-      pending_jobs--;
-    }
-  }
-
-  while ( pending_jobs != 0 ) {
-    Job job;
-    bool work = dequeue_job( job );
-    if ( work )
-      compute_job( job );
-  }
-
-  return new_name;
-}
-
-Name RuntimeWorker::evaluate_encode( Name name )
-{
-  Name encode_name = force_tree( name );
-  Name function_name = runtimestorage_.get_tree( encode_name ).at( 1 );
+  Name function_name = runtimestorage_.get_tree( name ).at( 1 );
 
   if ( not function_name.is_blob() ) {
     throw std::runtime_error( "ENCODE functions not yet supported" );
   }
 
   Name canonical_name = runtimestorage_.local_to_storage( function_name );
+
   if ( not runtimestorage_.name_to_program_.contains( canonical_name ) ) {
     /* compile the Wasm to C and then to ELF */
     const auto [c_header, h_header, fixpoint_header]
       = wasmcompiler::wasm_to_c( runtimestorage_.get_blob( function_name ) );
-
     Program program = link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) );
-
-    runtimestorage_.name_to_program_.insert_or_assign( canonical_name, std::move( program ) );
+    runtimestorage_.name_to_program_.put( canonical_name, std::move( program ) );
   }
 
-  auto& program = runtimestorage_.name_to_program_.at( canonical_name );
-  __m256i output = program.execute( encode_name );
+  auto& program = runtimestorage_.name_to_program_.getMutable( canonical_name );
+  __m256i output = program.execute( name );
 
-  return output;
+  // Compute next operation
+  progress( hash, output );
 }
 
-void RuntimeWorker::compute_job( Job& job )
+void RuntimeWorker::update_parent( Name name )
 {
-  Name name = job.name;
-  if ( !name.is_literal_blob() ) {
-    switch ( name.get_content_type() ) {
-      case ContentType::Blob:
-        break;
-      case ContentType::Tree:
-        name = force_tree( name );
-        break;
+  span_view<Name> tree = runtimestorage_.get_tree( name );
 
-      case ContentType::Thunk:
-        name = force_thunk( name );
-        break;
-
-      default:
-        throw std::runtime_error( "Invalid content type." );
+  for ( size_t i = 0; i < tree.size(); ++i ) {
+    auto entry = tree[i];
+    if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
+      Name desired(
+        sha256::encode( std::string_view( reinterpret_cast<const char*>( &entry ), 32 ) ), false, { FORCE } );
+      tree.mutable_data()[i] = runtimestorage_.fix_cache_.get_name( desired );
     }
   }
+}
 
-  *job.entry = name;
-  ( *job.pending_jobs )--;
+void RuntimeWorker::child( Name hash )
+{
+  for ( int i = 1;; ++i ) {
+    hash.set_index( i );
+    if ( runtimestorage_.fix_cache_.contains( hash ) ) {
+      Name tree_name = runtimestorage_.fix_cache_.get_name( hash );
+      Name nhash(
+        sha256::encode( std::string_view( reinterpret_cast<const char*>( &tree_name ), 32 ) ), false, { EVAL } );
+      std::shared_ptr<std::atomic<int64_t>> pending = runtimestorage_.fix_cache_.get_pending( nhash );
+
+      ( *pending.get() )--;
+
+      int64_t last_job = 0;
+      if ( pending.get()->compare_exchange_strong( last_job, -1 ) ) {
+        update_parent( tree_name );
+        // TODO this can be a seperate job if needed
+        progress( runtimestorage_.fix_cache_.get_name( nhash ), tree_name );
+      }
+    } else {
+      break;
+    }
+  }
+}
+
+void RuntimeWorker::progress( Name hash, Name name )
+{
+  uint64_t current = hash.peek_operation();
+
+  if ( current != NONE ) {
+    hash.pop_operation();
+    Name nhash(
+      sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) ), false, { current } );
+    runtimestorage_.fix_cache_.insert_or_update( nhash, hash, 1 );
+
+    switch ( current ) {
+      case APPLY:
+        apply( nhash, name );
+        break;
+      case EVAL:
+        eval( nhash, name );
+        break;
+      case FORCE:
+        force( nhash, name );
+        break;
+      default:
+        throw std::runtime_error( "Invalid job type." );
+    }
+  } else {
+    if ( runtimestorage_.fix_cache_.contains( hash ) ) {
+      Name requestor = runtimestorage_.fix_cache_.get_name( hash );
+      runtimestorage_.fix_cache_.insert_or_update( hash, name, 0 );
+
+      if ( requestor != hash ) {
+        progress( requestor, name );
+      } else {
+        child( requestor );
+      }
+    }
+  }
 }
 
 void RuntimeWorker::work()
 {
   // Wait till all threads have been primed before computation can begin
-  {
-    std::unique_lock<std::mutex> conditional_lock( runtimestorage_.to_workers_mutex_ );
-    runtimestorage_.to_workers_.wait( conditional_lock, [this] { return runtimestorage_.threads_active_; } );
-  }
+  runtimestorage_.threads_active_.wait( false );
 
+  Job job;
   while ( runtimestorage_.threads_active_ ) {
-    Job job;
-    bool work = dequeue_job( job );
-    if ( work )
-      compute_job( job );
+    if ( dequeue_job( job ) ) {
+      progress( job.hash, job.name );
+    } else {
+      runtimestorage_.work_.wait( 0 );
+    }
   }
-}
-
-void RuntimeWorker::queue_job( Job job )
-{
-  jobs_.push( std::move( job ) );
-}
-
-bool RuntimeWorker::dequeue_job( Job& job )
-{
-  // Try to pop of the local queue, steal work if that fails, return false if no work can be found
-  bool contains = jobs_.pop( job );
-  if ( !contains ) {
-    contains = runtimestorage_.steal_work( job, thread_id_ );
-  }
-  return contains;
 }

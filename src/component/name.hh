@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bit>
+#include <cstdarg>
 #include <iostream>
 #include <string>
 #include <variant>
@@ -54,6 +56,23 @@ public:
     content_[2] = size;
   }
 
+  Name( std::string hash, bool pending, std::initializer_list<uint64_t> list )
+  {
+    __builtin_memcpy( &content_, hash.data(), 32 );
+
+    content_[0] = 0;
+    content_[1] = 0;
+
+    for ( auto elem : list ) {
+      content_[1] ^= elem;
+      content_[1] = std::rotl( (unsigned long long)content_[1], ( pending ? 1 : -1 ) * 4 );
+    }
+
+    if ( pending ) {
+      content_[1] = std::rotr( (unsigned long long)content_[1], 4 );
+    }
+  }
+
   Name( std::string_view literal_content )
   {
     assert( literal_content.size() < 32 );
@@ -75,6 +94,39 @@ public:
   bool is_strict_tree_entry() const { return !( metadata() & 0x80 ); }
 
   uint8_t get_metadata() { return metadata(); }
+
+  void set_index( size_t value ) { content_[0] = value; }
+
+  void get_index( size_t value ) { content_[0] = value; }
+
+  uint64_t pop_operation()
+  {
+    uint64_t op = 0xF & content_[1];
+
+    content_[1] = std::rotr( (unsigned long long)content_[1], 4 );
+
+    return op;
+  }
+
+  void set_operations( bool pending, std::initializer_list<uint64_t> list )
+  {
+    content_[1] = 0;
+
+    for ( auto elem : list ) {
+      content_[1] ^= elem;
+      content_[1] = std::rotl( (unsigned long long)content_[1], ( pending ? 1 : -1 ) * 4 );
+    }
+
+    if ( pending ) {
+      content_[1] = std::rotr( (unsigned long long)content_[1], 4 );
+    }
+  }
+
+  uint64_t peek_operation()
+  {
+    uint64_t op = 0xF & content_[1];
+    return op;
+  }
 
   static Name name_only( Name name )
   {
