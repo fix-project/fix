@@ -12,7 +12,6 @@ typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
 int32_t create_file( int32_t path, int32_t path_len, int32_t curr_fd, int32_t desired_fd );
 
-
 bool is_dir( int32_t ro_table_index );
 
 struct substring get_name( int32_t ro_table_index );

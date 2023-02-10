@@ -83,7 +83,7 @@ int32_t find_local_file( struct substring path, int32_t curr_fd, bool must_be_di
     }
   }
 
-  return ( 0 - (int32_t)path.len );
+  return ( 0 - (int32_t) path.len );
 }
 
 int32_t lookup( struct substring path, int32_t curr_fd, int32_t desired_fd )
@@ -91,9 +91,9 @@ int32_t lookup( struct substring path, int32_t curr_fd, int32_t desired_fd )
   while ( 1 ) {
     void* slash_ptr = memchr( path.ptr, '/', path.len );
     if ( slash_ptr ) {
-      const size_t component_len = (size_t)( (char*)slash_ptr - (char*)path.ptr );
+      const size_t component_len = (size_t)( (char*) slash_ptr - (char*) path.ptr );
       const struct substring curr_component = { path.ptr, component_len };
-      const struct substring rest_of_path = { (char*)slash_ptr + 1, path.len - component_len - 1 };
+      const struct substring rest_of_path = { (char*) slash_ptr + 1, path.len - component_len - 1 };
 
       curr_fd = find_local_file( curr_component, curr_fd, true, desired_fd );
       if ( curr_fd < 0 ) {
@@ -118,11 +118,11 @@ int32_t find_file( int32_t path, // offset into main memory of sloth program, ne
   struct substring my_path;
   int32_t result;
 
-  buf = (char*)malloc( (unsigned long)path_len );
+  buf = (char*) malloc( (unsigned long) path_len );
 
   program_memory_to_flatware_memory( buf, path, path_len );
 
-  my_path = ( struct substring ) { buf, (size_t)path_len };
+  my_path = ( struct substring ) { buf, (size_t) path_len };
 
   result = lookup( my_path, curr_fd, desired_fd );
 
@@ -136,6 +136,35 @@ int32_t create_file(int32_t path, // offset into main memory of sloth program, n
                     int32_t curr_fd,
                     int32_t desired_fd )
 {
-  //TODO 
+  // TODO implementation
+  // look up parent directory                  --done
+  // create new tree                           create_tree                 
+  // create new file                           
+  // copy contents of old tree
+  // copy new file to new pointer
+  // return handle of file pointer to new file
+
+  char* buf;
+  struct substring my_path;
+  int32_t directory_fd;
+  void* slash_ptr;
+  size_t parent_directory_length;
+
+  buf = (char*) malloc( (unsigned long) path_len );
+  
+  program_memory_to_flatware_memory( buf, path, path_len );
+  
+  my_path = ( struct substring ) { buf, (size_t) path_len };
+  slash_ptr =  strrchr( my_path.ptr, '/' );
+  parent_directory_length = (size_t)( (char*) slash_ptr - (char*) my_path.ptr );
+  my_path = ( struct substring ) { buf, (size_t) parent_directory_length };
+  directory_fd = find_local_file( my_path, curr_fd, true, desired_fd );
+
+  // create tree
+  
+
+  // create file
+
+  free( buf );
   return -1;
 }

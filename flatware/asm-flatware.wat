@@ -17,6 +17,13 @@
   (table $ro_table_6 (export "ro_table_6") 0 externref)
   (table $ro_table_7 (export "ro_table_7") 0 externref)
   (table $return (export "rw_table_0") 3 externref)
+  (table $rw_table_1 (export "rw_table_1") 3 externref)
+  (table $rw_table_2 (export "rw_table_2") 3 externref)
+  (table $rw_table_3 (export "rw_table_3") 3 externref)
+  (table $rw_table_4 (export "rw_table_4") 3 externref)
+  (table $rw_table_5 (export "rw_table_5") 3 externref)
+  (table $rw_table_6 (export "rw_table_6") 3 externref)
+  (table $rw_table_7 (export "rw_table_7") 3 externref)
   ;; rw_0
   (func (export "flatware_memory_to_rw_0") (param $offset i32) (param $ptr i32) (param $len i32)
     (memory.copy $flatware_mem $mymem0
@@ -176,6 +183,35 @@
   ;; rw_table_0
   (func (export "set_rw_table_0") (param $index i32) (param $val externref) 
     (table.set $return (local.get $index) (local.get $val))
+  )
+
+  ;; rw_table_1
+  (func (export "set_rw_table_1") (param $index i32) (param $val externref) 
+    (table.set $rw_table_1 (local.get $index) (local.get $val))
+  )
+  ;; rw_table_2
+  (func (export "set_rw_table_2") (param $index i32) (param $val externref) 
+    (table.set $rw_table_2 (local.get $index) (local.get $val))
+  )
+  ;; rw_table_3
+  (func (export "set_rw_table_3") (param $index i32) (param $val externref) 
+    (table.set $rw_table_3 (local.get $index) (local.get $val))
+  )
+  ;; rw_table_4
+  (func (export "set_rw_table_4") (param $index i32) (param $val externref) 
+    (table.set $rw_table_4 (local.get $index) (local.get $val))
+  )
+  ;; rw_table_5
+  (func (export "set_rw_table_5") (param $index i32) (param $val externref) 
+    (table.set $rw_table_5 (local.get $index) (local.get $val))
+  )
+  ;; rw_table_6
+  (func (export "set_rw_table_6") (param $index i32) (param $val externref) 
+    (table.set $rw_table_6 (local.get $index) (local.get $val))
+  )
+  ;; rw_table_7
+  (func (export "set_rw_table_7") (param $index i32) (param $val externref) 
+    (table.set $rw_table_7 (local.get $index) (local.get $val))
   )
 
   (tag $exit)

@@ -61,6 +61,13 @@ DEFINE_RO_TABLE_OPS( 5 )
 DEFINE_RO_TABLE_OPS( 6 )
 DEFINE_RO_TABLE_OPS( 7 )
 DEFINE_RW_TABLE_OPS( 0 )
+DEFINE_RW_TABLE_OPS( 1 )
+DEFINE_RW_TABLE_OPS( 2 )
+DEFINE_RW_TABLE_OPS( 3 )
+DEFINE_RW_TABLE_OPS( 4 )
+DEFINE_RW_TABLE_OPS( 5 )
+DEFINE_RW_TABLE_OPS( 6 )
+DEFINE_RW_TABLE_OPS( 7 )
 
 static externref ( *get_ro_table_functions[] )( int32_t ) = { get_ro_table_0,
                                                               get_ro_table_1,
