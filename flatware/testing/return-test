@@ -3,25 +3,28 @@
 use strict;
 
 if ((scalar @ARGV) != 2) {
-  die qq{Usage: $0 wasi_tester return3.wasm};
+  die qq{Usage: $0 stateless-tester return3.wasm};
 }
 
 my ($executable, $wasm) = @ARGV;
 
 sub check_return($) {
-  my ($expected_answer) = @_;
+  my ($expected_retval) = @_;
+  my ($expected_stdout) = "";
 
-  my $result = `$executable $wasm 2>&1`;
+  my $result = `$executable tree:2 string:\"0\" file:$wasm 2>&1`;
 
   if ($?) {
     die qq{Failure in running return-test: $result};
   }
 
-  my ($answer) = $result =~ m{^The result is (.*)};
+  my (undef, $substring) = split( 'Result:\n', $result );
+  ($_, my $retval) = $substring =~ m{0\. Blob \(4 bytes\): (.*) \(uint32:(\d*)\)};
+  ($_, my $stdout) = $substring =~ m{1\. Blob \((\d*) bytes\): \"(.*)\"};
 
-  if ( !( $answer eq $expected_answer ) ) {
+  if ( !( $retval eq $expected_retval ) or !( $stdout eq $expected_stdout ) ) {
     print STDERR qq{Got result:\n$result\n};
-    die qq{Wrong return value ($answer, was expecting $expected_answer)};
+    die qq{Wrong return value ($retval, was expecting $expected_retval)};
   }
 }
 

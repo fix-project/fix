@@ -3,7 +3,7 @@
 use strict;
 
 if ((scalar @ARGV) != 2) {
-  die qq{Usage: $0 wasi_tester addarg.wasm};
+  die qq{Usage: $0 stateless-tester addarg.wasm};
 }
 
 my ($executable, $wasm) = @ARGV;
@@ -12,8 +12,10 @@ sub check_add($$) {
   my ($x, $y) = @_;
   my $x_char = chr($x);
   my $y_char = chr($y);
-  my $expected_answer = unpack q{l}, (pack q{l}, ($x + $y) % 2**32);
-  my $result = `$executable $wasm add $x_char $y_char 2>&1`;
+  my $expected_retval = unpack q{l}, (pack q{l}, ($x + $y) % 2**32);
+  my $expected_stdout = "";
+
+  my $result = `$executable tree:3 string:\"0\" file:$wasm tree:3 string:\"add\" string:\"$x_char\" string:\"$y_char\" 2>&1`;
 
   if ($?) {
     print STDERR qq{Got result:\n$result\n};
@@ -22,9 +24,13 @@ sub check_add($$) {
 
   my ($answer) = $result =~ m{^The result is (.*)};
 
-  if ( !( $answer eq $expected_answer) ) {
+  my (undef, $substring) = split( 'Result:\n', $result );
+  ($_, my $retval) = $substring =~ m{0\. Blob \(4 bytes\): (.*) \(uint32:(\d*)\)};
+  ($_, my $stdout) = $substring =~ m{1\. Blob \((\d*) bytes\): \"(.*)\"};
+
+  if ( !( $retval eq $expected_retval ) or !( $stdout eq $expected_stdout ) ) {
     print STDERR qq{Got result:\n$result\n};
-    die qq{Wrong answer to $x + $y ($answer)};
+    die qq{Wrong return value ($retval, was expecting $expected_retval)};
   }
 }
 

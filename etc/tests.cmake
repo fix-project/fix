@@ -41,19 +41,19 @@ add_test(NAME t_fib WORKING_DIRECTORY
 
 add_test(NAME t_return3 WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/flatware/testing/return-test
-  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/wasi_tester
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
   ${CMAKE_CURRENT_BINARY_DIR}/flatware-prefix/src/flatware-build/examples/return3/return3-fixpoint.wasm
 )
 
 add_test(NAME t_hello_world WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/flatware/testing/hello-world-test
-  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/wasi_tester
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
   ${CMAKE_CURRENT_BINARY_DIR}/flatware-prefix/src/flatware-build/examples/helloworld/helloworld-fixpoint.wasm
 )
 
 add_test(NAME t_add_args WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/flatware/testing/add-test
-  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/wasi_tester
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
   ${CMAKE_CURRENT_BINARY_DIR}/flatware-prefix/src/flatware-build/examples/add/add-fixpoint.wasm
 )
 # XXX we don't catch the trap yet
