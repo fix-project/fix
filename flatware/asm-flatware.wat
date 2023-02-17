@@ -184,34 +184,62 @@
   (func (export "set_rw_table_0") (param $index i32) (param $val externref) 
     (table.set $return (local.get $index) (local.get $val))
   )
+  (func (export "get_rw_table_0") (param $index i32) (result externref)
+    (table.get $rw_table_7 (local.get $index))
+  )
 
   ;; rw_table_1
   (func (export "set_rw_table_1") (param $index i32) (param $val externref) 
     (table.set $rw_table_1 (local.get $index) (local.get $val))
   )
+  (func (export "get_rw_table_1") (param $index i32) (result externref)
+    (table.get $rw_table_1 (local.get $index))
+  )
+
   ;; rw_table_2
   (func (export "set_rw_table_2") (param $index i32) (param $val externref) 
     (table.set $rw_table_2 (local.get $index) (local.get $val))
+  )
+  (func (export "get_rw_table_2") (param $index i32) (result externref)
+    (table.get $rw_table_2 (local.get $index))
   )
   ;; rw_table_3
   (func (export "set_rw_table_3") (param $index i32) (param $val externref) 
     (table.set $rw_table_3 (local.get $index) (local.get $val))
   )
+  (func (export "get_rw_table_3") (param $index i32) (result externref)
+    (table.get $rw_table_3 (local.get $index))
+  )
+
   ;; rw_table_4
   (func (export "set_rw_table_4") (param $index i32) (param $val externref) 
     (table.set $rw_table_4 (local.get $index) (local.get $val))
   )
+  (func (export "get_rw_table_4") (param $index i32) (result externref)
+    (table.get $rw_table_4 (local.get $index))
+  )
+
   ;; rw_table_5
   (func (export "set_rw_table_5") (param $index i32) (param $val externref) 
     (table.set $rw_table_5 (local.get $index) (local.get $val))
+  )
+  (func (export "get_rw_table_5") (param $index i32) (result externref)
+    (table.get $rw_table_5 (local.get $index))
   )
   ;; rw_table_6
   (func (export "set_rw_table_6") (param $index i32) (param $val externref) 
     (table.set $rw_table_6 (local.get $index) (local.get $val))
   )
+  (func (export "get_rw_table_6") (param $index i32) (result externref)
+    (table.get $rw_table_6 (local.get $index))
+  )
+
   ;; rw_table_7
   (func (export "set_rw_table_7") (param $index i32) (param $val externref) 
     (table.set $rw_table_7 (local.get $index) (local.get $val))
+  )
+  (func (export "get_rw_table_7") (param $index i32) (result externref)
+    (table.get $rw_table_7 (local.get $index))
   )
 
   (tag $exit)

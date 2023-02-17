@@ -155,7 +155,7 @@ int32_t create_file(int32_t path, // offset into main memory of sloth program, n
   program_memory_to_flatware_memory( buf, path, path_len );
   
   my_path = ( struct substring ) { buf, (size_t) path_len };
-  slash_ptr =  strrchr( my_path.ptr, '/' );
+  slash_ptr = strrchr( my_path.ptr, '/' );
   parent_directory_length = (size_t)( (char*) slash_ptr - (char*) my_path.ptr );
   my_path = ( struct substring ) { buf, (size_t) parent_directory_length };
   directory_fd = find_local_file( my_path, curr_fd, true, desired_fd );

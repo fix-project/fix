@@ -22,8 +22,10 @@
   extern void attach_tree_ro_table_##index( externref ) __attribute__( ( import_module( "fixpoint" ) ) );
 
 #define DEFINE_RW_TABLE_OPS( index )                                                                               \
+  extern externref get_rw_table_##index( int32_t ) __attribute__( ( import_module( "asm-flatware" ) ) );           \
   extern void set_rw_table_##index( int32_t, externref ) __attribute__( ( import_module( "asm-flatware" ) ) );     \
-  extern externref create_tree_rw_table_##index( int32_t ) __attribute__( ( import_module( "fixpoint" ) ) );
+  extern externref create_tree_rw_table_##index( int32_t ) __attribute__( ( import_module( "fixpoint" ) ) );       \
+  extern void attach_tree_rw_table_##index( externref ) __attribute__( ( import_module( "fixpoint" ) ) );
 
 typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
@@ -60,6 +62,7 @@ DEFINE_RO_TABLE_OPS( 4 )
 DEFINE_RO_TABLE_OPS( 5 )
 DEFINE_RO_TABLE_OPS( 6 )
 DEFINE_RO_TABLE_OPS( 7 )
+
 DEFINE_RW_TABLE_OPS( 0 )
 DEFINE_RW_TABLE_OPS( 1 )
 DEFINE_RW_TABLE_OPS( 2 )
@@ -85,6 +88,24 @@ static void ( *attach_tree_ro_table_functions[] )( externref ) = { attach_tree_r
                                                                    attach_tree_ro_table_5,
                                                                    attach_tree_ro_table_6,
                                                                    attach_tree_ro_table_7 };
+static externref ( *get_rw_table_functions[] )( int32_t ) = { get_rw_table_0,
+                                                              get_rw_table_1,
+                                                              get_rw_table_2,
+                                                              get_rw_table_3,
+                                                              get_rw_table_4,
+                                                              get_rw_table_5,
+                                                              get_rw_table_6,
+                                                              get_rw_table_7 };
+static externref ( *create_tree_rw_table_functions[] )( int32_t ) = { create_tree_rw_table_0,
+                                                                      create_tree_rw_table_1,
+                                                                      create_tree_rw_table_2,
+                                                                      create_tree_rw_table_3,
+                                                                      create_tree_rw_table_4,
+                                                                      create_tree_rw_table_5,
+                                                                      create_tree_rw_table_6,
+                                                                      create_tree_rw_table_7 };
 externref get_ro_table( int32_t table_index, int32_t index ) __attribute__( ( __export_name__( "get_ro_table" ) ) );
 void attach_tree_ro_table( int32_t table_index, externref name )
   __attribute__( ( __export_name__( "attach_tree_ro_table" ) ) );
+void create_tree_rw_table( int32_t table_index, externref name )
+  __attribute__( ( __export_name__( "create_tree_rw_table" ) ) );
