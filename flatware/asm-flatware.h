@@ -108,5 +108,5 @@ externref get_ro_table( int32_t table_index, int32_t index ) __attribute__( ( __
 externref get_rw_table( int32_t table_index, int32_t index ) __attribute__( ( __export_name__( "get_rw_table" ) ) );
 void attach_tree_ro_table( int32_t table_index, externref name )
   __attribute__( ( __export_name__( "attach_tree_ro_table" ) ) );
-void create_tree_rw_table( int32_t table_index, externref name )
+externref create_tree_rw_table( int32_t table_index, int32_t index )
   __attribute__( ( __export_name__( "create_tree_rw_table" ) ) );

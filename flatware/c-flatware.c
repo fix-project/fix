@@ -724,6 +724,12 @@ externref get_rw_table( int32_t table_index, int32_t index )
   return get_rw_table_functions[table_index]( index );
 }
 
+externref create_tree_rw_table( int32_t table_index, int32_t index ) {
+  create_tree_rw_table_functions[table_index] ( index ); // TODO add new tree how to do?
+
+  return create_tree_rw_table_functions[table_index] ( index );
+}
+
 void attach_tree_ro_table( int32_t table_index, externref handle )
 {
   attach_tree_ro_table_functions[table_index]( handle );

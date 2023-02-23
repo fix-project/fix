@@ -165,11 +165,17 @@ int32_t create_file(int32_t path, // offset into main memory of sloth program, n
   my_path = ( struct substring ) { buf, (size_t) parent_directory_length };
   directory_fd = find_local_file( my_path, curr_fd, true, desired_fd );
 
-  // create tree
-  //create_tree_rw_table_functions[desired_fd];
+  // create tree size old tree + 1 
   
-  // create file
+  // create file 
 
+  // copy contents of old tree
+
+  // copy new file to new tree as last element
+
+  // free malloced memory
   free( buf );
-  return -1;
+
+  // return file pointer where new tree was created
+  return -1; //TODO remove
 }
