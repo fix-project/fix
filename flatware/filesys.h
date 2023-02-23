@@ -18,7 +18,9 @@ struct substring get_name( int32_t ro_table_index );
 
 uint64_t get_permissions( int32_t ro_table_index );
 
-externref get_content( int32_t ro_table_index );
+externref get_ro_content( int32_t ro_table_index );
+
+externref get_rw_content( int32_t rw_table_index );
 
 int32_t find_local_file( struct substring path, int32_t curr_fd, bool should_be_dir, int32_t desired_fd );
 

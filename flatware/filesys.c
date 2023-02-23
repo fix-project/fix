@@ -5,7 +5,7 @@
 
 bool is_dir( int32_t ro_table_index )
 {
-  externref ret = get_content( ro_table_index );
+  externref ret = get_ro_content( ro_table_index );
 
   if ( value_type( ret ) == 0 ) { // if is tree
     return true;
@@ -52,9 +52,14 @@ uint64_t get_permissions( int32_t ro_table_index )
   return buf;
 }
 
-externref get_content( int32_t ro_table_index )
+externref get_ro_content( int32_t ro_table_index )
 {
   return get_ro_table( ro_table_index, 2 );
+}
+
+externref get_rw_content( int32_t rw_table_index )
+{
+  return get_rw_table( rw_table_index, 2 );
 }
 
 int32_t find_local_file( struct substring path, int32_t curr_fd, bool must_be_dir, int32_t desired_fd )
@@ -62,7 +67,7 @@ int32_t find_local_file( struct substring path, int32_t curr_fd, bool must_be_di
   externref dirent_content;
   int32_t num_of_dirents;
 
-  dirent_content = get_content( curr_fd );
+  dirent_content = get_ro_content( curr_fd );
   attach_tree_ro_table_2( dirent_content );
   num_of_dirents = size_ro_table_2();
 
@@ -161,8 +166,8 @@ int32_t create_file(int32_t path, // offset into main memory of sloth program, n
   directory_fd = find_local_file( my_path, curr_fd, true, desired_fd );
 
   // create tree
+  //create_tree_rw_table_functions[desired_fd];
   
-
   // create file
 
   free( buf );
