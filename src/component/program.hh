@@ -11,6 +11,7 @@
 #include "wasm-rt.h"
 
 #include "timer.hh"
+#include "wasm-rt-impl.hh"
 
 struct InstanceCleanUp
 {
@@ -86,10 +87,19 @@ public:
     __m256i ( *main_func )( void*, __m256i );
     main_func = reinterpret_cast<__m256i ( * )( void*, __m256i )>( code_.get() + main_entry_ );
 
-    __m256i result = main_func( instance, encode_name );
-
     void ( *cleanup_func )( void* );
     cleanup_func = reinterpret_cast<void ( * )( void* )>( code_.get() + cleanup_entry_ );
+
+    const wasm_rt_trap_t code = static_cast<wasm_rt_trap_t>( wasm_rt_impl_try() );
+    if ( code != 0 ) {
+      /* XXX should return a Result OR Error */
+      cleanup_func( instance );
+      free( instance );
+      throw std::runtime_error( std::string( "Execution trapped: " ) + wasm_rt_strerror( code ) );
+    }
+
+    __m256i result = main_func( instance, encode_name );
+
     cleanup_func( instance );
     free( instance );
 
