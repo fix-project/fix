@@ -96,6 +96,7 @@ tuple<string, string, string> wasm_to_c( const string_view wasm_content )
   ReadBinaryOptions options;
   options.features.enable_multi_memory();
   options.features.enable_exceptions();
+  options.read_debug_names = true;
 
   wabt_try( "ReadBinaryIr",
             errors,
@@ -121,7 +122,8 @@ tuple<string, string, string> wasm_to_c( const string_view wasm_content )
 
   WriteCOptions write_c_options;
   write_c_options.module_name = "function";
-  wabt_try( "WriteC", errors, WriteC( &c_stream, &h_stream, "function.h", &module, write_c_options ) );
+  wabt_try(
+    "WriteC", errors, WriteC( { &c_stream }, &h_stream, &c_stream, "function.h", "", &module, write_c_options ) );
 
   fixpoint_header = initcomposer::compose_header( "function", &module, &errors, &inspector );
 

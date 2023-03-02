@@ -18,7 +18,6 @@ static void throw_assertion_failure( const char* __assertion,
 
 const static map<string, uint64_t> library_func_map
   = { { "wasm_rt_trap", (uint64_t)wasm_rt_trap },
-      { "wasm_rt_register_func_type", (uint64_t)wasm_rt_register_func_type },
       { "wasm_rt_allocate_memory", (uint64_t)wasm_rt_allocate_memory },
       { "wasm_rt_allocate_memory_sw_checked", (uint64_t)wasm_rt_allocate_memory_sw_checked },
       { "wasm_rt_grow_memory", (uint64_t)wasm_rt_grow_memory },
@@ -34,7 +33,6 @@ const static map<string, uint64_t> library_func_map
       { "wasm_rt_init", (uint64_t)wasm_rt_init },
       { "wasm_rt_free", (uint64_t)wasm_rt_free },
       { "wasm_rt_is_initialized", (uint64_t)wasm_rt_is_initialized },
-      { "wasm_rt_register_tag", (uint64_t)wasm_rt_register_tag },
       { "wasm_rt_load_exception", (uint64_t)wasm_rt_load_exception },
       { "wasm_rt_throw", (uint64_t)wasm_rt_throw },
       { "wasm_rt_get_unwind_target", (uint64_t)wasm_rt_get_unwind_target },
@@ -227,12 +225,11 @@ Program link_program( const string_view program_content )
 
   shared_ptr<char> code( static_cast<char*>( program_mem ), free );
   uint64_t init_entry = elf_info.func_map.at( "initProgram" );
-  uint64_t main_entry = elf_info.func_map.at( "Z_functionZ__fixpoint_apply" );
-  uint64_t cleanup_entry = elf_info.func_map.at( "Z_function_free" );
+  uint64_t main_entry = elf_info.func_map.at( "w2c_function_0x5Ffixpoint_apply" );
+  uint64_t cleanup_entry = elf_info.func_map.at( "wasm2c_function_free" );
   uint64_t instance_size_entry = elf_info.func_map.at( "get_instance_size" );
-  uint64_t init_module_entry = elf_info.func_map.at( "Z_function_init_module" );
 #if TIME_FIXPOINT == 2
   global_timer().stop<Timer::Category::Linking>();
 #endif
-  return Program( code, init_entry, main_entry, cleanup_entry, instance_size_entry, init_module_entry );
+  return Program( code, init_entry, main_entry, cleanup_entry, instance_size_entry );
 }

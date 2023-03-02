@@ -49,8 +49,7 @@ public:
            uint64_t init_entry,
            uint64_t main_entry,
            uint64_t cleanup_entry,
-           uint64_t instance_size_entry,
-           uint64_t init_module_entry )
+           uint64_t instance_size_entry )
     : code_( code )
     , init_entry_( init_entry )
     , main_entry_( main_entry )
@@ -65,10 +64,6 @@ public:
     if ( instance_context_size_ % alignof( __m256i ) != 0 ) {
       instance_context_size_ = ( instance_context_size_ / alignof( __m256i ) + 1 ) * alignof( __m256i );
     }
-
-    void ( *init_module_func )( void );
-    init_module_func = reinterpret_cast<void ( * )( void )>( code_.get() + init_module_entry );
-    init_module_func();
   }
 
   void populate_instance_and_context( string_span instance ) const
