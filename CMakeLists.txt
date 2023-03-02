@@ -25,7 +25,7 @@ set(FETCHCONTENT_QUIET OFF)
 FetchContent_Declare(
   wabt
   GIT_REPOSITORY https://github.com/fix-project/wabt
-  GIT_TAG        fixpoint
+  GIT_TAG        fixpoint-rebase
   )
 set(BUILD_TESTS off)
 set(BUILD_LIBWASM off)

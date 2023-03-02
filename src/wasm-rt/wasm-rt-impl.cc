@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY && !defined( _WIN32 )
 #include <signal.h>
 #include <unistd.h>
 #endif
@@ -36,103 +36,56 @@
 #include <sys/mman.h>
 #endif
 
+#if _MSC_VER
+#include <malloc.h>
+#define alloca _alloca
+#endif
+
 #define PAGE_SIZE 65536
 #define MAX_EXCEPTION_SIZE PAGE_SIZE
 
-#include <stdexcept>
-
-typedef struct FuncType
-{
-  wasm_rt_type_t* params;
-  wasm_rt_type_t* results;
-  uint32_t param_count;
-  uint32_t result_count;
-} FuncType;
-
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY
 static bool g_signal_handler_installed = false;
-static char* g_alt_stack;
+#ifdef _WIN32
+static void* g_sig_handler_handle = 0;
 #else
-uint32_t wasm_rt_call_stack_depth;
-uint32_t wasm_rt_saved_call_stack_depth;
+static char* g_alt_stack = 0;
+#endif
 #endif
 
-static FuncType* g_func_types;
-static uint32_t g_func_type_count;
+#if WASM_RT_USE_STACK_DEPTH_COUNT
+WASM_RT_THREAD_LOCAL uint32_t wasm_rt_call_stack_depth;
+WASM_RT_THREAD_LOCAL uint32_t wasm_rt_saved_call_stack_depth;
+#endif
 
-jmp_buf wasm_rt_jmp_buf;
+WASM_RT_THREAD_LOCAL wasm_rt_jmp_buf g_wasm_rt_jmp_buf;
 
-static uint32_t g_active_exception_tag;
-static uint8_t g_active_exception[MAX_EXCEPTION_SIZE];
-static uint32_t g_active_exception_size;
+static WASM_RT_THREAD_LOCAL wasm_rt_tag_t g_active_exception_tag;
+static WASM_RT_THREAD_LOCAL uint8_t g_active_exception[MAX_EXCEPTION_SIZE];
+static WASM_RT_THREAD_LOCAL uint32_t g_active_exception_size;
 
-static jmp_buf* g_unwind_target;
+static WASM_RT_THREAD_LOCAL wasm_rt_jmp_buf* g_unwind_target;
 
 void wasm_rt_trap( wasm_rt_trap_t code )
 {
   assert( code != WASM_RT_TRAP_NONE );
-  throw std::runtime_error( wasm_rt_strerror( code ) );
+#if WASM_RT_USE_STACK_DEPTH_COUNT
+  wasm_rt_call_stack_depth = wasm_rt_saved_call_stack_depth;
+#endif
+
+#ifdef WASM_RT_TRAP_HANDLER
+  WASM_RT_TRAP_HANDLER( code );
+  wasm_rt_unreachable();
+#else
+  WASM_RT_LONGJMP( g_wasm_rt_jmp_buf, code );
+#endif
 }
 
-static bool func_types_are_equal( FuncType* a, FuncType* b )
+void wasm_rt_load_exception( const wasm_rt_tag_t tag, uint32_t size, const void* values )
 {
-  if ( a->param_count != b->param_count || a->result_count != b->result_count )
-    return 0;
-  uint32_t i;
-  for ( i = 0; i < a->param_count; ++i )
-    if ( a->params[i] != b->params[i] )
-      return 0;
-  for ( i = 0; i < a->result_count; ++i )
-    if ( a->results[i] != b->results[i] )
-      return 0;
-  return 1;
-}
-
-uint32_t wasm_rt_register_func_type( uint32_t param_count, uint32_t result_count, ... )
-{
-  FuncType func_type;
-  func_type.param_count = param_count;
-  func_type.params = static_cast<wasm_rt_type_t*>( malloc( param_count * sizeof( wasm_rt_type_t ) ) );
-  func_type.result_count = result_count;
-  func_type.results = static_cast<wasm_rt_type_t*>( malloc( result_count * sizeof( wasm_rt_type_t ) ) );
-
-  va_list args;
-  va_start( args, result_count );
-
-  uint32_t i;
-  for ( i = 0; i < param_count; ++i )
-    func_type.params[i] = static_cast<wasm_rt_type_t>( va_arg( args, int ) );
-  for ( i = 0; i < result_count; ++i )
-    func_type.results[i] = static_cast<wasm_rt_type_t>( va_arg( args, int ) );
-  va_end( args );
-
-  for ( i = 0; i < g_func_type_count; ++i ) {
-    if ( func_types_are_equal( &g_func_types[i], &func_type ) ) {
-      free( func_type.params );
-      free( func_type.results );
-      return i + 1;
-    }
-  }
-
-  uint32_t idx = g_func_type_count++;
-  g_func_types = static_cast<FuncType*>( realloc( g_func_types, g_func_type_count * sizeof( FuncType ) ) );
-  g_func_types[idx] = func_type;
-  return idx + 1;
-}
-
-uint32_t wasm_rt_register_tag( uint32_t size )
-{
-  static uint32_t s_tag_count = 0;
-
   if ( size > MAX_EXCEPTION_SIZE ) {
     wasm_rt_trap( WASM_RT_TRAP_EXHAUSTION );
   }
-  return s_tag_count++;
-}
-
-void wasm_rt_load_exception( uint32_t tag, uint32_t size, const void* values )
-{
-  assert( size <= MAX_EXCEPTION_SIZE );
 
   g_active_exception_tag = tag;
   g_active_exception_size = size;
@@ -157,7 +110,7 @@ void wasm_rt_set_unwind_target( WASM_RT_UNWIND_TARGET* target )
   g_unwind_target = target;
 }
 
-uint32_t wasm_rt_exception_tag( void )
+wasm_rt_tag_t wasm_rt_exception_tag( void )
 {
   return g_active_exception_tag;
 }
@@ -172,34 +125,32 @@ void* wasm_rt_exception( void )
   return g_active_exception;
 }
 
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-static void signal_handler( int, siginfo_t* si, void* )
-{
-  if ( si->si_code == SEGV_ACCERR ) {
-    wasm_rt_trap( WASM_RT_TRAP_OOB );
-  } else {
-    wasm_rt_trap( WASM_RT_TRAP_EXHAUSTION );
-  }
-}
-#endif
-
 #ifdef _WIN32
 static void* os_mmap( size_t size )
 {
-  return VirtualAlloc( NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_NOACCESS );
+  void* ret = VirtualAlloc( NULL, size, MEM_RESERVE, PAGE_NOACCESS );
+  return ret;
 }
 
 static int os_munmap( void* addr, size_t size )
 {
-  BOOL succeeded = VirtualFree( addr, size, MEM_RELEASE );
+  // Windows can only unmap the whole mapping
+  (void)size; /* unused */
+  BOOL succeeded = VirtualFree( addr, 0, MEM_RELEASE );
   return succeeded ? 0 : -1;
 }
 
 static int os_mprotect( void* addr, size_t size )
 {
-  DWORD old;
-  BOOL succeeded = VirtualProtect( (LPVOID)addr, size, PAGE_READWRITE, &old );
-  return succeeded ? 0 : -1;
+  if ( size == 0 ) {
+    return 0;
+  }
+  void* ret = VirtualAlloc( addr, size, MEM_COMMIT, PAGE_READWRITE );
+  if ( ret == addr ) {
+    return 0;
+  }
+  VirtualFree( addr, 0, MEM_RELEASE );
+  return -1;
 }
 
 static void os_print_last_error( const char* msg )
@@ -223,6 +174,31 @@ static void os_print_last_error( const char* msg )
     printf( "%s. No error code.\n", msg );
   }
 }
+
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY
+
+static LONG os_signal_handler( PEXCEPTION_POINTERS info )
+{
+  if ( info->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) {
+    wasm_rt_trap( WASM_RT_TRAP_OOB );
+  } else if ( info->ExceptionRecord->ExceptionCode == EXCEPTION_STACK_OVERFLOW ) {
+    wasm_rt_trap( WASM_RT_TRAP_EXHAUSTION );
+  }
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void os_install_signal_handler( void )
+{
+  g_sig_handler_handle = AddVectoredExceptionHandler( 1 /* CALL_FIRST */, os_signal_handler );
+}
+
+static void os_cleanup_signal_handler( void )
+{
+  RemoveVectoredExceptionHandler( g_sig_handler_handle );
+}
+
+#endif
+
 #else
 static void* os_mmap( size_t size )
 {
@@ -248,47 +224,85 @@ static void os_print_last_error( const char* msg )
 {
   perror( msg );
 }
+
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY
+static void os_signal_handler( __attribute__( ( unused ) ) int sig,
+                               siginfo_t* si,
+                               __attribute__( ( unused ) ) void* unused )
+{
+  if ( si->si_code == SEGV_ACCERR ) {
+    wasm_rt_trap( WASM_RT_TRAP_OOB );
+  } else {
+    wasm_rt_trap( WASM_RT_TRAP_EXHAUSTION );
+  }
+}
+
+static void os_install_signal_handler( void )
+{
+  /* Use alt stack to handle SIGSEGV from stack overflow */
+  g_alt_stack = static_cast<char*>( malloc( SIGSTKSZ ) );
+  if ( g_alt_stack == NULL ) {
+    perror( "malloc failed" );
+    abort();
+  }
+
+  stack_t ss;
+  ss.ss_sp = g_alt_stack;
+  ss.ss_flags = 0;
+  ss.ss_size = SIGSTKSZ;
+  if ( sigaltstack( &ss, NULL ) != 0 ) {
+    perror( "sigaltstack failed" );
+    abort();
+  }
+
+  struct sigaction sa;
+  memset( &sa, '\0', sizeof( sa ) );
+  sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+  sigemptyset( &sa.sa_mask );
+  sa.sa_sigaction = os_signal_handler;
+
+  /* Install SIGSEGV and SIGBUS handlers, since macOS seems to use SIGBUS. */
+  if ( sigaction( SIGSEGV, &sa, NULL ) != 0 || sigaction( SIGBUS, &sa, NULL ) != 0 ) {
+    perror( "sigaction failed" );
+    abort();
+  }
+}
+
+static void os_cleanup_signal_handler( void )
+{
+  /* Undo what was done in os_install_signal_handler */
+  struct sigaction sa;
+  memset( &sa, '\0', sizeof( sa ) );
+  sa.sa_handler = SIG_DFL;
+  if ( sigaction( SIGSEGV, &sa, NULL ) != 0 || sigaction( SIGBUS, &sa, NULL ) ) {
+    perror( "sigaction failed" );
+    abort();
+  }
+
+  if ( sigaltstack( NULL, NULL ) != 0 ) {
+    perror( "sigaltstack failed" );
+    abort();
+  }
+
+  free( g_alt_stack );
+}
+#endif
+
 #endif
 
 void wasm_rt_init( void )
 {
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY
   if ( !g_signal_handler_installed ) {
     g_signal_handler_installed = true;
-
-    /* Use alt stack to handle SIGSEGV from stack overflow */
-    g_alt_stack = static_cast<char*>( malloc( SIGSTKSZ ) );
-    if ( g_alt_stack == NULL ) {
-      perror( "malloc failed" );
-      abort();
-    }
-
-    stack_t ss;
-    ss.ss_sp = g_alt_stack;
-    ss.ss_flags = 0;
-    ss.ss_size = SIGSTKSZ;
-    if ( sigaltstack( &ss, NULL ) != 0 ) {
-      perror( "sigaltstack failed" );
-      abort();
-    }
-
-    struct sigaction sa;
-    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-    sigemptyset( &sa.sa_mask );
-    sa.sa_sigaction = signal_handler;
-
-    /* Install SIGSEGV and SIGBUS handlers, since macOS seems to use SIGBUS. */
-    if ( sigaction( SIGSEGV, &sa, NULL ) != 0 || sigaction( SIGBUS, &sa, NULL ) != 0 ) {
-      perror( "sigaction failed" );
-      abort();
-    }
+    os_install_signal_handler();
   }
 #endif
 }
 
 bool wasm_rt_is_initialized( void )
 {
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY
   return g_signal_handler_installed;
 #else
   return true;
@@ -297,14 +311,15 @@ bool wasm_rt_is_initialized( void )
 
 void wasm_rt_free( void )
 {
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
-  free( g_alt_stack );
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY
+  os_cleanup_signal_handler();
 #endif
 }
 
 void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
-                                     uint32_t initial_pages,
-                                     uint32_t max_pages,
+                                     uint64_t initial_pages,
+                                     uint64_t max_pages,
+                                     bool is64,
                                      bool hw_checked )
 {
   memory->read_only = false;
@@ -316,13 +331,13 @@ void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
     return;
   }
 
-  uint32_t byte_length = initial_pages * PAGE_SIZE;
-
+  uint64_t byte_length = initial_pages * PAGE_SIZE;
   if ( hw_checked ) {
     /* Reserve 8GiB. */
+    assert( !is64 && "memory64 is not yet compatible with WASM_RT_MEMCHECK_SIGNAL_HANDLER" );
     void* addr = os_mmap( 0x200000000ul );
 
-    if ( addr == (void*)-1 ) {
+    if ( !addr ) {
       os_print_last_error( "os_mmap failed." );
       abort();
     }
@@ -338,42 +353,46 @@ void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
   memory->size = byte_length;
   memory->pages = initial_pages;
   memory->max_pages = max_pages;
+  memory->is64 = is64;
 }
 
-void wasm_rt_allocate_memory_sw_checked( wasm_rt_memory_t* memory, uint32_t initial_pages, uint32_t max_pages )
+void wasm_rt_allocate_memory_sw_checked( wasm_rt_memory_t* memory,
+                                         uint64_t initial_pages,
+                                         uint64_t max_pages,
+                                         bool is64 )
 {
-  wasm_rt_allocate_memory_helper( memory, initial_pages, max_pages, false );
+  wasm_rt_allocate_memory_helper( memory, initial_pages, max_pages, is64, false );
 }
 
-void wasm_rt_allocate_memory( wasm_rt_memory_t* memory, uint32_t initial_pages, uint32_t max_pages )
+void wasm_rt_allocate_memory( wasm_rt_memory_t* memory, uint64_t initial_pages, uint64_t max_pages, bool is64 )
 {
-  wasm_rt_allocate_memory_helper( memory, initial_pages, max_pages, WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX );
+  wasm_rt_allocate_memory_helper( memory, initial_pages, max_pages, is64, WASM_RT_MEMCHECK_SIGNAL_HANDLER );
 }
 
-uint32_t wasm_rt_grow_memory_helper( wasm_rt_memory_t* memory, uint32_t delta, bool hw_checked )
+uint64_t wasm_rt_grow_memory_helper( wasm_rt_memory_t* memory, uint64_t delta, bool hw_checked )
 {
-  uint32_t old_pages = memory->pages;
-  uint32_t new_pages = memory->pages + delta;
+  uint64_t old_pages = memory->pages;
+  uint64_t new_pages = memory->pages + delta;
   if ( new_pages == 0 ) {
     return 0;
   }
   if ( new_pages < old_pages || new_pages > memory->max_pages ) {
-    return (uint32_t)-1;
+    return (uint64_t)-1;
   }
-  uint32_t old_size = old_pages * PAGE_SIZE;
-  uint32_t new_size = new_pages * PAGE_SIZE;
-  uint32_t delta_size = delta * PAGE_SIZE;
+  uint64_t old_size = old_pages * PAGE_SIZE;
+  uint64_t new_size = new_pages * PAGE_SIZE;
+  uint64_t delta_size = delta * PAGE_SIZE;
   uint8_t* new_data;
   if ( hw_checked ) {
     new_data = memory->data;
     int ret = os_mprotect( new_data + old_size, delta_size );
     if ( ret != 0 ) {
-      return (uint32_t)-1;
+      return (uint64_t)-1;
     }
   } else {
     new_data = static_cast<uint8_t*>( realloc( memory->data, new_size ) );
     if ( new_data == NULL ) {
-      return (uint32_t)-1;
+      return (uint64_t)-1;
     }
 
 #if !WABT_BIG_ENDIAN
@@ -390,14 +409,14 @@ uint32_t wasm_rt_grow_memory_helper( wasm_rt_memory_t* memory, uint32_t delta, b
   return old_pages;
 }
 
-uint32_t wasm_rt_grow_memory_sw_checked( wasm_rt_memory_t* memory, uint32_t delta )
+uint64_t wasm_rt_grow_memory_sw_checked( wasm_rt_memory_t* memory, uint64_t delta )
 {
   return wasm_rt_grow_memory_helper( memory, delta, false );
 }
 
-uint32_t wasm_rt_grow_memory( wasm_rt_memory_t* memory, uint32_t delta )
+uint64_t wasm_rt_grow_memory( wasm_rt_memory_t* memory, uint64_t delta )
 {
-  return wasm_rt_grow_memory_helper( memory, delta, WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX );
+  return wasm_rt_grow_memory_helper( memory, delta, WASM_RT_MEMCHECK_SIGNAL_HANDLER );
 }
 
 void wasm_rt_free_memory_hw_checked( wasm_rt_memory_t* memory )
@@ -414,7 +433,7 @@ void wasm_rt_free_memory_sw_checked( wasm_rt_memory_t* memory )
 
 void wasm_rt_free_memory( wasm_rt_memory_t* memory )
 {
-#if WASM_RT_MEMCHECK_SIGNAL_HANDLER_POSIX
+#if WASM_RT_MEMCHECK_SIGNAL_HANDLER
   wasm_rt_free_memory_hw_checked( memory );
 #else
   wasm_rt_free_memory_sw_checked( memory );
@@ -442,24 +461,24 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
   }                                                                                                                \
   uint32_t wasm_rt_grow_##type##_table( wasm_rt_##type##_table_t* table, uint32_t delta, wasm_rt_##type##_t init ) \
   {                                                                                                                \
-    uint32_t old_length = table->size;                                                                             \
     wasm_rt_##type##_t* old_data = table->data;                                                                    \
-    uint64_t new_length = (uint64_t)table->size + delta;                                                           \
-    if ( new_length == 0 ) {                                                                                       \
+    uint32_t old_elems = table->size;                                                                              \
+    uint64_t new_elems = (uint64_t)table->size + delta;                                                            \
+    if ( new_elems == 0 ) {                                                                                        \
       return 0;                                                                                                    \
     }                                                                                                              \
-    if ( ( new_length < old_length ) || ( new_length > table->max_size ) ) {                                       \
+    if ( ( new_elems < old_elems ) || ( new_elems > table->max_size ) ) {                                          \
       return (uint32_t)-1;                                                                                         \
     }                                                                                                              \
-    void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), new_length * sizeof( wasm_rt_##type##_t ) );         \
+    void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), new_elems * sizeof( wasm_rt_##type##_t ) );          \
     table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                         \
-    memcpy( table->data, old_data, old_length * sizeof( wasm_rt_##type##_t ) );                                    \
-    table->size = new_length;                                                                                      \
-    for ( uint32_t i = old_length; i < new_length; i++ ) {                                                         \
+    memcpy( table->data, old_data, old_elems * sizeof( wasm_rt_##type##_t ) );                                     \
+    table->size = new_elems;                                                                                       \
+    for ( uint32_t i = old_elems; i < new_elems; i++ ) {                                                           \
       table->data[i] = init;                                                                                       \
     }                                                                                                              \
     free( old_data );                                                                                              \
-    return old_length;                                                                                             \
+    return old_elems;                                                                                              \
   }
 
 DEFINE_TABLE_OPS( funcref )
