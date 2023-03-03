@@ -56,9 +56,10 @@ add_test(NAME t_add_args WORKING_DIRECTORY
   ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
   ${CMAKE_CURRENT_BINARY_DIR}/flatware-prefix/src/flatware-build/examples/add/add-fixpoint.wasm
 )
-# XXX we don't catch the trap yet
-#add_test(NAME t_trap WORKING_DIRECTORY
-#  COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
-#  tree:2 string:ignored
-#  "file:${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/trap.wasm"
-#)
+
+add_test(NAME t_trap WORKING_DIRECTORY
+  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/testing/expect-trap
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
+  ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/trap.wasm
+  "Integer divide by zero"
+)
