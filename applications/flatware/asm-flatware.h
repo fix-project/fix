@@ -11,7 +11,10 @@ enum RO_TABLE_ID
 };
 enum RW_TABLE_ID
 {
-  ReturnRWTable
+  ReturnRWTable,
+  ScratchRWTable0,
+  ScratchRWTable1,
+  WorkingDirRWTable
 };
 enum RW_MEM_ID
 {
@@ -62,3 +65,7 @@ void program_mem_to_rw_mem( int32_t rw_mem_id, int32_t rw_offset, int32_t progra
 void ro_mem_to_program_mem( int32_t ro_mem_id, int32_t program_offset, int32_t ro_offset, int32_t len );
 
 void ro_mem_to_flatware_mem( int32_t ro_mem_id, const char* flatware_pointer, int32_t ro_offset, int32_t len );
+
+void rw_mem_to_program_mem( int32_t rw_mem_id, int32_t program_offset, int32_t ro_offset, int32_t len );
+
+void rw_mem_to_flatware_mem( int32_t rw_mem_id, const char* flatware_pointer, int32_t ro_offset, int32_t len );

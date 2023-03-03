@@ -10,6 +10,7 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory );
 
 __m256i create_tree( wasm_rt_externref_table_t* table, size_t size );
 
+//void copy_input( wasm_rt_externref_table_t* ro_handle, wasm_rt_externref_table_t* rw_handle );
 __m256i create_blob( wasm_rt_memory_t* memory, size_t size );
 
 __m256i create_blob_i32( uint32_t content );

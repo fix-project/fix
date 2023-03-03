@@ -24,6 +24,12 @@ externref get_ro_table( int32_t table_id, int32_t index )
 {
   return get_ro_table_functions[table_id]( index );
 }
+
+externref get_rw_table( int32_t table_id, int32_t index )
+{
+  return get_rw_table_functions[table_id]( index );
+}
+
 void attach_tree_ro_table( int32_t table_id, externref name )
 {
   attach_tree_functions[table_id]( name );
@@ -52,6 +58,11 @@ int32_t byte_size_ro_mem( int32_t mem_id )
 int32_t size_ro_table( int32_t table_id )
 {
   return size_ro_table_functions[table_id]();
+}
+
+int32_t size_rw_table( int32_t table_id )
+{
+  return size_rw_table_functions[table_id]();
 }
 
 void attach_blob_ro_mem( int32_t mem_id, externref blob )

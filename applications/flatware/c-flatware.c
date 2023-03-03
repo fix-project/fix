@@ -2,7 +2,7 @@
 #include "api.h"
 #include "asm-flatware.h"
 #include "filesys.h"
-
+#include <stdlib.h>
 #include <stdarg.h>
 #include <stdbool.h>
 
@@ -13,10 +13,19 @@ typedef struct filedesc
   int32_t offset;
   int32_t size;
   bool open;
-  char pad[7];
+  //bool for readonly / not readonly used in read/write to indicate ro or rw mem should be used because file is blob
+  bool readonly; 
+  char pad_1[2];
+  substring path;
+  char pad_2[4];
   __wasi_fdstat_t stat;
 } filedesc;
 
+//place to store home directory if it is changed
+
+static substring dirty_files[1000];
+static int32_t number_of_dirty = 0;
+static char* dirty_working_home_directory = NULL; 
 enum
 {
   STDIN,
@@ -27,10 +36,10 @@ enum
 
 #define N_FDS 16
 static filedesc fds[N_FDS] = {
-  { .open = true, .size = -1, .offset = 0 }, // STDIN
-  { .open = true, .size = -1, .offset = 0 }, // STDOUT
-  { .open = true, .size = -1, .offset = 0 }, // STDERR
-  { .open = true, .size = -1, .offset = 0 }, // WORKINGDIR
+  { .open = true, .size = -1, .offset = 0, .readonly = true }, // STDIN
+  { .open = true, .size = -1, .offset = 0, .readonly = false }, // STDOUT
+  { .open = true, .size = -1, .offset = 0, .readonly = false  }, // STDERR
+  { .open = true, .size = -1, .offset = 0, .readonly = false }, // WORKINGDIR
 };
 
 #define DO_TRACE 1
@@ -187,13 +196,67 @@ _Noreturn void proc_exit( int32_t rval )
 
 int32_t fd_close( int32_t fd )
 {
+  substring parent = fds[fd].path;
+  substring child = fds[fd].path;
+  externref child_handle;
+  int32_t retfd;
+  int32_t tempfd;
+  int32_t result;
+  int32_t size;
+  int32_t index;
+
   FUNC_TRACE( T32, fd, TEND );
 
   if ( fd <= 3 || fd >= N_FDS || fds[fd].open == false )
     return __WASI_ERRNO_BADF;
+  if (!fds[fd].readonly && fd >= 4) {
+    for ( retfd = 4; retfd < N_FDS; retfd++ ) {
+      if ( fds[retfd].open == false ) {
+        fds[retfd].open = true;
+        break;
+      }
+    }
+    for ( tempfd = 4; tempfd < N_FDS; tempfd++ ) {
+      if ( fds[tempfd].open == false ) {
+        fds[tempfd].open = true;
+        break;    
+      }   
+    }
+    child_handle = create_blob_functions[ScratchRWMem0]( fds[fd].offset );
+    parent = find_parent_file_path( child );
+    while (parent.len != 0) {
+      result = lookup(parent, WORKINGDIR, retfd, true, number_of_dirty > 0 ); //to get into a ro table
+      if (result != retfd) {
+        return -1;
+      }
+      size = size_ro_table_functions[result]();
+      grow_rw_table( result, size, create_blob_i32( 1 ) );
+      copy_ro_to_rw_table(result, result, 0, 0, size);
+      index = find_rw_index( child, result, tempfd, number_of_dirty > 0 );
+      set_rw_table(result, index, child_handle);
+      child_handle = create_tree_rw_table(result, size);
 
+      dirty_files[number_of_dirty] = child;
+      number_of_dirty += 1;
+      child = parent;
+      parent = find_parent_file_path( child );
+    }
+    size = size_ro_table_functions[WORKINGDIR]();
+    grow_rw_table( WORKINGDIR, size, create_blob_i32( 1 ) );
+    copy_ro_to_rw_table( WORKINGDIR, WORKINGDIR, 0, 0, size );
+    set_rw_table( WORKINGDIR, 2, child_handle );
+    child_handle = create_tree_rw_table( WORKINGDIR, size );
+
+    dirty_working_home_directory = (char *) malloc( (unsigned long) 10 * sizeof(char) );
+    for (int i = 0; i < 10; i++ ) {
+      dirty_working_home_directory[i] = ((char *)child_handle)[i];
+    }
+    free( (char*) fds[fd].path.ptr );
+    fds[retfd].open = false;
+    fds[tempfd].open = false;
+  }
+  
   fds[fd].open = false;
-
   return 0;
 }
 
@@ -215,7 +278,7 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
   stat.fs_filetype = __WASI_FILETYPE_UNKNOWN;
   stat.fs_flags = __WASI_FDFLAGS_APPEND;
   stat.fs_rights_base = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
-  if ( fd == STDOUT )
+  if ( fd == STDOUT || fd == STDERR || fd == WORKINGDIR )
     stat.fs_rights_base |= __WASI_RIGHTS_FD_WRITE;
   stat.fs_rights_inheriting = stat.fs_rights_base;
 
@@ -225,8 +288,9 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
 
 int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
 {
-  FUNC_TRACE( T32, fd, T64, offset, T32, whence, T32, retptr0, TEND );
+  //TODO: functionality for going back to offset prior to current offset does not seem to work
 
+  FUNC_TRACE( T32, fd, T64, offset, T32, whence, T32, retptr0, TEND );
   if ( fd != 4 )
     return __WASI_ERRNO_BADF;
 
@@ -241,7 +305,7 @@ int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
   return 0;
 }
 
-// fd_read copies from memory (ro mem 1) to program memory
+// fd_read copies from memory (ro or rw mem 1) to program memory
 // need to match signature from wasi-libc
 int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 {
@@ -264,7 +328,11 @@ int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
     iobuf_len = get_program_i32( iovs + 4 + i * 8 );
 
     size_to_read = iobuf_len < file_remaining ? iobuf_len : file_remaining;
-    ro_mem_to_program_mem(FileSystemROMem, iobuf_offset, fds[fd].offset, size_to_read );
+    if (fds[fd].readonly) {
+      ro_mem_to_program_mem( FileSystemROMem, iobuf_offset, fds[fd].offset, size_to_read );
+    } else {
+      rw_mem_to_program_mem( ScratchRWMem0, iobuf_offset, fds[fd].offset, size_to_read );
+    }
     fds[fd].offset += size_to_read;
     total_read += size_to_read;
   }
@@ -280,21 +348,28 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   int32_t total_written = 0;
 
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T32, retptr0, TEND );
-
-  if ( fd != STDOUT )
+  if ( fds[fd].readonly )
     return __WASI_ERRNO_BADF;
 
   for ( int32_t i = 0; i < iovs_len; i++ ) {
     iobuf_offset = get_program_i32( iovs + i * 8 );
     iobuf_len = get_program_i32( iovs + 4 + i * 8 );
+
+    if (fd == STDOUT) {
+      grow_rw_mem( StdOutRWMem, fds[STDOUT].offset + iobuf_len );
+      program_mem_to_rw_mem( StdOutRWMem, fds[STDOUT].offset, iobuf_offset, iobuf_len );
+    } else {
+      grow_rw_mem( ScratchRWMem0, fds[fd].offset + iobuf_len );
+      program_mem_to_rw_mem( ScratchRWMem0, fds[fd].offset, iobuf_offset, iobuf_len );
+    }
     
-    grow_rw_mem(StdOutRWMem,fds[STDOUT].offset + iobuf_len );
-    program_mem_to_rw_mem(StdOutRWMem, fds[STDOUT].offset, iobuf_offset, iobuf_len );
-    fds[STDOUT].offset += iobuf_len;
+    fds[fd].offset += iobuf_len;
     total_written += iobuf_len;
   }
 
   memory_copy_program( retptr0, &total_written, sizeof( total_written ) );
+  fds[fd].size += total_written;
+
   RET_TRACE( total_written );
   return 0;
 }
@@ -334,7 +409,6 @@ int32_t fd_prestat_get( int32_t fd, int32_t retptr0 )
   }
 
   // retptr offset in program memory where struct should be stored
-  // TODO: fd == 3: working directory
 
   if ( fd == WORKINGDIR ) {
     __wasi_prestat_t ps;
@@ -541,15 +615,15 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
 
   attach_tree_ro_table( ArgsROTable, get_ro_table(InputROTable, 2 ) );
 
-  num = size_ro_table(ArgsROTable);
+  num = size_ro_table( ArgsROTable );
 
   memory_copy_program( num_argument_ptr, &num, 4 );
   RET_TRACE( num );
 
   // Actual arguments
   for ( int32_t i = 0; i < num; i++ ) {
-    attach_blob_ro_mem(ArgROMem, get_ro_table(ArgsROTable, i ) );
-    size += byte_size_ro_mem(ArgROMem);
+    attach_blob_ro_mem( ArgROMem, get_ro_table(ArgsROTable, i ) );
+    size += byte_size_ro_mem( ArgROMem);
   }
 
   memory_copy_program( size_argument_ptr, &size, 4 );
@@ -568,8 +642,8 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
   attach_tree_ro_table(ArgsROTable, get_ro_table(InputROTable, 2 ) );
 
   for ( int32_t i = 0; i < size_ro_table(ArgsROTable); i++ ) {
-    attach_blob_ro_mem(ArgROMem, get_ro_table(ArgsROTable, i ) );
-    size = byte_size_ro_mem(ArgROMem);
+    attach_blob_ro_mem( ArgROMem, get_ro_table(ArgsROTable, i ) );
+    size = byte_size_ro_mem( ArgROMem );
     memory_copy_program( argv_ptr + i * 4, &addr, 4 );
     ro_mem_to_program_mem( ArgROMem, addr, 0, size );
     addr += size;
@@ -604,6 +678,8 @@ int32_t path_open( int32_t fd,
 {
   __wasi_fd_t retfd;
   int32_t result;
+  substring path_substring;
+  bool wd_dirty;
 
   FUNC_TRACE( T32,
               fd,
@@ -630,22 +706,32 @@ int32_t path_open( int32_t fd,
       break;
   }
 
-  result = find_file( path, path_len, fd, retfd );
-  
+  wd_dirty = number_of_dirty > 0;
+  path_substring = find_file_path( path, path_len );
+
+  result = find_file( path, path_len, fd, retfd, wd_dirty );
+
   if ( result != retfd ) {
     RET_TRACE( result );
     return __WASI_ERRNO_NOENT;
+  } else if ((fs_rights_base & (1 << 6))) {
+    //Flag specs: api.h
+    fds[retfd].readonly = false;
+    fds[retfd].size = 0;
+    fds[retfd].path = find_file_path( path, path_len );
   } else {
-    attach_blob_ro_mem(FileSystemROMem, get_ro_table( retfd, 2 ) );
+    //TODO: make this attach_blob_ro_mem fd instead of attach_blob_ro_mem 1
+    attach_blob_ro_mem( FileSystemROMem, get_ro_table( retfd, 2 ) );
+    fds[retfd].readonly = true;
+    fds[retfd].size = byte_size_ro_mem( FileSystemROMem ) - 1;
+    //TODO: if readonly need to add check to make sure dirty is read from write mem or convert from write to read in close
   }
 
   if ( retfd >= N_FDS )
     return __WASI_ERRNO_NFILE;
 
   fds[retfd].offset = 0;
-  fds[retfd].size = byte_size_ro_mem(FileSystemROMem) - 1;
   fds[retfd].open = true;
-
   fds[retfd].stat.fs_filetype = __WASI_FILETYPE_REGULAR_FILE;
   fds[retfd].stat.fs_flags = __WASI_FDFLAGS_APPEND;
   fds[retfd].stat.fs_rights_base = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
@@ -701,19 +787,19 @@ int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
 externref fixpoint_apply( externref encode )
 {
 
-  grow_rw_table(ReturnRWTable, 3, create_blob_i32(0));
-  set_rw_table(ReturnRWTable, 0, create_blob_i32( 0 ) );
+  grow_rw_table( ReturnRWTable, 3, create_blob_i32( 0 ));
+  set_rw_table( ReturnRWTable, 0, create_blob_i32( 0 ) );
   
-  attach_tree_ro_table(InputROTable, encode );
+  attach_tree_ro_table( InputROTable, encode );
 
   // Attach working directory to WorkingDirTable if exists
-  if ( size_ro_table(InputROTable) >= 4 ) {
-    attach_tree_ro_table(WorkingDirROTable, get_ro_table(InputROTable, 3 ) );
+  if ( size_ro_table( InputROTable ) >= 4 ) {
+    attach_tree_ro_table (WorkingDirROTable, get_ro_table(InputROTable, 3 ) );
   }
   run_start();
 
-  set_rw_table(ReturnRWTable, 1, create_blob_rw_mem(StdOutRWMem, fds[STDOUT].offset ) );
-  set_rw_table(ReturnRWTable, 2, create_blob_rw_mem(TraceRWMem, fds[STDERR].offset ) );
+  set_rw_table( ReturnRWTable, 1, create_blob_rw_mem( StdOutRWMem, fds[STDOUT].offset ) );
+  set_rw_table( ReturnRWTable, 2, create_blob_rw_mem( TraceRWMem, fds[STDERR].offset ) );
 
-  return create_tree_rw_table(ReturnRWTable, 3 );
+  return create_tree_rw_table( ReturnRWTable, 3 );
 }
