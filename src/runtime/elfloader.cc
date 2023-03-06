@@ -49,6 +49,7 @@ const static map<string, uint64_t> library_func_map
       { "fixpoint_create_blob_i32", (uint64_t)fixpoint::create_blob_i32 },
       { "fixpoint_create_thunk", (uint64_t)fixpoint::create_thunk },
       { "fixpoint_value_type", (uint64_t)fixpoint::value_type },
+      { "fixpoint_unsafe_io", (uint64_t)fixpoint::unsafe_io },
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
       { "memset", (uint64_t)memset },

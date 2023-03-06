@@ -2,6 +2,8 @@
 
 int32_t add_2( int32_t x )
 {
+  std::string s = "add_2 called.";
+  unsafe_io( s.c_str(), s.length() );
   return x + 2;
 }
 

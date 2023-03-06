@@ -94,4 +94,16 @@ uint32_t value_type( __m256i handle )
     return 2;
   }
 }
+
+void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
+{
+  if ( index + length > (int64_t)mem->size ) {
+    wasm_rt_trap( WASM_RT_TRAP_OOB );
+  }
+  for ( int i = index; i < index + length; i++ ) {
+    std::cout << mem->data[i];
+  }
+  std::cout << std::endl;
+  std::flush( std::cout );
+}
 }
