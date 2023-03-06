@@ -1,9 +1,13 @@
 #include <cstdint>
+#include <string>
 
 typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
 externref create_blob_i32( uint32_t number )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_blob_i32" ) ) );
+
+void unsafe_io( const char* s, int32_t size )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "unsafe_io" ) ) );
 
 // rw_table_0
 void set_rw_table_0( int32_t index, externref pointer )

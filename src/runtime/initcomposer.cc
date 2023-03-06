@@ -191,6 +191,7 @@ private:
   void write_init_read_only_mem_table();
   void write_get_instance_size();
   void write_context();
+  void write_unsafe_io();
 };
 
 void InitComposer::write_context()
@@ -331,6 +332,23 @@ void InitComposer::write_get_instance_size()
   result_ << "}\n" << endl;
 }
 
+void InitComposer::write_unsafe_io()
+{
+
+  result_ << "extern void fixpoint_unsafe_io(uint32_t index, uint32_t length, wasm_rt_memory_t* main_mem);" << endl;
+  result_ << "void " << ExportName( "fixpoint", "unsafe_io" );
+  result_ << "(struct w2c_fixpoint* instance, uint32_t index, uint32_t length) {" << endl;
+
+  // Only call fixpoint_unsafe_io if there is a memory called "memory"
+  // Otherwise unsafe_io is a no op.
+  if ( inspector_->ExportsMainMemory() ) {
+    result_ << "  wasm_rt_memory_t* main_mem = " << ExportName( module_prefix_, "memory" ) << "(("
+            << state_info_type_name_ << "*)instance);" << endl;
+    result_ << "  fixpoint_unsafe_io(index, length, main_mem);" << endl;
+  }
+  result_ << "}" << endl;
+}
+
 string InitComposer::compose_header()
 {
   result_ = ostringstream();
@@ -349,6 +367,7 @@ string InitComposer::compose_header()
   write_create_blob_i32();
   write_value_type();
   write_create_thunk();
+  write_unsafe_io();
 
   result_ << "void initProgram(void* ptr) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_ << "*)ptr;" << endl;

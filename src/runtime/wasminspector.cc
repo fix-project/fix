@@ -60,6 +60,15 @@ WasmInspector::WasmInspector( Module* module, Errors* errors )
   }
 }
 
+bool WasmInspector::ExportsMainMemory()
+{
+  for ( Export* export_ : current_module_->exports ) {
+    if ( export_->kind == ExternalKind::Memory && export_->name == "memory" )
+      return true;
+  }
+  return false;
+}
+
 Result WasmInspector::OnMemoryCopyExpr( MemoryCopyExpr* expr )
 {
   return CheckMemoryAccess( &expr->destmemidx );
@@ -198,6 +207,16 @@ Result WasmInspector::ValidateImports()
     }
   }
 
+  // unsafe_io requires memory called "memory"
+  if ( !ExportsMainMemory() ) {
+    for ( auto it = imported_functions_.begin(); it != imported_functions_.end(); it++ ) {
+      if ( *it == "unsafe_io" ) {
+        string message = "ValidateImports: If unsafe_io is imported, memory with name memory must be exported.";
+        errors_->push_back( createErrorWithMessage( message ) );
+        return Result::Error;
+      }
+    }
+  }
   return Result::Ok;
 }
 

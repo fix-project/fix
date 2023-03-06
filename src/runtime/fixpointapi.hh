@@ -17,4 +17,8 @@ __m256i create_blob_i32( uint32_t content );
 __m256i create_thunk( __m256i ro_handle );
 
 uint32_t value_type( __m256i handle );
+
+// Unsafe_io prints the contents mem[str_index: index + length]. Traps if
+// index + length - 1 is out of bounds.
+void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem );
 }
