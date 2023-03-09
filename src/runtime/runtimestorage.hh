@@ -64,7 +64,7 @@ private:
     , local_storage_()
     , ready_evaluate_()
     , threads_()
-    , num_threads_( 128 )
+    , num_threads_( 1 )
     , threads_active_( true )
     , to_workers_()
     , to_producer_()
