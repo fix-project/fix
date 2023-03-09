@@ -17,6 +17,7 @@
 #include "wasm-rt-impl.hh"
 
 #include <assert.h>
+#include <cstddef>
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -447,6 +448,7 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
     table->read_only = false;                                                                                      \
     table->size = elements;                                                                                        \
     table->max_size = max_elements;                                                                                \
+    table->data = NULL;                                                                                            \
     if ( table->size != 0 ) {                                                                                      \
       void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), table->size * sizeof( wasm_rt_##type##_t ) );      \
       memset( ptr, 0, table->size * sizeof( wasm_rt_##type##_t ) );                                                \
@@ -471,6 +473,9 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
       return (uint32_t)-1;                                                                                         \
     }                                                                                                              \
     void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), new_elems * sizeof( wasm_rt_##type##_t ) );          \
+    if ( ptr == NULL ) {                                                                                           \
+      return -1;                                                                                                   \
+    }                                                                                                              \
     table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                         \
     memcpy( table->data, old_data, old_elems * sizeof( wasm_rt_##type##_t ) );                                     \
     table->size = new_elems;                                                                                       \
