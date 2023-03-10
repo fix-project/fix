@@ -51,7 +51,6 @@ void RuntimeWorker::eval( Name hash, Name name )
         tree.mutable_data()[i] = entry;
 
         if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-          // TODO need "atomic cache insert next"
           auto entry_hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &entry ), 32 ) );
 
           Name desired( entry_hash, false, { FORCE } );
@@ -173,7 +172,7 @@ void RuntimeWorker::child( Name hash )
       int64_t last_job = 0;
       if ( pending.get()->compare_exchange_strong( last_job, -1 ) ) {
         update_parent( tree_name );
-        // TODO this can be a seperate job if needed
+        // this can be a seperate job if needed
         progress( runtimestorage_.fix_cache_.get_name( nhash ), tree_name );
       }
     } else {

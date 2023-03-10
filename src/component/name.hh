@@ -1,7 +1,6 @@
 #pragma once
 
 #include <bit>
-#include <cstdarg>
 #include <iostream>
 #include <string>
 #include <variant>

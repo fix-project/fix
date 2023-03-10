@@ -51,8 +51,6 @@ Name RuntimeStorage::add_blob( Blob&& blob )
   }
 }
 
-// TODO need to get rid of reference to variant stuff
-
 string_view RuntimeStorage::get_blob( Name name )
 {
   if ( name.is_literal_blob() ) {
@@ -139,10 +137,10 @@ Name RuntimeStorage::local_to_storage( Name name )
       if ( holds_alternative<Blob>( obj ) ) {
         string_view blob = get<Blob>( obj );
 
-        Name new_name( sha256::encode( blob ), blob.size(), name.get_metadata() );
-        fix_cache_.insert_or_assign( new_name, name );
+        Name hash( sha256::encode( blob ), blob.size(), name.get_metadata() );
+        fix_cache_.insert_or_assign( hash, name );
 
-        return new_name;
+        return hash;
       } else {
         throw runtime_error( "Name type does not match content type" );
       }
@@ -153,21 +151,22 @@ Name RuntimeStorage::local_to_storage( Name name )
     case ContentType::Tree: {
       const Object& obj = local_storage_.at( name.get_local_id() );
       if ( holds_alternative<Tree>( obj ) ) {
-        // TODO-this assumes no one is operating on the tree
         span_view<Name> orig_tree = get<Tree>( obj );
 
-        for ( size_t i = 0; i < orig_tree.size(); ++i ) {
+        Name new_name = add_tree( std::move( Tree( orig_tree.size() ) ) );
+        span_view<Name> tree = get_tree( new_name );
+
+        for ( size_t i = 0; i < tree.size(); ++i ) {
           auto entry = orig_tree[i];
-          orig_tree.mutable_data()[i] = local_to_storage( entry );
+          tree.mutable_data()[i] = local_to_storage( entry );
         }
 
-        string_view view( reinterpret_cast<char*>( orig_tree.mutable_data() ), orig_tree.size() * sizeof( Name ) );
-        Name new_name( sha256::encode( view ), orig_tree.size(), name.get_metadata() );
+        string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Name ) );
+        Name hash( sha256::encode( view ), tree.size(), name.get_metadata() );
 
-        fix_cache_.insert_or_assign( new_name, name );
+        fix_cache_.insert_or_assign( hash, new_name );
 
-        return new_name;
-
+        return hash;
       } else {
         throw runtime_error( "Name type does not match content type" );
       }
