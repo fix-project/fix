@@ -27,16 +27,13 @@ private:
   friend class RuntimeWorker;
   friend class Job;
 
-  // Storage: maps a Name to the contents of the corresponding Object
-  InMemoryStorage<Object> storage;
-
   fixcache fix_cache_;
 
   // Maps a Wasm function Name to corresponding compiled Program
   InMemoryStorage<Program> name_to_program_;
 
   // Storage for Object/Names with a local name
-  concurrent_vector<ObjectOrName> local_storage_;
+  concurrent_vector<Object> local_storage_;
 
   std::vector<std::unique_ptr<RuntimeWorker>> workers_;
 
@@ -47,8 +44,7 @@ private:
   std::atomic<size_t> work_;
 
   RuntimeStorage()
-    : storage()
-    , fix_cache_()
+    : fix_cache_()
     , name_to_program_()
     , local_storage_()
     , workers_()

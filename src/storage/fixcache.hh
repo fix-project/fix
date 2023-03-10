@@ -41,6 +41,12 @@ public:
     return fixcache_.at( name ).pending;
   }
 
+  void insert_or_assign( Name name, Name value )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    fixcache_.insert_or_assign( name, Entry( value ) );
+  }
+
   void insert_or_update( Name name, Name value, int64_t pending )
   {
     std::unique_lock lock( fixcache_mutex_ );
@@ -72,7 +78,6 @@ public:
 
       // If insertion was sucessful
       if ( ins.second ) {
-        // std::cerr << "ins next: " << name << "\n";
         break;
       }
     }

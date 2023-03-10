@@ -51,22 +51,17 @@ Name RuntimeStorage::add_blob( Blob&& blob )
   }
 }
 
+// TODO need to get rid of reference to variant stuff
+
 string_view RuntimeStorage::get_blob( Name name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
   } else if ( name.is_local() ) {
-    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-    if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj );
-    } else if ( holds_alternative<Name>( obj ) ) {
-      return get_blob( get<Name>( obj ) );
-    }
+    return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    const Object& obj = storage.get( name );
-    if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj );
-    }
+    Name local_name = fix_cache_.get_name( name );
+    return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Blob does not exist." );
@@ -77,17 +72,10 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
   } else if ( name.is_local() ) {
-    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-    if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj );
-    } else if ( holds_alternative<Name>( obj ) ) {
-      return get_blob( get<Name>( obj ) );
-    }
+    return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    const Object& obj = storage.get( name );
-    if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj );
-    }
+    Name local_name = fix_cache_.get_name( name );
+    return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Blob does not exist." );
@@ -103,17 +91,10 @@ Name RuntimeStorage::add_tree( Tree&& tree )
 span_view<Name> RuntimeStorage::get_tree( Name name )
 {
   if ( name.is_local() ) {
-    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-    if ( holds_alternative<Tree>( obj ) ) {
-      return get<Tree>( obj );
-    } else if ( holds_alternative<Name>( obj ) ) {
-      return get_tree( get<Name>( obj ) );
-    }
+    return get<Tree>( local_storage_.at( name.get_local_id() ) );
   } else {
-    const Object& obj = storage.get( name ); // TODO This will need to be better protected
-    if ( holds_alternative<Tree>( obj ) ) {
-      return get<Tree>( obj );
-    }
+    Name local_name = fix_cache_.get_name( name );
+    return get<Tree>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Tree does not exist." );
@@ -154,32 +135,25 @@ Name RuntimeStorage::local_to_storage( Name name )
 
   switch ( name.get_content_type() ) {
     case ContentType::Blob: {
-      const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-      if ( holds_alternative<Name>( obj ) ) {
-        Name new_name = get<Name>( obj );
-        assert( !new_name.is_local() );
-
-        return new_name;
-      } else if ( holds_alternative<Blob>( obj ) ) {
+      const Object& obj = local_storage_.at( name.get_local_id() );
+      if ( holds_alternative<Blob>( obj ) ) {
         string_view blob = get<Blob>( obj );
+
         Name new_name( sha256::encode( blob ), blob.size(), name.get_metadata() );
-        storage.put( new_name, move( get<Blob>( local_storage_.at( name.get_local_id() ) ) ) );
-        local_storage_.at( name.get_local_id() ) = new_name;
+        fix_cache_.insert_or_assign( new_name, name );
 
         return new_name;
       } else {
         throw runtime_error( "Name type does not match content type" );
       }
+
       break;
     }
 
     case ContentType::Tree: {
-      const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-      if ( holds_alternative<Name>( obj ) ) {
-        Name new_name = get<Name>( obj );
-        assert( !new_name.is_local() );
-        return new_name;
-      } else if ( holds_alternative<Tree>( obj ) ) {
+      const Object& obj = local_storage_.at( name.get_local_id() );
+      if ( holds_alternative<Tree>( obj ) ) {
+        // TODO-this assumes no one is operating on the tree
         span_view<Name> orig_tree = get<Tree>( obj );
 
         for ( size_t i = 0; i < orig_tree.size(); ++i ) {
@@ -189,8 +163,8 @@ Name RuntimeStorage::local_to_storage( Name name )
 
         string_view view( reinterpret_cast<char*>( orig_tree.mutable_data() ), orig_tree.size() * sizeof( Name ) );
         Name new_name( sha256::encode( view ), orig_tree.size(), name.get_metadata() );
-        storage.put( new_name, move( get<Tree>( local_storage_.at( name.get_local_id() ) ) ) );
-        local_storage_.at( name.get_local_id() ) = new_name;
+
+        fix_cache_.insert_or_assign( new_name, name );
 
         return new_name;
 
@@ -202,7 +176,6 @@ Name RuntimeStorage::local_to_storage( Name name )
 
     case ContentType::Thunk: {
       return Name::get_thunk_name( local_to_storage( Name::get_encode_name( name ) ) );
-      break;
     }
 
     default:
@@ -232,6 +205,7 @@ string RuntimeStorage::serialize( Name name )
         output_file << base64::encode( tree[i] );
       }
       output_file.close();
+
       return file_name;
     }
 
@@ -254,7 +228,7 @@ void RuntimeStorage::deserialize()
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
     Name name( base64::decode( file.path().filename().string() ) );
 
-    if ( name.is_literal_blob() || name.is_local() || storage.contains( name ) ) {
+    if ( name.is_literal_blob() || name.is_local() || fix_cache_.contains( name ) ) {
       continue;
     }
 
@@ -276,7 +250,9 @@ void RuntimeStorage::deserialize()
         input_file.read( buf, size );
 
         Blob blob( Blob_ptr( buf ), size );
-        storage.put( name, move( blob ) );
+        Name local_id = add_blob( move( blob ) );
+        fix_cache_.insert_or_assign( name, local_id );
+
         continue;
       }
 
@@ -294,7 +270,10 @@ void RuntimeStorage::deserialize()
 
         Tree tree( Tree_ptr( tree_buf ), size / 43 );
         free( buf );
-        storage.put( name, move( tree ) );
+
+        Name local_id = add_tree( move( tree ) );
+        fix_cache_.insert_or_assign( name, local_id );
+
         continue;
       }
 

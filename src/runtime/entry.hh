@@ -9,4 +9,9 @@ struct Entry
     : name( name )
     , pending( new std::atomic<int64_t>( pending ) )
   {}
+
+  Entry( Name name )
+    : name( name )
+    , pending()
+  {}
 };
