@@ -451,8 +451,10 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
     table->data = NULL;                                                                                            \
     if ( table->size != 0 ) {                                                                                      \
       void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), table->size * sizeof( wasm_rt_##type##_t ) );      \
-      memset( ptr, 0, table->size * sizeof( wasm_rt_##type##_t ) );                                                \
       table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                       \
+      for ( int i = 0; i < (int32_t)table->size; i++ ) {                                                           \
+        table->data[i] = wasm_rt_##type##_null_value;                                                              \
+      }                                                                                                            \
     }                                                                                                              \
   }                                                                                                                \
   void wasm_rt_free_##type##_table( wasm_rt_##type##_table_t* table )                                              \

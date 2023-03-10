@@ -209,8 +209,8 @@ static const wasm_rt_funcref_t wasm_rt_funcref_null_value = { NULL, NULL, NULL }
 /** The type of an external reference (opaque to WebAssembly). */
 typedef __m256i wasm_rt_externref_t;
 
-/** Default (null) value of an externref */
-static const wasm_rt_externref_t wasm_rt_externref_null_value = { 0, 0, 0, 0 };
+/** Default (null) value of an externref. Strict accessible blob of size zero. */
+static const wasm_rt_externref_t wasm_rt_externref_null_value = { 0, 0, 0, 4611686018427387904 };
 
 /** A Memory object. */
 typedef struct
