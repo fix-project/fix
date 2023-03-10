@@ -27,7 +27,7 @@ jobs:
         run: cmake --build out --parallel 8
       - name: test
         run: cmake --build out --target fixpoint-check
-  sanitize:
+  sanitize-ASan:
       runs-on: ubuntu-latest
       container: ghcr.io/fix-project/wasm_toolchain_docker:latest
       steps:
@@ -38,6 +38,21 @@ jobs:
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - name: cmake
         run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=DebugASan
+      - name: compile
+        run: cmake --build out-sanitize --parallel 8
+      - name: test
+        run: cmake --build out-sanitize --target fixpoint-check
+  sanitize-TSan:
+      runs-on: ubuntu-latest
+      container: ghcr.io/fix-project/wasm_toolchain_docker:latest
+      steps:
+      - uses: actions/checkout@v1
+      - name: install boost
+        run: sudo apt update && sudo apt-get install libboost-all-dev -y
+      - shell: bash
+        run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
+      - name: cmake
+        run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=DebugTSan
       - name: compile
         run: cmake --build out-sanitize --parallel 8
       - name: test
