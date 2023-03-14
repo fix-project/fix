@@ -12,6 +12,7 @@ void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )
     throw std::runtime_error( "not an accessible tree" );
   }
   auto tree = RuntimeStorage::get_instance().get_tree( ObjectReference::object_reference_name_only( obj ) );
+  target_table->ref = ro_handle;
   target_table->data = reinterpret_cast<wasm_rt_externref_t*>( const_cast<Name*>( tree.data() ) );
   target_table->size = tree.size();
   target_table->max_size = tree.size();
@@ -25,9 +26,9 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
     throw std::runtime_error( "not an accessible blob" );
   }
 
+  target_memory->ref = ro_handle;
   std::string_view blob;
   if ( obj.is_literal_blob() ) {
-    target_memory->ref = ro_handle;
     blob = { reinterpret_cast<const char*>( &target_memory->ref ), obj.literal_blob_len() };
   } else {
     blob = RuntimeStorage::get_instance().get_blob( (__m256i)obj );

@@ -192,6 +192,8 @@ private:
   void write_get_instance_size();
   void write_context();
   void write_unsafe_io();
+  void write_get_attached_tree();
+  void write_get_attached_blob();
 };
 
 void InitComposer::write_context()
@@ -349,6 +351,37 @@ void InitComposer::write_unsafe_io()
   result_ << "}" << endl;
 }
 
+void InitComposer::write_get_attached_tree()
+{
+  result_ << "extern __m256i fixpoint_get_attached_tree(wasm_rt_externref_table_t*);" << endl;
+  auto ro_tables = inspector_->GetExportedROTables();
+  for ( uint32_t idx : ro_tables ) {
+    result_ << "__m256i " << ExportName( "fixpoint", "get_attached_tree_ro_table_" + to_string( idx ) )
+            << "(struct w2c_fixpoint* instance) {" << endl;
+    result_ << "  wasm_rt_externref_table_t* ro_table = "
+            << ExportName( module_prefix_, "ro_table_" + to_string( idx ) ) << "((" << state_info_type_name_
+            << "*)instance);" << endl;
+    result_ << "if ( ro_table->read_only && ro_table->size > 0 ) return ro_table->ref;" << endl;
+    result_ << "wasm_rt_trap( WASM_RT_TRAP_OOB );" << endl;
+    result_ << "}\n" << endl;
+  }
+}
+
+void InitComposer::write_get_attached_blob()
+{
+  auto ro_mems = inspector_->GetExportedROMems();
+  result_ << "extern __m256i fixpoint_get_attached_blob(wasm_rt_memory_t*);" << endl;
+  for ( uint32_t idx : ro_mems ) {
+    result_ << "__m256i " << ExportName( "fixpoint", "get_attached_blob_ro_mem_" + to_string( idx ) )
+            << "(struct w2c_fixpoint* instance) {" << endl;
+    result_ << "  wasm_rt_memory_t* ro_mem = " << ExportName( module_prefix_, "ro_mem_" + to_string( idx ) ) << "(("
+            << state_info_type_name_ << "*)instance);" << endl;
+    result_ << "if ( ro_mem->read_only && ro_mem->size > 0 ) return ro_mem->ref;" << endl;
+    result_ << "wasm_rt_trap( WASM_RT_TRAP_OOB );" << endl;
+    result_ << "}\n" << endl;
+  }
+}
+
 string InitComposer::compose_header()
 {
   result_ = ostringstream();
@@ -368,6 +401,8 @@ string InitComposer::compose_header()
   write_value_type();
   write_create_thunk();
   write_unsafe_io();
+  write_get_attached_tree();
+  write_get_attached_blob();
 
   result_ << "void initProgram(void* ptr) {" << endl;
   result_ << "  " << state_info_type_name_ << "* instance = (" << state_info_type_name_ << "*)ptr;" << endl;
