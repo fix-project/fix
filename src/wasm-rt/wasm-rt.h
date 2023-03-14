@@ -215,7 +215,7 @@ static const wasm_rt_externref_t wasm_rt_externref_null_value = { 0, 0, 0, 46116
 /** A Memory object. */
 typedef struct
 {
-  wasm_rt_externref_t ref;
+  wasm_rt_externref_t ref; // Pointer to blob currently attached to memory
   bool read_only;
 
   /** The linear memory data, with a byte length of `size`. */
@@ -232,6 +232,7 @@ typedef struct
 /** A Table of type funcref. */
 typedef struct
 {
+  wasm_rt_externref_t ref;
   bool read_only;
 
   /** The table element data, with an element count of `size`. */
@@ -246,6 +247,7 @@ typedef struct
 /** A Table of type externref. */
 typedef struct
 {
+  wasm_rt_externref_t ref; // Pointer to tree currently attached to table
   bool read_only;
 
   /** The table element data, with an element count of `size`. */
