@@ -35,7 +35,7 @@ void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
   }
 
   target_memory->data = (uint8_t*)const_cast<char*>( blob.data() );
-  target_memory->pages = ( blob.size() + getpagesize() - 1 ) / getpagesize(); // ceil(blob_size/page_size)
+  target_memory->pages = ( blob.size() + WASM_RT_PAGE_SIZE - 1 ) / WASM_RT_PAGE_SIZE; // ceil(blob_size/page_size)
   target_memory->max_pages = target_memory->pages;
   target_memory->size = blob.size();
 }
