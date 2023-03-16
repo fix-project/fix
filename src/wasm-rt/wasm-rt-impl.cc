@@ -42,8 +42,7 @@
 #define alloca _alloca
 #endif
 
-#define PAGE_SIZE 65536
-#define MAX_EXCEPTION_SIZE PAGE_SIZE
+#define MAX_EXCEPTION_SIZE WASM_RT_PAGE_SIZE
 
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY
 static bool g_signal_handler_installed = false;
@@ -332,7 +331,7 @@ void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
     return;
   }
 
-  uint64_t byte_length = initial_pages * PAGE_SIZE;
+  uint64_t byte_length = initial_pages * WASM_RT_PAGE_SIZE;
   if ( hw_checked ) {
     /* Reserve 8GiB. */
     assert( !is64 && "memory64 is not yet compatible with WASM_RT_MEMCHECK_SIGNAL_HANDLER" );
@@ -380,9 +379,9 @@ uint64_t wasm_rt_grow_memory_helper( wasm_rt_memory_t* memory, uint64_t delta, b
   if ( new_pages < old_pages || new_pages > memory->max_pages ) {
     return (uint64_t)-1;
   }
-  uint64_t old_size = old_pages * PAGE_SIZE;
-  uint64_t new_size = new_pages * PAGE_SIZE;
-  uint64_t delta_size = delta * PAGE_SIZE;
+  uint64_t old_size = old_pages * WASM_RT_PAGE_SIZE;
+  uint64_t new_size = new_pages * WASM_RT_PAGE_SIZE;
+  uint64_t delta_size = delta * WASM_RT_PAGE_SIZE;
   uint8_t* new_data;
   if ( hw_checked ) {
     new_data = memory->data;

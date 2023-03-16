@@ -60,6 +60,8 @@ extern "C" {
 #define WASM_RT_THREAD_LOCAL
 #endif
 
+#define WASM_RT_PAGE_SIZE 65536
+
 /**
  * Enable memory checking via a signal handler via the following definition:
  *
