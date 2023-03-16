@@ -177,7 +177,7 @@ Result WasmInspector::ValidateImports()
       case ExternalKind::Memory:
       case ExternalKind::Func: {
         if ( import->module_name != "fixpoint" ) {
-          string message = "ValidateImports: module name is not fixpoint";
+          string message = "ValidateImports: module name is not fixpoint " + import->field_name;
           errors_->push_back( createErrorWithMessage( message ) );
           return Result::Error;
         }
