@@ -1,10 +1,10 @@
+#include "base64.hh"
 #include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
-#include "base64.hh"
-#include "elfloader.hh"
+#include "job.hh"
 #include "object.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
@@ -12,11 +12,38 @@
 
 using namespace std;
 
+bool RuntimeStorage::steal_work( Job& job, size_t tid )
+{
+  // Starting at the next thread index after the current thread--look to steal work
+  for ( size_t i = 0; i < num_workers_; ++i ) {
+    if ( workers_[( i + tid + 1 ) % num_workers_]->jobs_.pop( job ) ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Name RuntimeStorage::force_thunk( Name name )
+{
+  auto hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) );
+  Name desired( hash, false, { FORCE } );
+  Name operations( hash, true, { FORCE } );
+
+  fix_cache_.insert_or_update( desired, Name(), 1 );
+
+  workers_[0].get()->queue_job( Job( name, operations ) );
+
+  std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
+  ( pending.get() )->wait( 1 );
+
+  return fix_cache_.get_name( desired );
+}
+
 Name RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 31 ) {
-    Name name( local_storage_.size(), blob.size(), ContentType::Blob );
-    local_storage_.push_back( move( blob ) );
+    size_t local_id = local_storage_.push_back( move( blob ) );
+    Name name( local_id, blob.size(), ContentType::Blob );
     return name;
   } else {
     Name name( blob );
@@ -29,17 +56,10 @@ string_view RuntimeStorage::get_blob( Name name )
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
   } else if ( name.is_local() ) {
-    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-    if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj );
-    } else if ( holds_alternative<Name>( obj ) ) {
-      return get_blob( get<Name>( obj ) );
-    }
+    return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    const Object& obj = storage.get( name );
-    if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj );
-    }
+    Name local_name = fix_cache_.get_name( name );
+    return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Blob does not exist." );
@@ -50,17 +70,10 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
   } else if ( name.is_local() ) {
-    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-    if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj );
-    } else if ( holds_alternative<Name>( obj ) ) {
-      return get_blob( get<Name>( obj ) );
-    }
+    return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    const Object& obj = storage.get( name );
-    if ( holds_alternative<Blob>( obj ) ) {
-      return get<Blob>( obj );
-    }
+    Name local_name = fix_cache_.get_name( name );
+    return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Blob does not exist." );
@@ -68,25 +81,18 @@ string_view RuntimeStorage::user_get_blob( const Name& name )
 
 Name RuntimeStorage::add_tree( Tree&& tree )
 {
-  Name name( local_storage_.size(), tree.size(), ContentType::Tree );
-  local_storage_.push_back( move( tree ) );
+  size_t local_id = local_storage_.push_back( move( tree ) );
+  Name name( local_id, tree.size(), ContentType::Tree );
   return name;
 }
 
 span_view<Name> RuntimeStorage::get_tree( Name name )
 {
   if ( name.is_local() ) {
-    const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-    if ( holds_alternative<Tree>( obj ) ) {
-      return get<Tree>( obj );
-    } else if ( holds_alternative<Name>( obj ) ) {
-      return get_tree( get<Name>( obj ) );
-    }
+    return get<Tree>( local_storage_.at( name.get_local_id() ) );
   } else {
-    const Object& obj = storage.get( name );
-    if ( holds_alternative<Tree>( obj ) ) {
-      return get<Tree>( obj );
-    }
+    Name local_name = fix_cache_.get_name( name );
+    return get<Tree>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Tree does not exist." );
@@ -102,159 +108,6 @@ Name RuntimeStorage::get_thunk_encode_name( Name thunk_name )
   return Name::get_encode_name( thunk_name );
 }
 
-Name RuntimeStorage::force( Name name )
-{
-  if ( name.is_literal_blob() ) {
-    return name;
-  } else {
-    switch ( name.get_content_type() ) {
-      case ContentType::Blob:
-        return name;
-
-      case ContentType::Tree:
-        return force_tree( name );
-
-      case ContentType::Thunk:
-        return force_thunk( name );
-
-      default:
-        throw runtime_error( "Invalid content type." );
-    }
-  }
-}
-
-void RuntimeStorage::compute_job( std::tuple<Name, Name*, std::atomic<size_t>*> job )
-{
-  Name name = std::get<0>( job );
-  if ( !name.is_literal_blob() ) {
-    switch ( name.get_content_type() ) {
-      case ContentType::Blob:
-        break;
-      case ContentType::Tree:
-        name = force_tree( name );
-        break;
-
-      case ContentType::Thunk:
-        name = force_thunk( name );
-        break;
-
-      default:
-        throw runtime_error( "Invalid content type." );
-    }
-  }
-
-  ( *std::get<1>( job ) ) = name;
-  ( *std::get<2>( job ) )--;
-  to_producer_.notify_all();
-}
-
-void RuntimeStorage::worker()
-{
-  while ( true ) {
-    std::tuple<Name, Name*, std::atomic<size_t>*> job;
-    {
-      std::unique_lock<std::mutex> conditional_lock( to_workers_mutex_ );
-      to_workers_.wait( conditional_lock,
-                        [this, &job] { return !threads_active_ || ready_evaluate_.front_pop( job ); } );
-    }
-
-    if ( !threads_active_ ) {
-      break;
-    }
-    compute_job( job );
-  }
-}
-
-Name RuntimeStorage::force_tree( Name name )
-{
-  auto orig_tree = get_tree( name );
-
-  std::atomic<size_t> pending_jobs = orig_tree.size();
-
-  for ( size_t i = 0; i < orig_tree.size(); ++i ) {
-    auto entry = orig_tree[i];
-    if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-      ready_evaluate_.push( std::make_tuple( entry, &( orig_tree.mutable_data()[i] ), &pending_jobs ) );
-      to_workers_.notify_one();
-    } else {
-      pending_jobs--;
-    }
-  }
-
-  // Don't waste time waiting for sub-jobs to complete--compute some jobs
-  while ( true ) {
-    std::tuple<Name, Name*, std::atomic<size_t>*> job;
-
-    {
-      std::unique_lock<std::mutex> conditional_lock( to_producer_mutex_ );
-      to_producer_.wait( conditional_lock, [this, &pending_jobs, &job] {
-        return pending_jobs == 0 || ready_evaluate_.front_pop( job );
-      } );
-    }
-
-    if ( pending_jobs == 0 ) {
-      return name;
-    }
-
-    compute_job( job );
-  }
-}
-
-Name RuntimeStorage::force_thunk( Name name )
-{
-  Name current_name = name;
-  while ( true ) {
-    Name new_name = reduce_thunk( current_name );
-    switch ( new_name.get_content_type() ) {
-      case ContentType::Blob:
-      case ContentType::Tree:
-        return force( new_name );
-
-      default:
-        current_name = new_name;
-    }
-  }
-}
-
-Name RuntimeStorage::reduce_thunk( Name name )
-{
-  Name encode_name = get_thunk_encode_name( name );
-  // Name canonical_name = local_to_storage( encode_name );
-  // if ( memoization_cache.contains( canonical_name ) ) {
-  //   return memoization_cache.at( canonical_name );
-  // } else {
-  Name result = evaluate_encode( encode_name );
-  // memoization_cache.insert_or_assign( canonical_name, result );
-  return result;
-  //}
-}
-
-Name RuntimeStorage::evaluate_encode( Name encode_name )
-{
-  force_tree( encode_name );
-  Name function_name = get_tree( encode_name ).at( 1 );
-
-  if ( not function_name.is_blob() ) {
-    throw runtime_error( "ENCODE functions not yet supported" );
-  }
-
-  Name canonical_name = local_to_storage( function_name );
-
-  if ( not name_to_program_.contains( canonical_name ) ) {
-    /* compile the Wasm to C and then to ELF */
-    const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
-
-    Program program = link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) );
-
-    name_to_program_.insert_or_assign( canonical_name, std::move( program ) );
-  }
-
-  auto& program = name_to_program_.at( canonical_name );
-  __m256i output = program.execute( encode_name );
-
-  return output;
-}
-
 void RuntimeStorage::populate_program( Name function_name )
 {
   if ( not function_name.is_blob() ) {
@@ -265,8 +118,8 @@ void RuntimeStorage::populate_program( Name function_name )
     /* compile the Wasm to C and then to ELF */
     const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
 
-    name_to_program_.insert_or_assign(
-      function_name, link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+    name_to_program_.put( function_name,
+                          link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
   }
 
   return;
@@ -280,45 +133,40 @@ Name RuntimeStorage::local_to_storage( Name name )
 
   switch ( name.get_content_type() ) {
     case ContentType::Blob: {
-      const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-      if ( holds_alternative<Name>( obj ) ) {
-        Name new_name = get<Name>( obj );
-        assert( !new_name.is_local() );
-        return new_name;
-      } else if ( holds_alternative<Blob>( obj ) ) {
+      const Object& obj = local_storage_.at( name.get_local_id() );
+      if ( holds_alternative<Blob>( obj ) ) {
         string_view blob = get<Blob>( obj );
-        Name new_name( sha256::encode( blob ), blob.size(), name.get_metadata() );
-        storage.put( new_name, move( get<Blob>( local_storage_.at( name.get_local_id() ) ) ) );
-        local_storage_.at( name.get_local_id() ) = new_name;
 
-        return new_name;
+        Name hash( sha256::encode( blob ), blob.size(), name.get_metadata() );
+        fix_cache_.insert_or_assign( hash, name );
+
+        return hash;
       } else {
         throw runtime_error( "Name type does not match content type" );
       }
+
       break;
     }
 
     case ContentType::Tree: {
-      const ObjectOrName& obj = local_storage_.at( name.get_local_id() );
-      if ( holds_alternative<Name>( obj ) ) {
-        Name new_name = get<Name>( obj );
-        assert( !new_name.is_local() );
-        return new_name;
-      } else if ( holds_alternative<Tree>( obj ) ) {
+      const Object& obj = local_storage_.at( name.get_local_id() );
+      if ( holds_alternative<Tree>( obj ) ) {
         span_view<Name> orig_tree = get<Tree>( obj );
 
-        for ( size_t i = 0; i < orig_tree.size(); ++i ) {
+        Name new_name = add_tree( std::move( Tree( orig_tree.size() ) ) );
+        span_view<Name> tree = get_tree( new_name );
+
+        for ( size_t i = 0; i < tree.size(); ++i ) {
           auto entry = orig_tree[i];
-          orig_tree.mutable_data()[i] = local_to_storage( entry );
+          tree.mutable_data()[i] = local_to_storage( entry );
         }
 
-        string_view view( reinterpret_cast<char*>( orig_tree.mutable_data() ), orig_tree.size() * sizeof( Name ) );
-        Name new_name( sha256::encode( view ), orig_tree.size(), name.get_metadata() );
-        storage.put( new_name, move( get<Tree>( local_storage_.at( name.get_local_id() ) ) ) );
-        local_storage_.at( name.get_local_id() ) = new_name;
+        string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Name ) );
+        Name hash( sha256::encode( view ), tree.size(), name.get_metadata() );
 
-        return new_name;
+        fix_cache_.insert_or_assign( hash, new_name );
 
+        return hash;
       } else {
         throw runtime_error( "Name type does not match content type" );
       }
@@ -327,7 +175,6 @@ Name RuntimeStorage::local_to_storage( Name name )
 
     case ContentType::Thunk: {
       return Name::get_thunk_name( local_to_storage( Name::get_encode_name( name ) ) );
-      break;
     }
 
     default:
@@ -357,6 +204,7 @@ string RuntimeStorage::serialize( Name name )
         output_file << base64::encode( tree[i] );
       }
       output_file.close();
+
       return file_name;
     }
 
@@ -379,7 +227,7 @@ void RuntimeStorage::deserialize()
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
     Name name( base64::decode( file.path().filename().string() ) );
 
-    if ( name.is_literal_blob() || name.is_local() || storage.contains( name ) ) {
+    if ( name.is_literal_blob() || name.is_local() || fix_cache_.contains( name ) ) {
       continue;
     }
 
@@ -401,7 +249,9 @@ void RuntimeStorage::deserialize()
         input_file.read( buf, size );
 
         Blob blob( Blob_ptr( buf ), size );
-        storage.put( name, move( blob ) );
+        Name local_id = add_blob( move( blob ) );
+        fix_cache_.insert_or_assign( name, local_id );
+
         continue;
       }
 
@@ -419,7 +269,10 @@ void RuntimeStorage::deserialize()
 
         Tree tree( Tree_ptr( tree_buf ), size / 43 );
         free( buf );
-        storage.put( name, move( tree ) );
+
+        Name local_id = add_tree( move( tree ) );
+        fix_cache_.insert_or_assign( name, local_id );
+
         continue;
       }
 
