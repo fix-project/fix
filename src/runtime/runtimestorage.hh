@@ -106,6 +106,9 @@ public:
   // Blocking force operations
   Name force_thunk( Name name );
 
+  // Blocking eval operations
+  Name eval_thunk( Name name );
+
   // Return encode name referred to by thunk
   Name get_thunk_encode_name( Name thunk_name );
 

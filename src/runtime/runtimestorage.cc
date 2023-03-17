@@ -39,6 +39,22 @@ Name RuntimeStorage::force_thunk( Name name )
   return fix_cache_.get_name( desired );
 }
 
+Name RuntimeStorage::eval_thunk( Name name )
+{
+  auto hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) );
+  Name desired( hash, false, { EVAL } );
+  Name operations( hash, true, { EVAL } );
+
+  fix_cache_.insert_or_update( desired, Name(), 1 );
+
+  workers_[0].get()->queue_job( Job( name, operations ) );
+
+  std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
+  ( pending.get() )->wait( 1 );
+
+  return fix_cache_.get_name( desired );
+}
+
 Name RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 31 ) {
