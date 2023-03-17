@@ -74,8 +74,9 @@ void RuntimeWorker::eval( Name hash, Name name )
     case ContentType::Thunk: {
       auto name_hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) );
 
-      Name desired( name_hash, false, { EVAL, FORCE } );
-      Name operations( name_hash, true, { FORCE, EVAL } );
+      Name desired( name_hash, false, { FORCE, EVAL } );
+      Name operations( name_hash, true, { EVAL, FORCE } );
+
       runtimestorage_.fix_cache_.insert_or_update( desired, hash, 0 );
 
       progress( operations, name );

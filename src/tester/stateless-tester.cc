@@ -52,7 +52,7 @@ void program_body( span_view<char*> args )
   Name thunk_name = runtime.add_thunk( Thunk { encode_name } );
 
   // force the Thunk and print it
-  Name result = runtime.force_thunk( thunk_name );
+  Name result = runtime.eval_thunk( thunk_name );
 
   // print the result
   cout << "Result:\n" << pretty_print( result );
