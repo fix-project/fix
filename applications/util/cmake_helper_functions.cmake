@@ -1,6 +1,5 @@
 # contains functions to create a fixpoint-compatible wasm module out of a c++ object.
 
-
 # link_libc links cc_obj_file with the libc and generates linked_with_libc.wasm. Depends on cc_obj_rule.
 # Note: you also need to link with wasi_snapshot_preview1.wasm via wasmlink (see "link_wasi_stubs" function)
 function(link_libc cc_obj_file cc_obj_rule) 
@@ -25,11 +24,11 @@ endfunction()
 function(link_storage storage_file_dir storage_file_name)
     set_source_files_properties( ${storage_file_dir}/${storage_file_name} PROPERTIES GENERATED TRUE )
 
-    # symlink because wasmlink requires modules to be in same directory
+    # copy because wasmlink requires modules to be in same directory
     add_custom_command(
         OUTPUT ${storage_file_name}
         DEPENDS ${storage_file_dir}/${storage_file_name}
-        COMMAND ln -s ${storage_file_dir}/${storage_file_name} .)
+        COMMAND cp ${storage_file_dir}/${storage_file_name} .)
 
     add_custom_command(
         OUTPUT "linked_with_storage.wasm"
@@ -50,11 +49,11 @@ endfunction()
 function(link_wasi_stubs wasi_stubs_file_dir wasi_stubs_file_name output_file_name) 
     set_source_files_properties( ${wasi_stubs_file_dir}/${wasi_stubs_file_name} PROPERTIES GENERATED TRUE )
 
-    # symlink because wasmlink requires modules to be in same directory
+    # copy because wasmlink requires modules to be in same directory
     add_custom_command(
         OUTPUT ${wasi_stubs_file_name}
         DEPENDS ${wasi_stubs_file_dir}/${wasi_stubs_file_name}
-        COMMAND ln -s ${wasi_stubs_file_dir}/${wasi_stubs_file_name} .)
+        COMMAND cp ${wasi_stubs_file_dir}/${wasi_stubs_file_name} .)
 
     add_custom_command(
         OUTPUT ${output_file_name}

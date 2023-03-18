@@ -4,6 +4,7 @@
 (memory $ro_mem_0 (export "ro_mem_0") 0)
 (memory $ro_mem_1 (export "ro_mem_1") 0)
 (memory $ro_mem_2 (export "ro_mem_2") 0)
+(memory $ro_mem_3 (export "ro_mem_3") 0)
 
 (memory $rw_mem_0 (export "rw_mem_0") 0)
 (memory $rw_mem_1 (export "rw_mem_1") 0)
@@ -12,6 +13,11 @@
 (table $ro_table_0 (export "ro_table_0") 0 externref)
 (table $ro_table_1 (export "ro_table_1") 0 externref)
 (table $ro_table_2 (export "ro_table_2") 0 externref)
+(table $ro_table_3 (export "ro_table_3") 0 externref)
+(table $ro_table_4 (export "ro_table_4") 0 externref)
+(table $ro_table_5 (export "ro_table_5") 0 externref)
+(table $ro_table_6 (export "ro_table_6") 0 externref)
+(table $ro_table_7 (export "ro_table_7") 0 externref)
 
 (table $rw_table_0 (export "rw_table_0") 0 externref)
 (table $rw_table_1 (export "rw_table_1") 0 externref)
@@ -34,6 +40,36 @@
     (table.get $ro_table_2 (local.get $index)))
 (func (export "size_ro_table_2") (result i32)
     (table.size $ro_table_2))
+
+;; ro_table_3 operations 
+(func (export "get_ro_table_3") (param $index i32) (result externref)
+    (table.get $ro_table_3 (local.get $index)))
+(func (export "size_ro_table_3") (result i32)
+    (table.size $ro_table_3))
+
+;; ro_table_4 operations 
+(func (export "get_ro_table_4") (param $index i32) (result externref)
+    (table.get $ro_table_4 (local.get $index)))
+(func (export "size_ro_table_4") (result i32)
+    (table.size $ro_table_4))
+
+;; ro_table_5 operations 
+(func (export "get_ro_table_5") (param $index i32) (result externref)
+    (table.get $ro_table_5 (local.get $index)))
+(func (export "size_ro_table_5") (result i32)
+    (table.size $ro_table_5))
+
+;; ro_table_6 operations 
+(func (export "get_ro_table_6") (param $index i32) (result externref)
+    (table.get $ro_table_6 (local.get $index)))
+(func (export "size_ro_table_6") (result i32)
+    (table.size $ro_table_6))
+
+;; ro_table_7 operations 
+(func (export "get_ro_table_7") (param $index i32) (result externref)
+    (table.get $ro_table_7 (local.get $index)))
+(func (export "size_ro_table_7") (result i32)
+    (table.size $ro_table_7))
 
 ;; rw_table_0 operations 
 (func (export "set_rw_table_0") (param $index i32) (param $val externref)
@@ -94,6 +130,14 @@
     (i32.load8_u $ro_mem_2 (local.get $index)))
 (func (export "size_ro_mem_2") (result i32)
     (memory.size $ro_mem_2))
+
+;; ro_mem_3 operations 
+(func (export "get_i32_ro_mem_3") (param $index i32) (result i32)
+    (i32.load $ro_mem_3 (local.get $index)))
+(func (export "get_i8_ro_mem_3") (param $index i32) (result i32)
+    (i32.load8_u $ro_mem_3 (local.get $index)))
+(func (export "size_ro_mem_3") (result i32)
+    (memory.size $ro_mem_3))
 
 ;; rw_mem_0 operations 
 (func (export "set_i32_rw_mem_0") (param $index i32) (param $val i32)
