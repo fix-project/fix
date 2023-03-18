@@ -74,7 +74,8 @@ static int32_t strlen( const char* str )
 
 static void write_trace( const char* str, int32_t len )
 {
-  flatware_memory_to_rw_2( fds[STDERR].offset, str, len );
+  grow_rw_mem(TraceRWMem, fds[STDERR].offset + len);
+  flatware_mem_to_rw_mem(TraceRWMem, fds[STDERR].offset, str, len );
   fds[STDERR].offset += len;
 }
 
@@ -179,7 +180,8 @@ _Noreturn void proc_exit( int32_t rval )
 {
   FUNC_TRACE( T32, rval, TEND );
 
-  set_rw_table_0( 0, create_blob_i32( rval ) );
+  grow_rw_table(ReturnRWTable, 1, create_blob_i32( rval ));
+  set_rw_table(ReturnRWTable, 0, create_blob_i32( rval ) );
   flatware_exit();
 }
 
@@ -262,7 +264,7 @@ int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
     iobuf_len = get_program_i32( iovs + 4 + i * 8 );
 
     size_to_read = iobuf_len < file_remaining ? iobuf_len : file_remaining;
-    ro_1_to_program_memory( iobuf_offset, fds[fd].offset, size_to_read );
+    ro_mem_to_program_mem(FileSystemROMem, iobuf_offset, fds[fd].offset, size_to_read );
     fds[fd].offset += size_to_read;
     total_read += size_to_read;
   }
@@ -285,8 +287,9 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   for ( int32_t i = 0; i < iovs_len; i++ ) {
     iobuf_offset = get_program_i32( iovs + i * 8 );
     iobuf_len = get_program_i32( iovs + 4 + i * 8 );
-
-    program_memory_to_rw_1( fds[STDOUT].offset, iobuf_offset, iobuf_len );
+    
+    grow_rw_mem(StdOutRWMem,fds[STDOUT].offset + iobuf_len );
+    program_mem_to_rw_mem(StdOutRWMem, fds[STDOUT].offset, iobuf_offset, iobuf_len );
     fds[STDOUT].offset += iobuf_len;
     total_written += iobuf_len;
   }
@@ -536,17 +539,17 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
 
   FUNC_TRACE( T32, num_argument_ptr, T32, size_argument_ptr, TEND );
 
-  attach_tree_ro_table_1( get_ro_table_0( 2 ) );
+  attach_tree_ro_table( ArgsROTable, get_ro_table(InputROTable, 2 ) );
 
-  num = size_ro_table_1();
+  num = size_ro_table(ArgsROTable);
 
   memory_copy_program( num_argument_ptr, &num, 4 );
   RET_TRACE( num );
 
   // Actual arguments
   for ( int32_t i = 0; i < num; i++ ) {
-    attach_blob_ro_mem_0( get_ro_table_1( i ) );
-    size += size_ro_mem_0();
+    attach_blob_ro_mem(ArgROMem, get_ro_table(ArgsROTable, i ) );
+    size += size_ro_mem(ArgROMem);
   }
 
   memory_copy_program( size_argument_ptr, &size, 4 );
@@ -562,13 +565,13 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 
   FUNC_TRACE( T32, argv_ptr, T32, argv_buf_ptr, TEND );
 
-  attach_tree_ro_table_1( get_ro_table_0( 2 ) );
+  attach_tree_ro_table(ArgsROTable, get_ro_table(InputROTable, 2 ) );
 
-  for ( int32_t i = 0; i < size_ro_table_1(); i++ ) {
-    attach_blob_ro_mem_0( get_ro_table_1( i ) );
-    size = size_ro_mem_0();
+  for ( int32_t i = 0; i < size_ro_table(ArgsROTable); i++ ) {
+    attach_blob_ro_mem(ArgROMem, get_ro_table(ArgsROTable, i ) );
+    size = size_ro_mem(ArgROMem);
     memory_copy_program( argv_ptr + i * 4, &addr, 4 );
-    ro_0_to_program_memory( addr, 0, size );
+    ro_mem_to_program_mem( ArgROMem, addr, 0, size );
     addr += size;
   }
 
@@ -628,19 +631,19 @@ int32_t path_open( int32_t fd,
   }
 
   result = find_file( path, path_len, fd, retfd );
-
+  
   if ( result != retfd ) {
     RET_TRACE( result );
     return __WASI_ERRNO_NOENT;
   } else {
-    attach_blob_ro_mem_1( get_ro_table( retfd, 2 ) );
+    attach_blob_ro_mem(FileSystemROMem, get_ro_table( retfd, 2 ) );
   }
 
   if ( retfd >= N_FDS )
     return __WASI_ERRNO_NFILE;
 
   fds[retfd].offset = 0;
-  fds[retfd].size = size_ro_mem_1() - 1;
+  fds[retfd].size = size_ro_mem(FileSystemROMem) - 1;
   fds[retfd].open = true;
 
   fds[retfd].stat.fs_filetype = __WASI_FILETYPE_REGULAR_FILE;
@@ -697,29 +700,20 @@ int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
 
 externref fixpoint_apply( externref encode )
 {
-  set_rw_table_0( 0, create_blob_i32( 0 ) );
 
-  attach_tree_ro_table_0( encode );
+  grow_rw_table(ReturnRWTable, 3, create_blob_i32(0));
+  set_rw_table(ReturnRWTable, 0, create_blob_i32( 0 ) );
+  
+  attach_tree_ro_table(InputROTable, encode );
 
-  // Attach working directory to table 3 if exists
-  if ( size_ro_table_0() >= 4 ) {
-    attach_tree_ro_table_3( get_ro_table_0( 3 ) );
+  // Attach working directory to WorkingDirTable if exists
+  if ( size_ro_table(InputROTable) >= 4 ) {
+    attach_tree_ro_table(WorkingDirROTable, get_ro_table(InputROTable, 3 ) );
   }
   run_start();
 
-  set_rw_table_0( 1, create_blob_rw_mem_1( fds[STDOUT].offset ) );
+  set_rw_table(ReturnRWTable, 1, create_blob_rw_mem(StdOutRWMem, fds[STDOUT].offset ) );
+  set_rw_table(ReturnRWTable, 2, create_blob_rw_mem(TraceRWMem, fds[STDERR].offset ) );
 
-  set_rw_table_0( 2, create_blob_rw_mem_2( fds[STDERR].offset ) );
-
-  return create_tree_rw_table_0( 3 );
-}
-
-externref get_ro_table( int32_t table_index, int32_t index )
-{
-  return get_ro_table_functions[table_index]( index );
-}
-
-void attach_tree_ro_table( int32_t table_index, externref handle )
-{
-  attach_tree_ro_table_functions[table_index]( handle );
+  return create_tree_rw_table(ReturnRWTable, 3 );
 }

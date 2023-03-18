@@ -1,6 +1,13 @@
-#include "util/fixpoint_util.cc"
+extern "C" {
+#include "../util/fixpoint_util.h"
+}
 #include <cstdint>
 #include <string>
+
+void unsafe_io( std::string s )
+{
+  fixpoint_unsafe_io( s.c_str(), s.length() );
+}
 
 // Map applies main_blob to all the elements in arr. Passes the element as the fourth
 // value in the encode and arg_1 as the fifth.

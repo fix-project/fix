@@ -2,9 +2,11 @@ cmake_minimum_required(VERSION 2.8.12)
 cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0115 NEW)
 
-project(flatware)
-
 include(FetchContent)
+
+# defines functions link_libc, link_storage, link_wasi_stubs
+include(../util/cmake_helper_functions.cmake)
+
 FetchContent_Declare(
   wasm-tools
   GIT_REPOSITORY https://github.com/fix-project/wasm-tools
@@ -25,15 +27,17 @@ add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
 
 add_library(filesys_obj OBJECT "filesys.c")
 add_library(c_flatware_obj OBJECT "c-flatware.c")
+add_library(asm_flatware_obj OBJECT "asm-flatware.c")
+
+
 add_custom_command(
   OUTPUT  "c-flatware.wasm"
-  DEPENDS filesys_obj
-          c_flatware_obj
-          filesys.c
-          c-flatware.c
+  DEPENDS filesys_obj c_flatware_obj asm_flatware_obj util/fixpoint_util_obj filesys.c c-flatware.c asm-flatware.c
   COMMAND $ENV{HOME}/wasm-toolchain/sysroot/bin/wasm-ld
-          ${CMAKE_BINARY_DIR}/CMakeFiles/filesys_obj.dir/filesys.c.o
-          ${CMAKE_BINARY_DIR}/CMakeFiles/c_flatware_obj.dir/c-flatware.c.o
+          ${CMAKE_BINARY_DIR}/flatware/CMakeFiles/filesys_obj.dir/filesys.c.o
+          ${CMAKE_BINARY_DIR}/util/CMakeFiles/fixpoint_util_obj.dir/fixpoint_util.c.o
+          ${CMAKE_BINARY_DIR}/flatware/CMakeFiles/c_flatware_obj.dir/c-flatware.c.o
+          ${CMAKE_BINARY_DIR}/flatware/CMakeFiles/asm_flatware_obj.dir/asm-flatware.c.o
           $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc.a
           -o c-flatware.wasm
           --no-entry
@@ -50,29 +54,32 @@ add_custom_command(
           -o asm-flatware.wasm
 )
 
+set_source_files_properties(asm-flatware.wasm PROPERTIES GENERATED TRUE)
+
 add_custom_command(
-  OUTPUT "flatware_with_exported_memory.wasm"
+  OUTPUT "linked_with_libc.wasm"
   DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
           asm-flatware.wasm
           c-flatware.wasm
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
           --enable-multi-memory
-	  --enable-exceptions
+          --enable-exceptions
           c-flatware.wasm
           asm-flatware.wasm
-          -o flatware_with_exported_memory.wasm
+          -o linked_with_libc.wasm
 )
-set_source_files_properties(asm-flatware.wasm PROPERTIES GENERATED TRUE)
+
+link_storage(../util fixpoint_storage.wasm)
 
 add_custom_command(
   OUTPUT "wasi_snapshot_preview1.wasm"
-  DEPENDS flatware_with_exported_memory.wasm
+  DEPENDS linked_with_storage.wasm
           ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/export-audit/export-audit
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/export-audit/export-audit
           --enable-multi-memory
           --enable-exceptions
           -r memory
-          flatware_with_exported_memory.wasm
+          linked_with_storage.wasm
           wasi_snapshot_preview1.wasm
 )
 

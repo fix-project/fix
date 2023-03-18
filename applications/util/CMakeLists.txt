@@ -3,8 +3,6 @@ cmake_minimum_required(VERSION 2.8.12)
 cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0115 NEW)
 
-project(pl)
-
 include(FetchContent)
 FetchContent_Declare(
   wasm-tools
@@ -15,11 +13,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(wasm-tools)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -mreference-types -I ~/wasm-toolchain/wasix/include -fno-exceptions")
-set(CMAKE_CXX_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang++)
 
-add_link_options( -Wl,--no-entry -Wl,--allow-undefined, -Wl, -Werror, -Wunused-parameter, -fno-exceptions)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_BASE_C_FLAGS "${CMAKE_C_FLAGS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")
 
+set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
+set(CMAKE_C_COMPILER_TARGET "wasm32")
 
 add_custom_command(
   OUTPUT "wasi_snapshot_preview1.wasm"
@@ -40,9 +40,12 @@ add_custom_command(
           -o fixpoint_storage.wasm
 )
 
+add_library(fixpoint_util_obj OBJECT "fixpoint_util.c")
+
 add_custom_target(
-              pl-storage ALL
+              applications-util ALL
               DEPENDS 
                 fixpoint_storage.wasm
                 wasi_snapshot_preview1.wasm
+                fixpoint_util_obj
               )

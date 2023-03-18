@@ -40,21 +40,13 @@ set(ABSL_PROPAGATE_CXX_STD on)
 FetchContent_MakeAvailable(absl)
 
 include(ExternalProject)
-ExternalProject_Add(flatware
-  SOURCE_DIR "${PROJECT_SOURCE_DIR}/flatware"
-  INSTALL_COMMAND cmake -E echo "Skipping flatware install."
+ExternalProject_Add(applications
+  SOURCE_DIR "${PROJECT_SOURCE_DIR}/applications"
+  INSTALL_COMMAND cmake -E echo "Skipping applications install."
   DEPENDS wat2wasm
   BUILD_ALWAYS true
   )
 
-include(ExternalProject)
-ExternalProject_Add(pl
-    SOURCE_DIR "${PROJECT_SOURCE_DIR}/pl"
-    INSTALL_COMMAND cmake -E echo "Skipping pl install."
-    DEPENDS wat2wasm
-    BUILD_ALWAYS true
-    )
-  
 include(etc/build_type.cmake)
 include(etc/cflags.cmake)
 include(etc/clang_format.cmake)
