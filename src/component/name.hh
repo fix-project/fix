@@ -21,6 +21,10 @@ class Name : public cookie_name
    * 1) if the name is a literal:     | strict/lazy | other/literal | 0 | size of the blob (5 bits)
    * 2) if the name is not a literal: | strict/lazy | other/literal | 0 | 0 | 0 | canonical/local | Blob/Tree/Thunk
    * (2 bits)
+   *
+   * Name 256-bits local:
+   * content_[0]  |  content_[1]  |  content_[2]  |  content_[3][0:31]  |  content_[3][56:63]
+   *   local_id   |  multimap idx |     size      |      operations     |         metadata
    */
 
 public:
@@ -55,21 +59,21 @@ public:
     content_[2] = size;
   }
 
-  Name( std::string hash, bool pending, std::initializer_list<uint64_t> list )
+  Name( Name name, bool pending, std::initializer_list<uint64_t> list )
+    : cookie_name( name )
   {
-    __builtin_memcpy( &content_, hash.data(), 32 );
-
-    content_[0] = 0;
-    content_[1] = 0;
+    uint32_t ops = 0;
 
     for ( auto elem : list ) {
-      content_[1] ^= elem;
-      content_[1] = std::rotl( (unsigned long long)content_[1], ( pending ? 1 : -1 ) * 4 );
+      ops ^= elem;
+      ops = std::rotl( (uint32_t)ops, ( pending ? 1 : -1 ) * 4 );
     }
 
     if ( pending ) {
-      content_[1] = std::rotr( (unsigned long long)content_[1], 4 );
+      ops = std::rotr( (uint32_t)ops, 4 );
     }
+
+    __builtin_memcpy( (char*)&content_ + 24, &ops, 4 );
   }
 
   Name( std::string_view literal_content )
@@ -94,37 +98,24 @@ public:
 
   uint8_t get_metadata() { return metadata(); }
 
-  void set_index( size_t value ) { content_[0] = value; }
+  void set_index( size_t value ) { content_[1] = value; }
 
-  void get_index( size_t value ) { content_[0] = value; }
+  void get_index( size_t value ) { content_[1] = value; }
 
-  uint64_t pop_operation()
+  uint32_t pop_operation()
   {
-    uint64_t op = 0xF & content_[1];
+    uint32_t prev = 0xF & ( (uint32_t)content_[3] );
+    uint32_t curr = std::rotr( (uint32_t)content_[3], 4 );
 
-    content_[1] = std::rotr( (unsigned long long)content_[1], 4 );
+    __builtin_memcpy( (char*)&content_ + 24, &curr, 4 );
 
-    return op;
+    return prev;
   }
 
-  void set_operations( bool pending, std::initializer_list<uint64_t> list )
+  uint32_t peek_operation()
   {
-    content_[1] = 0;
-
-    for ( auto elem : list ) {
-      content_[1] ^= elem;
-      content_[1] = std::rotl( (unsigned long long)content_[1], ( pending ? 1 : -1 ) * 4 );
-    }
-
-    if ( pending ) {
-      content_[1] = std::rotr( (unsigned long long)content_[1], 4 );
-    }
-  }
-
-  uint64_t peek_operation()
-  {
-    uint64_t op = 0xF & content_[1];
-    return op;
+    uint32_t prev = 0xF & ( (uint32_t)content_[3] );
+    return prev;
   }
 
   static Name name_only( Name name )

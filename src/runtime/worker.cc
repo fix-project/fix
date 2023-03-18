@@ -38,8 +38,7 @@ void RuntimeWorker::eval( Name hash, Name name )
     case ContentType::Tree: {
       auto orig_tree = runtimestorage_.get_tree( name );
       Name new_name = runtimestorage_.add_tree( std::move( Tree( orig_tree.size() ) ) );
-      Name nhash(
-        sha256::encode( std::string_view( reinterpret_cast<const char*>( &new_name ), 32 ) ), false, { EVAL } );
+      Name nhash( new_name, false, { EVAL } );
 
       runtimestorage_.fix_cache_.insert_or_update( nhash, hash, orig_tree.size() );
 
@@ -51,10 +50,9 @@ void RuntimeWorker::eval( Name hash, Name name )
         tree.mutable_data()[i] = entry;
 
         if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-          auto entry_hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &entry ), 32 ) );
+          Name desired( entry, false, { FORCE } );
+          Name operations( entry, true, { FORCE } );
 
-          Name desired( entry_hash, false, { FORCE } );
-          Name operations( entry_hash, true, { FORCE } );
           runtimestorage_.fix_cache_.insert_next( desired, new_name, 0 );
 
           queue_job( Job( entry, operations ) );
@@ -72,10 +70,8 @@ void RuntimeWorker::eval( Name hash, Name name )
     }
 
     case ContentType::Thunk: {
-      auto name_hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) );
-
-      Name desired( name_hash, false, { FORCE, EVAL } );
-      Name operations( name_hash, true, { EVAL, FORCE } );
+      Name desired( name, false, { FORCE, EVAL } );
+      Name operations( name, true, { EVAL, FORCE } );
 
       runtimestorage_.fix_cache_.insert_or_update( desired, hash, 0 );
 
@@ -97,9 +93,9 @@ void RuntimeWorker::force( Name hash, Name name )
     case ContentType::Thunk: {
       Name encode_name = Name::get_encode_name( name );
 
-      auto encode_hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &encode_name ), 32 ) );
-      Name desired( encode_hash, false, { EVAL, APPLY, FORCE } );
-      Name operations( encode_hash, true, { FORCE, APPLY, EVAL } );
+      Name desired( encode_name, false, { EVAL, APPLY, FORCE } );
+      Name operations( encode_name, true, { FORCE, APPLY, EVAL } );
+
       runtimestorage_.fix_cache_.insert_or_update( desired, hash, 0 );
 
       progress( operations, encode_name );
@@ -151,8 +147,7 @@ void RuntimeWorker::update_parent( Name name )
   for ( size_t i = 0; i < tree.size(); ++i ) {
     auto entry = tree[i];
     if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-      Name desired(
-        sha256::encode( std::string_view( reinterpret_cast<const char*>( &entry ), 32 ) ), false, { FORCE } );
+      Name desired( entry, false, { FORCE } );
       tree.mutable_data()[i] = runtimestorage_.fix_cache_.get_name( desired );
     }
   }
@@ -164,8 +159,7 @@ void RuntimeWorker::child( Name hash )
     hash.set_index( i );
     if ( runtimestorage_.fix_cache_.contains( hash ) ) {
       Name tree_name = runtimestorage_.fix_cache_.get_name( hash );
-      Name nhash(
-        sha256::encode( std::string_view( reinterpret_cast<const char*>( &tree_name ), 32 ) ), false, { EVAL } );
+      Name nhash( tree_name, false, { EVAL } );
       std::shared_ptr<std::atomic<int64_t>> pending = runtimestorage_.fix_cache_.get_pending( nhash );
 
       ( *pending.get() )--;
@@ -184,12 +178,11 @@ void RuntimeWorker::child( Name hash )
 
 void RuntimeWorker::progress( Name hash, Name name )
 {
-  uint64_t current = hash.peek_operation();
+  uint32_t current = hash.peek_operation();
 
   if ( current != NONE ) {
     hash.pop_operation();
-    Name nhash(
-      sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) ), false, { current } );
+    Name nhash( name, false, { current } );
     runtimestorage_.fix_cache_.insert_or_update( nhash, hash, 1 );
 
     switch ( current ) {
