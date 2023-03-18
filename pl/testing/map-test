@@ -1,0 +1,27 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+if ((scalar @ARGV) != 2) {
+  die qq{Usage: $0 stateless-tester add_2_map.wasm};
+}
+
+my ($executable, $add_2_map_wasm) = @ARGV;
+
+sub check_add_2_map() {
+  my $result = `$executable tree:3 string:\"0\" file:$add_2_map_wasm uint32:0 2>&1`;
+
+  if ($?) {
+    print STDERR qq{Got result:\n$result\n};
+    die qq{Failure in running add_2_map};
+  }
+
+  my (undef, $answer) = split( 'Result:', $result );
+  my $expected_result = qq{\nTree (3 entries):\n  0. Blob (4 bytes): "\\x06\\x00\\x00\\x00" (uint32:6)\n  1. Blob (4 bytes): "\\x0a\\x00\\x00\\x00" (uint32:10)\n  2. Blob (4 bytes): "\\x03\\x00\\x00\\x00" (uint32:3)\n};
+  if ( ! ( $answer eq $expected_result ) ) {
+    print STDERR qq{Got result:\n$result\n};
+    die qq{Wrong answer to add_2_map ($answer) ($expected_result)};
+  }
+}
+
+check_add_2_map();

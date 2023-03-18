@@ -63,3 +63,9 @@ add_test(NAME t_trap WORKING_DIRECTORY
   ${CMAKE_CURRENT_BINARY_DIR}/testing/wasm-examples/trap.wasm
   "Integer divide by zero"
 )
+
+add_test(NAME t_map WORKING_DIRECTORY
+  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pl/testing/map-test
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
+  ${CMAKE_CURRENT_BINARY_DIR}/pl-prefix/src/pl-build/add_2_map.wasm
+)
