@@ -50,8 +50,8 @@ void RuntimeWorker::eval( Name hash, Name name )
         tree.mutable_data()[i] = entry;
 
         if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-          Name desired( entry, false, { FORCE } );
-          Name operations( entry, true, { FORCE } );
+          Name desired( entry, false, { EVAL } );
+          Name operations( entry, true, { EVAL } );
 
           runtimestorage_.fix_cache_.insert_next( desired, new_name, 0 );
 
@@ -147,7 +147,7 @@ void RuntimeWorker::update_parent( Name name )
   for ( size_t i = 0; i < tree.size(); ++i ) {
     auto entry = tree[i];
     if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-      Name desired( entry, false, { FORCE } );
+      Name desired( entry, false, { EVAL } );
       tree.mutable_data()[i] = runtimestorage_.fix_cache_.get_name( desired );
     }
   }
