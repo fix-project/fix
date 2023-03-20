@@ -25,9 +25,8 @@ bool RuntimeStorage::steal_work( Job& job, size_t tid )
 
 Name RuntimeStorage::force_thunk( Name name )
 {
-  auto hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) );
-  Name desired( hash, false, { FORCE } );
-  Name operations( hash, true, { FORCE } );
+  Name desired( name, false, { FORCE } );
+  Name operations( name, true, { FORCE } );
 
   fix_cache_.insert_or_update( desired, Name(), 1 );
 
@@ -41,9 +40,8 @@ Name RuntimeStorage::force_thunk( Name name )
 
 Name RuntimeStorage::eval_thunk( Name name )
 {
-  auto hash = sha256::encode( std::string_view( reinterpret_cast<const char*>( &name ), 32 ) );
-  Name desired( hash, false, { EVAL } );
-  Name operations( hash, true, { EVAL } );
+  Name desired( name, false, { EVAL } );
+  Name operations( name, true, { EVAL } );
 
   fix_cache_.insert_or_update( desired, Name(), 1 );
 
