@@ -53,33 +53,21 @@ add_custom_command(
           ${CMAKE_CURRENT_SOURCE_DIR}/asm-flatware.wat
           -o asm-flatware.wasm
 )
-
 set_source_files_properties(asm-flatware.wasm PROPERTIES GENERATED TRUE)
 
-add_custom_command(
-  OUTPUT "linked_with_libc.wasm"
-  DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-          asm-flatware.wasm
-          c-flatware.wasm
-  COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-          --enable-multi-memory
-          --enable-exceptions
-          c-flatware.wasm
-          asm-flatware.wasm
-          -o linked_with_libc.wasm
-)
+link_wasm(. asm-flatware.wasm c-flatware.wasm) # outputs linked_with_wasm_0.wasm
+link_another_wasm(../util fixpoint_storage.wasm 1) # outputs linked_with_wasm_1.wasm
 
-link_storage(../util fixpoint_storage.wasm)
 
 add_custom_command(
   OUTPUT "wasi_snapshot_preview1.wasm"
-  DEPENDS linked_with_storage.wasm
+  DEPENDS linked_with_wasm_1.wasm
           ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/export-audit/export-audit
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/export-audit/export-audit
           --enable-multi-memory
           --enable-exceptions
           -r memory
-          linked_with_storage.wasm
+          linked_with_wasm_1.wasm
           wasi_snapshot_preview1.wasm
 )
 
