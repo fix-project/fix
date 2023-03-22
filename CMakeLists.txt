@@ -29,6 +29,7 @@ FetchContent_Declare(
   )
 set(BUILD_TESTS off)
 set(BUILD_LIBWASM off)
+set(USE_INTERNAL_SHA256)
 FetchContent_MakeAvailable(wabt)
 
 FetchContent_Declare(
