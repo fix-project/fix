@@ -7,14 +7,6 @@ include(FetchContent)
 # defines functions link_libc, link_storage, link_wasi_stubs
 include(../util/cmake_helper_functions.cmake)
 
-FetchContent_Declare(
-  wasm-tools
-  GIT_REPOSITORY https://github.com/fix-project/wasm-tools
-  GIT_TAG        main
-  BUILD_ALWAYS   true
-)
-FetchContent_MakeAvailable(wasm-tools)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BASE_C_FLAGS "${CMAKE_C_FLAGS}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")

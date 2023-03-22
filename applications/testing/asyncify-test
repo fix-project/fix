@@ -1,0 +1,27 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+if ((scalar @ARGV) != 2) {
+  die qq{Usage: $0 stateless-tester example_asyncify.wasm};
+}
+
+my ($executable, $example_asyncify) = @ARGV;
+
+sub check_asyncify() {
+  my $result = `$executable tree:2 string:\"0\" file:$example_asyncify 2>&1`;
+
+  if ($?) {
+    print STDERR qq{Got result:\n$result\n};
+    die qq{Failure in running asyncify example};
+  }
+
+  my (undef, $answer) = split( 'Result:', $result );
+  my $expected_result = qq{\nBlob (4 bytes): "\\x01\\x00\\x00\\x00" (uint32:1)\n};
+  if ( ! ( $answer eq $expected_result ) ) {
+    print STDERR qq{Got result:\n$result\n};
+    die qq{Wrong answer to add_2_map ($answer) ($expected_result)};
+  }
+}
+
+check_asyncify();

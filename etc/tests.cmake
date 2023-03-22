@@ -69,3 +69,9 @@ add_test(NAME t_map WORKING_DIRECTORY
   ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
   ${CMAKE_CURRENT_BINARY_DIR}/applications-prefix/src/applications-build/map/add_2_map.wasm
 )
+
+add_test(NAME t_asyncify WORKING_DIRECTORY
+  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/applications/testing/asyncify-test
+  ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester
+  ${CMAKE_CURRENT_BINARY_DIR}/applications-prefix/src/applications-build/asyncify/example_asyncify.wasm
+)
