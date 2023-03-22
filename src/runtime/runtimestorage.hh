@@ -61,7 +61,7 @@ private:
     }
 
     threads_active_ = true;
-    threads_active_.notify_one();
+    threads_active_.notify_all();
   }
 
   ~RuntimeStorage()
