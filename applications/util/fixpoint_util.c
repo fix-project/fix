@@ -2,10 +2,7 @@
 
 void copy_ro_to_rw_mem( int32_t rw_mem_id, int32_t ro_mem_id, int32_t rw_offset, int32_t ro_offset, int32_t len )
 {
-  for ( int i = 0; i < len; i++ ) {
-    int32_t val = get_i8_ro_mem_functions[ro_mem_id]( ro_offset + i );
-    set_i8_rw_mem_functions[rw_mem_id]( rw_offset + i, val );
-  }
+    copy_ro_table_to_rw_functions[ro_mem_id][rw_mem_id](rw_offset, ro_offset, len);
 }
 
 void copy_ro_to_rw_table( int32_t rw_table_id,
@@ -14,10 +11,7 @@ void copy_ro_to_rw_table( int32_t rw_table_id,
                           int32_t ro_offset,
                           int32_t len )
 {
-  for ( int i = 0; i < len; i++ ) {
-    externref val = get_ro_table_functions[ro_table_id]( ro_offset + i );
-    set_rw_table_functions[rw_table_id]( rw_offset + i, val );
-  }
+  copy_ro_table_to_rw_functions[ro_table_id][rw_table_id](rw_offset, ro_offset, len);
 }
 
 externref get_ro_table( int32_t table_id, int32_t index )
@@ -69,7 +63,7 @@ externref create_tree_rw_table( int32_t table_id, int32_t length )
   return create_tree_functions[table_id]( length );
 }
 
-int32_t grow_rw_mem( int32_t mem_id, int32_t delta )
+int32_t grow_rw_mem_pages( int32_t mem_id, int32_t delta )
 {
   return grow_rw_mem_functions[mem_id]( delta );
 }
@@ -77,4 +71,8 @@ int32_t grow_rw_mem( int32_t mem_id, int32_t delta )
 int32_t grow_rw_table( int32_t table_id, int32_t delta, externref init_value )
 {
   return grow_rw_table_functions[table_id]( delta, init_value );
+}
+
+int32_t page_size_rw_mem( int32_t mem_id ) {
+  return page_size_rw_mem_functions[mem_id]();
 }
