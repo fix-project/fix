@@ -46,6 +46,8 @@ externref create_blob_rw_mem( int32_t mem_id, int32_t length );
 // table_id is size zero after this function is called.
 externref create_tree_rw_table( int32_t table_id, int32_t length );
 
-int32_t grow_rw_mem( int32_t mem_id, int32_t delta );
+int32_t grow_rw_mem_pages( int32_t mem_id, int32_t delta );
 
 int32_t grow_rw_table( int32_t table_id, int32_t delta, externref init_value );
+
+int32_t page_size_rw_mem( int32_t mem_id );

@@ -74,7 +74,9 @@ static int32_t strlen( const char* str )
 
 static void write_trace( const char* str, int32_t len )
 {
-  grow_rw_mem(TraceRWMem, fds[STDERR].offset + len);
+  if (fds[STDERR].offset + len > page_size_rw_mem(TraceRWMem) * WASM_RT_PAGESIZE ) {
+      grow_rw_mem_pages(TraceRWMem, len / WASM_RT_PAGESIZE + 1);
+  }
   flatware_mem_to_rw_mem(TraceRWMem, fds[STDERR].offset, str, len );
   fds[STDERR].offset += len;
 }
@@ -287,8 +289,9 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
   for ( int32_t i = 0; i < iovs_len; i++ ) {
     iobuf_offset = get_program_i32( iovs + i * 8 );
     iobuf_len = get_program_i32( iovs + 4 + i * 8 );
-    
-    grow_rw_mem(StdOutRWMem,fds[STDOUT].offset + iobuf_len );
+    if (fds[STDOUT].offset + iobuf_len > page_size_rw_mem(StdOutRWMem) * WASM_RT_PAGESIZE ) {
+      grow_rw_mem_pages(StdOutRWMem, iobuf_len / WASM_RT_PAGESIZE + 1);
+    }
     program_mem_to_rw_mem(StdOutRWMem, fds[STDOUT].offset, iobuf_offset, iobuf_len );
     fds[STDOUT].offset += iobuf_len;
     total_written += iobuf_len;
