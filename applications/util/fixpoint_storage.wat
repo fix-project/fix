@@ -112,32 +112,24 @@
     (i32.load $ro_mem_0 (local.get $index)))
 (func (export "get_i8_ro_mem_0") (param $index i32) (result i32)
     (i32.load8_u $ro_mem_0 (local.get $index)))
-(func (export "size_ro_mem_0") (result i32)
-    (memory.size $ro_mem_0))
 
 ;; ro_mem_1 operations 
 (func (export "get_i32_ro_mem_1") (param $index i32) (result i32)
     (i32.load $ro_mem_1 (local.get $index)))
 (func (export "get_i8_ro_mem_1") (param $index i32) (result i32)
     (i32.load8_u $ro_mem_1 (local.get $index)))
-(func (export "size_ro_mem_1") (result i32)
-    (memory.size $ro_mem_1))
 
 ;; ro_mem_2 operations 
 (func (export "get_i32_ro_mem_2") (param $index i32) (result i32)
     (i32.load $ro_mem_2 (local.get $index)))
 (func (export "get_i8_ro_mem_2") (param $index i32) (result i32)
     (i32.load8_u $ro_mem_2 (local.get $index)))
-(func (export "size_ro_mem_2") (result i32)
-    (memory.size $ro_mem_2))
 
 ;; ro_mem_3 operations 
 (func (export "get_i32_ro_mem_3") (param $index i32) (result i32)
     (i32.load $ro_mem_3 (local.get $index)))
 (func (export "get_i8_ro_mem_3") (param $index i32) (result i32)
     (i32.load8_u $ro_mem_3 (local.get $index)))
-(func (export "size_ro_mem_3") (result i32)
-    (memory.size $ro_mem_3))
 
 ;; rw_mem_0 operations 
 (func (export "set_i32_rw_mem_0") (param $index i32) (param $val i32)

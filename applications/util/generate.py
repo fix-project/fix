@@ -55,7 +55,10 @@ C_TABLE_GROW = 'int32_t grow_{name}( int32_t size, externref pointer )\n\
 C_TABLE_GET = 'externref get_{name}( int32_t index )\n\
   __attribute__( ( import_module( "{module}" ), import_name( "get_{name}" ) ) )\n;'
 
-C_SIZE = 'int32_t size_{name}(void) __attribute__( ( import_module( "{module}" ),\
+C_TABLE_SIZE = 'int32_t size_{name}(void) __attribute__( ( import_module( "{module}" ),\
+             import_name( "size_{name}" ) ) );\n'
+
+C_MEM_SIZE = 'int32_t {byte_or_page}_size_{name}(void) __attribute__( ( import_module( "{module}" ),\
              import_name( "size_{name}" ) ) );\n'
 
 C_CREATE = 'externref create_{tree_or_blob}_{name}( int32_t size )\n\
@@ -82,7 +85,8 @@ C_LIST_TABLE_GROW = 'static int32_t (*grow_rw_table_functions[]) (int32_t, exter
 C_LIST_MEM_GET = 'static int32_t (*get_{int_type}_{ro_or_rw}_mem_functions[]) (int32_t) = {list};\n'
 C_LIST_MEM_SET = 'static void (*set_{int_type}_rw_mem_functions[]) (int32_t, int32_t) = {list};\n'
 C_LIST_MEM_GROW = 'static int32_t (*grow_rw_mem_functions[]) (int32_t) = {list};\n'
-C_LIST_SIZE = 'static int32_t (*size_{ro_or_rw}_{mem_or_table}_functions[])(void) = {list};\n'
+C_LIST_TABLE_SIZE = 'static int32_t (*size_{ro_or_rw}_table_functions[])(void) = {list};\n'
+C_LIST_MEM_SIZE = 'static int32_t (*{byte_or_page}_size_{ro_or_rw}_mem_functions[])(void) = {list};\n'
 C_LIST_CREATE = 'static externref (*create_{tree_or_blob}_functions[]) (int32_t) = {list};\n'
 C_LIST_GET_ATTACHED = 'static externref (*get_attached_{tree_or_blob}_functions[]) (void) = {list};\n'
 C_LIST_ATTACH = 'static void (*attach_{tree_or_blob}_functions[]) (externref) = {list};\n'
@@ -131,7 +135,6 @@ def write_wat():
         f.write(f';; {name} operations \n')
         f.write(WAT_MEM_GET.format(name = name, suffix='', int_type = 'i32'))
         f.write(WAT_MEM_GET.format(name = name, suffix='8_u', int_type = 'i8'))
-        f.write(WAT_SIZE.format(name=name, table_or_memory='memory'))
         f.write('\n')
     # rw mem operations
     for i in range(NUM_RW_MEM):
@@ -166,7 +169,7 @@ def write_c():
         name = f'ro_table_{i}'
         f.write(f'// {name} imports \n')
         f.write(C_TABLE_GET.format(name = name, module=MODULE))
-        f.write(C_SIZE.format(name=name, table_or_memory='table', module=MODULE))
+        f.write(C_TABLE_SIZE.format(name=name, module=MODULE))
         f.write(C_ATTACH.format(name = name, tree_or_blob='tree', module = FIXPOINT_MODULE))
         f.write(C_GET_ATTACHED.format(name=name, tree_or_blob='tree', module = FIXPOINT_MODULE))
         f.write('\n')
@@ -177,7 +180,7 @@ def write_c():
         f.write(C_TABLE_SET.format(name = name, module=MODULE))
         f.write(C_TABLE_GET.format(name = name, module=MODULE))
         f.write(C_TABLE_GROW.format(name = name, module=MODULE))
-        f.write(C_SIZE.format(name=name, module=MODULE))
+        f.write(C_TABLE_SIZE.format(name=name, module=MODULE))
         f.write(C_CREATE.format(name = name, tree_or_blob='tree', module = FIXPOINT_MODULE))
         f.write('\n')
     # ro mem imports
@@ -186,7 +189,7 @@ def write_c():
         f.write(f'// {name} imports \n')
         f.write(C_MEM_GET.format(name = name, module=MODULE, int_type = 'i32'))
         f.write(C_MEM_GET.format(name = name, module=MODULE, int_type = 'i8'))
-        f.write(C_SIZE.format(name=name, module=MODULE))
+        f.write(C_MEM_SIZE.format(byte_or_page = 'byte', name=name, module=FIXPOINT_MODULE))
         f.write(C_GET_ATTACHED.format(name = name, tree_or_blob='blob', module = FIXPOINT_MODULE))
         f.write(C_ATTACH.format(name = name, tree_or_blob='blob', module = FIXPOINT_MODULE))
         f.write('\n')
@@ -199,7 +202,7 @@ def write_c():
         f.write(C_MEM_GET.format(name = name, module=MODULE, int_type = 'i32'))
         f.write(C_MEM_GET.format(name = name, module=MODULE, int_type = 'i8'))
         f.write(C_MEM_GROW.format(name = name, module=MODULE))
-        f.write(C_SIZE.format(name=name, module=MODULE))
+        f.write(C_MEM_SIZE.format(byte_or_page = 'page', name=name, module=MODULE))
         f.write(C_CREATE.format(name = name, tree_or_blob='blob', module = FIXPOINT_MODULE))
         f.write('\n')
     # ro table function arrays
@@ -207,7 +210,7 @@ def write_c():
     f_list = ','.join([f'get_ro_table_{i}' for i in range(NUM_RO_TABLE) ])
     f.write(C_LIST_TABLE_GET.format(ro_or_rw = 'ro', list='{'+f_list+'}'))
     f_list = ','.join([f'size_ro_table_{i}' for i in range(NUM_RO_TABLE) ])
-    f.write(C_LIST_SIZE.format(ro_or_rw = 'ro', mem_or_table = 'table', list='{'+f_list+'}'))
+    f.write(C_LIST_TABLE_SIZE.format(ro_or_rw = 'ro',  list='{'+f_list+'}'))
     f_list = ','.join([f'get_attached_tree_ro_table_{i}' for i in range(NUM_RO_TABLE) ])
     f.write(C_LIST_GET_ATTACHED.format(tree_or_blob = 'tree', list='{'+f_list+'}'))
     f_list = ','.join([f'attach_tree_ro_table_{i}' for i in range(NUM_RO_TABLE) ])
@@ -219,7 +222,7 @@ def write_c():
     f_list = ','.join([f'get_rw_table_{i}' for i in range(NUM_RW_TABLE) ])
     f.write(C_LIST_TABLE_GET.format(ro_or_rw = 'rw', list='{'+f_list+'}'))
     f_list = ','.join([f'size_rw_table_{i}' for i in range(NUM_RW_TABLE) ])
-    f.write(C_LIST_SIZE.format(ro_or_rw = 'rw', mem_or_table = 'table', list='{'+f_list+'}'))
+    f.write(C_LIST_TABLE_SIZE.format(ro_or_rw = 'rw', list='{'+f_list+'}'))
     f_list = ','.join([f'grow_rw_table_{i}' for i in range(NUM_RW_TABLE) ])
     f.write(C_LIST_TABLE_GROW.format( list='{'+f_list+'}'))
     f_list = ','.join([f'set_rw_table_{i}' for i in range(NUM_RW_TABLE) ])
@@ -234,8 +237,8 @@ def write_c():
     f.write(C_LIST_MEM_GET.format(ro_or_rw = 'ro', list='{'+f_list+'}', int_type = 'i32'))
     f_list = ','.join([f'get_i8_ro_mem_{i}' for i in range(NUM_RO_MEM) ])
     f.write(C_LIST_MEM_GET.format(ro_or_rw = 'ro', list='{'+f_list+'}', int_type = 'i8'))
-    f_list = ','.join([f'size_ro_mem_{i}' for i in range(NUM_RO_MEM) ])
-    f.write(C_LIST_SIZE.format(ro_or_rw = 'ro', mem_or_table = 'mem', list='{'+f_list+'}'))
+    f_list = ','.join([f'byte_size_ro_mem_{i}' for i in range(NUM_RO_MEM) ])
+    f.write(C_LIST_MEM_SIZE.format(byte_or_page = 'byte', ro_or_rw = 'ro', list='{'+f_list+'}'))
     f_list = ','.join([f'get_attached_blob_ro_mem_{i}' for i in range(NUM_RO_MEM) ])
     f.write(C_LIST_GET_ATTACHED.format(tree_or_blob = 'blob', list='{'+f_list+'}'))
     f_list = ','.join([f'attach_blob_ro_mem_{i}' for i in range(NUM_RO_MEM) ])
@@ -248,8 +251,8 @@ def write_c():
     f.write(C_LIST_MEM_GET.format(ro_or_rw = 'rw', list='{'+f_list+'}', int_type = 'i32'))
     f_list = ','.join([f'get_i8_rw_mem_{i}' for i in range(NUM_RW_MEM) ])
     f.write(C_LIST_MEM_GET.format(ro_or_rw = 'rw', list='{'+f_list+'}', int_type = 'i8'))
-    f_list = ','.join([f'size_rw_mem_{i}' for i in range(NUM_RW_MEM) ])
-    f.write(C_LIST_SIZE.format(ro_or_rw = 'rw', mem_or_table = 'mem', list='{'+f_list+'}'))
+    f_list = ','.join([f'page_size_rw_mem_{i}' for i in range(NUM_RW_MEM) ])
+    f.write(C_LIST_MEM_SIZE.format(ro_or_rw = 'rw',byte_or_page = 'page', list='{'+f_list+'}'))
     f_list = ','.join([f'grow_rw_mem_{i}' for i in range(NUM_RW_MEM) ])
     f.write(C_LIST_MEM_GROW.format( list='{'+f_list+'}'))
     f_list = ','.join([f'set_i32_rw_mem_{i}' for i in range(NUM_RW_MEM) ])
