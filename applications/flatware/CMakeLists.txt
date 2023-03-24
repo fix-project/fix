@@ -43,53 +43,53 @@ add_custom_command(
           --allow-undefined
 )
 
-
-
 add_custom_command(
-  OUTPUT "asm-flatware-without-fixpoint-storage.wasm"
+  OUTPUT "asm-flatware.wasm"
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/asm-flatware.wat
   COMMAND ${CMAKE_BINARY_DIR}/../../../_deps/wabt-build/wat2wasm
           --enable-multi-memory
 	        --enable-exceptions
           ${CMAKE_CURRENT_SOURCE_DIR}/asm-flatware.wat
-          -o asm-flatware-without-fixpoint-storage.wasm
+          -o asm-flatware.wasm
 )
-add_custom_command(
-  OUTPUT "fixpoint_storage.wasm"
-  DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-        asm-flatware-without-fixpoint-storage.wasm
-        ../util/fixpoint_storage.wasm
-        COMMAND cp ../util/fixpoint_storage.wasm fixpoint_storage_0.wasm && ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-        --enable-multi-memory
-        --enable-exceptions
-        fixpoint_storage_0.wasm
-        asm-flatware-without-fixpoint-storage.wasm
-        -o "fixpoint_storage.wasm"
-)
-set_source_files_properties(fixpoint_storage.wasm PROPERTIES GENERATED TRUE)
 
 add_custom_command(
-  OUTPUT "linked_with_storage.wasm"
+  OUTPUT "linked_with_asm_flatware.wasm"
   DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-        fixpoint_storage.wasm
+        asm-flatware.wasm
         c-flatware.wasm
-        COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+  COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
         --enable-multi-memory
         --enable-exceptions
+        asm-flatware.wasm
         c-flatware.wasm
-        fixpoint_storage.wasm
-        -o "linked_with_storage.wasm"
+        -o linked_with_asm_flatware.wasm
 )
+
+add_custom_command(
+  OUTPUT "linked_with_fixpoint_storage.wasm"
+  DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+        linked_with_asm_flatware.wasm
+        ../util/fixpoint_storage.wasm
+  COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+        --enable-multi-memory
+        --enable-exceptions
+        ../util/fixpoint_storage.wasm
+        linked_with_asm_flatware.wasm
+        -m fixpoint_storage
+        -o "linked_with_fixpoint_storage.wasm"
+)
+set_source_files_properties(linked_with_fixpoint_storage.wasm PROPERTIES GENERATED TRUE)
 
 add_custom_command(
   OUTPUT "wasi_snapshot_preview1.wasm"
-  DEPENDS linked_with_storage.wasm
+  DEPENDS linked_with_fixpoint_storage.wasm
           ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/export-audit/export-audit
   COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/export-audit/export-audit
           --enable-multi-memory
           --enable-exceptions
           -r memory
-          linked_with_storage.wasm
+          linked_with_fixpoint_storage.wasm
           wasi_snapshot_preview1.wasm
 )
 
