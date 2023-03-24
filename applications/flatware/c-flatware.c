@@ -549,7 +549,7 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
   // Actual arguments
   for ( int32_t i = 0; i < num; i++ ) {
     attach_blob_ro_mem(ArgROMem, get_ro_table(ArgsROTable, i ) );
-    size += size_ro_mem(ArgROMem);
+    size += byte_size_ro_mem(ArgROMem);
   }
 
   memory_copy_program( size_argument_ptr, &size, 4 );
@@ -569,7 +569,7 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 
   for ( int32_t i = 0; i < size_ro_table(ArgsROTable); i++ ) {
     attach_blob_ro_mem(ArgROMem, get_ro_table(ArgsROTable, i ) );
-    size = size_ro_mem(ArgROMem);
+    size = byte_size_ro_mem(ArgROMem);
     memory_copy_program( argv_ptr + i * 4, &addr, 4 );
     ro_mem_to_program_mem( ArgROMem, addr, 0, size );
     addr += size;
@@ -643,7 +643,7 @@ int32_t path_open( int32_t fd,
     return __WASI_ERRNO_NFILE;
 
   fds[retfd].offset = 0;
-  fds[retfd].size = size_ro_mem(FileSystemROMem) - 1;
+  fds[retfd].size = byte_size_ro_mem(FileSystemROMem) - 1;
   fds[retfd].open = true;
 
   fds[retfd].stat.fs_filetype = __WASI_FILETYPE_REGULAR_FILE;

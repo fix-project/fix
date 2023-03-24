@@ -34,7 +34,7 @@ void set_i32_rw_mem( int32_t mem_id, int32_t index, int32_t val );
 int32_t get_i32_rw_mem( int32_t mem_id, int32_t index );
 
 // Returns the size of mem_id in PAGES (not bytes)
-int32_t size_ro_mem( int32_t mem_id );
+int32_t byte_size_ro_mem( int32_t mem_id );
 
 int32_t size_ro_table( int32_t table_id );
 

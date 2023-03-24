@@ -24,7 +24,7 @@ struct substring get_name( int32_t ro_table_index )
 
   attach_blob_ro_mem( FileSystemDataROMem, ret );
 
-  blob_size = size_ro_mem(FileSystemDataROMem);
+  blob_size = byte_size_ro_mem(FileSystemDataROMem);
 
   buf = (char*)malloc( (unsigned long)blob_size );
 
@@ -45,7 +45,7 @@ uint64_t get_permissions( int32_t ro_table_index )
 
   attach_blob_ro_mem( FileSystemDataROMem, ret );
 
-  blob_size = size_ro_mem(FileSystemDataROMem);
+  blob_size = byte_size_ro_mem(FileSystemDataROMem);
 
   ro_mem_to_flatware_mem(FileSystemDataROMem, (char*)&buf, 0, blob_size );
 
