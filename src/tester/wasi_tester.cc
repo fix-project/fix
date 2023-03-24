@@ -41,8 +41,8 @@ static void ParseOptions( int argc, char* argv[] )
 
 static void print_result( int retval )
 {
-  if ( retval != 0) {
-    throw std::runtime_error("Test case returned a non zero value");
+  if ( retval != 0 ) {
+    throw std::runtime_error( "Test case returned a non zero value" );
   }
   cout << "The result is ";
   if ( pretty_print ) {
