@@ -116,7 +116,6 @@ externref create_tree_rw_table_2( int32_t size )
 
 // ro_mem_0 imports 
 int32_t get_i32_ro_mem_0( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i32_ro_mem_0" ) ) );
-int32_t get_i8_ro_mem_0( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i8_ro_mem_0" ) ) );
 int32_t byte_size_ro_mem_0(void) __attribute__( ( import_module( "fixpoint" ), import_name( "size_ro_mem_0" ) ) );
 externref get_attached_blob_ro_mem_0(void)
   __attribute__( ( import_module( "fixpoint" ), import_name( "get_attached_blob_ro_mem_0" ) ) );
@@ -125,7 +124,6 @@ void attach_blob_ro_mem_0(externref)
 
 // ro_mem_1 imports 
 int32_t get_i32_ro_mem_1( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i32_ro_mem_1" ) ) );
-int32_t get_i8_ro_mem_1( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i8_ro_mem_1" ) ) );
 int32_t byte_size_ro_mem_1(void) __attribute__( ( import_module( "fixpoint" ), import_name( "size_ro_mem_1" ) ) );
 externref get_attached_blob_ro_mem_1(void)
   __attribute__( ( import_module( "fixpoint" ), import_name( "get_attached_blob_ro_mem_1" ) ) );
@@ -134,7 +132,6 @@ void attach_blob_ro_mem_1(externref)
 
 // ro_mem_2 imports 
 int32_t get_i32_ro_mem_2( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i32_ro_mem_2" ) ) );
-int32_t get_i8_ro_mem_2( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i8_ro_mem_2" ) ) );
 int32_t byte_size_ro_mem_2(void) __attribute__( ( import_module( "fixpoint" ), import_name( "size_ro_mem_2" ) ) );
 externref get_attached_blob_ro_mem_2(void)
   __attribute__( ( import_module( "fixpoint" ), import_name( "get_attached_blob_ro_mem_2" ) ) );
@@ -143,7 +140,6 @@ void attach_blob_ro_mem_2(externref)
 
 // ro_mem_3 imports 
 int32_t get_i32_ro_mem_3( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i32_ro_mem_3" ) ) );
-int32_t get_i8_ro_mem_3( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i8_ro_mem_3" ) ) );
 int32_t byte_size_ro_mem_3(void) __attribute__( ( import_module( "fixpoint" ), import_name( "size_ro_mem_3" ) ) );
 externref get_attached_blob_ro_mem_3(void)
   __attribute__( ( import_module( "fixpoint" ), import_name( "get_attached_blob_ro_mem_3" ) ) );
@@ -153,10 +149,7 @@ void attach_blob_ro_mem_3(externref)
 // rw_mem_0 imports 
 void set_i32_rw_mem_0( int32_t index, int32_t val )
   __attribute__( ( import_module( "fixpoint_storage" ), import_name( "set_i32_rw_mem_0" ) ) );
-void set_i8_rw_mem_0( int32_t index, int32_t val )
-  __attribute__( ( import_module( "fixpoint_storage" ), import_name( "set_i8_rw_mem_0" ) ) );
 int32_t get_i32_rw_mem_0( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i32_rw_mem_0" ) ) );
-int32_t get_i8_rw_mem_0( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i8_rw_mem_0" ) ) );
 int32_t grow_rw_mem_0_pages( int32_t size )
   __attribute__( ( import_module( "fixpoint_storage" ), import_name( "grow_rw_mem_0" ) ) );
 int32_t page_size_rw_mem_0(void) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "size_rw_mem_0" ) ) );
@@ -166,10 +159,7 @@ externref create_blob_rw_mem_0( int32_t size )
 // rw_mem_1 imports 
 void set_i32_rw_mem_1( int32_t index, int32_t val )
   __attribute__( ( import_module( "fixpoint_storage" ), import_name( "set_i32_rw_mem_1" ) ) );
-void set_i8_rw_mem_1( int32_t index, int32_t val )
-  __attribute__( ( import_module( "fixpoint_storage" ), import_name( "set_i8_rw_mem_1" ) ) );
 int32_t get_i32_rw_mem_1( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i32_rw_mem_1" ) ) );
-int32_t get_i8_rw_mem_1( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i8_rw_mem_1" ) ) );
 int32_t grow_rw_mem_1_pages( int32_t size )
   __attribute__( ( import_module( "fixpoint_storage" ), import_name( "grow_rw_mem_1" ) ) );
 int32_t page_size_rw_mem_1(void) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "size_rw_mem_1" ) ) );
@@ -179,10 +169,7 @@ externref create_blob_rw_mem_1( int32_t size )
 // rw_mem_2 imports 
 void set_i32_rw_mem_2( int32_t index, int32_t val )
   __attribute__( ( import_module( "fixpoint_storage" ), import_name( "set_i32_rw_mem_2" ) ) );
-void set_i8_rw_mem_2( int32_t index, int32_t val )
-  __attribute__( ( import_module( "fixpoint_storage" ), import_name( "set_i8_rw_mem_2" ) ) );
 int32_t get_i32_rw_mem_2( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i32_rw_mem_2" ) ) );
-int32_t get_i8_rw_mem_2( int32_t ) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "get_i8_rw_mem_2" ) ) );
 int32_t grow_rw_mem_2_pages( int32_t size )
   __attribute__( ( import_module( "fixpoint_storage" ), import_name( "grow_rw_mem_2" ) ) );
 int32_t page_size_rw_mem_2(void) __attribute__( ( import_module( "fixpoint_storage" ), import_name( "size_rw_mem_2" ) ) );
@@ -280,18 +267,15 @@ static externref (*const create_tree_functions[]) (int32_t) = {create_tree_rw_ta
 
 // ro mem function arrays 
 static int32_t (*const get_i32_ro_mem_functions[]) (int32_t) = {get_i32_ro_mem_0,get_i32_ro_mem_1,get_i32_ro_mem_2,get_i32_ro_mem_3};
-static int32_t (*const get_i8_ro_mem_functions[]) (int32_t) = {get_i8_ro_mem_0,get_i8_ro_mem_1,get_i8_ro_mem_2,get_i8_ro_mem_3};
 static int32_t (*const byte_size_ro_mem_functions[])(void) = {byte_size_ro_mem_0,byte_size_ro_mem_1,byte_size_ro_mem_2,byte_size_ro_mem_3};
 static externref (*const get_attached_blob_functions[]) (void) = {get_attached_blob_ro_mem_0,get_attached_blob_ro_mem_1,get_attached_blob_ro_mem_2,get_attached_blob_ro_mem_3};
 static void (*const attach_blob_functions[]) (externref) = {attach_blob_ro_mem_0,attach_blob_ro_mem_1,attach_blob_ro_mem_2,attach_blob_ro_mem_3};
 
 // rw mem function arrays 
 static int32_t (*const get_i32_rw_mem_functions[]) (int32_t) = {get_i32_rw_mem_0,get_i32_rw_mem_1,get_i32_rw_mem_2};
-static int32_t (*const get_i8_rw_mem_functions[]) (int32_t) = {get_i8_rw_mem_0,get_i8_rw_mem_1,get_i8_rw_mem_2};
 static int32_t (*const page_size_rw_mem_functions[])(void) = {page_size_rw_mem_0,page_size_rw_mem_1,page_size_rw_mem_2};
 static int32_t (*const grow_rw_mem_functions[]) (int32_t) = {grow_rw_mem_0_pages,grow_rw_mem_1_pages,grow_rw_mem_2_pages};
 static void (*const set_i32_rw_mem_functions[]) (int32_t, int32_t) = {set_i32_rw_mem_0,set_i32_rw_mem_1,set_i32_rw_mem_2};
-static void (*const set_i8_rw_mem_functions[]) (int32_t, int32_t) = {set_i8_rw_mem_0,set_i8_rw_mem_1,set_i8_rw_mem_2};
 static externref (*const create_blob_functions[]) (int32_t) = {create_blob_rw_mem_0,create_blob_rw_mem_1,create_blob_rw_mem_2};
 
 // copy function arrays 

@@ -36,20 +36,12 @@ extern int32_t get_program_i32( int32_t )
   __attribute( ( import_module( "asm-flatware" ), import_name( "get_i32_program" ) ) );
 extern void set_program_i32( int32_t, int32_t )
   __attribute( ( import_module( "asm-flatware" ), import_name( "set_i32_program" ) ) );
-extern int32_t get_program_i8( int32_t )
-  __attribute( ( import_module( "asm-flatware" ), import_name( "get_i8_program" ) ) );
-extern void set_program_i8( int32_t, int32_t )
-  __attribute( ( import_module( "asm-flatware" ), import_name( "set_i8_program" ) ) );
 
 // Flatware mem
 extern int32_t get_flatware_i32( const char* flatware_pointer )
   __attribute( ( import_module( "asm-flatware" ), import_name( "get_i32_flatware" ) ) );
 extern void set_flatware_i32( const char* flatware_pointer, int32_t val )
   __attribute( ( import_module( "asm-flatware" ), import_name( "set_i32_flatware" ) ) );
-extern int32_t get_flatware_i8( const char* flatware_pointer )
-  __attribute( ( import_module( "asm-flatware" ), import_name( "get_i8_flatware" ) ) );
-extern void set_flatware_i8( const char* flatware_pointer, int32_t val )
-  __attribute( ( import_module( "asm-flatware" ), import_name( "set_i8_flatware" ) ) );
 
 extern void run_start( void ) __attribute( ( import_module( "asm-flatware" ), import_name( "run-start" ) ) );
 __attribute( ( noreturn ) ) void flatware_exit( void )
