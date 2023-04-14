@@ -163,7 +163,7 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
     = ( &stream == &cout and isatty( STDOUT_FILENO ) ) or ( &stream == &cerr and isatty( STDERR_FILENO ) );
   if ( pp.name.is_blob() ) {
     const auto view = runtime.user_get_blob( pp.name );
-    stream << ( terminal ? "\033[1;34mBlob\033[m" : "Blob" ) << " (" << view.size() << " byte"
+    stream << ( terminal ? "\033[1;34mBlob\033[m" : "Blob" ) << " (" << dec << view.size() << " byte"
            << ( view.size() != 1 ? "s" : "" ) << "): \"";
     for ( const unsigned char ch : view.substr( 0, 32 ) ) {
       if ( ch == '\\' ) {
@@ -197,7 +197,7 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
     stream << "\n";
   } else if ( pp.name.is_tree() ) {
     const auto view = runtime.get_tree( pp.name );
-    stream << ( terminal ? "\033[1;32mTree\033[m" : "Tree" ) << " (" << view.size() << " entr"
+    stream << ( terminal ? "\033[1;32mTree\033[m" : "Tree" ) << " (" << dec << view.size() << " entr"
            << ( view.size() != 1 ? "ies" : "y" ) << "):\n";
     for ( unsigned int i = 0; i < view.size(); ++i ) {
       for ( unsigned int j = 0; j < pp.level + 1; ++j ) {
