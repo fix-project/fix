@@ -206,7 +206,8 @@ string RuntimeStorage::serialize( Name name )
 {
   Name new_name = local_to_storage( name );
   string file_name = base64::encode( new_name );
-  ofstream output_file( ".fix/" + file_name );
+  const filesystem::path dir { FIX_DIR };
+  ofstream output_file( dir / file_name );
 
   switch ( new_name.get_content_type() ) {
     case ContentType::Blob: {
@@ -242,7 +243,7 @@ string RuntimeStorage::serialize( Name name )
 
 void RuntimeStorage::deserialize()
 {
-  const filesystem::path dir { ".fix" };
+  const filesystem::path dir { FIX_DIR };
 
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
     Name name( base64::decode( file.path().filename().string() ) );

@@ -7,31 +7,10 @@ project(fixpoint)
 find_package(PkgConfig)
 
 pkg_check_modules(CRYPT REQUIRED libcrypto++)
-# find_package( libcryptopp REQUIRED)
 include_directories(${CRYPT_INCLUDE_DIRS})
 add_compile_options(${CRYPT_CFLAGS_OTHER})
 
-find_package(Clang REQUIRED)
-include_directories(SYSTEM ${CLANG_INCLUDE_DIRS})
-set(CLANG_LIBS clangFrontend clangDriver clangSerialization clangParse clangCodeGen clangSema clangAnalysis clangEdit clangAST clangLex clangBasic)
-
-find_package(LLVM REQUIRED)
-include_directories(SYSTEM ${LLVM_INCLUDE_DIRS}) 
-add_definitions( ${LLVM_DEFINITIONS})
-llvm_map_components_to_libnames( llvm_libs support irreader)
-
 include(FetchContent)
-set(FETCHCONTENT_QUIET OFF)
-FetchContent_Declare(
-  wabt
-  GIT_REPOSITORY https://github.com/fix-project/wabt
-  GIT_TAG        fixpoint
-  )
-set(BUILD_TESTS off)
-set(BUILD_LIBWASM off)
-set(USE_INTERNAL_SHA256 on)
-FetchContent_MakeAvailable(wabt)
-
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp
@@ -44,7 +23,6 @@ include(ExternalProject)
 ExternalProject_Add(applications
   SOURCE_DIR "${PROJECT_SOURCE_DIR}/applications"
   INSTALL_COMMAND cmake -E echo "Skipping applications install."
-  DEPENDS wat2wasm
   BUILD_ALWAYS true
   )
 
@@ -53,11 +31,10 @@ include(etc/cflags.cmake)
 include(etc/clang_format.cmake)
 include(etc/tests.cmake)
 
-include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-src/include")
-include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/wabt-build/include")
-
 include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-src")
 include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-build")
+
+file(REAL_PATH .fix FIX_DIR BASE_DIRECTORY ${PROJECT_SOURCE_DIR} EXPAND_TILDE)
 
 include_directories("${PROJECT_SOURCE_DIR}/src/util")
 include_directories("${PROJECT_SOURCE_DIR}/src/runtime")
@@ -76,6 +53,7 @@ set(FIXPOINT_LIBS_TIMING_2 runtime-timing-2 component-timing-2 util-timing-2)
 #add_subdirectory("${PROJECT_SOURCE_DIR}/src/storage") # only headers
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/tester")
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/scripts")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/testing/wasm-examples")
 add_subdirectory("${PROJECT_SOURCE_DIR}/testing/benchmark")

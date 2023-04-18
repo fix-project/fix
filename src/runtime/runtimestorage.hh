@@ -51,7 +51,6 @@ private:
     , work_( 0 )
   {
     wasm_rt_init();
-    llvm_init();
 
     for ( size_t i = 0; i < num_workers_; ++i ) {
       std::unique_ptr<RuntimeWorker> worker = std::make_unique<RuntimeWorker>( i, *this );
@@ -113,9 +112,10 @@ public:
   // Populate a program
   void populate_program( Name function_name );
 
+  void add_program( Name function_name, std::string_view elf_content );
+
   Name local_to_storage( Name name );
 
   std::string serialize( Name name );
-
   void deserialize();
 };

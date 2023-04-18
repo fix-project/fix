@@ -8,14 +8,13 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT "return3-fixpoint.wasm"
-  DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-          return3-wasi.wasm
+  DEPENDS return3-wasi.wasm
           ../../c-flatware.c
           ../../filesys.c
           ../../asm-flatware.wat
           ../../asm-flatware.h
           wasi-snapshot
-  COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
           --enable-multi-memory
           --enable-exceptions
           return3-wasi.wasm

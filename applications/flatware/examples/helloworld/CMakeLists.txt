@@ -8,14 +8,13 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT "helloworld-fixpoint.wasm"
-  DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-          helloworld-wasi.wasm
+  DEPENDS helloworld-wasi.wasm
           ../../c-flatware.c
           ../../filesys.c
           ../../asm-flatware.wat
           ../../asm-flatware.h
           wasi-snapshot
-  COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
           --enable-multi-memory
           --enable-exceptions
           helloworld-wasi.wasm

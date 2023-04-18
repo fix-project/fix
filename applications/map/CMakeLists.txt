@@ -15,10 +15,10 @@ link_libc("${CMAKE_BINARY_DIR}/map/CMakeFiles/add_2_obj.dir/add_2.cc.o" add_2_ob
 # link fixpoint_storage, which defines wat tables and memories
 add_custom_command(
         OUTPUT "linked_with_storage.wasm"
-        DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-        add_2.wasm
-        ../util/fixpoint_storage.wasm
-        COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+        DEPENDS add_2.wasm
+                applications-util
+                ../util/fixpoint_storage.wasm
+  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
         --enable-multi-memory
         --enable-exceptions
         add_2.wasm
@@ -30,10 +30,10 @@ add_custom_command(
 # link wasi_snapshot_preview1, which defines stubs for fd_write/seek/close
 add_custom_command(
         OUTPUT "add_2_map.wasm"
-        DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-        linked_with_storage.wasm
-        ../util/wasi_snapshot_preview1.wasm
-        COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+        DEPENDS linked_with_storage.wasm
+                applications-util
+                ../util/wasi_snapshot_preview1.wasm
+  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
         --enable-multi-memory
         --enable-exceptions
         linked_with_storage.wasm

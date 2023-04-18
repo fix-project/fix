@@ -7,15 +7,6 @@ add_subdirectory(util)
 add_subdirectory(map)
 add_subdirectory(flatware)
 
-include(FetchContent)
-FetchContent_Declare(
-  wasm-tools
-  GIT_REPOSITORY https://github.com/fix-project/wasm-tools
-  GIT_TAG        main
-  BUILD_ALWAYS   true
-)
-FetchContent_MakeAvailable(wasm-tools)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -mreference-types -I ~/wasm-toolchain/wasix/include -fno-exceptions")
 set(CMAKE_CXX_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang++)

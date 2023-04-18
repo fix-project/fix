@@ -10,8 +10,12 @@ add_custom_command(
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-add_library (runtime STATIC ${LIB_SOURCES} wasm-rt-content.h include-path.hh)
-add_library (runtime-timing STATIC ${LIB_SOURCES} wasm-rt-content.h include-path.hh)
+add_library (runtime STATIC ${LIB_SOURCES} wasm-rt-content.h)
+target_compile_definitions(runtime PUBLIC "FIX_DIR=\"${FIX_DIR}\"")
+
+add_library (runtime-timing STATIC ${LIB_SOURCES} wasm-rt-content.h)
 target_compile_definitions(runtime-timing PUBLIC TIME_FIXPOINT=1)
-add_library (runtime-timing-2 STATIC ${LIB_SOURCES} wasm-rt-content.h include-path.hh)
+target_compile_definitions(runtime-timing PUBLIC "FIX_DIR=\"${FIX_DIR}\"")
+add_library (runtime-timing-2 STATIC ${LIB_SOURCES} wasm-rt-content.h)
 target_compile_definitions(runtime-timing-2 PUBLIC TIME_FIXPOINT=2)
+target_compile_definitions(runtime-timing-2 PUBLIC "FIX_DIR=\"${FIX_DIR}\"")

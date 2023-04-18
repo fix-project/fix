@@ -16,14 +16,13 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT "open-fixpoint.wasm"
-  DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-          open-wasi.wasm
+  DEPENDS open-wasi.wasm
           ../../c-flatware.c
           ../../filesys.c
           ../../asm-flatware.wat
           ../../asm-flatware.h
-          wasi-snapshot 
-  COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+          wasi-snapshot
+  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
           --enable-multi-memory
           --enable-exceptions
           open-wasi.wasm
@@ -35,14 +34,13 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT "open-deep-fixpoint.wasm"
-  DEPENDS ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
-          open-deep-wasi.wasm
+  DEPENDS open-deep-wasi.wasm
           ../../c-flatware.c
           ../../filesys.c
           ../../asm-flatware.wat
           ../../asm-flatware.h
-          wasi-snapshot 
-  COMMAND ${CMAKE_BINARY_DIR}/_deps/wasm-tools-build/src/module-combiner/wasmlink
+          wasi-snapshot
+  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
           --enable-multi-memory
           --enable-exceptions
           open-deep-wasi.wasm
