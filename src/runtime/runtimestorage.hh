@@ -7,7 +7,6 @@
 #include <thread>
 #include <unordered_map>
 
-#include "ccompiler.hh"
 #include "concurrent_storage.hh"
 #include "concurrent_vector.hh"
 #include "entry.hh"
@@ -16,7 +15,6 @@
 #include "object.hh"
 #include "program.hh"
 #include "spans.hh"
-#include "wasmcompiler.hh"
 #include "worker.hh"
 
 #include "absl/container/flat_hash_map.h"

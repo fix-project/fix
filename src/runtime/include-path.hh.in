@@ -1,3 +1,0 @@
-#pragma once
-
-#cmakedefine FIXPOINT_C_INCLUDE_PATH @FIXPOINT_C_INCLUDE_PATH@

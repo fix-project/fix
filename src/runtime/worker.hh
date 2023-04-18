@@ -7,7 +7,6 @@
 #include "job.hh"
 
 #include "elfloader.hh"
-#include "wasmcompiler.hh"
 
 class RuntimeStorage;
 
