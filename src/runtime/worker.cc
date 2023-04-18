@@ -118,18 +118,21 @@ void RuntimeWorker::force( Name hash, Name name )
 void RuntimeWorker::apply( Name hash, Name name )
 {
   Name function_name = runtimestorage_.get_tree( name ).at( 1 );
-
   if ( not function_name.is_blob() ) {
-    throw std::runtime_error( "ENCODE functions not yet supported" );
+    if ( function_name.is_tree() ) {
+      function_name = runtimestorage_.get_tree( function_name ).at( 0 );
+      if ( not function_name.is_blob() ) {
+        throw std::runtime_error( "Multilevel ENCODE functions not yet supported" );
+      }
+    } else {
+      throw std::runtime_error( "Unevaled strict Thunk in apply(ENCODE). " );
+    }
   }
 
   Name canonical_name = runtimestorage_.local_to_storage( function_name );
-
   if ( not runtimestorage_.name_to_program_.contains( canonical_name ) ) {
-    /* compile the Wasm to C and then to ELF */
-    const auto [c_header, h_header, fixpoint_header]
-      = wasmcompiler::wasm_to_c( runtimestorage_.get_blob( function_name ) );
-    Program program = link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) );
+    /* Link program */
+    Program program = link_program( runtimestorage_.get_blob( function_name ) );
     runtimestorage_.name_to_program_.put( canonical_name, std::move( program ) );
   }
 

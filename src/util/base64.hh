@@ -59,7 +59,7 @@ __attribute__( ( unused ) ) static std::string encode( __m256i name_to_encode )
   return ret;
 }
 
-static __m256i decode( std::string encoded_name )
+__attribute__( ( unused ) ) static __m256i decode( std::string_view encoded_name )
 {
   std::string res;
   res.reserve( 32 );

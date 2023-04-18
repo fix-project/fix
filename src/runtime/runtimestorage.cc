@@ -129,11 +129,17 @@ void RuntimeStorage::populate_program( Name function_name )
   }
 
   if ( not name_to_program_.contains( function_name ) ) {
-    /* compile the Wasm to C and then to ELF */
-    const auto [c_header, h_header, fixpoint_header] = wasmcompiler::wasm_to_c( get_blob( function_name ) );
+    /* Link the program */
+    name_to_program_.put( function_name, link_program( get_blob( function_name ) ) );
+  }
 
-    name_to_program_.put( function_name,
-                          link_program( c_to_elf( c_header, h_header, fixpoint_header, wasm_rt_content ) ) );
+  return;
+}
+
+void RuntimeStorage::add_program( Name function_name, string_view elf_content )
+{
+  if ( not name_to_program_.contains( function_name ) ) {
+    name_to_program_.put( function_name, link_program( elf_content ) );
   }
 
   return;

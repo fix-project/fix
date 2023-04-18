@@ -1,4 +1,5 @@
 #include <iostream>
+#include <math.h>
 
 #include "elfloader.hh"
 #include "runtimestorage.hh"
@@ -53,6 +54,11 @@ const static map<string, uint64_t> library_func_map
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
       { "memset", (uint64_t)memset },
+      { "sqrt", ( uint64_t ) static_cast<double ( * )( double )>( sqrt ) },
+      { "ceilf", (uint64_t)ceilf },
+      { "ceil", ( uint64_t ) static_cast<double ( * )( double )>( ceil ) },
+      { "floor", ( uint64_t ) static_cast<double ( * )( double )>( floor ) },
+      { "nearbyint", ( uint64_t ) static_cast<double ( * )( double )>( nearbyint ) },
       { "__assert_fail", (uint64_t)throw_assertion_failure } };
 
 void __stack_chk_fail( void )
@@ -63,6 +69,11 @@ void __stack_chk_fail( void )
 Elf_Info load_program( const string_view program_content )
 {
   Elf_Info res;
+
+  // Check ELF magic bytes
+  if ( !program_content.starts_with( "\177ELF" ) ) {
+    throw std::runtime_error( "Not a valid ELF file" );
+  }
 
   // Step 0: Read Elf header
   const Elf64_Ehdr* header = reinterpret_cast<const Elf64_Ehdr*>( program_content.data() );
@@ -223,7 +234,7 @@ Program link_program( const string_view program_content )
       }
     }
   }
-
+  // cout << "Linking program at program_mem " << program_mem << endl;
   shared_ptr<char> code( static_cast<char*>( program_mem ), free );
   uint64_t init_entry = elf_info.func_map.at( "initProgram" );
   uint64_t main_entry = elf_info.func_map.at( "w2c_function_0x5Ffixpoint_apply" );
