@@ -2,27 +2,27 @@
 
 use strict;
 
-if ((scalar @ARGV) != 3) {
-  die qq{Usage: $0 stateless-tester compile-tool helloworld.wasm};
+if ((scalar @ARGV) != 4) {
+  print STDERR @ARGV;
+  die qq{Usage: $0 stateless-tester compile-tool home-tree.txt open.wasm};
 }
 
-my ($executable, $compile, $wasm) = @ARGV;
+my ($executable, $compile, $hometreefile, $wasm) = @ARGV;
 
 sub check_return($) {
   my ($expected_retval) = @_;
-  my ($expected_stdout) = "Hello, World!";
 
-  my $result = `$executable tree:2 string:\"0\" thunk: tree:3 string:unused name:$compile file:$wasm 2>&1`;
+  my $hometree = `cat $hometreefile`;
+  my $result = `$executable tree:4 string:\"0\" thunk: tree:3 string:unused name:$compile file:$wasm tree:0 name:$hometree 2>&1`;
 
   if ($?) {
     die qq{Failure in running return-test: $result};
   }
-  
+
   my (undef, $substring) = split( 'Result:\n', $result );
   ($_, my $retval) = $substring =~ m{0\. Blob \(4 bytes\): (.*) \(uint32:(\d*)\)};
-  ($_, my $stdout) = $substring =~ m{1\. Blob \((\d*) bytes\): \"(.*)\"};
 
-  if ( !( $retval eq $expected_retval ) or !( $stdout eq $expected_stdout ) ) {
+  if ( !( $retval eq $expected_retval ) ) {
     print STDERR qq{Got result:\n$result\n};
     die qq{Wrong return value ($retval, was expecting $expected_retval)};
   }

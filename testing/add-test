@@ -2,17 +2,18 @@
 
 use strict;
 
-if ((scalar @ARGV) != 2) {
-  die qq{Usage: $0 stateless-tester addblob.wasm};
+if ((scalar @ARGV) != 3) {
+  die qq{Usage: $0 stateless-tester compile-tool addblob.wasm};
 }
 
-my ($executable, $wasm) = @ARGV;
+my ($executable, $compile, $wasm) = @ARGV;
 
 sub check_add($$) {
   my ($x, $y) = @_;
   my $expected_answer = ($x + $y) % 2**32;
 
-  my $result = `$executable tree:4 string:\"0\" file:$wasm uint32:$x uint32:$y 2>&1`;
+  print `$executable tree:4 string:\"0\" thunk: tree:3 string:\"0\" name:$compile file:$wasm uint32:$x uint32:$y 2>&1`;
+  my $result = `$executable tree:4 string:\"0\" thunk: tree:3 string:\"0\" name:$compile file:$wasm uint32:$x uint32:$y 2>&1`;
 
   if ($?) {
     print STDERR qq{Got result:\n$result\n};

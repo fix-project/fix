@@ -5,6 +5,7 @@
 #include <string>
 #include <unistd.h>
 
+#include "base64.hh"
 #include "mmap.hh"
 #include "name.hh"
 #include "runtimestorage.hh"
@@ -28,6 +29,8 @@ struct pretty_print
 };
 
 ostream& operator<<( ostream& stream, const pretty_print& pp );
+
+bool deserialized = false;
 
 void program_body( span_view<char*> args )
 {
@@ -72,6 +75,16 @@ Name parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
     open_files.emplace_back( string( str.substr( 5 ) ) );
     args.remove_prefix( 1 );
     return runtime.add_blob( static_cast<string_view>( open_files.back() ) );
+  }
+
+  if ( str.starts_with( "name:" ) ) {
+    if ( !deserialized ) {
+      runtime.deserialize();
+      deserialized = true;
+    }
+    args.remove_prefix( 1 );
+    cout << "Reading in name " << endl;
+    return base64::decode( str.substr( 5 ) );
   }
 
   if ( str.starts_with( "string:" ) ) {
@@ -223,6 +236,7 @@ void usage_message( const char* argv0 )
   cerr << "Usage: " << argv0 << " entry...\n";
   cerr << "   entry :=   file:<filename>\n";
   cerr << "            | string:<string>\n";
+  cerr << "            | name:<base64-encoded name>\n";
   cerr << "            | uint<n>:<integer> (with <n> = 8 | 16 | 32 | 64)\n";
   cerr << "            | tree:<n> (followed by <n> entries)\n";
 }
