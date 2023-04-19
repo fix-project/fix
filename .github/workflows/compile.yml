@@ -19,8 +19,18 @@ jobs:
       - uses: actions/checkout@v1
       - name: install boost
         run: sudo apt update && sudo apt-get install libboost-all-dev -y
+      - name: install gh
+        run: sudo apt install gh unzip -y
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
+      - name: Download release asset
+        run: gh release download --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Unzip
+        run: unzip bootstrap.zip
+      - name: Print directory structure
+        run: ls -R -a
       - name: cmake
         run: cmake -S . -B out
       - name: compile
@@ -34,8 +44,16 @@ jobs:
       - uses: actions/checkout@v1
       - name: install boost
         run: sudo apt update && sudo apt-get install libboost-all-dev -y
+      - name: install gh
+        run: sudo apt install gh unzip -y
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
+      - name: Download release asset
+        run: gh release download --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Unzip
+        run: unzip bootstrap.zip
       - name: cmake
         run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=DebugASan
       - name: compile
@@ -49,8 +67,16 @@ jobs:
       - uses: actions/checkout@v1
       - name: install boost
         run: sudo apt update && sudo apt-get install libboost-all-dev -y
+      - name: install gh
+        run: sudo apt install gh unzip -y
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
+      - name: Download release asset
+        run: gh release download --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Unzip
+        run: unzip bootstrap.zip
       - name: cmake
         run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=DebugTSan
       - name: compile

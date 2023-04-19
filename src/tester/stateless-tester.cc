@@ -83,7 +83,6 @@ Name parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
       deserialized = true;
     }
     args.remove_prefix( 1 );
-    cout << "Reading in name " << endl;
     return base64::decode( str.substr( 5 ) );
   }
 
