@@ -9,7 +9,7 @@
 #define FORCE 0x02
 #define EVAL 0x03
 #define LINK 0x04
-#define CHILD 0x05
+#define FILL 0x05
 
 struct Job
 {

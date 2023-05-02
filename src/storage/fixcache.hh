@@ -1,15 +1,67 @@
 #pragma once
 
+#include <mutex>
+#include <optional>
+#include <queue>
+#include <shared_mutex>
+#include <stdexcept>
+
 #include "absl/container/flat_hash_map.h"
 #include "entry.hh"
-#include "name.hh"
-#include <shared_mutex>
 
+// -2: user thread waiting for the pending
+// -1: job done, entry.name is the result Value
+// 0: job done, hasn't updated entry.name or call child
+// positive number: the job has been started
+
+// For multimap entries
+// pending == 0: progress with desired entry name (The desired entry is equivalent to the requestor)
+// pending == 1: progress with the entry itself's name (the desired entry needs to be done before the requestor
+// starts)
 class fixcache
 {
 private:
   absl::flat_hash_map<Name, Entry, NameHash> fixcache_;
   std::shared_mutex fixcache_mutex_;
+
+  void insert_dependency( Name name, Name value, bool start_after )
+  {
+    for ( size_t i = 1;; ++i ) {
+      name.set_index( i );
+      auto ins = fixcache_.insert( { name, Entry( value, start_after ) } );
+
+      // If insertion was sucessful
+      if ( ins.second ) {
+        break;
+      }
+    }
+  }
+
+  bool is_complete( Name name )
+  {
+    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == static_cast<int64_t>( -1 );
+  }
+
+  bool is_pending( Name name )
+  {
+    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == static_cast<int64_t>( -2 );
+  }
+
+  bool is_running( Name name )
+  {
+    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == static_cast<int64_t>( 1 );
+  }
+
+  bool start_job( Name name )
+  {
+    if ( fixcache_.contains( name ) ) {
+      int64_t job_pending = -2;
+      return fixcache_.at( name ).pending->compare_exchange_strong( job_pending, 1 );
+    } else {
+      fixcache_.insert_or_assign( name, Entry( name, 1 ) );
+      return true;
+    }
+  }
 
 public:
   fixcache()
@@ -47,21 +99,6 @@ public:
     fixcache_.insert_or_assign( name, Entry( value ) );
   }
 
-  void insert_or_update( Name name, Name value, int64_t pending )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    if ( fixcache_.contains( name ) ) {
-      Entry& entry = fixcache_.at( name );
-      entry.name = value;
-      ( *entry.pending.get() ) = pending;
-      if ( pending == 0 ) {
-        ( *entry.pending.get() ).notify_all();
-      }
-    } else {
-      fixcache_.insert_or_assign( name, Entry( value, pending ) );
-    }
-  }
-
   void set_name( Name name, Name value )
   {
     std::unique_lock lock( fixcache_mutex_ );
@@ -69,17 +106,123 @@ public:
     entry.name = value;
   }
 
-  void insert_next( Name name, Name value, int64_t pending )
+  bool start_after( Name name, Name requestor )
   {
     std::unique_lock lock( fixcache_mutex_ );
-    for ( size_t i = 1;; ++i ) {
-      name.set_index( i );
-      auto ins = fixcache_.insert( { name, Entry( value, pending ) } );
+    if ( is_complete( name ) ) {
+      return false;
+    }
 
-      // If insertion was sucessful
-      if ( ins.second ) {
+    insert_dependency( name, requestor, true );
+    return true;
+  }
+
+  std::optional<Name> continue_after( Name name, Name requestor )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    if ( is_complete( name ) ) {
+      return fixcache_.at( name ).name;
+    }
+
+    if ( name != requestor ) {
+      insert_dependency( name, requestor, false );
+    }
+    return {};
+  }
+
+  int try_run( Name name, Name requestor )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    if ( is_complete( name ) ) {
+      return -1;
+    }
+
+    if ( name != requestor ) {
+      insert_dependency( name, requestor, false );
+    }
+
+    if ( start_job( name ) ) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  void pending_start( Name name, Name arg, int64_t pending )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    if ( !is_complete( name ) ) {
+      fixcache_.insert_or_assign( name, Entry( arg, pending ) );
+    }
+  }
+
+  bool try_wait( Name name )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    if ( is_complete( name ) ) {
+      return false;
+    }
+
+    if ( !fixcache_.contains( name ) ) {
+      fixcache_.insert_or_assign( name, Entry( name, -2 ) );
+    }
+
+    return true;
+  }
+
+  bool change_status_to_completed( Name name, Name value )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    bool result = false;
+    if ( fixcache_.contains( name ) ) {
+      Entry& entry = fixcache_.at( name );
+      entry.name = value;
+
+      int64_t job_running = 1;
+      result = entry.pending->compare_exchange_strong( job_running, -1 );
+
+      ( *entry.pending.get() ).notify_all();
+    } else {
+      fixcache_.insert_or_assign( name, Entry( value, -1 ) );
+      result = true;
+    }
+    return result;
+  }
+
+  std::queue<std::pair<Name, Name>> update_pending_jobs( Name name )
+  {
+    Name dependency = name;
+    std::queue<std::pair<Name, Name>> result;
+    for ( int i = 1;; ++i ) {
+      dependency.set_index( i );
+      if ( contains( dependency ) ) {
+        Name requestor = get_name( dependency );
+        if ( get_pending( dependency )->load() == 1 ) {
+          // Start after
+          std::shared_ptr<std::atomic<int64_t>> pending = get_pending( requestor );
+          auto sub_result = pending->fetch_sub( 1 ) - 1;
+
+          if ( sub_result == 0 ) {
+            result.push( { get_name( requestor ), requestor } );
+          }
+        } else {
+          // Continue after
+          result.push( { get_name( name ), requestor } );
+        }
+      } else {
         break;
       }
+    }
+
+    return result;
+  }
+
+  std::queue<std::pair<Name, Name>> complete( Name name, Name value )
+  {
+    if ( change_status_to_completed( name, value ) ) {
+      return update_pending_jobs( name );
+    } else {
+      return {};
     }
   }
 };

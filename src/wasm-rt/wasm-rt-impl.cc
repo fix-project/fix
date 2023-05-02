@@ -478,7 +478,9 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
       return -1;                                                                                                   \
     }                                                                                                              \
     table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                         \
-    memcpy( table->data, old_data, old_elems * sizeof( wasm_rt_##type##_t ) );                                     \
+    if ( old_data != NULL ) {                                                                                      \
+      memcpy( table->data, old_data, old_elems * sizeof( wasm_rt_##type##_t ) );                                   \
+    }                                                                                                              \
     table->size = new_elems;                                                                                       \
     for ( uint32_t i = old_elems; i < new_elems; i++ ) {                                                           \
       table->data[i] = init;                                                                                       \

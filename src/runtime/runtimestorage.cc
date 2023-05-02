@@ -28,12 +28,15 @@ Name RuntimeStorage::force_thunk( Name name )
   Name desired( name, false, { FORCE } );
   Name operations( name, true, { FORCE } );
 
-  fix_cache_.insert_or_update( desired, Name(), 1 );
+  if ( fix_cache_.try_wait( desired ) ) {
+    workers_[0].get()->queue_job( Job( name, operations ) );
 
-  workers_[0].get()->queue_job( Job( name, operations ) );
+    std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
 
-  std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
-  ( pending.get() )->wait( 1 );
+    pending->wait( -2 );
+    pending->wait( 1 );
+    pending->wait( 0 );
+  }
 
   return fix_cache_.get_name( desired );
 }
@@ -43,12 +46,15 @@ Name RuntimeStorage::eval_thunk( Name name )
   Name desired( name, false, { EVAL } );
   Name operations( name, true, { EVAL } );
 
-  fix_cache_.insert_or_update( desired, Name(), 1 );
+  if ( fix_cache_.try_wait( desired ) ) {
+    workers_[0].get()->queue_job( Job( name, operations ) );
 
-  workers_[0].get()->queue_job( Job( name, operations ) );
+    std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
 
-  std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
-  ( pending.get() )->wait( 1 );
+    pending->wait( -2 );
+    pending->wait( 1 );
+    pending->wait( 0 );
+  }
 
   return fix_cache_.get_name( desired );
 }

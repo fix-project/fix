@@ -1,5 +1,9 @@
 #pragma once
 
+#include <atomic>
+
+#include "name.hh"
+
 struct Entry
 {
   Name name;

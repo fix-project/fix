@@ -2,6 +2,7 @@
 
 #include <boost/lockfree/queue.hpp>
 #include <condition_variable>
+#include <queue>
 #include <thread>
 
 #include "job.hh"
@@ -26,6 +27,8 @@ private:
 
   RuntimeStorage& runtimestorage_;
 
+  void launch_jobs( std::queue<std::pair<Name, Name>> ready_jobs );
+
 public:
   RuntimeWorker( size_t thread_id, RuntimeStorage& runtimestorage )
     : jobs_( 0 )
@@ -47,7 +50,7 @@ public:
 
   void apply( Name hash, Name name );
 
-  void child( Name hash );
+  void fill( Name hash, Name name );
 
   void link( Name hash, Name name );
 
