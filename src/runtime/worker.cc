@@ -46,6 +46,7 @@ void RuntimeWorker::eval( Name hash, Name name )
 
       std::shared_ptr<std::atomic<int64_t>> pending = runtimestorage_.fix_cache_.get_pending( fill_operation );
       bool to_fill = false;
+      int64_t post_sub = orig_tree.size();
 
       for ( size_t i = 0; i < orig_tree.size(); ++i ) {
         auto entry = orig_tree[i];
@@ -59,10 +60,10 @@ void RuntimeWorker::eval( Name hash, Name name )
           if ( runtimestorage_.fix_cache_.start_after( desired, fill_operation ) ) {
             queue_job( Job( entry, operations ) );
           } else {
-            ( *pending )--;
+            post_sub = pending->fetch_sub( 1 ) - 1;
           }
         } else {
-          ( *pending )--;
+          post_sub = pending->fetch_sub( 1 ) - 1;
         }
       }
 
@@ -75,7 +76,7 @@ void RuntimeWorker::eval( Name hash, Name name )
       if ( value_if_completed.has_value() ) {
         progress( hash, value_if_completed.value() );
       } else {
-        if ( pending->load() == 0 ) {
+        if ( post_sub == 0 ) {
           progress( fill_operation, name );
         }
       }

@@ -18,6 +18,11 @@
 // pending == 0: progress with desired entry name (The desired entry is equivalent to the requestor)
 // pending == 1: progress with the entry itself's name (the desired entry needs to be done before the requestor
 // starts)
+//
+#define COMPLETE INT64_C( -1 )
+#define PENDING INT64_C( -2 )
+#define RUNNING INT64_C( 1 )
+
 class fixcache
 {
 private:
@@ -39,26 +44,26 @@ private:
 
   bool is_complete( Name name )
   {
-    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == static_cast<int64_t>( -1 );
+    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == COMPLETE;
   }
 
   bool is_pending( Name name )
   {
-    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == static_cast<int64_t>( -2 );
+    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == PENDING;
   }
 
   bool is_running( Name name )
   {
-    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == static_cast<int64_t>( 1 );
+    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == RUNNING;
   }
 
   bool start_job( Name name )
   {
     if ( fixcache_.contains( name ) ) {
-      int64_t job_pending = -2;
-      return fixcache_.at( name ).pending->compare_exchange_strong( job_pending, 1 );
+      int64_t job_pending = PENDING;
+      return fixcache_.at( name ).pending->compare_exchange_strong( job_pending, RUNNING );
     } else {
-      fixcache_.insert_or_assign( name, Entry( name, 1 ) );
+      fixcache_.insert_or_assign( name, Entry( name, RUNNING ) );
       return true;
     }
   }
@@ -164,7 +169,7 @@ public:
     }
 
     if ( !fixcache_.contains( name ) ) {
-      fixcache_.insert_or_assign( name, Entry( name, -2 ) );
+      fixcache_.insert_or_assign( name, Entry( name, PENDING ) );
     }
 
     return true;
@@ -178,12 +183,12 @@ public:
       Entry& entry = fixcache_.at( name );
       entry.name = value;
 
-      int64_t job_running = 1;
-      result = entry.pending->compare_exchange_strong( job_running, -1 );
+      int64_t job_running = RUNNING;
+      result = entry.pending->compare_exchange_strong( job_running, COMPLETE );
 
       ( *entry.pending.get() ).notify_all();
     } else {
-      fixcache_.insert_or_assign( name, Entry( value, -1 ) );
+      fixcache_.insert_or_assign( name, Entry( value, COMPLETE ) );
       result = true;
     }
     return result;
