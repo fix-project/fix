@@ -38,6 +38,7 @@ private:
   size_t num_workers_;
 
   std::atomic<bool> threads_active_;
+  std::atomic<bool> threads_started_;
 
   std::atomic<size_t> work_;
 
@@ -47,7 +48,8 @@ private:
     , local_storage_()
     , workers_()
     , num_workers_( 16 )
-    , threads_active_( false )
+    , threads_active_( true )
+    , threads_started_( false )
     , work_( 0 )
   {
     wasm_rt_init();
@@ -57,8 +59,8 @@ private:
       workers_.push_back( std::move( worker ) );
     }
 
-    threads_active_ = true;
-    threads_active_.notify_all();
+    threads_started_ = true;
+    threads_started_.notify_all();
   }
 
   ~RuntimeStorage()

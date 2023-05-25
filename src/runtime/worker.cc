@@ -240,7 +240,7 @@ void RuntimeWorker::progress( Name hash, Name name )
 void RuntimeWorker::work()
 {
   // Wait till all threads have been primed before computation can begin
-  runtimestorage_.threads_active_.wait( false );
+  runtimestorage_.threads_started_.wait( false );
 
   Job job;
   while ( runtimestorage_.threads_active_ ) {
