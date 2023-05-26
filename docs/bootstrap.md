@@ -1,0 +1,33 @@
+# Navigating Bootstrap
+There are two ways to get the compilation toolchain needed to compile any Wasm
+modules to X86.
+
+## Way 0: Build from source
+Clone the source from [bootstrap](https://github.com/fix-project/bootstrap).
+Building bootstrap from source requires a working
+[wasm-toolchain](https://github.com/fix-project/wasm-toolchain).
+```
+cmake -S . -B build
+cmake --build build --parallel {# of parallelism}
+cmake -S . -B fix-build -DBUILD_SYS_DRIVER=OFF
+cmake --build fix-build --parallel {# of parallelism}
+./build.sh
+./serialize.sh
+```
+After building, copy `./boot/` and `./.fix/` to the source directory of Fix.
+
+## Way 1: Fetch from Release
+Either
+```
+wget https://github.com/fix-project/bootstrap/releases/download/v0.0.3/bootstrap.zip
+```
+or use `gh`
+```
+gh release download --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+```
+
+## Upgrade Bootstrap
+The output of building bootstrap depends on two things:
+* Which commit `wasm-toolchain` is at? (This includes which commit each
+  submodule of `wasm-toolchain` is at.)
+* The version that the kernel of the machine is at.

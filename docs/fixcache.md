@@ -79,11 +79,18 @@ conditions in the last section does not imply the current implementation.
    `fixcache::change_status_to_completed()`).
 3. THE thread that changes a job to COMPLETE status resolves all dependencies on
    the job (in `fixcache::update_pending_jobs()`).
+* For any continue-after dependency on the completed job, the thread queues the
+  job directly.
+* For any start-after dependency, the thread deducts the pending entry by 1 and
+  the thread that changes the pending entry from 1 to 0 queues the job.
 4. Dependencies on a job can only be added before the job is changed to COMPLETE
    status (in `fixcache::start_after()` and `fixcache::continue_after()`).
 
+2 and 3 implies the "correctness" requirement. 3 and 4 implies the
+"make-progress" requirement.
+
 ## To do 
-An interesting question rises from the current implementation is that how fixed
+An interesting question rising from the current implementation is that how fixed
 points should be handled. Given a thunk `t`, `{[eval], t, []}` 
 continue-after `{[eval, force], t, []}`, `{[force], t, [eval]}` continue-after 
 `{[force], t, []}`, and `{[eval, force], t, []}` continue-after `{[eval], force(t), []}`.
