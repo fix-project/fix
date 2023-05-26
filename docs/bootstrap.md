@@ -1,6 +1,11 @@
 # Navigating Bootstrap
-There are two ways to get the compilation toolchain needed to compile any Wasm
-modules to X86.
+Bootstrap is a compilation toolchain in Wasm (on top of Fix) that compiles Wasm
+modules (on top of Fix) to machine code (currently X86). Since Fix only executes
+machine code, we need to compile Bootstrap itself to machine code before we can
+execute in Fix. Given a Wasm module, Bootstrap runs `wasm2c` and `initcomposer`.
+Then, it compiles each output c file using `clang`, and `lld` the results.
+
+There are two ways to get the compilation toolchain.
 
 ## Way 0: Build from source
 Clone the source from [bootstrap](https://github.com/fix-project/bootstrap).
