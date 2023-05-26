@@ -1,22 +1,24 @@
 # Fix
-  ## Objects 
-  The basic type is an Object. Each Object is immutable and has one canonical
-  representations, and is either:
-  * A Value, which is either:
+## Objects 
+The basic type is an Object. Each Object is immutable and has one canonical
+representations, and is either:
+  
+* A Value, which is either:
   - Blob: a vector of bytes
   - Tree: a vector of Handles
   - Tag
-  * or a Thunk, which represents a Value by specifying a way to compute it.
-    Internally, a Thunk contains a Tree (or a strict Handle to a Tree) in Encode
-    format.
+  
+* or a Thunk, which represents a Value by specifying a way to compute it.
+  Internally, a Thunk contains a Tree (or a strict Handle to a Tree) in Encode
+  format.
 
-  ## Handles 
-  A Handle is an opaque identifier. It idenifies a particular Object and
-  specifies a capability: whether it is "strict" or "shallow" or "lazy"[^1]. 
-  Two Handles that identify the same Object with the same capability are 
-  equivalent and indistinguishable.
+## Handles 
+A Handle is an opaque identifier. It idenifies a particular Object and
+specifies a capability: whether it is "strict" or "shallow" or "lazy"[^1]. 
+Two Handles that identify the same Object with the same capability are 
+equivalent and indistinguishable.
  
-  ## Fully-evaluated Values:
+## Fully-evaluated Values:
   * A Blob is always fully-evaluated
   * A Tree is fully-evaluated if and only if any entry reachable through a
   (strict)<sup>\*</sup>(shallow)<sup>0 or 1</sup> path is not a Thunk.
@@ -29,22 +31,22 @@
   needed, and therefore a Tree would not contain any shallow Thunk after it is
   fully evaluated.
 
-  ## Encodes
+## Encodes
   An Encode is a Tree in a particular format. It describes the application of a
   function to inputs, producing an Object as output. The first entry specifies
   the resoure limits at runtime (e.g. maximum pages of mutable memory) and the
   format of the Encode. 
   * If the Encode format is "apply", the second entry specifies the procedure,
   which is either:
-  - A Tag contains a Blob and verifies that the Blob is compiled from a Wasm
+    1. A Tag contains a Blob and verifies that the Blob is compiled from a Wasm
     module through a trusted compilation toolchain, or
-  - An Encode
+    2. An Encode
  
   * If the Encode format is "lift", the second entry is the Handle to the
   Object to be lifted.
 
-  ## Tags:
-  A Tag contains two entries, and can be created in two ways:
+## Tags:
+A Tag contains two entries, and can be created in two ways:
   
   * Given *A*, creates a Tag \{*A*, *A*\} 
   * A procedure can create a Tag where the first entry is the procedure itself
@@ -82,15 +84,17 @@ Thunk. For a Handle *x*, `eval_shallow(`*x*`)` is defined as:
 ## Apply
 `apply` transforms Trees (in apply-Encode format) to Handles. For a Tree *x* in
 Encode format, `apply(`*x*`)` is defined as:
-	1. call the ELF's apply function, passing it x and providing host functions
-     that let it: 
-	* access any Value reachable through a (strict)<sup>\*</sup>(shallow)<sup>0 or
-    1</sup> path
-	* create new Objects
-	* return an Object as its output
-	2. The return value from the ELF function is the value of `apply(`*x*`)`
-	3. If *x* is not in apply-Encode format, or executing the ELF function traps,
-     `apply` fails.
+	
+1. call the ELF's apply function, passing it x and providing host functions
+   that let it: 
+   - access any Value reachable through a (strict)<sup>\*</sup>(shallow)<sup>0 or
+   1</sup> path
+   - create new Objects 
+   - return an Object as its output
+   
+2. The return value from the ELF function is the value of `apply(`*x*`)`
+3. If *x* is not in apply-Encode format, or executing the ELF function traps,
+   `apply` fails.
   
 ## Lift\_strict
 `lift_strict` transforms non-strict Handles to strict Handles. For a Handle
