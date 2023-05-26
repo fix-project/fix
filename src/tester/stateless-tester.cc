@@ -238,6 +238,7 @@ void usage_message( const char* argv0 )
   cerr << "            | name:<base64-encoded name>\n";
   cerr << "            | uint<n>:<integer> (with <n> = 8 | 16 | 32 | 64)\n";
   cerr << "            | tree:<n> (followed by <n> entries)\n";
+  cerr << "            | thunk: (followed by tree:<n>)\n";
 }
 
 int main( int argc, char* argv[] )
