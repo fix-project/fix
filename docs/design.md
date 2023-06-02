@@ -6,7 +6,7 @@ representations, and is either:
 * A Value, which is either:
   - Blob: a vector of bytes
   - Tree: a vector of Handles
-  - Tag
+  - Tag: a tuple of Handles
   
 * or a Thunk, which represents a Value by specifying a way to compute it.
   Internally, a Thunk contains a Tree (or a strict Handle to a Tree) in Encode
@@ -22,7 +22,7 @@ equivalent and indistinguishable.
   * A Blob is always fully-evaluated
   * A Tree is fully-evaluated if and only if any entry reachable through a
   (strict)<sup>\*</sup>(shallow)<sup>0 or 1</sup> path is not a Thunk.
-  * A Tag is fully-evaluated if and only if the second entry is fully-evaluated.
+  * A Tag is fully-evaluated if and only if the first entry is fully-evaluated.
 
 [^1]: These accessibility status are defined such that
   each Encode can specify which part of the Encode Tree is actually needed for
@@ -38,18 +38,19 @@ equivalent and indistinguishable.
   format of the Encode. 
   * If the Encode format is "apply", the second entry specifies the procedure,
   which is either:
-    1. A Tag contains a Blob and verifies that the Blob is compiled from a Wasm
-    module through a trusted compilation toolchain, or
+    1. A Tag that the first entry is a Blob, the second entry is "Runnable" and 
+    the third entry is a trusted compilation toolchain, or
     2. An Encode
  
   * If the Encode format is "lift", the second entry is the Handle to the
   Object to be lifted.
 
 ## Tags:
-A Tag contains two entries, and can be created in two ways:
+A Tag contains three entries, and can be created in two ways:
   
-  * Given *A*, creates a Tag \{*A*, *A*\} 
-  * A procedure can create a Tag where the first entry is the procedure itself
+  * Given *A*, creates a Tag \{*A*, "eval", *A*\} (TBD)
+  * A procedure can create a Tag where the first entry can be anything, the second 
+  entry is a Blob (TBD), and the third entry is the procedure itself.
 
 # Operations: eval, force, apply and lift 
 ## Eval
@@ -62,7 +63,7 @@ Handle of the resulting Value. For a Handle *x*, `eval(`*x*`)` is defined as:
   * If *x* is a strict Tree:
     For each entry *y*, replace with `eval(`*y*`)`.
   * If *x* is a strict Tag:
-    Replace the second entry *y* with `eval(`*y*`)`.
+    Replace the first entry *y* with `eval(`*y*`)`.
   * If *x* is a strict or shallow Thunk, 
     1. Let *y* be the Encode that *x* refers to. Let *z* be `eval(y)`
     2. If *z* is not in Encode format, traps 
@@ -119,11 +120,12 @@ To give the Wasm module access to the Encode and the ability to create new
 Objects, Fix makes available the following host functions as imports. Each of
 them can be imported from the \"`fix`\" namespace:
 	
-  * `attach_tree_ro_blob_N` (`externref -> []`): This function "attaches" the
-    Tree givein in the argument to the Wasm table numbered *N*. Future calls to
+  * `attach_tree_ro_table_N` (`externref -> []`): This function "attaches" the
+    Tree or the first entry of the Tag given in the argument to the Wasm table 
+    numbered *N*. Future calls to
     `table.get`, `table.size` or `table.copy` (referring to table *N* as a
     source) will refer to the entries of this Tree. The argument must be a
-    strict Handle. Te table must:
+    strict Handle. The table must:
 	- Be exported under the name `ro_table_N`,
 	- Not be exported under another name,
 	- Never be the target of an instruction that would mutate it (`table.set`,
@@ -131,7 +133,8 @@ them can be imported from the \"`fix`\" namespace:
 	These table properties can be checked statically upfront.
 
   * `attach_blob_ro_mem_N` (`externref → []`): The function “attaches” the Blob
-    given in the argument to the Wasm memory numbered *N*. Future calls to
+    or the first entry of the Tag given in the argument to the Wasm memory 
+    numbered *N*. Future calls to
     `*.load` instructions as well as `memory.size` or `memory.copy` (referring
     to memory *N* as a source) will refer to the bytes of this Blob. The
     argument must describe an strict Handle. The memory must: *
@@ -140,6 +143,18 @@ them can be imported from the \"`fix`\" namespace:
 	- Never be the target of an instruction that would mutate it (`*.store`,
     `memory.init`, `memory.fill`, `memory.copy`, `memory.grow`).
   These memory properties can be checked statically upfront.
+  
+  * `attach_tree_ro_table_N` (`externref -> []`): This function "attaches" the
+    the Tag given in the argument to the Wasm table 
+    numbered *N*. Future calls to
+    `table.get`, `table.size` or `table.copy` (referring to table *N* as a
+    source) will refer to the entries of this Tree. The argument must be a
+    strict Handle. The table must:
+	- Be exported under the name `ro_table_N`,
+	- Not be exported under another name,
+	- Never be the target of an instruction that would mutate it (`table.set`,
+    `table.init`, `table.fill`, `table.copy`, `table.grow`).*
+	These table properties can be checked statically upfront.
 
   * `size_ro_mem_N` (`externref -> i32`): Returns the size of the Blob attached
     to memory *N* , in bytes (or zero). This differs from the `memory.size`
@@ -167,10 +182,17 @@ them can be imported from the \"`fix`\" namespace:
   
 	* `create_thunk` (`externref -> externref`): Given a Tree, returns a
     corresponding Thunk as a strict Handle.
-  
-	* `value_type` (`externref -> i32`): Retrieve type (Blob or Tree or Tag) from
-    a strict or shallow Handle. Traps if Handle is not strict or shallow.
 
+  * `create_tag` (`externref -> externref -> externref`): Given Handle x and
+    Handle y, return a Tag \{x, y, procedure\}.
+  
+	* `value_type` (`externref -> i32`): Retrieve type (Blob or Tree) from
+    a strict or shallow Handle. If the Handle is a Blob or Tree, return the
+    corresponding type. If the Handle is a Tag, return the type of the first
+    entry of the Tag.
+
+  * `is_tagged` (`externref -> bool`): Return whether the Handle is a Tag from a
+    strict or shallow Handle.
   * `length` (`externref -> i32`): Given an strict or shallow Handle, returns
     the length (in bytes or number of entries) of the corresponding Value.
 
