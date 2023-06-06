@@ -9,8 +9,7 @@
 #include <variant>
 
 #include "exception.hh"
-#include "job.hh"
-#include "name.hh"
+#include "handle.hh"
 #include "spans.hh"
 #include "thunk.hh"
 
@@ -80,12 +79,11 @@ private:
   uint32_t size_;
 };
 
-static_assert( sizeof( __m256i ) == sizeof( Name ) );
+static_assert( sizeof( __m256i ) == sizeof( Handle ) );
 
 using Blob = Value<char, std::string_view>;
-using Tree = Value<Name, span_view<Name>>;
+using Tree = Value<Handle, span_view<Handle>>;
 using Object = std::variant<Blob, Tree>;
-using ObjectOrName = std::variant<Blob, Tree, Name>;
 
 using Blob_ptr = Blob::ptr_type;
 using Tree_ptr = Tree::ptr_type;

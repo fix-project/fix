@@ -2,8 +2,8 @@
 #include <utility>
 
 #include "base64.hh"
+#include "handle.hh"
 #include "job.hh"
-#include "name.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
 #include "wasm-rt-content.h"
@@ -29,7 +29,7 @@ bool RuntimeWorker::dequeue_job( Job& job )
   return work;
 }
 
-void RuntimeWorker::eval( Name hash, Name name )
+void RuntimeWorker::eval( Handle hash, Handle name )
 {
   switch ( name.get_content_type() ) {
     case ContentType::Blob: {
@@ -39,8 +39,8 @@ void RuntimeWorker::eval( Name hash, Name name )
 
     case ContentType::Tree: {
       auto orig_tree = runtimestorage_.get_tree( name );
-      Name fill_operation( name, true, { FILL } );
-      Name fill_desired( name, false, { FILL } );
+      Handle fill_operation( name, true, { FILL } );
+      Handle fill_desired( name, false, { FILL } );
 
       runtimestorage_.fix_cache_.pending_start( fill_operation, name, orig_tree.size() );
 
@@ -51,11 +51,11 @@ void RuntimeWorker::eval( Name hash, Name name )
       for ( size_t i = 0; i < orig_tree.size(); ++i ) {
         auto entry = orig_tree[i];
 
-        if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
+        if ( entry.is_strict() && !entry.is_blob() ) {
           to_fill = true;
 
-          Name desired( entry, false, { EVAL } );
-          Name operations( entry, true, { EVAL } );
+          Handle desired( entry, false, { EVAL } );
+          Handle operations( entry, true, { EVAL } );
 
           if ( runtimestorage_.fix_cache_.start_after( desired, fill_operation ) ) {
             queue_job( Job( entry, operations ) );
@@ -84,8 +84,8 @@ void RuntimeWorker::eval( Name hash, Name name )
     }
 
     case ContentType::Thunk: {
-      Name desired( name, false, { FORCE, EVAL } );
-      Name operations( name, true, { EVAL, FORCE } );
+      Handle desired( name, false, { FORCE, EVAL } );
+      Handle operations( name, true, { EVAL, FORCE } );
 
       runtimestorage_.fix_cache_.continue_after( desired, hash );
 
@@ -101,14 +101,14 @@ void RuntimeWorker::eval( Name hash, Name name )
   }
 }
 
-void RuntimeWorker::force( Name hash, Name name )
+void RuntimeWorker::force( Handle hash, Handle name )
 {
   switch ( name.get_content_type() ) {
     case ContentType::Thunk: {
-      Name encode_name = Name::get_encode_name( name );
+      Handle encode_name = Handle::get_encode_name( name );
 
-      Name desired( encode_name, false, { EVAL, APPLY, FORCE } );
-      Name operations( encode_name, true, { FORCE, APPLY, EVAL } );
+      Handle desired( encode_name, false, { EVAL, APPLY, FORCE } );
+      Handle operations( encode_name, true, { FORCE, APPLY, EVAL } );
 
       runtimestorage_.fix_cache_.continue_after( desired, hash );
 
@@ -129,9 +129,9 @@ void RuntimeWorker::force( Name hash, Name name )
   }
 }
 
-void RuntimeWorker::apply( Name hash, Name name )
+void RuntimeWorker::apply( Handle hash, Handle name )
 {
-  Name function_name = runtimestorage_.get_tree( name ).at( 1 );
+  Handle function_name = runtimestorage_.get_tree( name ).at( 1 );
   if ( not function_name.is_blob() ) {
     if ( function_name.is_tree() ) {
       function_name = runtimestorage_.get_tree( function_name ).at( 0 );
@@ -143,7 +143,7 @@ void RuntimeWorker::apply( Name hash, Name name )
     }
   }
 
-  Name canonical_name = runtimestorage_.local_to_storage( function_name );
+  Handle canonical_name = runtimestorage_.local_to_storage( function_name );
   if ( not runtimestorage_.name_to_program_.contains( canonical_name ) ) {
     /* Link program */
     Program program = link_program( runtimestorage_.get_blob( function_name ) );
@@ -156,33 +156,33 @@ void RuntimeWorker::apply( Name hash, Name name )
   progress( hash, output );
 }
 
-void RuntimeWorker::update_parent( Name name )
+void RuntimeWorker::update_parent( Handle name )
 {
-  span_view<Name> tree = runtimestorage_.get_tree( name );
+  span_view<Handle> tree = runtimestorage_.get_tree( name );
 
   for ( size_t i = 0; i < tree.size(); ++i ) {
     auto entry = tree[i];
-    if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-      Name desired( entry, false, { EVAL } );
+    if ( entry.is_strict() && !entry.is_blob() ) {
+      Handle desired( entry, false, { EVAL } );
       tree.mutable_data()[i] = runtimestorage_.fix_cache_.get_name( desired );
     }
   }
 }
 
-void RuntimeWorker::fill( Name hash, Name name )
+void RuntimeWorker::fill( Handle hash, Handle name )
 {
   switch ( name.get_content_type() ) {
     case ContentType::Tree: {
       auto orig_tree = runtimestorage_.get_tree( name );
-      Name new_name = runtimestorage_.add_tree( Tree( orig_tree.size() ) );
-      span_view<Name> tree = runtimestorage_.get_tree( new_name );
+      Handle new_name = runtimestorage_.add_tree( Tree( orig_tree.size() ) );
+      span_view<Handle> tree = runtimestorage_.get_tree( new_name );
 
       for ( size_t i = 0; i < tree.size(); ++i ) {
         auto entry = orig_tree[i];
         tree.mutable_data()[i] = entry;
 
-        if ( entry.is_strict_tree_entry() && !entry.is_blob() ) {
-          Name desired( entry, false, { EVAL } );
+        if ( entry.is_strict() && !entry.is_blob() ) {
+          Handle desired( entry, false, { EVAL } );
           tree.mutable_data()[i] = runtimestorage_.fix_cache_.get_name( desired );
         }
       }
@@ -196,7 +196,7 @@ void RuntimeWorker::fill( Name hash, Name name )
   }
 }
 
-void RuntimeWorker::launch_jobs( std::queue<std::pair<Name, Name>> ready_jobs )
+void RuntimeWorker::launch_jobs( std::queue<std::pair<Handle, Handle>> ready_jobs )
 {
   while ( !ready_jobs.empty() ) {
     queue_job( Job( ready_jobs.front().first, ready_jobs.front().second ) );
@@ -204,13 +204,13 @@ void RuntimeWorker::launch_jobs( std::queue<std::pair<Name, Name>> ready_jobs )
   }
 }
 
-void RuntimeWorker::progress( Name hash, Name name )
+void RuntimeWorker::progress( Handle hash, Handle name )
 {
   uint32_t current = hash.peek_operation();
 
   if ( current != NONE ) {
     hash.pop_operation();
-    Name nhash( name, false, { current } );
+    Handle nhash( name, false, { current } );
     int status = runtimestorage_.fix_cache_.try_run( nhash, hash );
     if ( status == 1 ) {
       switch ( current ) {

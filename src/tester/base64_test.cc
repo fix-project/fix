@@ -1,5 +1,5 @@
 #include "base64.hh"
-#include "name.hh"
+#include "handle.hh"
 #include "sha256.hh"
 
 #include <iostream>
@@ -13,9 +13,9 @@ bool test()
 {
   int x = rand();
   string hash_x = sha256::encode( { reinterpret_cast<char*>( &x ), sizeof( int ) } );
-  Name name_x( hash_x, x, ContentType::Blob );
+  Handle name_x( hash_x, x, ContentType::Blob );
   string base64_encoded = base64::encode( name_x );
-  Name base64_decoded_name_x = base64::decode( base64_encoded );
+  Handle base64_decoded_name_x = base64::decode( base64_encoded );
   return ( base64_decoded_name_x == name_x );
 }
 

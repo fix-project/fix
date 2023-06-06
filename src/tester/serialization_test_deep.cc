@@ -31,75 +31,79 @@ int main()
   string c_file_1_name = "fixpoint";
   string c_file_1_content = "Hello, world!";
 
-  Name file_permission_blob
+  Handle file_permission_blob
     = runtime.add_blob( string_view( file_permission ) ); // all file dirents will have the same permissions
-  Name dir_permission_blob
+  Handle dir_permission_blob
     = runtime.add_blob( string_view( dir_permission ) ); // all dir dirents will have the same permissions
 
-  Name c_file_1_name_blob = runtime.add_blob( string_view( c_file_1_name ) );
-  Name c_file_1_content_blob = runtime.add_blob( string_view( c_file_1_content ) );
-  vector<Name> c_file_1_dirent { c_file_1_name_blob, file_permission_blob, c_file_1_content_blob };
-  Name c_file_1_dirent_name = runtime.add_tree( span_view<Name>( c_file_1_dirent.data(), c_file_1_dirent.size() ) );
+  Handle c_file_1_name_blob = runtime.add_blob( string_view( c_file_1_name ) );
+  Handle c_file_1_content_blob = runtime.add_blob( string_view( c_file_1_content ) );
+  vector<Handle> c_file_1_dirent { c_file_1_name_blob, file_permission_blob, c_file_1_content_blob };
+  Handle c_file_1_dirent_name
+    = runtime.add_tree( span_view<Handle>( c_file_1_dirent.data(), c_file_1_dirent.size() ) );
 
-  vector<Name> c_content { c_file_1_dirent_name };
-  Name c_content_tree = runtime.add_tree( span_view<Name>( c_content.data(), c_content.size() ) );
+  vector<Handle> c_content { c_file_1_dirent_name };
+  Handle c_content_tree = runtime.add_tree( span_view<Handle>( c_content.data(), c_content.size() ) );
 
-  Name directory_c_name_blob = runtime.add_blob( string_view( directory_c_name ) );
-  vector<Name> directory_c_dirent = { directory_c_name_blob, dir_permission_blob, c_content_tree };
-  Name directory_c_dirent_name
-    = runtime.add_tree( span_view<Name>( directory_c_dirent.data(), directory_c_dirent.size() ) );
+  Handle directory_c_name_blob = runtime.add_blob( string_view( directory_c_name ) );
+  vector<Handle> directory_c_dirent = { directory_c_name_blob, dir_permission_blob, c_content_tree };
+  Handle directory_c_dirent_name
+    = runtime.add_tree( span_view<Handle>( directory_c_dirent.data(), directory_c_dirent.size() ) );
 
-  Name hello_file_1_name_blob = runtime.add_blob( string_view( hello_file_1_name ) );
-  Name hello_file_1_content_blob = runtime.add_blob( string_view( hello_file_1_content ) );
-  vector<Name> hello_file_1_dirent { hello_file_1_name_blob, file_permission_blob, hello_file_1_content_blob };
-  Name hello_file_1_dirent_name
-    = runtime.add_tree( span_view<Name>( hello_file_1_dirent.data(), hello_file_1_dirent.size() ) );
+  Handle hello_file_1_name_blob = runtime.add_blob( string_view( hello_file_1_name ) );
+  Handle hello_file_1_content_blob = runtime.add_blob( string_view( hello_file_1_content ) );
+  vector<Handle> hello_file_1_dirent { hello_file_1_name_blob, file_permission_blob, hello_file_1_content_blob };
+  Handle hello_file_1_dirent_name
+    = runtime.add_tree( span_view<Handle>( hello_file_1_dirent.data(), hello_file_1_dirent.size() ) );
 
-  vector<Name> hello_content { hello_file_1_dirent_name };
-  Name hello_content_tree = runtime.add_tree( span_view<Name>( hello_content.data(), hello_content.size() ) );
+  vector<Handle> hello_content { hello_file_1_dirent_name };
+  Handle hello_content_tree = runtime.add_tree( span_view<Handle>( hello_content.data(), hello_content.size() ) );
 
-  Name b_directory_1_name_blob = runtime.add_blob( string_view( b_directory_1_name ) );
-  vector<Name> b_directory_1_dirent = { b_directory_1_name_blob, dir_permission_blob, hello_content_tree };
-  Name b_directory_1_dirent_name
-    = runtime.add_tree( span_view<Name>( b_directory_1_dirent.data(), b_directory_1_dirent.size() ) );
+  Handle b_directory_1_name_blob = runtime.add_blob( string_view( b_directory_1_name ) );
+  vector<Handle> b_directory_1_dirent = { b_directory_1_name_blob, dir_permission_blob, hello_content_tree };
+  Handle b_directory_1_dirent_name
+    = runtime.add_tree( span_view<Handle>( b_directory_1_dirent.data(), b_directory_1_dirent.size() ) );
 
-  Name b_file_1_name_blob = runtime.add_blob( string_view( b_file_1_name ) );
-  Name b_file_1_content_blob = runtime.add_blob( string_view( b_file_1_content ) );
-  vector<Name> b_file_1_dirent = { b_file_1_name_blob, file_permission_blob, b_file_1_content_blob };
-  Name b_file_1_dirent_name = runtime.add_tree( span_view<Name>( b_file_1_dirent.data(), b_file_1_dirent.size() ) );
+  Handle b_file_1_name_blob = runtime.add_blob( string_view( b_file_1_name ) );
+  Handle b_file_1_content_blob = runtime.add_blob( string_view( b_file_1_content ) );
+  vector<Handle> b_file_1_dirent = { b_file_1_name_blob, file_permission_blob, b_file_1_content_blob };
+  Handle b_file_1_dirent_name
+    = runtime.add_tree( span_view<Handle>( b_file_1_dirent.data(), b_file_1_dirent.size() ) );
 
-  vector<Name> b_content { b_file_1_dirent_name, directory_c_dirent_name, b_directory_1_dirent_name };
-  Name b_content_tree = runtime.add_tree( span_view<Name>( b_content.data(), b_content.size() ) );
+  vector<Handle> b_content { b_file_1_dirent_name, directory_c_dirent_name, b_directory_1_dirent_name };
+  Handle b_content_tree = runtime.add_tree( span_view<Handle>( b_content.data(), b_content.size() ) );
 
-  Name directory_b_name_blob = runtime.add_blob( string_view( directory_b_name ) );
-  vector<Name> directory_b_dirent = { directory_b_name_blob, dir_permission_blob, b_content_tree };
-  Name directory_b_dirent_name
-    = runtime.add_tree( span_view<Name>( directory_b_dirent.data(), directory_b_dirent.size() ) );
+  Handle directory_b_name_blob = runtime.add_blob( string_view( directory_b_name ) );
+  vector<Handle> directory_b_dirent = { directory_b_name_blob, dir_permission_blob, b_content_tree };
+  Handle directory_b_dirent_name
+    = runtime.add_tree( span_view<Handle>( directory_b_dirent.data(), directory_b_dirent.size() ) );
 
-  Name a_file_1_name_blob = runtime.add_blob( string_view( a_file_1_name ) );
-  Name a_file_1_content_blob = runtime.add_blob( string_view( a_file_1_content ) );
-  vector<Name> a_file_1_dirent { a_file_1_name_blob, file_permission_blob, a_file_1_content_blob };
-  Name a_file_1_dirent_name = runtime.add_tree( span_view<Name>( a_file_1_dirent.data(), a_file_1_dirent.size() ) );
+  Handle a_file_1_name_blob = runtime.add_blob( string_view( a_file_1_name ) );
+  Handle a_file_1_content_blob = runtime.add_blob( string_view( a_file_1_content ) );
+  vector<Handle> a_file_1_dirent { a_file_1_name_blob, file_permission_blob, a_file_1_content_blob };
+  Handle a_file_1_dirent_name
+    = runtime.add_tree( span_view<Handle>( a_file_1_dirent.data(), a_file_1_dirent.size() ) );
 
-  Name a_file_2_name_blob = runtime.add_blob( string_view( a_file_2_name ) );
-  Name a_file_2_content_blob = runtime.add_blob( string_view( a_file_2_content ) );
-  vector<Name> a_file_2_dirent { a_file_2_name_blob, file_permission_blob, a_file_2_content_blob };
-  Name a_file_2_dirent_name = runtime.add_tree( span_view<Name>( a_file_2_dirent.data(), a_file_2_dirent.size() ) );
+  Handle a_file_2_name_blob = runtime.add_blob( string_view( a_file_2_name ) );
+  Handle a_file_2_content_blob = runtime.add_blob( string_view( a_file_2_content ) );
+  vector<Handle> a_file_2_dirent { a_file_2_name_blob, file_permission_blob, a_file_2_content_blob };
+  Handle a_file_2_dirent_name
+    = runtime.add_tree( span_view<Handle>( a_file_2_dirent.data(), a_file_2_dirent.size() ) );
 
-  vector<Name> a_content { directory_b_dirent_name, a_file_1_dirent_name, a_file_2_dirent_name };
-  Name a_content_tree = runtime.add_tree( span_view<Name>( a_content.data(), a_content.size() ) );
+  vector<Handle> a_content { directory_b_dirent_name, a_file_1_dirent_name, a_file_2_dirent_name };
+  Handle a_content_tree = runtime.add_tree( span_view<Handle>( a_content.data(), a_content.size() ) );
 
-  Name directory_a_name_blob = runtime.add_blob( string_view( directory_a_name ) );
-  vector<Name> directory_a_dirent { directory_a_name_blob, dir_permission_blob, a_content_tree };
-  Name directory_a_dirent_name
-    = runtime.add_tree( span_view<Name>( directory_a_dirent.data(), directory_a_dirent.size() ) );
+  Handle directory_a_name_blob = runtime.add_blob( string_view( directory_a_name ) );
+  vector<Handle> directory_a_dirent { directory_a_name_blob, dir_permission_blob, a_content_tree };
+  Handle directory_a_dirent_name
+    = runtime.add_tree( span_view<Handle>( directory_a_dirent.data(), directory_a_dirent.size() ) );
 
-  vector<Name> home_content { directory_a_dirent_name };
-  Name home_content_tree = runtime.add_tree( span_view<Name>( home_content.data(), home_content.size() ) );
+  vector<Handle> home_content { directory_a_dirent_name };
+  Handle home_content_tree = runtime.add_tree( span_view<Handle>( home_content.data(), home_content.size() ) );
 
-  Name home_directory_blob = runtime.add_blob( string_view( home_directory_name ) );
-  vector<Name> home_dirent { home_directory_blob, dir_permission_blob, home_content_tree };
-  Name home_dirent_name = runtime.add_tree( span_view<Name>( home_dirent.data(), home_dirent.size() ) );
+  Handle home_directory_blob = runtime.add_blob( string_view( home_directory_name ) );
+  vector<Handle> home_dirent { home_directory_blob, dir_permission_blob, home_content_tree };
+  Handle home_dirent_name = runtime.add_tree( span_view<Handle>( home_dirent.data(), home_dirent.size() ) );
 
   cout << "Serialized home directory: " << runtime.serialize( home_dirent_name ) << endl;
 

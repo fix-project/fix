@@ -2,19 +2,19 @@
 
 #include <atomic>
 
-#include "name.hh"
+#include "handle.hh"
 
 struct Entry
 {
-  Name name;
+  Handle name;
   std::shared_ptr<std::atomic<int64_t>> pending;
 
-  Entry( Name name, int64_t pending )
+  Entry( Handle name, int64_t pending )
     : name( name )
     , pending( new std::atomic<int64_t>( pending ) )
   {}
 
-  Entry( Name name )
+  Entry( Handle name )
     : name( name )
     , pending()
   {}

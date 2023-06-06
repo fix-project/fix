@@ -7,7 +7,6 @@
 
 #include "add.hh"
 #include "mmap.hh"
-#include "name.hh"
 #include "runtimestorage.hh"
 #include "timer.hh"
 
@@ -28,8 +27,8 @@ char* add_program_name;
 char* add_cycle_program_name;
 
 auto& runtime = RuntimeStorage::get_instance();
-Name add_fixpoint_thunk[INIT_INSTANCE];
-Name add_wasi_thunk[INIT_INSTANCE];
+Handle add_fixpoint_thunk[INIT_INSTANCE];
+Handle add_wasi_thunk[INIT_INSTANCE];
 
 #define ADD_TEST( func, message )                                                                                  \
   {                                                                                                                \
@@ -86,13 +85,13 @@ int main( int argc, char* argv[] )
 
   ReadOnlyFile add_fixpoint_content { argv[3] };
   ReadOnlyFile add_wasi_content { argv[4] };
-  Name add_fixpoint_function = runtime.add_blob( string_view( add_fixpoint_content ) );
-  Name add_wasi_function = runtime.add_blob( string_view( add_wasi_content ) );
+  Handle add_fixpoint_function = runtime.add_blob( string_view( add_fixpoint_content ) );
+  Handle add_wasi_function = runtime.add_blob( string_view( add_wasi_content ) );
   runtime.populate_program( add_fixpoint_function );
   runtime.populate_program( add_wasi_function );
 
   const char* add_content = "add";
-  Name add_char = runtime.add_blob( string_view( add_content, strlen( add_content ) + 1 ) );
+  Handle add_char = runtime.add_blob( string_view( add_content, strlen( add_content ) + 1 ) );
 
 #if TIME_FIXPOINT == 1
   baseline_function();
@@ -110,47 +109,47 @@ int main( int argc, char* argv[] )
 
   // Populate encodes
   for ( int i = 0; i < INIT_INSTANCE; i++ ) {
-    Name arg1 = runtime.add_blob( make_blob( string_view( arguments[i].a, 2 ) ) );
-    Name arg2 = runtime.add_blob( make_blob( string_view( arguments[i].b, 2 ) ) );
+    Handle arg1 = runtime.add_blob( make_blob( string_view( arguments[i].a, 2 ) ) );
+    Handle arg2 = runtime.add_blob( make_blob( string_view( arguments[i].b, 2 ) ) );
 
-    Tree_ptr fix_encode { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 4 ) ) };
+    Tree_ptr fix_encode { static_cast<Handle*>( aligned_alloc( alignof( Handle ), sizeof( Handle ) * 4 ) ) };
     if ( not fix_encode ) {
       throw bad_alloc();
     }
-    Tree_ptr wasi_args { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 3 ) ) };
+    Tree_ptr wasi_args { static_cast<Handle*>( aligned_alloc( alignof( Handle ), sizeof( Handle ) * 3 ) ) };
     if ( not wasi_args ) {
       throw bad_alloc();
     }
-    Tree_ptr wasi_encode { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 3 ) ) };
+    Tree_ptr wasi_encode { static_cast<Handle*>( aligned_alloc( alignof( Handle ), sizeof( Handle ) * 3 ) ) };
     if ( not wasi_encode ) {
       throw bad_alloc();
     }
 
-    fix_encode.get()[0] = Name( "empty" );
+    fix_encode.get()[0] = Handle( "empty" );
     fix_encode.get()[1] = add_fixpoint_function;
     fix_encode.get()[2] = arg1;
     fix_encode.get()[3] = arg2;
 
-    Name fix_encode_name = runtime.add_tree( { move( fix_encode ), 4 } );
+    Handle fix_encode_name = runtime.add_tree( { std::move( fix_encode ), 4 } );
 
     Thunk fix_thunk( fix_encode_name );
-    Name fix_thunk_name = runtime.add_thunk( fix_thunk );
+    Handle fix_thunk_name = runtime.add_thunk( fix_thunk );
 
     add_fixpoint_thunk[i] = fix_thunk_name;
 
     wasi_args.get()[0] = add_char;
     wasi_args.get()[1] = arg1;
     wasi_args.get()[2] = arg2;
-    Name wasi_args_name = runtime.add_tree( { move( wasi_args ), 3 } );
+    Handle wasi_args_name = runtime.add_tree( { std::move( wasi_args ), 3 } );
 
-    wasi_encode.get()[0] = Name( "empty" );
+    wasi_encode.get()[0] = Handle( "empty" );
     wasi_encode.get()[1] = add_wasi_function;
     wasi_encode.get()[2] = wasi_args_name;
 
-    Name wasi_encode_name = runtime.add_tree( { move( wasi_encode ), 3 } );
+    Handle wasi_encode_name = runtime.add_tree( { std::move( wasi_encode ), 3 } );
 
     Thunk wasi_thunk( wasi_encode_name );
-    Name wasi_thunk_name = runtime.add_thunk( wasi_thunk );
+    Handle wasi_thunk_name = runtime.add_thunk( wasi_thunk );
 
     add_wasi_thunk[i] = wasi_thunk_name;
   }

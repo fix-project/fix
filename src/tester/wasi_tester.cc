@@ -3,7 +3,6 @@
 
 #include "base64.hh"
 #include "mmap.hh"
-#include "name.hh"
 #include "option-parser.hh"
 #include "runtimestorage.hh"
 
@@ -73,31 +72,31 @@ int main( int argc, char* argv[] )
 
   auto& runtime = RuntimeStorage::get_instance();
 
-  Name wasm_name = runtime.add_blob( string_view( wasm_content ) );
+  Handle wasm_name = runtime.add_blob( string_view( wasm_content ) );
 
-  vector<Name> encode;
-  encode.push_back( Name( "empty" ) );
+  vector<Handle> encode;
+  encode.push_back( Handle( "empty" ) );
   encode.push_back( wasm_name );
 
-  vector<Name> args;
+  vector<Handle> args;
   for ( const char* argument : arguments ) {
-    Name arg_name = runtime.add_blob( string_view( argument, strlen( argument ) + 1 ) );
+    Handle arg_name = runtime.add_blob( string_view( argument, strlen( argument ) + 1 ) );
     args.push_back( arg_name );
   }
-  Name args_name = runtime.add_tree( span_view<Name>( args.data(), args.size() ) );
+  Handle args_name = runtime.add_tree( span_view<Handle>( args.data(), args.size() ) );
   encode.push_back( args_name );
 
   if ( home_directory_64.length() != 0 ) {
     runtime.deserialize();
-    Name home_dir = base64::decode( home_directory_64 );
+    Handle home_dir = base64::decode( home_directory_64 );
     encode.push_back( home_dir );
   }
 
-  Name encode_name = runtime.add_tree( span_view<Name>( encode.data(), encode.size() ) );
+  Handle encode_name = runtime.add_tree( span_view<Handle>( encode.data(), encode.size() ) );
 
   Thunk thunk( encode_name );
-  Name thunk_name = runtime.add_thunk( thunk );
-  Name res_name = runtime.force_thunk( thunk_name );
+  Handle thunk_name = runtime.add_thunk( thunk );
+  Handle res_name = runtime.force_thunk( thunk_name );
 
   if ( res_name.is_blob() ) {
     cout << dec;

@@ -11,7 +11,7 @@
 #include "concurrent_vector.hh"
 #include "entry.hh"
 #include "fixcache.hh"
-#include "name.hh"
+#include "handle.hh"
 #include "object.hh"
 #include "program.hh"
 #include "spans.hh"
@@ -23,14 +23,14 @@ class RuntimeStorage
 {
 private:
   friend class RuntimeWorker;
-  friend class Job;
+  friend struct Job;
 
   fixcache fix_cache_;
 
-  // Maps a Wasm function Name to corresponding compiled Program
+  // Maps a Wasm function Handle to corresponding compiled Program
   InMemoryStorage<Program> name_to_program_;
 
-  // Storage for Object/Names with a local name
+  // Storage for Object/Handles with a local name
   concurrent_vector<Object> local_storage_;
 
   std::vector<std::unique_ptr<RuntimeWorker>> workers_;
@@ -85,39 +85,37 @@ public:
   bool steal_work( Job& job, size_t tid );
 
   // add blob
-  Name add_blob( Blob&& blob );
+  Handle add_blob( Blob&& blob );
 
   // Return reference to blob content
-  std::string_view get_blob( Name name );
-  std::string_view user_get_blob( const Name& name );
+  std::string_view get_blob( Handle name );
+  std::string_view user_get_blob( const Handle& name );
 
   // add Tree
-  Name add_tree( Tree&& tree );
+  Handle add_tree( Tree&& tree );
 
   // Return reference to Tree
-  span_view<Name> get_tree( Name name );
-
-  ObjectOrName& get_tree_obj( Name name );
+  span_view<Handle> get_tree( Handle name );
 
   // add Thunk
-  Name add_thunk( Thunk thunk );
+  Handle add_thunk( Thunk thunk );
 
   // Blocking force operations
-  Name force_thunk( Name name );
+  Handle force_thunk( Handle name );
 
   // Blocking eval operations
-  Name eval_thunk( Name name );
+  Handle eval_thunk( Handle name );
 
   // Return encode name referred to by thunk
-  Name get_thunk_encode_name( Name thunk_name );
+  Handle get_thunk_encode_name( Handle thunk_name );
 
   // Populate a program
-  void populate_program( Name function_name );
+  void populate_program( Handle function_name );
 
-  void add_program( Name function_name, std::string_view elf_content );
+  void add_program( Handle function_name, std::string_view elf_content );
 
-  Name local_to_storage( Name name );
+  Handle local_to_storage( Handle name );
 
-  std::string serialize( Name name );
+  std::string serialize( Handle name );
   void deserialize();
 };

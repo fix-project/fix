@@ -26,10 +26,10 @@
 class fixcache
 {
 private:
-  absl::flat_hash_map<Name, Entry, NameHash> fixcache_;
+  absl::flat_hash_map<Handle, Entry, AbslHash> fixcache_;
   std::shared_mutex fixcache_mutex_;
 
-  void insert_dependency( Name name, Name value, bool start_after )
+  void insert_dependency( Handle name, Handle value, bool start_after )
   {
     for ( size_t i = 1;; ++i ) {
       name.set_index( i );
@@ -42,22 +42,22 @@ private:
     }
   }
 
-  bool is_complete( Name name )
+  bool is_complete( Handle name )
   {
     return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == COMPLETE;
   }
 
-  bool is_pending( Name name )
+  bool is_pending( Handle name )
   {
     return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == PENDING;
   }
 
-  bool is_running( Name name )
+  bool is_running( Handle name )
   {
     return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == RUNNING;
   }
 
-  bool start_job( Name name )
+  bool start_job( Handle name )
   {
     if ( fixcache_.contains( name ) ) {
       int64_t job_pending = PENDING;
@@ -74,44 +74,44 @@ public:
     , fixcache_mutex_()
   {}
 
-  Entry& at( Name name )
+  Entry& at( Handle name )
   {
     std::shared_lock lock( fixcache_mutex_ );
     return fixcache_.at( name );
   }
 
-  bool contains( Name name )
+  bool contains( Handle name )
   {
     std::shared_lock lock( fixcache_mutex_ );
     return fixcache_.contains( name );
   }
 
-  Name get_name( Name name )
+  Handle get_name( Handle name )
   {
     std::shared_lock lock( fixcache_mutex_ );
     return fixcache_.at( name ).name;
   }
 
-  std::shared_ptr<std::atomic<int64_t>> get_pending( Name name )
+  std::shared_ptr<std::atomic<int64_t>> get_pending( Handle name )
   {
     std::shared_lock lock( fixcache_mutex_ );
     return fixcache_.at( name ).pending;
   }
 
-  void insert_or_assign( Name name, Name value )
+  void insert_or_assign( Handle name, Handle value )
   {
     std::unique_lock lock( fixcache_mutex_ );
     fixcache_.insert_or_assign( name, Entry( value ) );
   }
 
-  void set_name( Name name, Name value )
+  void set_name( Handle name, Handle value )
   {
     std::unique_lock lock( fixcache_mutex_ );
     Entry& entry = fixcache_.at( name );
     entry.name = value;
   }
 
-  bool start_after( Name name, Name requestor )
+  bool start_after( Handle name, Handle requestor )
   {
     std::unique_lock lock( fixcache_mutex_ );
     if ( is_complete( name ) ) {
@@ -122,7 +122,7 @@ public:
     return true;
   }
 
-  std::optional<Name> continue_after( Name name, Name requestor )
+  std::optional<Handle> continue_after( Handle name, Handle requestor )
   {
     std::unique_lock lock( fixcache_mutex_ );
     if ( is_complete( name ) ) {
@@ -135,7 +135,7 @@ public:
     return {};
   }
 
-  int try_run( Name name, Name requestor )
+  int try_run( Handle name, Handle requestor )
   {
     std::unique_lock lock( fixcache_mutex_ );
     if ( is_complete( name ) ) {
@@ -153,7 +153,7 @@ public:
     return 0;
   }
 
-  void pending_start( Name name, Name arg, int64_t pending )
+  void pending_start( Handle name, Handle arg, int64_t pending )
   {
     std::unique_lock lock( fixcache_mutex_ );
     if ( !is_complete( name ) ) {
@@ -161,7 +161,7 @@ public:
     }
   }
 
-  bool try_wait( Name name )
+  bool try_wait( Handle name )
   {
     std::unique_lock lock( fixcache_mutex_ );
     if ( is_complete( name ) ) {
@@ -175,7 +175,7 @@ public:
     return true;
   }
 
-  bool change_status_to_completed( Name name, Name value )
+  bool change_status_to_completed( Handle name, Handle value )
   {
     std::unique_lock lock( fixcache_mutex_ );
     bool result = false;
@@ -194,14 +194,14 @@ public:
     return result;
   }
 
-  std::queue<std::pair<Name, Name>> update_pending_jobs( Name name )
+  std::queue<std::pair<Handle, Handle>> update_pending_jobs( Handle name )
   {
-    Name dependency = name;
-    std::queue<std::pair<Name, Name>> result;
+    Handle dependency = name;
+    std::queue<std::pair<Handle, Handle>> result;
     for ( int i = 1;; ++i ) {
       dependency.set_index( i );
       if ( contains( dependency ) ) {
-        Name requestor = get_name( dependency );
+        Handle requestor = get_name( dependency );
         if ( get_pending( dependency )->load() == 1 ) {
           // Start after
           std::shared_ptr<std::atomic<int64_t>> pending = get_pending( requestor );
@@ -222,7 +222,7 @@ public:
     return result;
   }
 
-  std::queue<std::pair<Name, Name>> complete( Name name, Name value )
+  std::queue<std::pair<Handle, Handle>> complete( Handle name, Handle value )
   {
     if ( change_status_to_completed( name, value ) ) {
       return update_pending_jobs( name );

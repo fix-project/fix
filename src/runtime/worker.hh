@@ -15,7 +15,7 @@ class RuntimeWorker
 {
 private:
   friend class RuntimeStorage;
-  friend class Job;
+  friend struct Job;
 
   boost::lockfree::queue<Job> jobs_;
 
@@ -27,7 +27,7 @@ private:
 
   RuntimeStorage& runtimestorage_;
 
-  void launch_jobs( std::queue<std::pair<Name, Name>> ready_jobs );
+  void launch_jobs( std::queue<std::pair<Handle, Handle>> ready_jobs );
 
 public:
   RuntimeWorker( size_t thread_id, RuntimeStorage& runtimestorage )
@@ -44,21 +44,21 @@ public:
 
   bool dequeue_job( Job& job );
 
-  void force( Name hash, Name name );
+  void force( Handle hash, Handle name );
 
-  void eval( Name hash, Name name );
+  void eval( Handle hash, Handle name );
 
-  void apply( Name hash, Name name );
+  void apply( Handle hash, Handle name );
 
-  void fill( Name hash, Name name );
+  void fill( Handle hash, Handle name );
 
-  void link( Name hash, Name name );
+  void link( Handle hash, Handle name );
 
-  void update_parent( Name name );
+  void update_parent( Handle name );
 
-  void progress( Name hash, Name name );
+  void progress( Handle hash, Handle name );
 
-  bool resolve_parent( Name hash, Name name );
+  bool resolve_parent( Handle hash, Handle name );
 
   // Continue computing work if work exists in tasks_ or can be stolen
   void work();

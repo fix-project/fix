@@ -30,28 +30,29 @@ int main( int argc, char* argv[] )
   runtime.deserialize();
 
   array<std::string, 5> tasks = { "wasm-to-c-fix", "c-to-elf-fix", "link-elfs-fix", "compile", "map" };
-  vector<Name> wasm_names;
+  vector<Handle> wasm_names;
   for ( auto task : tasks ) {
     ReadOnlyFile wasm_file { boot_path + "/" + task + "-wasm" };
     wasm_names.push_back( base64::decode( string( wasm_file ) ) );
   }
   ReadOnlyFile compile_tool { boot_path + "/compile-tool" };
-  Name compile_tool_name( base64::decode( string( compile_tool ) ) );
+  Handle compile_tool_name( base64::decode( string( compile_tool ) ) );
 
   // Apply compile-tool to each wasm
-  vector<Name> new_elf_names;
+  vector<Handle> new_elf_names;
   size_t index = 0;
   for ( auto task : tasks ) {
-    vector<Name> compile_encode;
-    compile_encode.push_back( Name( "empty" ) );
+    vector<Handle> compile_encode;
+    compile_encode.push_back( Handle( "empty" ) );
     compile_encode.push_back( compile_tool_name );
     compile_encode.push_back( wasm_names[index] );
     index++;
-    Name compile_encode_name = runtime.add_tree( span_view<Name>( compile_encode.data(), compile_encode.size() ) );
+    Handle compile_encode_name
+      = runtime.add_tree( span_view<Handle>( compile_encode.data(), compile_encode.size() ) );
 
     Thunk compile_thunk( compile_encode_name );
-    Name compile_thunk_name = runtime.add_thunk( compile_thunk );
-    Name output_elf_name = runtime.force_thunk( compile_thunk_name );
+    Handle compile_thunk_name = runtime.add_thunk( compile_thunk );
+    Handle output_elf_name = runtime.force_thunk( compile_thunk_name );
     new_elf_names.push_back( output_elf_name );
   }
 

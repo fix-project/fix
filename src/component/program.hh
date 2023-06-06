@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "name.hh"
+#include "handle.hh"
 #include "parser.hh"
 #include "spans.hh"
 #include "wasm-rt.h"
@@ -76,7 +76,7 @@ public:
 
   size_t get_instance_and_context_size() const { return instance_context_size_; }
 
-  __m256i execute( Name encode_name )
+  __m256i execute( Handle encode_name )
   {
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );

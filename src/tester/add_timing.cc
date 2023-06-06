@@ -1,8 +1,8 @@
 #include <iostream>
 #include <string>
 
+#include "handle.hh"
 #include "mmap.hh"
-#include "name.hh"
 #include "runtimestorage.hh"
 #include "timer.hh"
 
@@ -18,7 +18,7 @@ struct addend
 
 addend arguments[INIT_INSTANCE];
 auto& runtime = RuntimeStorage::get_instance();
-Name add_fixpoint_thunk[INIT_INSTANCE];
+Handle add_fixpoint_thunk[INIT_INSTANCE];
 
 addend make_addend( int i )
 {
@@ -36,7 +36,7 @@ int main( int argc, char* argv[] )
 
   ReadOnlyFile wasm_content { argv[1] };
 
-  Name add_name = runtime.add_blob( string_view( wasm_content ) );
+  Handle add_name = runtime.add_blob( string_view( wasm_content ) );
   runtime.populate_program( add_name );
 
   // Populate addends
@@ -46,23 +46,23 @@ int main( int argc, char* argv[] )
 
   // Populate encodes
   for ( int i = 0; i < INIT_INSTANCE; i++ ) {
-    Name arg1 = runtime.add_blob( make_blob( arguments[i].a ) );
-    Name arg2 = runtime.add_blob( make_blob( arguments[i].b ) );
+    Handle arg1 = runtime.add_blob( make_blob( arguments[i].a ) );
+    Handle arg2 = runtime.add_blob( make_blob( arguments[i].b ) );
 
-    Tree_ptr fix_encode { static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * 4 ) ) };
+    Tree_ptr fix_encode { static_cast<Handle*>( aligned_alloc( alignof( Handle ), sizeof( Handle ) * 4 ) ) };
     if ( not fix_encode ) {
       throw bad_alloc();
     }
 
-    fix_encode.get()[0] = Name( "empty" );
+    fix_encode.get()[0] = Handle( "empty" );
     fix_encode.get()[1] = add_name;
     fix_encode.get()[2] = arg1;
     fix_encode.get()[3] = arg2;
 
-    Name fix_encode_name = runtime.add_tree( { move( fix_encode ), 4 } );
+    Handle fix_encode_name = runtime.add_tree( { std::move( fix_encode ), 4 } );
 
     Thunk fix_thunk( fix_encode_name );
-    Name fix_thunk_name = runtime.add_thunk( fix_thunk );
+    Handle fix_thunk_name = runtime.add_thunk( fix_thunk );
     add_fixpoint_thunk[i] = fix_thunk_name;
   }
 

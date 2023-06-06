@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-#include "name.hh"
+#include "handle.hh"
 
 #define NONE 0x00
 #define APPLY 0x01
@@ -13,10 +13,10 @@
 
 struct Job
 {
-  Name name;
-  Name hash;
+  Handle name;
+  Handle hash;
 
-  Job( Name name, Name hash )
+  Job( Handle name, Handle hash )
     : name( name )
     , hash( hash )
   {}

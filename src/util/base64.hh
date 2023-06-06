@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <immintrin.h>
 #include <iostream>
 #include <stdexcept>

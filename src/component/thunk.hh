@@ -3,19 +3,19 @@
 #include <string>
 #include <vector>
 
-#include "name.hh"
+#include "handle.hh"
 
 class Thunk
 {
 private:
-  // Name of the Encode
-  Name encode_name_;
+  // Handle of the Encode
+  Handle encode_name_;
 
 public:
   // Constructor
-  Thunk( const Name encode_name )
+  Thunk( const Handle encode_name )
     : encode_name_( encode_name )
   {}
 
-  const Name get_encode() const { return encode_name_; }
+  const Handle get_encode() const { return encode_name_; }
 };

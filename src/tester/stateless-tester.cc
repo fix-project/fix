@@ -7,7 +7,6 @@
 
 #include "base64.hh"
 #include "mmap.hh"
-#include "name.hh"
 #include "runtimestorage.hh"
 
 using namespace std;
@@ -16,13 +15,13 @@ template<integral T>
 T to_int( const string_view str );
 template<integral T>
 T from_int( const string_view str );
-Name parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files );
+Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files );
 
 struct pretty_print
 {
-  Name name;
+  Handle name;
   unsigned int level;
-  pretty_print( Name name, unsigned int level = 0 )
+  pretty_print( Handle name, unsigned int level = 0 )
     : name( name )
     , level( level )
   {}
@@ -40,7 +39,7 @@ void program_body( span_view<char*> args )
   args.remove_prefix( 1 ); // ignore argv[ 0 ]
 
   // make the combination from the given arguments
-  Name encode_name = parse_args( args, open_files );
+  Handle encode_name = parse_args( args, open_files );
 
   if ( not args.empty() ) {
     throw runtime_error( "unexpected argument: "s + args.at( 0 ) );
@@ -52,16 +51,16 @@ void program_body( span_view<char*> args )
   auto& runtime = RuntimeStorage::get_instance();
 
   // make a Thunk that points to the combination
-  Name thunk_name = runtime.add_thunk( Thunk { encode_name } );
+  Handle thunk_name = runtime.add_thunk( Thunk { encode_name } );
 
   // force the Thunk and print it
-  Name result = runtime.eval_thunk( thunk_name );
+  Handle result = runtime.eval_thunk( thunk_name );
 
   // print the result
   cout << "Result:\n" << pretty_print( result );
 }
 
-Name parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
+Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
 {
   auto& runtime = RuntimeStorage::get_instance();
 
@@ -132,7 +131,7 @@ Name parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
       throw runtime_error( "thunk not refering a tree" );
     }
 
-    Name tree_name = parse_args( args, open_files );
+    Handle tree_name = parse_args( args, open_files );
     Thunk the_thunk( tree_name );
     return runtime.add_thunk( the_thunk );
   }
@@ -218,7 +217,7 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
       stream << to_string( i ) << ". " << pretty_print( view.at( i ), pp.level + 1 );
     }
   } else if ( pp.name.is_thunk() ) {
-    Name encode_name = runtime.get_thunk_encode_name( pp.name );
+    Handle encode_name = runtime.get_thunk_encode_name( pp.name );
     stream << ( terminal ? "\033[1;36mThunk\033[m" : "Thunk" ) << ":\n";
     for ( unsigned int i = 0; i < pp.level + 1; ++i ) {
       stream << "  ";

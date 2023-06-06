@@ -23,10 +23,10 @@ bool RuntimeStorage::steal_work( Job& job, size_t tid )
   return false;
 }
 
-Name RuntimeStorage::force_thunk( Name name )
+Handle RuntimeStorage::force_thunk( Handle name )
 {
-  Name desired( name, false, { FORCE } );
-  Name operations( name, true, { FORCE } );
+  Handle desired( name, false, { FORCE } );
+  Handle operations( name, true, { FORCE } );
 
   if ( fix_cache_.try_wait( desired ) ) {
     workers_[0].get()->queue_job( Job( name, operations ) );
@@ -41,10 +41,10 @@ Name RuntimeStorage::force_thunk( Name name )
   return fix_cache_.get_name( desired );
 }
 
-Name RuntimeStorage::eval_thunk( Name name )
+Handle RuntimeStorage::eval_thunk( Handle name )
 {
-  Name desired( name, false, { EVAL } );
-  Name operations( name, true, { EVAL } );
+  Handle desired( name, false, { EVAL } );
+  Handle operations( name, true, { EVAL } );
 
   if ( fix_cache_.try_wait( desired ) ) {
     workers_[0].get()->queue_job( Job( name, operations ) );
@@ -59,76 +59,76 @@ Name RuntimeStorage::eval_thunk( Name name )
   return fix_cache_.get_name( desired );
 }
 
-Name RuntimeStorage::add_blob( Blob&& blob )
+Handle RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 31 ) {
-    size_t local_id = local_storage_.push_back( move( blob ) );
-    Name name( local_id, blob.size(), ContentType::Blob );
+    size_t local_id = local_storage_.push_back( std::move( blob ) );
+    Handle name( local_id, blob.size(), ContentType::Blob );
     return name;
   } else {
-    Name name( blob );
+    Handle name( blob );
     return name;
   }
 }
 
-string_view RuntimeStorage::get_blob( Name name )
+string_view RuntimeStorage::get_blob( Handle name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
   } else if ( name.is_local() ) {
     return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Name local_name = fix_cache_.get_name( name );
+    Handle local_name = fix_cache_.get_name( name );
     return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Blob does not exist." );
 }
 
-string_view RuntimeStorage::user_get_blob( const Name& name )
+string_view RuntimeStorage::user_get_blob( const Handle& name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
   } else if ( name.is_local() ) {
     return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Name local_name = fix_cache_.get_name( name );
+    Handle local_name = fix_cache_.get_name( name );
     return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Blob does not exist." );
 }
 
-Name RuntimeStorage::add_tree( Tree&& tree )
+Handle RuntimeStorage::add_tree( Tree&& tree )
 {
-  size_t local_id = local_storage_.push_back( move( tree ) );
-  Name name( local_id, tree.size(), ContentType::Tree );
+  size_t local_id = local_storage_.push_back( std::move( tree ) );
+  Handle name( local_id, tree.size(), ContentType::Tree );
   return name;
 }
 
-span_view<Name> RuntimeStorage::get_tree( Name name )
+span_view<Handle> RuntimeStorage::get_tree( Handle name )
 {
   if ( name.is_local() ) {
     return get<Tree>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Name local_name = fix_cache_.get_name( name );
+    Handle local_name = fix_cache_.get_name( name );
     return get<Tree>( local_storage_.at( local_name.get_local_id() ) );
   }
 
   throw out_of_range( "Tree does not exist." );
 }
 
-Name RuntimeStorage::add_thunk( Thunk thunk )
+Handle RuntimeStorage::add_thunk( Thunk thunk )
 {
-  return Name::get_thunk_name( thunk.get_encode() );
+  return Handle::get_thunk_name( thunk.get_encode() );
 }
 
-Name RuntimeStorage::get_thunk_encode_name( Name thunk_name )
+Handle RuntimeStorage::get_thunk_encode_name( Handle thunk_name )
 {
-  return Name::get_encode_name( thunk_name );
+  return Handle::get_encode_name( thunk_name );
 }
 
-void RuntimeStorage::populate_program( Name function_name )
+void RuntimeStorage::populate_program( Handle function_name )
 {
   if ( not function_name.is_blob() ) {
     throw runtime_error( "ENCODE functions not yet supported" );
@@ -142,7 +142,7 @@ void RuntimeStorage::populate_program( Name function_name )
   return;
 }
 
-void RuntimeStorage::add_program( Name function_name, string_view elf_content )
+void RuntimeStorage::add_program( Handle function_name, string_view elf_content )
 {
   if ( not name_to_program_.contains( function_name ) ) {
     name_to_program_.put( function_name, link_program( elf_content ) );
@@ -151,7 +151,7 @@ void RuntimeStorage::add_program( Name function_name, string_view elf_content )
   return;
 }
 
-Name RuntimeStorage::local_to_storage( Name name )
+Handle RuntimeStorage::local_to_storage( Handle name )
 {
   if ( name.is_literal_blob() || !name.is_local() ) {
     return name;
@@ -163,12 +163,12 @@ Name RuntimeStorage::local_to_storage( Name name )
       if ( holds_alternative<Blob>( obj ) ) {
         string_view blob = get<Blob>( obj );
 
-        Name hash( sha256::encode( blob ), blob.size(), name.get_metadata() );
+        Handle hash( sha256::encode( blob ), blob.size(), ContentType::Blob );
         fix_cache_.insert_or_assign( hash, name );
 
         return hash;
       } else {
-        throw runtime_error( "Name type does not match content type" );
+        throw runtime_error( "Handle type does not match content type" );
       }
 
       break;
@@ -177,30 +177,30 @@ Name RuntimeStorage::local_to_storage( Name name )
     case ContentType::Tree: {
       const Object& obj = local_storage_.at( name.get_local_id() );
       if ( holds_alternative<Tree>( obj ) ) {
-        span_view<Name> orig_tree = get<Tree>( obj );
+        span_view<Handle> orig_tree = get<Tree>( obj );
 
-        Name new_name = add_tree( std::move( Tree( orig_tree.size() ) ) );
-        span_view<Name> tree = get_tree( new_name );
+        Handle new_name = add_tree( Tree( orig_tree.size() ) );
+        span_view<Handle> tree = get_tree( new_name );
 
         for ( size_t i = 0; i < tree.size(); ++i ) {
           auto entry = orig_tree[i];
           tree.mutable_data()[i] = local_to_storage( entry );
         }
 
-        string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Name ) );
-        Name hash( sha256::encode( view ), tree.size(), name.get_metadata() );
+        string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Handle ) );
+        Handle hash( sha256::encode( view ), tree.size(), ContentType::Tree );
 
         fix_cache_.insert_or_assign( hash, new_name );
 
         return hash;
       } else {
-        throw runtime_error( "Name type does not match content type" );
+        throw runtime_error( "Handle type does not match content type" );
       }
       break;
     }
 
     case ContentType::Thunk: {
-      return Name::get_thunk_name( local_to_storage( Name::get_encode_name( name ) ) );
+      return Handle::get_thunk_name( local_to_storage( Handle::get_encode_name( name ) ) );
     }
 
     default:
@@ -208,9 +208,9 @@ Name RuntimeStorage::local_to_storage( Name name )
   }
 }
 
-string RuntimeStorage::serialize( Name name )
+string RuntimeStorage::serialize( Handle name )
 {
-  Name new_name = local_to_storage( name );
+  Handle new_name = local_to_storage( name );
   string file_name = base64::encode( new_name );
   const filesystem::path dir { FIX_DIR };
   ofstream output_file( dir / file_name );
@@ -223,7 +223,7 @@ string RuntimeStorage::serialize( Name name )
     }
 
     case ContentType::Tree: {
-      span_view<Name> tree = get_tree( new_name );
+      span_view<Handle> tree = get_tree( new_name );
       for ( size_t i = 0; i < tree.size(); i++ ) {
         serialize( tree[i] );
       }
@@ -236,7 +236,7 @@ string RuntimeStorage::serialize( Name name )
     }
 
     case ContentType::Thunk: {
-      output_file << base64::encode( Name::get_encode_name( name ) );
+      output_file << base64::encode( Handle::get_encode_name( name ) );
       return file_name;
     }
 
@@ -252,7 +252,7 @@ void RuntimeStorage::deserialize()
   const filesystem::path dir { FIX_DIR };
 
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
-    Name name( base64::decode( file.path().filename().string() ) );
+    Handle name( base64::decode( file.path().filename().string() ) );
 
     if ( name.is_literal_blob() || name.is_local() || fix_cache_.contains( name ) ) {
       continue;
@@ -276,7 +276,7 @@ void RuntimeStorage::deserialize()
         input_file.read( buf, size );
 
         Blob blob( Blob_ptr( buf ), size );
-        Name local_id = add_blob( move( blob ) );
+        Handle local_id = add_blob( std::move( blob ) );
         fix_cache_.insert_or_assign( name, local_id );
 
         continue;
@@ -286,7 +286,7 @@ void RuntimeStorage::deserialize()
         input_file.seekg( 0, std::ios::end );
         size_t size = input_file.tellg();
         char* buf = static_cast<char*>( malloc( size ) );
-        Name* tree_buf = static_cast<Name*>( aligned_alloc( alignof( Name ), sizeof( Name ) * size / 43 ) );
+        Handle* tree_buf = static_cast<Handle*>( aligned_alloc( alignof( Handle ), sizeof( Handle ) * size / 43 ) );
         input_file.seekg( 0, std::ios::beg );
         input_file.read( reinterpret_cast<char*>( buf ), size );
 
@@ -297,7 +297,7 @@ void RuntimeStorage::deserialize()
         Tree tree( Tree_ptr( tree_buf ), size / 43 );
         free( buf );
 
-        Name local_id = add_tree( move( tree ) );
+        Handle local_id = add_tree( std::move( tree ) );
         fix_cache_.insert_or_assign( name, local_id );
 
         continue;

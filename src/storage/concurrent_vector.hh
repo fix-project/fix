@@ -1,6 +1,8 @@
 #pragma once
 
+#include <mutex>
 #include <shared_mutex>
+#include <vector>
 
 template<typename T>
 class concurrent_vector
@@ -15,13 +17,13 @@ public:
     , vector_mutex_()
   {}
 
-  T& at( const std::vector<T>::size_type pos )
+  T& at( const typename std::vector<T>::size_type pos )
   {
     std::shared_lock lock( vector_mutex_ );
     return vector_.at( pos );
   }
 
-  std::vector<T>::size_type size()
+  typename std::vector<T>::size_type size()
   {
     std::shared_lock lock( vector_mutex_ );
     return vector_.size();
