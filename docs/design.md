@@ -6,7 +6,7 @@ representations, and is either:
 * A Value, which is either:
   - Blob: a vector of bytes
   - Tree: a vector of Handles
-  - Tag: either a pair of Handles or a tuple of Handles
+  - Tag: a tuple of Handles
 
 * or a Thunk, which represents a Value by specifying a way to compute it.
   Internally, a Thunk contains a Tree (or a strict Handle to a Tree) in Encode
@@ -48,8 +48,6 @@ equivalent and indistinguishable.
 ## Tags:
 A Tag contains three entries, and can be created in two ways:
 
-  * Given *A*, creates a Tag \{*A*, *A*\} (the first entry is strict and the second
-  entry is lazy)
   * A procedure can create a Tag where the first entry can be anything, the second
   entry is a Blob, and the third entry is the Name of the ELF blob of the procedure.
 
@@ -187,9 +185,6 @@ them can be imported from the \"`fix`\" namespace:
   * `create_tag` (`externref -> externref -> externref`): Given Handle x and
     Handle y, return the Handle of a Tag \{x, y, procedure\}.
 
-  * `create_tautology_tag` (`externref->externref`): Given Handle x, return
-    the Handle of a Tag \{x, x\}.
-
   * `value_type` (`externref -> i32`): Retrieve type (Blob or Tree) from
     a strict or shallow Handle. If the Handle is a Blob or Tree, return the
     corresponding type. If the Handle is a Tag, return the type of the first
@@ -211,3 +206,6 @@ them can be imported from the \"`fix`\" namespace:
     returns the shallow Handle that points to the same Object. If the Handle is
     shallow, returns the lazy Handle that points to the same Object. If the
     Handle is lazy, returns the same Handle.
+
+  * `equality` (`externref -> externref -> bool`): Given two strict or shallow
+    Handles, return whether they are equivalent.
