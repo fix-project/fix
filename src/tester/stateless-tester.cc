@@ -223,6 +223,16 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
       stream << "  ";
     }
     stream << pretty_print( encode_name, pp.level + 1 );
+  } else if ( pp.name.is_tag() ) {
+    const auto view = runtime.get_tree( pp.name );
+    stream << ( terminal ? "\033[1;32mTag\033[m" : "Tag" ) << " (" << dec << view.size() << " entr"
+           << ( view.size() != 1 ? "ies" : "y" ) << "):\n";
+    for ( unsigned int i = 0; i < view.size(); ++i ) {
+      for ( unsigned int j = 0; j < pp.level + 1; ++j ) {
+        stream << "  ";
+      }
+      stream << to_string( i ) << ". " << pretty_print( view.at( i ), pp.level + 1 );
+    }
   } else {
     throw runtime_error( "can't pretty-print object" );
   }

@@ -67,6 +67,8 @@ Handle RuntimeStorage::add_blob( Blob&& blob )
     return name;
   } else {
     Handle name( blob );
+    std::cout << name.literal_blob() << std::endl;
+    std::cout << name << std::endl;
     return name;
   }
 }
@@ -103,6 +105,14 @@ Handle RuntimeStorage::add_tree( Tree&& tree )
 {
   size_t local_id = local_storage_.push_back( std::move( tree ) );
   Handle name( local_id, tree.size(), ContentType::Tree );
+  return name;
+}
+
+Handle RuntimeStorage::add_tag( Tree&& tree )
+{
+  assert( tree.size() == 3 );
+  size_t local_id = local_storage_.push_back( std::move( tree ) );
+  Handle name( local_id, tree.size(), ContentType::Tag );
   return name;
 }
 
@@ -298,6 +308,27 @@ void RuntimeStorage::deserialize()
         free( buf );
 
         Handle local_id = add_tree( std::move( tree ) );
+        fix_cache_.insert_or_assign( name, local_id );
+
+        continue;
+      }
+
+      case ContentType::Tag: {
+        input_file.seekg( 0, std::ios::end );
+        size_t size = input_file.tellg();
+        char* buf = static_cast<char*>( malloc( size ) );
+        Handle* tree_buf = static_cast<Handle*>( aligned_alloc( alignof( Handle ), sizeof( Handle ) * size / 43 ) );
+        input_file.seekg( 0, std::ios::beg );
+        input_file.read( reinterpret_cast<char*>( buf ), size );
+
+        for ( size_t i = 0; i < size; i += 43 ) {
+          tree_buf[i / 43] = base64::decode( string( buf + i, 43 ) );
+        }
+
+        Tree tree( Tree_ptr( tree_buf ), size / 43 );
+        free( buf );
+
+        Handle local_id = add_tag( std::move( tree ) );
         fix_cache_.insert_or_assign( name, local_id );
 
         continue;

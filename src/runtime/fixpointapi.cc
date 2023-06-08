@@ -1,38 +1,40 @@
 #include "fixpointapi.hh"
+#include "base64.hh"
 #include "runtimestorage.hh"
+#include "wasm-rt.h"
 
 namespace fixpoint {
-void attach_tree( __m256i ro_handle, wasm_rt_externref_table_t* target_table )
+void attach_tree( __m256i handle, wasm_rt_externref_table_t* target_table )
 {
   GlobalScopeTimer<Timer::Category::AttachTree> record_timer;
-  Handle obj( ro_handle );
-  if ( obj.get_content_type() != ContentType::Tree || !obj.is_strict() ) {
-    throw std::runtime_error( "not an accessible tree" );
+  Handle tree_handle( handle );
+  if ( !( tree_handle.is_tree() || tree_handle.is_tag() ) || !tree_handle.is_strict() ) {
+    throw std::runtime_error( "not a strict tree" );
   }
-  auto tree = RuntimeStorage::get_instance().get_tree( obj );
-  target_table->ref = ro_handle;
+  auto tree = RuntimeStorage::get_instance().get_tree( tree_handle );
+  target_table->ref = tree_handle;
   target_table->data = reinterpret_cast<wasm_rt_externref_t*>( const_cast<Handle*>( tree.data() ) );
   target_table->size = tree.size();
   target_table->max_size = tree.size();
 }
 
-void attach_blob( __m256i ro_handle, wasm_rt_memory_t* target_memory )
+void attach_blob( __m256i handle, wasm_rt_memory_t* target_memory )
 {
   GlobalScopeTimer<Timer::Category::AttachBlob> record_timer;
-  Handle obj( ro_handle );
-  if ( obj.get_content_type() != ContentType::Blob || !obj.is_strict() ) {
-    throw std::runtime_error( "not an accessible blob" );
+  Handle blob_handle( handle );
+  if ( !blob_handle.is_blob() || !blob_handle.is_strict() ) {
+    throw std::runtime_error( "not a strict blob" );
   }
 
-  target_memory->ref = ro_handle;
+  target_memory->ref = blob_handle;
   std::string_view blob;
-  if ( obj.is_literal_blob() ) {
-    blob = { reinterpret_cast<const char*>( &target_memory->ref ), obj.literal_blob_len() };
+  if ( blob_handle.is_literal_blob() ) {
+    blob = { reinterpret_cast<const char*>( &target_memory->ref ), blob_handle.literal_blob_len() };
   } else {
-    blob = RuntimeStorage::get_instance().get_blob( (__m256i)obj );
+    blob = RuntimeStorage::get_instance().get_blob( blob_handle );
   }
 
-  target_memory->data = (uint8_t*)const_cast<char*>( blob.data() );
+  target_memory->data = reinterpret_cast<uint8_t*>( const_cast<char*>( blob.data() ) );
   target_memory->pages = ( blob.size() + WASM_RT_PAGE_SIZE - 1 ) / WASM_RT_PAGE_SIZE; // ceil(blob_size/page_size)
   target_memory->max_pages = target_memory->pages;
   target_memory->size = blob.size();
@@ -45,7 +47,6 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   if ( size > memory->size ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
-
   Blob_ptr data { reinterpret_cast<char*>( memory->data ) };
   memory->data = NULL;
   memory->pages = 0;
@@ -73,9 +74,23 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
   return RuntimeStorage::get_instance().add_tree( Tree( std::move( data ), size ) );
 }
 
-__m256i create_thunk( __m256i ro_handle )
+__m256i create_tag( __m256i handle, __m256i type )
 {
-  Handle encode( ro_handle );
+  GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
+
+  Handle new_name = RuntimeStorage::get_instance().add_tag( 3 );
+  span_view<Handle> tag = RuntimeStorage::get_instance().get_tree( new_name );
+
+  tag.mutable_data()[0] = handle;
+  tag.mutable_data()[1] = type;
+  tag.mutable_data()[2] = RuntimeStorage::get_instance().get_current_procedure();
+
+  return new_name;
+}
+
+__m256i create_thunk( __m256i handle )
+{
+  Handle encode( handle );
   return Handle::get_thunk_name( encode );
 }
 
@@ -83,6 +98,13 @@ uint32_t value_type( __m256i handle )
 {
   Handle object( handle );
   return static_cast<uint32_t>( object.get_content_type() );
+}
+
+uint32_t equality( __m256i lhs, __m256i rhs )
+{
+  Handle left( lhs );
+  Handle right( rhs );
+  return ( left == right );
 }
 
 void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )

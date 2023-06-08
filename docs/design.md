@@ -207,5 +207,6 @@ them can be imported from the \"`fix`\" namespace:
     shallow, returns the lazy Handle that points to the same Object. If the
     Handle is lazy, returns the same Handle.
 
-  * `equality` (`externref -> externref -> bool`): Given two strict or shallow
-    Handles, return whether they are equivalent.
+  * `get_name` (`externref -> (i64, i64, i64, i64)`): Given a strict or shallow
+    Blob Handle, return the canonical name of the Blob in the form of
+    `(i64, i64, i64, i64)`

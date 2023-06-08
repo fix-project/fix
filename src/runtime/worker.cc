@@ -95,6 +95,33 @@ void RuntimeWorker::eval( Handle hash, Handle name )
       break;
     }
 
+    case ContentType::Tag: {
+      auto orig_tag = runtimestorage_.get_tree( name );
+      auto first_entry = orig_tag[0];
+
+      if ( !first_entry.is_blob() ) {
+        Handle fill_operation( name, true, { FILL } );
+        Handle fill_desired( name, false, { FILL } );
+
+        runtimestorage_.fix_cache_.pending_start( fill_operation, name, 1 );
+        std::shared_ptr<std::atomic<int64_t>> pending = runtimestorage_.fix_cache_.get_pending( fill_operation );
+
+        Handle desired( first_entry, false, { EVAL } );
+        Handle operations( first_entry, true, { EVAL } );
+
+        runtimestorage_.fix_cache_.continue_after( fill_desired, hash );
+        if ( runtimestorage_.fix_cache_.start_after( desired, fill_operation ) ) {
+          queue_job( Job( first_entry, operations ) );
+        } else {
+          pending->fetch_sub( 1 );
+          progress( fill_operation, name );
+        }
+      } else {
+        progress( hash, name );
+      }
+      return;
+    }
+
     default: {
       throw std::runtime_error( "Invalid content type." );
     }
@@ -119,7 +146,8 @@ void RuntimeWorker::force( Handle hash, Handle name )
     }
 
     case ContentType::Blob:
-    case ContentType::Tree: {
+    case ContentType::Tree:
+    case ContentType::Tag: {
       progress( hash, name );
       break;
     }
@@ -131,18 +159,16 @@ void RuntimeWorker::force( Handle hash, Handle name )
 
 void RuntimeWorker::apply( Handle hash, Handle name )
 {
-  Handle function_name = runtimestorage_.get_tree( name ).at( 1 );
-  if ( not function_name.is_blob() ) {
-    if ( function_name.is_tree() ) {
-      function_name = runtimestorage_.get_tree( function_name ).at( 0 );
-      if ( not function_name.is_blob() ) {
-        throw std::runtime_error( "Multilevel ENCODE functions not yet supported" );
-      }
-    } else {
-      throw std::runtime_error( "Unevaled strict Thunk in apply(ENCODE). " );
-    }
+  Handle function_tag = runtimestorage_.get_tree( name ).at( 1 );
+  while ( !runtimestorage_.get_tree( function_tag ).at( 1 ).is_blob() ) {
+    function_tag = runtimestorage_.get_tree( function_tag ).at( 1 );
   }
 
+  auto tag = runtimestorage_.get_tree( function_tag );
+
+  // TODO: verify the tag is from the trusted compile-elf
+
+  Handle function_name = tag.at( 0 );
   Handle canonical_name = runtimestorage_.local_to_storage( function_name );
   if ( not runtimestorage_.name_to_program_.contains( canonical_name ) ) {
     /* Link program */
@@ -151,6 +177,7 @@ void RuntimeWorker::apply( Handle hash, Handle name )
   }
 
   auto& program = runtimestorage_.name_to_program_.getMutable( canonical_name );
+  runtimestorage_.set_current_procedure( canonical_name );
   __m256i output = program.execute( name );
   // Compute next operation
   progress( hash, output );
@@ -186,6 +213,21 @@ void RuntimeWorker::fill( Handle hash, Handle name )
           tree.mutable_data()[i] = runtimestorage_.fix_cache_.get_name( desired );
         }
       }
+
+      progress( hash, new_name );
+      return;
+    }
+
+    case ContentType::Tag: {
+      auto orig_tag = runtimestorage_.get_tree( name );
+      Handle new_name = runtimestorage_.add_tag( Tree( orig_tag.size() ) );
+      span_view<Handle> tag = runtimestorage_.get_tree( new_name );
+
+      auto first_entry = orig_tag[0];
+      Handle desired( first_entry, false, { EVAL } );
+      tag.mutable_data()[0] = runtimestorage_.fix_cache_.get_name( desired );
+      tag.mutable_data()[1] = orig_tag[1];
+      tag.mutable_data()[2] = orig_tag[2];
 
       progress( hash, new_name );
       return;

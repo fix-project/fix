@@ -19,6 +19,10 @@
 
 #include "absl/container/flat_hash_map.h"
 
+#ifndef TRUSTED
+#define TRUSTED
+#endif
+
 class RuntimeStorage
 {
 private:
@@ -41,6 +45,8 @@ private:
   std::atomic<bool> threads_started_;
 
   std::atomic<size_t> work_;
+
+  inline static thread_local Handle current_procedure_;
 
   RuntimeStorage()
     : fix_cache_()
@@ -94,6 +100,9 @@ public:
   // add Tree
   Handle add_tree( Tree&& tree );
 
+  // add Tag
+  Handle add_tag( Tree&& tree );
+
   // Return reference to Tree
   span_view<Handle> get_tree( Handle name );
 
@@ -118,4 +127,8 @@ public:
 
   std::string serialize( Handle name );
   void deserialize();
+
+  void set_current_procedure( const Handle function_name ) { current_procedure_ = function_name; }
+
+  Handle get_current_procedure() const { return current_procedure_; }
 };
