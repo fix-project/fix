@@ -67,8 +67,6 @@ Handle RuntimeStorage::add_blob( Blob&& blob )
     return name;
   } else {
     Handle name( blob );
-    std::cout << name.literal_blob() << std::endl;
-    std::cout << name << std::endl;
     return name;
   }
 }

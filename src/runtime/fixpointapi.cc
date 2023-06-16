@@ -82,8 +82,8 @@ __m256i create_tag( __m256i handle, __m256i type )
   span_view<Handle> tag = RuntimeStorage::get_instance().get_tree( new_name );
 
   tag.mutable_data()[0] = handle;
-  tag.mutable_data()[1] = type;
-  tag.mutable_data()[2] = RuntimeStorage::get_instance().get_current_procedure();
+  tag.mutable_data()[1] = RuntimeStorage::get_instance().get_current_procedure();
+  tag.mutable_data()[2] = type;
 
   return new_name;
 }
@@ -102,6 +102,7 @@ uint32_t value_type( __m256i handle )
 
 uint32_t equality( __m256i lhs, __m256i rhs )
 {
+  // XXX: proper equality
   Handle left( lhs );
   Handle right( rhs );
   return ( left == right );
