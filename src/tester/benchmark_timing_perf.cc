@@ -91,7 +91,7 @@ int main( int argc, char* argv[] )
     {
       GlobalScopeTimer<Timer::Category::Execution> record_timer;
       for ( int i = 0; i < INIT_INSTANCE; i++ ) {
-        runtime.force_thunk( add_fixpoint_thunk[i] );
+        runtime.eval_thunk( add_fixpoint_thunk[i] );
       }
     }
     global_timer().summary( cout );

@@ -6,7 +6,7 @@
 
 #define NONE 0x00
 #define APPLY 0x01
-#define FORCE 0x02
+#define MAKE_SHALLOW 0x02
 #define EVAL 0x03
 #define LINK 0x04
 #define FILL 0x05

@@ -44,6 +44,10 @@ void RuntimeWorker::eval( Handle hash, Handle name )
     }
 
     case ContentType::Tree: {
+      if ( !name.is_strict() ) {
+        progress( hash, name );
+        break;
+      }
       auto orig_tree = runtimestorage_.get_tree( name );
       Handle fill_operation( name, true, { FILL } );
       Handle fill_desired( name, false, { FILL } );
@@ -57,7 +61,7 @@ void RuntimeWorker::eval( Handle hash, Handle name )
       for ( size_t i = 0; i < orig_tree.size(); ++i ) {
         auto entry = orig_tree[i];
 
-        if ( entry.is_strict() && !entry.is_blob() ) {
+        if ( ( entry.is_strict() && !entry.is_blob() ) || ( entry.is_shallow() && entry.is_thunk() ) ) {
           to_fill = true;
 
           Handle desired( entry, false, { EVAL } );
@@ -90,18 +94,36 @@ void RuntimeWorker::eval( Handle hash, Handle name )
     }
 
     case ContentType::Thunk: {
-      Handle desired( name, false, { FORCE, EVAL } );
-      Handle operations( name, true, { EVAL, FORCE } );
+      if ( name.is_lazy() ) {
+        progress( hash, name );
+        return;
+      }
+      Handle encode_name = Handle::get_encode_name( name );
 
-      runtimestorage_.fix_cache_.continue_after( desired, hash );
+      if ( name.is_strict() ) {
+        Handle encode_desired( encode_name, false, { EVAL, APPLY } );
+        Handle encode_operations( encode_name, true, { APPLY, EVAL } );
 
-      progress( operations, name );
+        Handle operations( name, true, { EVAL } );
+        runtimestorage_.fix_cache_.continue_after( encode_desired, operations );
+        progress( encode_operations, encode_name );
+      } else {
+        Handle encode_desired( encode_name, false, { EVAL, APPLY, MAKE_SHALLOW } );
+        Handle encode_operations( encode_name, true, { MAKE_SHALLOW, APPLY, EVAL } );
 
-      // return eval(force(name))
+        Handle operations( name, true, { EVAL } );
+        runtimestorage_.fix_cache_.continue_after( encode_desired, operations );
+        progress( encode_operations, encode_name );
+      }
+
       break;
     }
 
     case ContentType::Tag: {
+      if ( !name.is_strict() ) {
+        progress( hash, name );
+        return;
+      }
       auto orig_tag = runtimestorage_.get_tree( name );
       auto first_entry = orig_tag[0];
 
@@ -128,35 +150,6 @@ void RuntimeWorker::eval( Handle hash, Handle name )
       return;
     }
 
-    default: {
-      throw std::runtime_error( "Invalid content type." );
-    }
-  }
-}
-
-void RuntimeWorker::force( Handle hash, Handle name )
-{
-  switch ( name.get_content_type() ) {
-    case ContentType::Thunk: {
-      Handle encode_name = Handle::get_encode_name( name );
-
-      Handle desired( encode_name, false, { EVAL, APPLY, FORCE } );
-      Handle operations( encode_name, true, { FORCE, APPLY, EVAL } );
-
-      runtimestorage_.fix_cache_.continue_after( desired, hash );
-
-      progress( operations, encode_name );
-
-      // return force(apply(eval(encode_name)))
-      break;
-    }
-
-    case ContentType::Blob:
-    case ContentType::Tree:
-    case ContentType::Tag: {
-      progress( hash, name );
-      break;
-    }
     default: {
       throw std::runtime_error( "Invalid content type." );
     }
@@ -258,6 +251,12 @@ void RuntimeWorker::progress( Handle hash, Handle name )
   uint32_t current = hash.peek_operation();
 
   if ( current != NONE ) {
+    if ( current == MAKE_SHALLOW ) {
+      name = Handle::make_shallow( name );
+      current = hash.peek_operation();
+      hash.pop_operation();
+    }
+
     hash.pop_operation();
     Handle nhash( name, false, { current } );
     int status = runtimestorage_.fix_cache_.try_run( nhash, hash );
@@ -268,9 +267,6 @@ void RuntimeWorker::progress( Handle hash, Handle name )
           break;
         case EVAL:
           eval( nhash, name );
-          break;
-        case FORCE:
-          force( nhash, name );
           break;
         case FILL:
           fill( nhash, name );

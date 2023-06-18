@@ -23,24 +23,6 @@ bool RuntimeStorage::steal_work( Job& job, size_t tid )
   return false;
 }
 
-Handle RuntimeStorage::force_thunk( Handle name )
-{
-  Handle desired( name, false, { FORCE } );
-  Handle operations( name, true, { FORCE } );
-
-  if ( fix_cache_.try_wait( desired ) ) {
-    workers_[0].get()->queue_job( Job( name, operations ) );
-
-    std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
-
-    pending->wait( -2 );
-    pending->wait( 1 );
-    pending->wait( 0 );
-  }
-
-  return fix_cache_.get_name( desired );
-}
-
 Handle RuntimeStorage::eval_thunk( Handle name )
 {
   Handle desired( name, false, { EVAL } );

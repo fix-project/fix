@@ -220,6 +220,7 @@ public:
 
   static Handle get_thunk_name( const Handle handle )
   {
+    // 00000001
     assert( handle.is_tree() );
     __m256i mask = _mm256_set_epi64x( 0x01'00'00'00'00'00'00'00, 0, 0, 0 );
     return _mm256_or_si256( mask, handle );
@@ -230,6 +231,17 @@ public:
     assert( handle.is_thunk() );
     __m256i mask = _mm256_set_epi64x( 0x01'00'00'00'00'00'00'00, 0, 0, 0 );
     return _mm256_andnot_si256( mask, handle );
+  }
+
+  static Handle make_shallow( const Handle handle )
+  {
+    if ( ( handle.is_tree() || handle.is_tag() ) && handle.is_strict() ) {
+      // 01000000
+      __m256i mask = _mm256_set_epi64x( 0x40'00'00'00'00'00'00'00, 0, 0, 0 );
+      return _mm256_or_si256( mask, handle );
+    } else {
+      return handle;
+    }
   }
 
   friend bool operator==( Handle lhs, Handle rhs );

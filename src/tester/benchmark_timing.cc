@@ -218,10 +218,10 @@ void vfork_add_rr()
 
 void add_fixpoint( int i )
 {
-  runtime.force_thunk( add_fixpoint_thunk[i] );
+  runtime.eval_thunk( add_fixpoint_thunk[i] );
 }
 
 void add_wasi( int i )
 {
-  runtime.force_thunk( add_wasi_thunk[i] );
+  runtime.eval_thunk( add_wasi_thunk[i] );
 }

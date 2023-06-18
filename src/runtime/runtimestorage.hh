@@ -109,9 +109,6 @@ public:
   // add Thunk
   Handle add_thunk( Thunk thunk );
 
-  // Blocking force operations
-  Handle force_thunk( Handle name );
-
   // Blocking eval operations
   Handle eval_thunk( Handle name );
 

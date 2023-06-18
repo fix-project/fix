@@ -52,7 +52,7 @@ int main( int argc, char* argv[] )
 
     Thunk compile_thunk( compile_encode_name );
     Handle compile_thunk_name = runtime.add_thunk( compile_thunk );
-    Handle output_elf_name = runtime.force_thunk( compile_thunk_name );
+    Handle output_elf_name = runtime.eval_thunk( compile_thunk_name );
     new_elf_names.push_back( output_elf_name );
   }
 

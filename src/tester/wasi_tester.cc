@@ -107,7 +107,7 @@ int main( int argc, char* argv[] )
 
   Thunk thunk( encode_name );
   Handle thunk_name = runtime.add_thunk( thunk );
-  Handle res_name = runtime.force_thunk( thunk_name );
+  Handle res_name = runtime.eval_thunk( thunk_name );
 
   if ( res_name.is_blob() ) {
     cout << dec;

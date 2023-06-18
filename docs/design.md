@@ -56,9 +56,7 @@ A Tag contains three entries, and can be created in two ways:
 `eval` transforms Objects to either strict fully-evaluated Values, or shallow
 Values, or lazy Objects. It takes the Handle of an Object and returns the
 Handle of the resulting Value. For a Handle *x*, `eval(`*x*`)` is defined as:
-  * If *x* is lazy, return *x*.
-  * If *x* is a Blob, return *x*.
-  * If *x* is a shallow Tree or a shallow Tag, return *x*.
+  * If *x* is a Blob, or a shallow/lazy Tree/Tag, or a lazy Thunk, return *x*
   * If *x* is a strict Tree:
     For each entry *y*, replace with `eval(`*y*`)`.
   * If *x* is a strict Tag:
@@ -68,18 +66,14 @@ Handle of the resulting Value. For a Handle *x*, `eval(`*x*`)` is defined as:
     2. If *z* is not in Encode format, traps
     3. If *z* is an apply-Encode,
     - if *x* is strict, return `eval(apply(*z*))`.
-    - if *x* is shallow, return `eval_shallow(apply(`*z*`))`.
+    - if *x* is shallow, return `eval(make_shallow(apply(`*z*`)))`.
     4. If *z* is a lift-Encode, let *m* be the second entry of *z*
     * if *x* is strict, return `lift_strict(`*m*`)`.
     * if *x* is shallow, return `lift_shallow(`*m*`)`
 
-## Eval\_shallow
-`eval_shallow` transforms Objects to Values or lazy Thunks. It takes the
-Handle of an Object and returns the Handle of the resulting Value or lazy
-Thunk. For a Handle *x*, `eval_shallow(`*x*`)` is defined as:
-  * If *x* is a Tree or Blob or Tag, return *x*.
-  * If *x* is a lazy Thunk, return *x*.
-  * If *x* is a strict or shallow Thunk: the same as `eval(x)`
+## make\_shallow
+`make_shallow(x)`: if x is a strict Tree or Tag, return a shallow Tree or Tag that
+has the same content as x, else return x.
 
 ## Apply
 `apply` transforms Trees (in apply-Encode format) to Handles. For a Tree *x* in

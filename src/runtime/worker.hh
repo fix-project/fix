@@ -44,8 +44,6 @@ public:
 
   bool dequeue_job( Job& job );
 
-  void force( Handle hash, Handle name );
-
   void eval( Handle hash, Handle name );
 
   void apply( Handle hash, Handle name );
