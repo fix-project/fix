@@ -9,11 +9,6 @@ add_custom_command (OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/file.txt
   COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tester/serialization_test_deep | cut -c28- | head -c -1 > ${CMAKE_CURRENT_BINARY_DIR}/file.txt
 )
 
-file(READ ${PROJECT_SOURCE_DIR}/boot/compile-encode COMPILE-ENCODE)
-
-message(PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
-message(COMPILE-ENCODE="${COMPILE-ENCODE}")
-
 add_test(NAME t_deep_open WORKING_DIRECTORY
   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/applications/flatware/testing/open-test
   ${CMAKE_CURRENT_BINARY_DIR}/src/tester/stateless-tester

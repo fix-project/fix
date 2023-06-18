@@ -26,6 +26,13 @@ ExternalProject_Add(applications
   BUILD_ALWAYS true
   )
 
+file(READ ${PROJECT_SOURCE_DIR}/boot/compile-encode COMPILE-ENCODE)
+message(COMPILE-ENCODE="${COMPILE-ENCODE}")
+add_compile_definitions(COMPILE_ENCODE="${COMPILE-ENCODE}")
+file(READ ${PROJECT_SOURCE_DIR}/boot/compile-elf COMPILE-ELF)
+message(COMPILE-ELF="${COMPILE-ELF}")
+add_compile_definitions(COMPILE=\"${COMPILE-ELF}\")
+
 include(etc/build_type.cmake)
 include(etc/cflags.cmake)
 include(etc/clang_format.cmake)
@@ -35,10 +42,6 @@ include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-src")
 include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-build")
 
 file(REAL_PATH .fix FIX_DIR BASE_DIRECTORY ${PROJECT_SOURCE_DIR} EXPAND_TILDE)
-
-file(READ ${PROJECT_SOURCE_DIR}/boot/compile-elf COMPILE-ELF)
-message(COMPILE-ELF="${COMPILE-ELF}")
-add_compile_definitions(COMPILE=\"${COMPILE-ELF}\")
 
 include_directories("${PROJECT_SOURCE_DIR}/src/util")
 include_directories("${PROJECT_SOURCE_DIR}/src/runtime")

@@ -13,6 +13,8 @@ using namespace std;
 #define EX_SOFTWARE 70
 #define EX_OSERR 71
 
+#define TRUSTED_COMPILE_ENCODE Handle( base64::decode( COMPILE_ENCODE ) )
+
 static bool pretty_print = false;
 static const char* s_infile;
 static string home_directory_64;
@@ -74,9 +76,18 @@ int main( int argc, char* argv[] )
 
   Handle wasm_name = runtime.add_blob( string_view( wasm_content ) );
 
+  Tree wasm_compile { 3 };
+  wasm_compile.at( 0 ) = Handle( "unused" );
+  wasm_compile.at( 1 ) = TRUSTED_COMPILE_ENCODE;
+  wasm_compile.at( 2 ) = wasm_name;
+  Handle compile_encode_tree = runtime.add_tree( std::move( wasm_compile ) );
+
+  Thunk wasm_compile_thunk( compile_encode_tree );
+  Handle wasm_compile_thunk_name = runtime.add_thunk( wasm_compile_thunk );
+
   vector<Handle> encode;
   encode.push_back( Handle( "empty" ) );
-  encode.push_back( wasm_name );
+  encode.push_back( wasm_compile_thunk_name );
 
   vector<Handle> args;
   for ( const char* argument : arguments ) {

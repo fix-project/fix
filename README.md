@@ -1,44 +1,63 @@
-# High level overview:
-Fixpoint is an operating system designed to allow users to be able to track a computation of a program and its answer without significant overhead.
-To do this, fixpoint was designed to have the following principles of computational-centric networking:
-1. Fine-grained visibility into application dataflow
-2. An objective, common notion of correctness
-3. A separation between I/O and compute, with delineated nondeterminism
+# Environment Setup
 
-To represent the first point we use abstractions of blob for a vector of bytes, thunk for a computation, and tree for a vector of names.
+1. clone fixpoint and the wasm-toolchain in the home directory by running:
+```
+git clone https://github.com/fix-project/fix.git
+git clone https://github.com/fix-project/wasm-toolchain.git
+```
+2. Build the wasm-toolchain using the following commands:
+```
+cd wasm-toolchain
+git submodule update --init --recursive
+./build.sh
+```
+3. Build bootstrap as specified in `fix/docs/bootstrap.md`
 
-To ensure deterministic behavior we convert a user program to webassembly since it is a deterministic with a few exceptions. The code that does this lives in the flatware directory. The code that convert to the abstractions of fixpoint api lives in the src directory.
-
-To learn more, please read refer to the design doc: https://github.com/fix-project/fixpoint-doc/
-
-# Getting access to the machine:
-First you need access to the research group's machines. Please get access from someone in the group by giving them your desired username and a public key. To generate a key run `ssh-keygen -t rsa` and follow instructions of the prompts. Your key will be added to a folder ~/.ssh.
-
-How to set up your environment:
-1. clone fixpoint and the wasm-toolchain in the home directory by running:  
-`git clone https://github.com/fix-project/fix.git`  
-`git clone https://github.com/fix-project/wasm-toolchain.git`  
-2. Build the wasm-toolchain using the following commands:  
-`cd wasm-toolchain`  
-`git submodule update --init --recursive` #pulls dependent libraries  
-`./build.sh build toolchain` #makes compiler c -> webassembly  
-3. Build fixpoint  
-`cd ~/fix`  
-`cmake -S . -B build` #creates build subdirectory snd sets source as fix directory  
-`cmake --build build/ --parallel 256` #generates build in parallel using 256 cores  
+4. Now, you should have a working wasm-toolchain`in your `{HOME}` directory,
+and `boot` and `.fix` under your fix source directory. You are ready to build
+Fix now:
+```
+cd ~/fix
+cmake -S . -B build
+cmake --build build/ --parallel 256
+```
 
 # How to run tests:
+Fix contains a set of test cases. To run them:
+```
+cmake --build build/ --target fixpoint-check
+```
+`etc/tests.cmake` contains the location of test scripts and files
 
-To see some user based tests look at ~/fix/build/flatware-prefix/src/flatware-build/examples/  
 
-To run wasm files the command is `./build/src/tester/wasi_tester` followed by the wasi file you want to run.  
-Examples:  
-1. to run a file that has no arguments  
-`./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/helloworld/helloworld-fixpoint.wasm`  
-2. to run file that reads from a directory use -h flag  
-`./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/open/open-deep-fixpoint.wasm -h <serialized home directory>`  
-3. to run a file that takes in arguments pass them in while running  
-`./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/add/add-fixpoint.wasm 1 2`  
+# Run Wasm modules in Fix
+The runtime of Fix accepts ELFs compiled from Wasm modules by a trusted compilation
+toolchain as valid inputs of procedures. The name of the trusted compilation toolchain
+is can be found at `boot/compile-encode`.
+
+`thunk: tree:3 string:none name:{content of boot/compile-encode} file:{content of boot/compile-encode}`
+evaluates to the corresponding ELF in the required format. You can evaluate it directly in
+stateless-tester:
+```
+./build/src/tester/stateless_tester tree:3 string:none name:{content of boot/compile-encode} file:{path to the Wasm module}
+```
+, or replace the procedure of an ENCODE with the specification to run an ENCODE.
+
+# Using `wasi_tester`
+To run wasm files the command is `./build/src/tester/wasi_tester` followed by the Wasm file you want to run.
+Examples:
+1. to run a file that has no arguments
+```
+./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/helloworld/helloworld-fixpoint.wasm
+```
+2. to run file that reads from a directory use -h flag
+```
+./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/open/open-deep-fixpoint.wasm -h <serialized home directory>
+```
+3. to run a file that takes in arguments pass them in while running
+```
+./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/add/add-fixpoint.wasm 1 2
+```
 
 # Useful commands:
 To figure out the serialized home directory run `./build/src/tester/serialization_test_deep`
