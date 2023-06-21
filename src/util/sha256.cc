@@ -1,6 +1,6 @@
-#include <crypto++/filters.h>
-#include <crypto++/hex.h>
-#include <crypto++/sha.h>
+#include <cryptopp/filters.h>
+#include <cryptopp/hex.h>
+#include <cryptopp/sha.h>
 
 #include "sha256.hh"
 #include "timer.hh"
