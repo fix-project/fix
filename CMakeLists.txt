@@ -5,6 +5,7 @@ cmake_policy(SET CMP0115 NEW)
 project(fixpoint)
 
 find_package(PkgConfig)
+find_package(Boost 1.74.0 REQUIRED COMPONENTS headers)
 
 pkg_search_module(CRYPT REQUIRED libcrypto++ libcryptopp)
 include_directories(${CRYPT_INCLUDE_DIRS})
