@@ -4,7 +4,7 @@ add_executable(wasi_tester "wasi_tester.cc")
 target_link_libraries(wasi_tester ${FIXPOINT_LIBS})
 target_link_libraries(wasi_tester cryptopp wasmrt absl::flat_hash_map)
 
-add_executable(stateless-tester "stateless-tester.cc")
+add_executable(stateless-tester "stateless-tester.cc" "tester-utils.cc")
 target_link_libraries(stateless-tester ${FIXPOINT_LIBS})
 target_link_libraries(stateless-tester cryptopp wasmrt absl::flat_hash_map)
 
