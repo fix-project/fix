@@ -44,27 +44,38 @@ private:
 
   bool is_complete( Handle name )
   {
-    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == COMPLETE;
+    return fixcache_.contains( name ) && unchecked_at( name ).pending->load() == COMPLETE;
   }
 
   bool is_pending( Handle name )
   {
-    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == PENDING;
+    return fixcache_.contains( name ) && unchecked_at( name ).pending->load() == PENDING;
   }
 
   bool is_running( Handle name )
   {
-    return fixcache_.contains( name ) && fixcache_.at( name ).pending->load() == RUNNING;
+    return fixcache_.contains( name ) && unchecked_at( name ).pending->load() == RUNNING;
   }
 
   bool start_job( Handle name )
   {
     if ( fixcache_.contains( name ) ) {
       int64_t job_pending = PENDING;
-      return fixcache_.at( name ).pending->compare_exchange_strong( job_pending, RUNNING );
+      return unchecked_at( name ).pending->compare_exchange_strong( job_pending, RUNNING );
     } else {
       fixcache_.insert_or_assign( name, Entry( name, RUNNING ) );
       return true;
+    }
+  }
+
+  Entry& unchecked_at( Handle name )
+  {
+    try {
+      return fixcache_.at( name );
+    } catch ( const std::out_of_range& e ) {
+      std::stringstream ss;
+      ss << "fixcache does not contain " << name;
+      throw std::out_of_range( ss.str() );
     }
   }
 
@@ -77,7 +88,7 @@ public:
   Entry& at( Handle name )
   {
     std::shared_lock lock( fixcache_mutex_ );
-    return fixcache_.at( name );
+    return unchecked_at( name );
   }
 
   bool contains( Handle name )
@@ -89,13 +100,13 @@ public:
   Handle get_name( Handle name )
   {
     std::shared_lock lock( fixcache_mutex_ );
-    return fixcache_.at( name ).name;
+    return unchecked_at( name ).name;
   }
 
   std::shared_ptr<std::atomic<int64_t>> get_pending( Handle name )
   {
     std::shared_lock lock( fixcache_mutex_ );
-    return fixcache_.at( name ).pending;
+    return unchecked_at( name ).pending;
   }
 
   void insert_or_assign( Handle name, Handle value )
@@ -107,7 +118,7 @@ public:
   void set_name( Handle name, Handle value )
   {
     std::unique_lock lock( fixcache_mutex_ );
-    Entry& entry = fixcache_.at( name );
+    Entry& entry = unchecked_at( name );
     entry.name = value;
   }
 
@@ -126,7 +137,7 @@ public:
   {
     std::unique_lock lock( fixcache_mutex_ );
     if ( is_complete( name ) ) {
-      return fixcache_.at( name ).name;
+      return unchecked_at( name ).name;
     }
 
     if ( name != requestor ) {
@@ -180,7 +191,7 @@ public:
     std::unique_lock lock( fixcache_mutex_ );
     bool result = false;
     if ( fixcache_.contains( name ) ) {
-      Entry& entry = fixcache_.at( name );
+      Entry& entry = unchecked_at( name );
       entry.name = value;
 
       int64_t job_running = RUNNING;

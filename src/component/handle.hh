@@ -101,6 +101,14 @@ public:
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
 
+  Handle( uint32_t x )
+  {
+    // set the handle to literal
+    uint8_t metadata = 0x20 | 4;
+    __builtin_memcpy( (char*)&content_, &x, 4 );
+    __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
+  }
+
   /* Construct a Handle out of local id */
   Handle( size_t local_id, size_t size, ContentType content_type )
   {

@@ -76,6 +76,9 @@ Elf_Info load_program( const string_view program_content )
 
   // Check ELF magic bytes
   if ( !program_content.starts_with( "\177ELF" ) ) {
+    if ( program_content.starts_with( "\0asm" ) ) {
+      throw std::runtime_error( "Not a valid ELF file: WebAssembly (wasm) binary module" );
+    }
     throw std::runtime_error( "Not a valid ELF file" );
   }
 

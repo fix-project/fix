@@ -8,6 +8,10 @@ add_executable(stateless-tester "stateless-tester.cc" "tester-utils.cc")
 target_link_libraries(stateless-tester ${FIXPOINT_LIBS})
 target_link_libraries(stateless-tester cryptopp wasmrt absl::flat_hash_map)
 
+add_executable(distributed-tester "distributed-tester.cc" "tester-utils.cc")
+target_link_libraries(distributed-tester ${FIXPOINT_LIBS})
+target_link_libraries(distributed-tester cryptopp wasmrt absl::flat_hash_map)
+
 add_executable(add_timing "add_timing.cc")
 target_compile_definitions(add_timing PUBLIC TIME_FIXPOINT=1)
 target_link_libraries(add_timing ${FIXPOINT_LIBS_TIMING})

@@ -73,6 +73,7 @@ int main( int argc, char* argv[] )
   ReadOnlyFile wasm_content { s_infile };
 
   auto& runtime = RuntimeStorage::get_instance();
+  runtime.deserialize();
 
   Handle wasm_name = runtime.add_blob( string_view( wasm_content ) );
 
