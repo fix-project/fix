@@ -88,13 +88,16 @@ add_custom_target(
   DEPENDS wasi_snapshot_preview1.wasm
 )
 
-add_custom_target(import-check-flatware ALL
+add_custom_command(
+  OUTPUT "import-check.log"
   DEPENDS wasi_snapshot_preview1.wasm
+  COMMENT "Checking that 'wasi_snapshot_preview1.wasm' doesn't import itself"
   COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/import-check/import-check
           --enable-multi-memory
           --enable-exceptions
           -e wasi_snapshot_preview1
-          wasi_snapshot_preview1.wasm
+          wasi_snapshot_preview1.wasm 2> import-check.log
 )
 
-add_subdirectory ("examples")
+add_custom_target( import-check-flatware ALL DEPENDS import-check.log )
+add_subdirectory( "examples" )
