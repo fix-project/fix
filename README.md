@@ -32,8 +32,8 @@ cmake --build build/ --target fixpoint-check
 
 # Run Wasm modules in Fix
 The runtime of Fix accepts ELFs compiled from Wasm modules by a trusted compilation
-toolchain as valid inputs of procedures. The name of the trusted compilation toolchain
-is can be found at `boot/compile-encode`.
+toolchain as valid inputs of procedures. The name of the trusted compilation toolchain 
+can be found at `boot/compile-encode`. 
 
 `thunk: tree:3 string:none name:{content of boot/compile-encode} file:{content of boot/compile-encode}`
 evaluates to the corresponding ELF in the required format. You can evaluate it directly in
@@ -41,22 +41,40 @@ stateless-tester:
 ```
 ./build/src/tester/stateless_tester tree:3 string:none name:{content of boot/compile-encode} file:{path to the Wasm module}
 ```
-, or replace the procedure of an ENCODE with the specification to run an ENCODE.
+or replace the procedure of an ENCODE with the specification to run an ENCODE.
 
-# Using `wasi_tester`
-To run wasm files the command is `./build/src/tester/wasi_tester` followed by the Wasm file you want to run.
-Examples:
-1. to run a file that has no arguments
+## Using `stateless_tester`
+To run wasm files, the command is `./build/src/tester/stateless-tester` followed by a tree in the following format:
 ```
-./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/helloworld/helloworld-fixpoint.wasm
+tree:4
+├─ string:"0"
+├─ thunk:
+|  ├─ tree:3
+|  |  ├─ string:unused
+|  |  ├─ name:$COMPILE_NAME
+|  |  ├─ file:$PATH_TO_WASM_FILE
+├─ $ARGUMENT_1
+├─ $ARGUMENT_2
 ```
-2. to run file that reads from a directory use -h flag
+
+where `$COMPILE_NAME` is the string contents of `boot/compile-encode`, e.g.
+
 ```
-./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/open/open-deep-fixpoint.wasm -h <serialized home directory>
+COMPILE_NAME=$(cat boot/compile-encode)
 ```
-3. to run a file that takes in arguments pass them in while running
+
+### Running Wasm Examples:
+1. without arguments
 ```
-./build/src/tester/wasi_tester build/flatware-prefix/src/flatware-build/examples/add/add-fixpoint.wasm 1 2
+./build/src/tester/stateless-tester tree:2 string:unused thunk: tree:3 string:unused name:$COMPILE_NAME file:build/applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm
+```
+2. with reading from a directory using `SERIALIZED_HOME_DIRECTORY=$(cat build/file.txt)`
+```
+./build/src/tester/stateless-tester tree:4 string:unused thunk: tree:3 string:unused name:$COMPILE_NAME file:build/applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm tree:unused name:$SERIALIZED_HOME_DIRECTORY
+```
+3. with arguments
+```
+./build/src/tester/stateless-tester tree:4 string:unused thunk: tree:3 string:unused name:$COMPILE_NAME file:build/testing/wasm-examples/add-simple.wasm uint32:9 uint32:7
 ```
 
 # Useful commands:
