@@ -51,7 +51,7 @@ A Tag contains three entries, and can be created in two ways:
   * A procedure can create a Tag where the first entry can be anything, the second
   entry is a Blob, and the third entry is the Name of the ELF blob of the procedure.
 
-# Operations: eval, force, apply and lift
+# Operations: eval, apply and lift
 ## Eval
 `eval` transforms Objects to either strict fully-evaluated Values, or shallow
 Values, or lazy Objects. It takes the Handle of an Object and returns the
