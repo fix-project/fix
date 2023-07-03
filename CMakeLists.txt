@@ -69,8 +69,9 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/testing/benchmark")
 # Doxygen documentation generation
 find_package(Doxygen)
 if (${DOXYGEN_FOUND})
+    set(DOXYGEN_DOCS_TARGET_NAME "doxygen-docs")    
+
     set(DOXYGEN_EXCLUDE_PATTERNS "*/_deps/*")
-    set(DOXYGEN_DOCS_TARGET_NAME "doxygen-docs")
     set(DOXYGEN_CREATE_SUBDIRS "YES")
     set(DOXYGEN_BUILTIN_STL_SUPPORT "YES")
     set(DOXYGEN_EXTRACT_ALL "YES")
@@ -92,6 +93,8 @@ if (${DOXYGEN_FOUND})
     set(DOXYGEN_CALL_GRAPH "YES")
     set(DOXYGEN_CALLER_GRAPH "YES")
     set(DOXYGEN_DOT_IMAGE_FORMAT "svg")
+
     doxygen_add_docs(${DOXYGEN_DOCS_TARGET_NAME})
+    
     message("Doxygen target \"${DOXYGEN_DOCS_TARGET_NAME}\" added")
 endif()
