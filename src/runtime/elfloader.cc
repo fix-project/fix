@@ -53,6 +53,8 @@ const static map<string, uint64_t> library_func_map
       { "fixpoint_value_type", (uint64_t)fixpoint::value_type },
       { "fixpoint_unsafe_io", (uint64_t)fixpoint::unsafe_io },
       { "fixpoint_equality", (uint64_t)fixpoint::equality },
+      { "fixpoint_get_length", (uint64_t)fixpoint::get_length },
+      { "fixpoint_get_total_size", (uint64_t)fixpoint::get_total_size },
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
       { "memset", (uint64_t)memset },
@@ -210,7 +212,7 @@ Program link_program( const string_view program_content )
           if ( symtb_entry.st_shndx == SHN_UNDEF ) {
             string name = string( elf_info.symstrs.data() + symtb_entry.st_name );
             if ( library_func_map.count( name ) != 1 ) {
-              throw runtime_error( "can't find function " + name );
+              throw runtime_error( "attempted to link against undefined runtime function <" + name + ">" );
             }
             rel_offset += library_func_map.at( name );
           } else {

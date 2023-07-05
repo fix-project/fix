@@ -60,7 +60,7 @@ protected:
  *
  * Handle 256-bits local:
  * content_[0]  |  content_[1]  |  content_[2]  |  content_[3][0:31]  |  content_[3][56:63]
- *   local_id   |  multimap idx |     size      |      operations     |         metadata
+ *   local_id   |  multimap idx |    length     |      operations     |         metadata
  */
 
 class Handle : public cookie
@@ -136,7 +136,7 @@ public:
     return metadata() & 0x1f;
   }
 
-  size_t get_size() const
+  size_t get_length() const
   {
     if ( is_literal_blob() ) {
       return literal_blob_len();

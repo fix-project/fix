@@ -119,4 +119,14 @@ void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
   std::cout << std::endl;
   std::flush( std::cout );
 }
+
+uint32_t get_length( __m256i handle )
+{
+  return Handle( handle ).get_length();
+}
+
+uint32_t get_total_size( __m256i handle )
+{
+  return RuntimeStorage::get_instance().get_total_size( Handle( handle ) );
+}
 }

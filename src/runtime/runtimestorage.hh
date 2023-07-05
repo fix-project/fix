@@ -128,4 +128,7 @@ public:
   void set_current_procedure( const Handle function_name ) { current_procedure_ = function_name; }
 
   Handle get_current_procedure() const { return current_procedure_; }
+
+  // Get the total storage size downstream of this name
+  size_t get_total_size( Handle name );
 };

@@ -25,4 +25,10 @@ uint32_t value_type( __m256i handle );
 void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem );
 
 uint32_t equality( __m256i lhs, __m256i rhs );
+
+// Length in elements (Tree-like) or bytes (Blobs)
+uint32_t get_length( __m256i handle );
+
+// Minimum number of bytes to transfer this Object to another node
+uint32_t get_total_size( __m256i handle );
 }

@@ -250,16 +250,22 @@ fn value_type(handle: &shallow Object) -> i32;
 Retrieve type (Tree = 0, Thunk = 1, Blob = 2 or Tag = 3) from a strict or 
 shallow Handle. 
 
-## length
+## get_length
 
 ```rust
-fn length(handle: &Object) -> i32;
-fn length(handle: &shallow Object) -> i32;
+fn get_length(handle: &Object) -> i32;
+fn get_length(handle: &shallow Object) -> i32;
 ```
 Given an strict or shallow Handle, returns the length (in bytes or number of 
 entries) of the corresponding Value.
 
-Not yet implemented. 
+## get_total_size
+
+```rust
+fn get_total_size(handle: &any Object) -> i32;
+```
+Given a Handle, returns the total downstream size (in bytes) required to
+transfer this Handle (with the specified accessibility) to another machine.
 
 ## access
 

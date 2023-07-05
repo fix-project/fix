@@ -319,3 +319,46 @@ void RuntimeStorage::deserialize()
     }
   }
 }
+
+size_t RuntimeStorage::get_total_size( Handle name )
+{
+  if ( name.is_lazy() ) {
+    return sizeof( __m256i ); // just a name
+  } else if ( name.is_shallow() ) {
+    if ( name.is_blob() ) {
+      return sizeof( __m256i ); // just a name (which includes the length)
+    } else if ( name.is_tree() or name.is_tag() ) {
+      return sizeof( __m256i ) * ( name.get_length() + 1 ); // name of current handle + names of each child
+    } else if ( name.is_thunk() ) {
+      return 2 * sizeof( __m256i ); // name of current handle + name of encode
+    } else {
+      // in case we add new Object types later
+      throw std::runtime_error( "get_total_size not fully implemented for shallow handle" );
+    }
+  } else if ( name.is_strict() ) {
+    if ( name.is_blob() ) {
+      if ( name.is_literal_blob() ) {
+        // just the name
+        return sizeof( __m256i );
+      } else {
+        // name + contents
+        return sizeof( __m256i ) + name.get_length();
+      }
+    } else if ( name.is_tree() or name.is_tag() ) {
+      // name + size of all children
+      size_t size = sizeof( __m256i );
+      for ( const auto& child : get_tree( name ) ) {
+        size += get_total_size( child );
+      }
+      return size;
+    } else if ( name.is_thunk() ) {
+      return sizeof( __m256i ) + get_total_size( get_thunk_encode_name( name ) );
+    } else {
+      // in case we add new Object types later
+      throw std::runtime_error( "get_total_size not fully implemented for strict handle" );
+    }
+  } else {
+    // in case we add new accessibilities later
+    throw std::runtime_error( "get_total_size not fully implemented" );
+  }
+}
