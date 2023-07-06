@@ -64,7 +64,7 @@ FIXPOINT_APPLY externref _fixpoint_apply( externref encode )
 
   uint32_t times[n];
   for ( size_t i = 0; i < n; i++ ) {
-    times[i] = compute_time( computers[i], get_total_size( get_ro_table_0(3) ) );
+    times[i] = compute_time( computers[i], get_total_size( get_ro_table_0( 3 ) ) );
   }
 
   size_t best_node = 0;

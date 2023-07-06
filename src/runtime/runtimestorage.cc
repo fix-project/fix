@@ -232,6 +232,7 @@ string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& di
     }
 
     case ContentType::Thunk: {
+      serialize_to_dir( Handle::get_encode_name( name ), dir );
       output_file << base64::encode( Handle::get_encode_name( name ) );
       return file_name;
     }
@@ -265,6 +266,19 @@ void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
 
     switch ( name.get_content_type() ) {
       case ContentType::Thunk: {
+        input_file.seekg( 0, std::ios::end );
+        size_t size = input_file.tellg();
+        assert( size == 43 );
+        char* buf = static_cast<char*>( malloc( size ) );
+        input_file.seekg( 0, std::ios::beg );
+        input_file.read( reinterpret_cast<char*>( buf ), size );
+
+        Handle handle;
+        handle = base64::decode( buf );
+
+        Thunk thunk( handle );
+        Handle local_id = add_thunk( thunk );
+        fix_cache_.insert_or_assign( name, local_id );
         continue;
       }
 
