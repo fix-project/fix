@@ -164,7 +164,8 @@ Handle RuntimeStorage::local_to_storage( Handle name )
       break;
     }
 
-    case ContentType::Tree: {
+    case ContentType::Tree:
+    case ContentType::Tag: {
       const Object& obj = local_storage_.at( name.get_local_id() );
       if ( holds_alternative<Tree>( obj ) ) {
         span_view<Handle> orig_tree = get<Tree>( obj );
@@ -200,9 +201,13 @@ Handle RuntimeStorage::local_to_storage( Handle name )
 
 string RuntimeStorage::serialize( Handle name )
 {
+  return serialize_to_dir( name, FIX_DIR );
+}
+
+string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& dir )
+{
   Handle new_name = local_to_storage( name );
   string file_name = base64::encode( new_name );
-  const filesystem::path dir { FIX_DIR };
   ofstream output_file( dir / file_name );
 
   switch ( new_name.get_content_type() ) {
@@ -212,10 +217,11 @@ string RuntimeStorage::serialize( Handle name )
       return file_name;
     }
 
-    case ContentType::Tree: {
+    case ContentType::Tree:
+    case ContentType::Tag: {
       span_view<Handle> tree = get_tree( new_name );
       for ( size_t i = 0; i < tree.size(); i++ ) {
-        serialize( tree[i] );
+        serialize_to_dir( tree[i], dir );
       }
       for ( size_t i = 0; i < tree.size(); i++ ) {
         output_file << base64::encode( tree[i] );
@@ -239,7 +245,11 @@ string RuntimeStorage::serialize( Handle name )
 
 void RuntimeStorage::deserialize()
 {
-  const filesystem::path dir { FIX_DIR };
+  deserialize_from_dir( FIX_DIR );
+}
+
+void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
+{
 
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
     Handle name( base64::decode( file.path().filename().string() ) );

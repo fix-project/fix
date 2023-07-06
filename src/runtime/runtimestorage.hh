@@ -1,6 +1,7 @@
 #pragma once
 
 #include <condition_variable>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <string_view>
@@ -123,7 +124,9 @@ public:
   Handle local_to_storage( Handle name );
 
   std::string serialize( Handle name );
+  std::string serialize_to_dir( Handle name, const std::filesystem::path& dir );
   void deserialize();
+  void deserialize_from_dir( const std::filesystem::path& dir );
 
   void set_current_procedure( const Handle function_name ) { current_procedure_ = function_name; }
 
