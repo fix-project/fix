@@ -1,0 +1,24 @@
+name: CMake
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Dependencies
+      run: sudo apt update && sudo apt install -y cmake doxygen graphviz
+    
+    - name: Configure Docs
+      run: cmake -S ${{github.workspace}}/docs -B ${{github.workspace}}/build
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --target doxygen-docs
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build/html
+      run: cat index.html
+
