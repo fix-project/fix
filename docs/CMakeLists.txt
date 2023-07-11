@@ -4,6 +4,7 @@ find_package(Doxygen)
 if (${DOXYGEN_FOUND})
     set(DOXYGEN_DOCS_TARGET_NAME "doxygen-docs")    
 
+    set(DOXYGEN_PROJECT_NAME "Fix")
     set(DOXYGEN_EXCLUDE_PATTERNS "*/_deps/*")
     set(DOXYGEN_CREATE_SUBDIRS "YES")
     set(DOXYGEN_BUILTIN_STL_SUPPORT "YES")
