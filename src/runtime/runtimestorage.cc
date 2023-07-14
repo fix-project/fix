@@ -60,7 +60,7 @@ string_view RuntimeStorage::get_blob( Handle name )
   } else if ( name.is_local() ) {
     return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Handle local_name = fix_cache_.get_name( name );
+    Handle local_name = canonical_to_local_.at( Handle( name ) );
     return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
@@ -74,7 +74,7 @@ string_view RuntimeStorage::user_get_blob( const Handle& name )
   } else if ( name.is_local() ) {
     return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Handle local_name = fix_cache_.get_name( name );
+    Handle local_name = canonical_to_local_.at( Handle( name ) );
     return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
@@ -101,7 +101,7 @@ span_view<Handle> RuntimeStorage::get_tree( Handle name )
   if ( name.is_local() ) {
     return get<Tree>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Handle local_name = fix_cache_.get_name( name );
+    Handle local_name = canonical_to_local_.at( Handle( name ) );
     return get<Tree>( local_storage_.at( local_name.get_local_id() ) );
   }
 
@@ -154,7 +154,7 @@ Handle RuntimeStorage::local_to_storage( Handle name )
         string_view blob = get<Blob>( obj );
 
         Handle hash( sha256::encode( blob ), blob.size(), ContentType::Blob );
-        fix_cache_.insert_or_assign( hash, name );
+        canonical_to_local_.insert_or_assign( hash, name );
 
         return hash;
       } else {
@@ -180,7 +180,7 @@ Handle RuntimeStorage::local_to_storage( Handle name )
         string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Handle ) );
         Handle hash( sha256::encode( view ), tree.size(), ContentType::Tree );
 
-        fix_cache_.insert_or_assign( hash, new_name );
+        canonical_to_local_.insert_or_assign( hash, name );
 
         return hash;
       } else {
@@ -267,7 +267,7 @@ void RuntimeStorage::deserialize()
 
         Blob blob( Blob_ptr( buf ), size );
         Handle local_id = add_blob( std::move( blob ) );
-        fix_cache_.insert_or_assign( name, local_id );
+        canonical_to_local_.insert_or_assign( name, local_id );
 
         continue;
       }
@@ -288,7 +288,7 @@ void RuntimeStorage::deserialize()
         free( buf );
 
         Handle local_id = add_tree( std::move( tree ) );
-        fix_cache_.insert_or_assign( name, local_id );
+        canonical_to_local_.insert_or_assign( name, local_id );
 
         continue;
       }
@@ -309,7 +309,7 @@ void RuntimeStorage::deserialize()
         free( buf );
 
         Handle local_id = add_tag( std::move( tree ) );
-        fix_cache_.insert_or_assign( name, local_id );
+        canonical_to_local_.insert_or_assign( name, local_id );
 
         continue;
       }
