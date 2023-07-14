@@ -31,6 +31,7 @@ private:
   friend struct Job;
 
   fixcache fix_cache_;
+  absl::flat_hash_map<Handle, Handle, AbslHash> canonical_to_local_;
 
   // Maps a Wasm function Handle to corresponding compiled Program
   InMemoryStorage<Program> name_to_program_;
@@ -51,6 +52,7 @@ private:
 
   RuntimeStorage()
     : fix_cache_()
+    , canonical_to_local_()
     , name_to_program_()
     , local_storage_()
     , workers_()
