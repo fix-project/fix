@@ -56,7 +56,7 @@ field of this kind of entry, the `to-do` list is empty.
 
 3. `{Name: job, Value: arg, pending: p}`:
 `job` has start-after dependencies on other jobs, and `p` is the number of
-unresolved depdendencies. If `p = 0`, all dependencies are resolved, and the
+unresolved dependencies. If `p = 0`, all dependencies are resolved, and the
 next step would be `to-do(arg)`.
 
 4. `{Name: canonical_name, Value: local_name, pending: 0}`:

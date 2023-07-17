@@ -8,6 +8,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "entry.hh"
+#include "key.hh"
 
 // -2: user thread waiting for the pending
 // -1: job done, entry.name is the result Value
@@ -26,7 +27,7 @@
 class fixcache
 {
 private:
-  absl::flat_hash_map<Handle, Entry, AbslHash> fixcache_;
+  absl::flat_hash_map<Key, Entry, absl::Hash<Key>> fixcache_;
   std::shared_mutex fixcache_mutex_;
 
   void insert_dependency( Handle name, Handle value, bool start_after )
