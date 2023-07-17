@@ -181,7 +181,7 @@ Handle RuntimeStorage::local_to_storage( Handle name )
         string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Handle ) );
         Handle hash( sha256::encode( view ), tree.size(), ContentType::Tree );
 
-        canonical_to_local_.insert_or_assign( hash, name );
+        canonical_to_local_.insert_or_assign( hash, new_name );
 
         return hash;
       } else {
@@ -255,7 +255,10 @@ void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
     Handle name( base64::decode( file.path().filename().string() ) );
 
-    if ( name.is_literal_blob() || name.is_local() || fix_cache_.contains( name ) ) {
+    if ( name.is_local() ) {
+      throw runtime_error( "Attempted to deserialize a local name." );
+    }
+    if ( name.is_literal_blob() || fix_cache_.contains( name ) ) {
       continue;
     }
 
