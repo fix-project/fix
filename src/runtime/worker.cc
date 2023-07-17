@@ -258,7 +258,9 @@ void RuntimeWorker::progress( Handle hash, Handle name )
     }
 
     hash.pop_operation();
+    // create a new hash for just the current operation
     Handle nhash( name, false, { current } );
+    // run the operation if it does not exist in the cache
     int status = runtimestorage_.fix_cache_.try_run( nhash, hash );
     if ( status == 1 ) {
       switch ( current ) {
@@ -275,9 +277,11 @@ void RuntimeWorker::progress( Handle hash, Handle name )
           throw std::runtime_error( "Invalid job type." );
       }
     } else if ( status == -1 ) {
+      // otherwise, progress with the remaining operations and the original name
       progress( hash, runtimestorage_.fix_cache_.get_name( nhash ) );
     }
   } else {
+    // finished a single operation. launch jobs that were waiting on this operation?
     launch_jobs( runtimestorage_.fix_cache_.complete( hash, name ) );
   }
 }
