@@ -35,7 +35,7 @@ It should be the case that a job only has one of the two kinds of dependency on 
 ## Structure of Fix Cache Entries
 Each entry of the fix cache contains three fields: `{Name: m256i, Value: m256i, pending: int64_t}`.
 
-There are 4 types of entries:
+There are 3 types of entries:
 1. `{Name: job, Value: v, pending: p}`:
 - If `p = -1`, `done(job)` is completed and `v = done(job)`.
 - If `p = 1`, `done(job)` is either currently being processed by a thread, or pending on
@@ -59,7 +59,10 @@ field of this kind of entry, the `to-do` list is empty.
 unresolved dependencies. If `p = 0`, all dependencies are resolved, and the
 next step would be `to-do(arg)`.
 
-4. `{Name: canonical_name, Value: local_name, pending: 0}`:
+### Canonical Name Entries
+Mappings from canonical to local names are stored in runtimestorage in a similar 
+format to entries in fixcache.
+`{Name: canonical_name, Value: local_name}`:
 These entries are not used for synchronizing jobs, but instead map canonical
 names to local ids. This is mainly used by `get_blob` and `get_tree`.
 
