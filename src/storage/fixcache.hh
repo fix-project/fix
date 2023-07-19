@@ -1,5 +1,6 @@
 #pragma once
 
+#include <condition_variable>
 #include <mutex>
 #include <optional>
 #include <queue>
@@ -7,35 +8,33 @@
 #include <stdexcept>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/hash/hash.h"
 #include "entry.hh"
-#include "key.hh"
-
-// -2: user thread waiting for the pending
-// -1: job done, entry.name is the result Value
-// 0: job done, hasn't updated entry.name or call child
-// positive number: the job has been started
-
-// For multimap entries
-// pending == 0: progress with desired entry name (The desired entry is equivalent to the requestor)
-// pending == 1: progress with the entry itself's name (the desired entry needs to be done before the requestor
-// starts)
-//
-#define COMPLETE INT64_C( -1 )
-#define PENDING INT64_C( -2 )
-#define RUNNING INT64_C( 1 )
+#include "task.hh"
 
 class fixcache
 {
+public:
+  using QueueFunction = std::function<void( Task )>;
+
 private:
-  absl::flat_hash_map<Key, Entry, absl::Hash<Key>> fixcache_;
+  absl::flat_hash_map<Task, std::optional<Handle>, absl::Hash<Task>> fixcache_;
+
+  absl::flat_hash_map<std::pair<Task, std::size_t>, Task, absl::Hash<std::pair<Task, std::size_t>>>
+    dependency_cache_;
+  absl::flat_hash_map<Task, std::shared_ptr<std::atomic<std::size_t>>, absl::Hash<Task>> blocked_count_;
   std::shared_mutex fixcache_mutex_;
+  std::condition_variable_any fixcache_cv_;
 
-  void insert_dependency( Handle name, Handle value, bool start_after )
+  void insert_dependency( Task dependee, Task depender )
   {
+    if ( dependee == depender ) {
+      throw std::runtime_error( "attempted to insert self-dependency" );
+    }
     for ( size_t i = 1;; ++i ) {
-      name.set_index( i );
-      auto ins = fixcache_.insert( { name, Entry( value, start_after ) } );
-
+      // we deal with duplicates by adding a dependency index; we linear scan until we find a free index
+      auto pair = std::make_pair( dependee, i );
+      auto ins = dependency_cache_.insert( { pair, depender } );
       // If insertion was sucessful
       if ( ins.second ) {
         break;
@@ -43,203 +42,107 @@ private:
     }
   }
 
-  bool is_complete( Handle name )
+  void unblock_jobs( Task finished, QueueFunction queue )
   {
-    return fixcache_.contains( name ) && unchecked_at( name ).pending->load() == COMPLETE;
-  }
-
-  bool is_pending( Handle name )
-  {
-    return fixcache_.contains( name ) && unchecked_at( name ).pending->load() == PENDING;
-  }
-
-  bool is_running( Handle name )
-  {
-    return fixcache_.contains( name ) && unchecked_at( name ).pending->load() == RUNNING;
-  }
-
-  bool start_job( Handle name )
-  {
-    if ( fixcache_.contains( name ) ) {
-      int64_t job_pending = PENDING;
-      return unchecked_at( name ).pending->compare_exchange_strong( job_pending, RUNNING );
-    } else {
-      fixcache_.insert_or_assign( name, Entry( name, RUNNING ) );
-      return true;
-    }
-  }
-
-  Entry& unchecked_at( Handle name )
-  {
-    try {
-      return fixcache_.at( name );
-    } catch ( const std::out_of_range& e ) {
-      std::stringstream ss;
-      ss << "fixcache does not contain " << name;
-      throw std::out_of_range( ss.str() );
-    }
-  }
-
-public:
-  fixcache()
-    : fixcache_()
-    , fixcache_mutex_()
-  {}
-
-  Entry& at( Handle name )
-  {
-    std::shared_lock lock( fixcache_mutex_ );
-    return unchecked_at( name );
-  }
-
-  bool contains( Handle name )
-  {
-    std::shared_lock lock( fixcache_mutex_ );
-    return fixcache_.contains( name );
-  }
-
-  Handle get_name( Handle name )
-  {
-    std::shared_lock lock( fixcache_mutex_ );
-    return unchecked_at( name ).name;
-  }
-
-  std::shared_ptr<std::atomic<int64_t>> get_pending( Handle name )
-  {
-    std::shared_lock lock( fixcache_mutex_ );
-    return unchecked_at( name ).pending;
-  }
-
-  void insert_or_assign( Handle name, Handle value )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    fixcache_.insert_or_assign( name, Entry( value ) );
-  }
-
-  void set_name( Handle name, Handle value )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    Entry& entry = unchecked_at( name );
-    entry.name = value;
-  }
-
-  bool start_after( Handle name, Handle requestor )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    if ( is_complete( name ) ) {
-      return false;
-    }
-
-    insert_dependency( name, requestor, true );
-    return true;
-  }
-
-  std::optional<Handle> continue_after( Handle name, Handle requestor )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    if ( is_complete( name ) ) {
-      return unchecked_at( name ).name;
-    }
-
-    if ( name != requestor ) {
-      insert_dependency( name, requestor, false );
-    }
-    return {};
-  }
-
-  int try_run( Handle name, Handle requestor )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    if ( is_complete( name ) ) {
-      return -1;
-    }
-
-    if ( name != requestor ) {
-      insert_dependency( name, requestor, false );
-    }
-
-    if ( start_job( name ) ) {
-      return 1;
-    }
-
-    return 0;
-  }
-
-  void pending_start( Handle name, Handle arg, int64_t pending )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    if ( !is_complete( name ) ) {
-      fixcache_.insert_or_assign( name, Entry( arg, pending ) );
-    }
-  }
-
-  bool try_wait( Handle name )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    if ( is_complete( name ) ) {
-      return false;
-    }
-
-    if ( !fixcache_.contains( name ) ) {
-      fixcache_.insert_or_assign( name, Entry( name, PENDING ) );
-    }
-
-    return true;
-  }
-
-  bool change_status_to_completed( Handle name, Handle value )
-  {
-    std::unique_lock lock( fixcache_mutex_ );
-    bool result = false;
-    if ( fixcache_.contains( name ) ) {
-      Entry& entry = unchecked_at( name );
-      entry.name = value;
-
-      int64_t job_running = RUNNING;
-      result = entry.pending->compare_exchange_strong( job_running, COMPLETE );
-
-      ( *entry.pending.get() ).notify_all();
-    } else {
-      fixcache_.insert_or_assign( name, Entry( value, COMPLETE ) );
-      result = true;
-    }
-    return result;
-  }
-
-  std::queue<std::pair<Handle, Handle>> update_pending_jobs( Handle name )
-  {
-    Handle dependency = name;
-    std::queue<std::pair<Handle, Handle>> result;
     for ( int i = 1;; ++i ) {
-      dependency.set_index( i );
-      if ( contains( dependency ) ) {
-        Handle requestor = get_name( dependency );
-        if ( get_pending( dependency )->load() == 1 ) {
-          // Start after
-          std::shared_ptr<std::atomic<int64_t>> pending = get_pending( requestor );
-          auto sub_result = pending->fetch_sub( 1 ) - 1;
-
-          if ( sub_result == 0 ) {
-            result.push( { get_name( requestor ), requestor } );
-          }
-        } else {
-          // Continue after
-          result.push( { get_name( name ), requestor } );
+      auto pair = std::make_pair( finished, i );
+      if ( dependency_cache_.contains( pair ) ) {
+        Task requestor = dependency_cache_.at( pair );
+        size_t blocked = blocked_count_.at( requestor )->fetch_sub( 1 ) - 1;
+        if ( blocked == 0 ) {
+          queue( requestor );
         }
       } else {
         break;
       }
     }
-
-    return result;
   }
 
-  std::queue<std::pair<Handle, Handle>> complete( Handle name, Handle value )
+  bool add_task( Task task, QueueFunction queue )
   {
-    if ( change_status_to_completed( name, value ) ) {
-      return update_pending_jobs( name );
+    if ( not fixcache_.contains( task ) ) {
+      fixcache_.insert( { task, std::nullopt } );
+      blocked_count_.insert( { task, std::make_shared<std::atomic<std::size_t>>( 0 ) } );
+      queue( task );
+      return true;
+    }
+    return false;
+  }
+
+public:
+  fixcache()
+    : fixcache_()
+    , dependency_cache_()
+    , blocked_count_()
+    , fixcache_mutex_()
+    , fixcache_cv_()
+  {}
+
+  std::optional<Handle> get( Task task )
+  {
+    std::shared_lock lock( fixcache_mutex_ );
+    if ( fixcache_.contains( task ) ) {
+      return fixcache_.at( task );
     } else {
       return {};
     }
+  }
+
+  void cache( Task task, Handle result, QueueFunction queue )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    if ( fixcache_.at( task ).has_value() ) {
+      throw std::runtime_error( "double-cache" );
+    }
+    if ( blocked_count_.at( task )->load() != 0 ) {
+      throw std::runtime_error( "caching result of task which is still blocked" );
+    }
+    fixcache_.at( task ) = result;
+    fixcache_cv_.notify_all();
+    unblock_jobs( task, queue );
+  }
+
+  void start( Task task, QueueFunction queue )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    add_task( task, queue );
+  }
+
+  std::optional<Handle> get_or_add_dependency( Task dependee, Task depender, QueueFunction queue )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    add_task( dependee, queue );
+    if ( fixcache_.at( dependee ).has_value() ) {
+      return fixcache_.at( dependee );
+    }
+    insert_dependency( dependee, depender );
+    blocked_count_.at( depender )->fetch_add( 1 );
+    return {};
+  }
+
+  void increment_blocking_count( Task task, std::size_t count = 1 )
+  {
+    std::shared_lock lock( fixcache_mutex_ );
+    blocked_count_.at( task )->fetch_add( count );
+  }
+
+  size_t add_dependency_or_decrement_blocking_count( Task dependee, Task depender, QueueFunction queue )
+  {
+    std::unique_lock lock( fixcache_mutex_ );
+    add_task( dependee, queue );
+    if ( fixcache_.at( dependee ).has_value() ) {
+      return blocked_count_.at( depender )->fetch_sub( 1 ) - 1;
+    }
+    insert_dependency( dependee, depender );
+    return *blocked_count_.at( depender );
+  }
+
+  Handle get_blocking( Task target )
+  {
+    using namespace std;
+    unique_lock lock( fixcache_mutex_ );
+    fixcache_cv_.wait(
+      lock, [this, target] { return fixcache_.contains( target ) and fixcache_.at( target ).has_value(); } );
+    return fixcache_.at( target ).value();
   }
 };

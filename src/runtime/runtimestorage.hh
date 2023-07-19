@@ -28,7 +28,6 @@ class RuntimeStorage
 {
 private:
   friend class RuntimeWorker;
-  friend struct Job;
 
   fixcache fix_cache_;
   absl::flat_hash_map<Handle, Handle, AbslHash> canonical_to_local_;
@@ -91,7 +90,7 @@ public:
     return runtime_instance;
   }
 
-  bool steal_work( Job& job, size_t tid );
+  bool steal_work( Task& task, size_t tid );
 
   // add blob
   Handle add_blob( Blob&& blob );

@@ -10,6 +10,7 @@ find_package(Boost 1.74.0 REQUIRED COMPONENTS headers)
 pkg_search_module(CRYPT REQUIRED libcrypto++ libcryptopp cryptopp)
 include_directories(${CRYPT_INCLUDE_DIRS})
 add_compile_options(${CRYPT_CFLAGS_OTHER})
+add_compile_options(-g)
 
 include(FetchContent)
 FetchContent_Declare(

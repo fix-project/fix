@@ -12,8 +12,8 @@ sub check_add($$) {
   my ($x, $y) = @_;
   my $expected_answer = ($x + $y) % 2**32;
 
-  print `$executable tree:4 string:\"0\" thunk: tree:3 string:\"0\" name:$compile file:$wasm uint32:$x uint32:$y 2>&1`;
-  my $result = `$executable tree:4 string:\"0\" thunk: tree:3 string:\"0\" name:$compile file:$wasm uint32:$x uint32:$y 2>&1`;
+  my $result = `$executable tree:4 string:\"0\" thunk: tree:3 string:\"0\" name:$compile file:$wasm uint32:$x uint32:$y`;
+  print "$result";
 
   if ($?) {
     print STDERR qq{Got result:\n$result\n};

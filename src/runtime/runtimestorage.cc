@@ -4,19 +4,20 @@
 #include <fstream>
 #include <iostream>
 
-#include "job.hh"
 #include "object.hh"
+#include "operation.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
+#include "task.hh"
 #include "wasm-rt-content.h"
 
 using namespace std;
 
-bool RuntimeStorage::steal_work( Job& job, size_t tid )
+bool RuntimeStorage::steal_work( Task& task, size_t tid )
 {
   // Starting at the next thread index after the current thread--look to steal work
   for ( size_t i = 0; i < num_workers_; ++i ) {
-    if ( workers_[( i + tid + 1 ) % num_workers_]->jobs_.pop( job ) ) {
+    if ( workers_[( i + tid + 1 ) % num_workers_]->jobs_.pop( task ) ) {
       return true;
     }
   }
@@ -25,20 +26,14 @@ bool RuntimeStorage::steal_work( Job& job, size_t tid )
 
 Handle RuntimeStorage::eval_thunk( Handle name )
 {
-  Handle desired( name, false, { EVAL } );
-  Handle operations( name, true, { EVAL } );
+  Task task( name, Operation::Eval );
+  auto cached = fix_cache_.get( task );
+  if ( cached )
+    return cached.value();
 
-  if ( fix_cache_.try_wait( desired ) ) {
-    workers_[0].get()->queue_job( Job( name, operations ) );
+  fix_cache_.start( task, workers_[0].get()->queue_cb );
 
-    std::shared_ptr<std::atomic<int64_t>> pending = fix_cache_.get_pending( desired );
-
-    pending->wait( -2 );
-    pending->wait( 1 );
-    pending->wait( 0 );
-  }
-
-  return fix_cache_.get_name( desired );
+  return fix_cache_.get_blocking( task );
 }
 
 Handle RuntimeStorage::add_blob( Blob&& blob )
@@ -258,7 +253,7 @@ void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
     if ( name.is_local() ) {
       throw runtime_error( "Attempted to deserialize a local name." );
     }
-    if ( name.is_literal_blob() || fix_cache_.contains( name ) ) {
+    if ( name.is_literal_blob() ) {
       continue;
     }
 
@@ -281,7 +276,7 @@ void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
 
         Thunk thunk( handle );
         Handle local_id = add_thunk( thunk );
-        fix_cache_.insert_or_assign( name, local_id );
+        canonical_to_local_.insert_or_assign( name, local_id );
         continue;
       }
 

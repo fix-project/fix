@@ -58,11 +58,18 @@ protected:
  * 2) if the handle is not a literal: | strict/shallow/lazy (2 bits) | other/literal | 0 | 0 | canonical/local |
  * Blob/Tree/Thunk/Tag (2 bits)
  *
- * Handle 256-bits local:
- * content_[0]  |  content_[1]  |  content_[2]  |  content_[3][0:31]  |  content_[3][56:63]
- *   local_id   |  multimap idx |    length     |      operations     |         metadata
+ * A local handle is treated like a bitfield struct with the following pseudo-declaration:
+ *
+ *   struct local_handle {
+ *     size_t local_id: 64;   // 255-192
+ *     SBZ: 64;              // 191-128
+ *     size_t length: 64;     // 127-64
+ *     uint8_t metadata: 8;   // 63-56
+ *     SBZ: 56;              // 56-0
+ *   };
+ *
+ * Unused fields should be zeroed (SBZ).
  */
-
 class Handle : public cookie
 {
 public:
@@ -74,14 +81,16 @@ public:
     : cookie( val )
   {}
 
+  /* Cast 4*uint64_t to a Handle */
   Handle( uint64_t a, uint64_t b, uint64_t c, uint64_t d )
     : cookie( a, b, c, d )
   {}
 
+  /* Cast 32 bytes to a Handle */
   Handle( const std::array<char, 32>& input )
     : cookie( input ) {};
 
-  /* Construct a Handle out ot a sha256 hash */
+  /* Construct a Handle out of a sha256 hash */
   Handle( std::string hash, size_t size, ContentType content_type )
   {
     assert( hash.size() == 32 );
@@ -101,6 +110,7 @@ public:
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
 
+  /* Construct a Handle out of literal blob content (as an integer) */
   Handle( uint32_t x )
   {
     // set the handle to literal
@@ -116,24 +126,6 @@ public:
     content_[0] = local_id;
     content_[2] = size;
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
-  }
-
-  /* Construct a job handle */
-  Handle( Handle handle, bool pending, std::initializer_list<uint64_t> list )
-    : cookie( handle )
-  {
-    uint32_t ops = 0;
-
-    for ( auto elem : list ) {
-      ops ^= elem;
-      ops = std::rotl( (uint32_t)ops, ( pending ? 1 : -1 ) * 4 );
-    }
-
-    if ( pending ) {
-      ops = std::rotr( (uint32_t)ops, 4 );
-    }
-
-    __builtin_memcpy( (char*)&content_ + 24, &ops, 4 );
   }
 
   bool is_literal_blob() const { return metadata() & 0x20; }
@@ -200,25 +192,9 @@ public:
 
   bool is_lazy() const { return ( ( metadata() & 0xc0 ) == static_cast<uint8_t>( Laziness::Lazy ) ); }
 
+  Laziness get_laziness() const { return Laziness( metadata() & 0xc0 ); }
+
   uint8_t get_metadata() { return metadata(); }
-
-  void set_index( size_t value ) { content_[1] = value; }
-
-  uint32_t pop_operation()
-  {
-    uint32_t prev = 0xF & ( (uint32_t)content_[3] );
-    uint32_t curr = std::rotr( (uint32_t)content_[3], 4 );
-
-    __builtin_memcpy( (char*)&content_ + 24, &curr, 4 );
-
-    return prev;
-  }
-
-  uint32_t peek_operation()
-  {
-    uint32_t prev = 0xF & ( (uint32_t)content_[3] );
-    return prev;
-  }
 
   static Handle name_only( Handle handle )
   {
@@ -257,6 +233,12 @@ public:
 
   friend struct IdentityHash;
   friend struct AbslHash;
+
+  template<typename H>
+  friend H AbslHashValue( H h, const Handle& handle )
+  {
+    return H::combine( std::move( h ), _mm256_extract_epi64( handle.content_, 0 ) );
+  }
 };
 
 struct IdentityHash
