@@ -17,7 +17,7 @@ bool RuntimeStorage::steal_work( Task& task, size_t tid )
 {
   // Starting at the next thread index after the current thread--look to steal work
   for ( size_t i = 0; i < num_workers_; ++i ) {
-    if ( workers_[( i + tid + 1 ) % num_workers_]->jobs_.pop( task ) ) {
+    if ( workers_[( i + tid + 1 ) % num_workers_]->runq_.pop( task ) ) {
       return true;
     }
   }
@@ -33,7 +33,7 @@ Handle RuntimeStorage::eval_thunk( Handle name )
 
   fix_cache_.start( task, workers_[0].get()->queue_cb );
 
-  return fix_cache_.get_blocking( task );
+  return fix_cache_.get_or_block( task );
 }
 
 Handle RuntimeStorage::add_blob( Blob&& blob )

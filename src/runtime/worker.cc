@@ -34,11 +34,11 @@ bool RuntimeWorker::await_tree( Task task )
   // first of N dependencies, then get preeempted; if that dependency runs to completion in the meantime, it'll
   // reset the count back to zero and start <task> again.  This could then happen for the other N-1 dependencies,
   // leading to <task> being queued N times.
-  runtimestorage_.fix_cache_.increment_blocking_count( task, tree.size() );
+  runtimestorage_.fix_cache_.increment_blocked_count( task, tree.size() );
   size_t blocking = 0;
   for ( size_t i = 0; i < tree.size(); i++ ) {
     Task target = Task::Eval( tree.at( i ) );
-    blocking = runtimestorage_.fix_cache_.add_dependency_or_decrement_blocking_count( target, task, queue_cb );
+    blocking = runtimestorage_.fix_cache_.add_dependency_or_decrement_blocked_count( target, task, queue_cb );
   }
   return blocking == 0;
 }
@@ -97,7 +97,7 @@ std::optional<Handle> RuntimeWorker::do_eval( Task task )
 void RuntimeWorker::queue_job( Task task )
 {
   runtimestorage_.work_++;
-  jobs_.push( std::move( task ) );
+  runq_.push( std::move( task ) );
   runtimestorage_.work_.notify_all();
 }
 
@@ -105,7 +105,7 @@ optional<Task> RuntimeWorker::dequeue_job()
 {
   // Try to pop off the local queue, steal work if that fails, return false if no work can be found
   Task task;
-  bool work = jobs_.pop( task );
+  bool work = runq_.pop( task );
 
   if ( !work ) {
     work = runtimestorage_.steal_work( task, thread_id_ );

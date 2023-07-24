@@ -5,6 +5,11 @@
 #include "handle.hh"
 #include "operation.hh"
 
+/**
+ * A "Task" is the base unit of work in Fix.  It corresponds to the execution of a certain ::Operation on a certain
+ * Handle.  Tasks are immutable and trivially constructable/destructable; they are meant to be used only as keys for
+ * FixCache and RuntimeWorker.
+ */
 class Task
 {
   Handle handle_;

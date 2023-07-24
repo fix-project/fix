@@ -29,7 +29,7 @@ class RuntimeStorage
 private:
   friend class RuntimeWorker;
 
-  fixcache fix_cache_;
+  FixCache fix_cache_;
   absl::flat_hash_map<Handle, Handle, AbslHash> canonical_to_local_;
 
   // Maps a Wasm function Handle to corresponding compiled Program
