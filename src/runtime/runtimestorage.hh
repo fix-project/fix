@@ -29,38 +29,36 @@ class RuntimeStorage
 private:
   friend class RuntimeWorker;
 
-  FixCache fix_cache_;
-  absl::flat_hash_map<Handle, Handle, AbslHash> canonical_to_local_;
+  FixCache fix_cache_ {};
+  absl::flat_hash_map<Handle, Handle, AbslHash> canonical_to_local_ {};
 
   // Maps a Wasm function Handle to corresponding compiled Program
-  InMemoryStorage<Program> name_to_program_;
+  InMemoryStorage<Program> name_to_program_ {};
 
   // Storage for Object/Handles with a local name
-  concurrent_vector<Object> local_storage_;
+  concurrent_vector<Object> local_storage_ {};
 
-  std::vector<std::unique_ptr<RuntimeWorker>> workers_;
+  std::vector<std::unique_ptr<RuntimeWorker>> workers_ {};
 
   size_t num_workers_;
 
-  std::atomic<bool> threads_active_;
-  std::atomic<bool> threads_started_;
+  std::atomic<bool> threads_active_ = true;
+  std::atomic<bool> threads_started_ = false;
 
-  std::atomic<size_t> work_;
+  std::atomic<size_t> work_ = 0;
 
   inline static thread_local Handle current_procedure_;
 
+  std::thread scheduler_thread_ {};
+  boost::lockfree::queue<Task> schedulable_tasks_;
+  std::atomic<size_t> schedulable_ = 0;
+
   RuntimeStorage()
-    : fix_cache_()
-    , canonical_to_local_()
-    , name_to_program_()
-    , local_storage_()
-    , workers_()
-    , num_workers_( 16 )
-    , threads_active_( true )
-    , threads_started_( false )
-    , work_( 0 )
+    : num_workers_( 16 )
+    , schedulable_tasks_( 0 )
   {
     wasm_rt_init();
+    scheduler_thread_ = std::thread( std::bind( &RuntimeStorage::schedule, this ) );
 
     for ( size_t i = 0; i < num_workers_; ++i ) {
       std::unique_ptr<RuntimeWorker> worker = std::make_unique<RuntimeWorker>( i, *this );
@@ -76,9 +74,36 @@ private:
     threads_active_ = false;
     work_ = 1;
     work_.notify_all();
+    schedulable_ = 1;
+    schedulable_.notify_all();
 
     for ( size_t i = 0; i < num_workers_; ++i ) {
       ( *workers_.at( i ) ).thread_.join();
+    }
+    scheduler_thread_.join();
+  }
+
+  void schedule_task( Task task )
+  {
+    schedulable_tasks_.push( task );
+    schedulable_++;
+    schedulable_.notify_all();
+  }
+
+  void schedule()
+  {
+    schedulable_.wait( 0 );
+    while ( threads_active_ ) {
+      Task task;
+      bool popped = schedulable_tasks_.pop( task );
+      schedulable_--;
+      if ( not popped ) {
+        throw std::runtime_error( "couldn't pop task" );
+      }
+      workers_.at( 0 )->runq_.push( task );
+      work_++;
+      work_.notify_all();
+      schedulable_.wait( 0 );
     }
   }
 

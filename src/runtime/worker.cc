@@ -96,9 +96,7 @@ std::optional<Handle> RuntimeWorker::do_eval( Task task )
 
 void RuntimeWorker::queue_job( Task task )
 {
-  runtimestorage_.work_++;
-  runq_.push( std::move( task ) );
-  runtimestorage_.work_.notify_all();
+  runtimestorage_.schedule_task( task );
 }
 
 optional<Task> RuntimeWorker::dequeue_job()

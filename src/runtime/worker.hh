@@ -58,7 +58,8 @@ private:
   void cache( Task task, Handle result );
 
   /**
-   * The callback to take ownership of a Task, by adding it to the runnable queue of this RuntimeWorker.
+   * The callback to take ownership of a Task, which in this case adds it to the scheduleable queue of
+   * RuntimeStorage.
    *
    * @param task  The inbound Task, which should be added to the runnable queue.
    */
