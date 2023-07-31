@@ -89,9 +89,6 @@ private:
     for ( size_t i = 1;; ++i ) {
       auto pair = std::make_pair( depender, i );
       if ( !inverted_dependency_graph_.contains( pair ) ) {
-        if ( depender.handle().get_local_id() == 13 * 16 + 9 ) {
-          std::cerr << "Bonjour\n" << depender << " and " << dependee << std::endl;
-        }
         inverted_dependency_graph_.insert( { pair, dependee } );
         break;
       }

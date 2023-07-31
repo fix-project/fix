@@ -1,4 +1,3 @@
-#include <cassert>
 #include <charconv>
 #include <cstddef>
 #include <cstdlib>
@@ -145,7 +144,6 @@ void program_body( span_view<char*> args )
         } else if ( handle.is_canonical() ) {
           id = runtime.get_local_handle( handle ).get_local_id();
         } else {
-          assert( handle.is_literal_blob() );
           cout << "Blob: ";
           print_string_view( handle.literal_blob() );
           cout << endl;
@@ -158,9 +156,6 @@ void program_body( span_view<char*> args )
         continue;
       }
       if ( holds_alternative<Blob>( runtime.local_storage_at( id ) ) ) {
-        // since the blob is in local storage, it cannot be less than 32 bytes
-        // otherwise, it would be a literal instead
-        assert( blob.size() >= 32 );
         cout << "Blob: ";
         print_string_view( get<Blob>( runtime.local_storage_at( id ) ) );
         cout << endl;
