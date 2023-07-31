@@ -39,6 +39,23 @@ public:
     return handle_ == other.handle() and operation_ == other.operation();
   }
 
+  friend std::ostream& operator<<( std::ostream& s, const Task task )
+  {
+    s << task.handle_ << ": ";
+    switch ( task.operation() ) {
+      case Operation::Apply:
+        s << "Apply";
+        break;
+      case Operation::Eval:
+        s << "Eval";
+        break;
+      case Operation::Fill:
+        s << "Fill";
+        break;
+    }
+    return s;
+  }
+
   template<typename H>
   friend H AbslHashValue( H h, const Task& task )
   {
@@ -47,4 +64,5 @@ public:
 
   static Task Eval( Handle handle ) { return Task( handle, Operation::Eval ); }
   static Task Apply( Handle handle ) { return Task( handle, Operation::Apply ); }
+  static Task Fill( Handle handle ) { return Task( handle, Operation::Fill ); }
 };

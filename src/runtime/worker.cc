@@ -58,7 +58,8 @@ std::optional<Handle> RuntimeWorker::do_eval( Task task )
     case ContentType::Tree:
       if ( !await_tree( task ) )
         return {};
-      return do_fill( name );
+
+      return await( Task::Fill( name ), task );
 
     case ContentType::Tag: {
       Tree tree = runtimestorage_.get_tree( name );
@@ -71,7 +72,7 @@ std::optional<Handle> RuntimeWorker::do_eval( Task task )
       if ( not result )
         return {};
 
-      return do_fill( name );
+      return await( Task::Fill( name ), task );
     }
 
     case ContentType::Thunk:
@@ -191,6 +192,8 @@ optional<Handle> RuntimeWorker::progress( Task task )
       return do_apply( task );
     case Operation::Eval:
       return do_eval( task );
+    case Operation::Fill:
+      return do_fill( task.handle() );
   }
   throw std::runtime_error( "invalid operation for progress" );
 }

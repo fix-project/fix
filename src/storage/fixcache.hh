@@ -41,19 +41,22 @@ private:
 
   absl::flat_hash_map<std::pair<Task, std::size_t>, Task, absl::Hash<std::pair<Task, std::size_t>>>
     dependency_graph_;
+  absl::flat_hash_map<std::pair<Task, std::size_t>, Task, absl::Hash<std::pair<Task, std::size_t>>>
+    inverted_dependency_graph_;
   absl::flat_hash_map<Task, std::shared_ptr<std::atomic<std::size_t>>, absl::Hash<Task>> blocked_count_;
   std::shared_mutex fixcache_mutex_;
   std::condition_variable_any fixcache_cv_;
 
   /**
    * Marks that execution of @p depender is blocked until the result of @p dependee has been calculated.
+   * Used for resuming work.
    *
    * @pre FixCache::fixcache_mutex_ must be locked in exclusive mode.
    *
    * @param dependee  The task which can make progress.
    * @param depender  The task which is blocked.
    */
-  void insert_dependency( Task dependee, Task depender )
+  void insert_pending_dependency( Task dependee, Task depender )
   {
     if ( dependee == depender ) {
       throw std::runtime_error( "attempted to insert self-dependency" );
@@ -64,6 +67,36 @@ private:
       auto ins = dependency_graph_.insert( { pair, depender } );
       // If insertion was sucessful
       if ( ins.second ) {
+        break;
+      }
+    }
+  }
+
+  /**
+   * Marks that completion of @p depender requires @p dependee, regardless of whether @p dependee has been
+   * calculated or not.
+   *
+   * Used specifically for tracing computation progress. The inverted graph is not guaranteed to match the
+   * dependency graph.
+   *
+   * @pre FixCache::fixcache_mutex_ must be locked in exclusive mode.
+   *
+   * @param dependee  The task which must run first.
+   * @param depender  The task which is blocked.
+   */
+  void insert_reverse_dependency( Task dependee, Task depender )
+  {
+    for ( size_t i = 1;; ++i ) {
+      auto pair = std::make_pair( depender, i );
+      if ( !inverted_dependency_graph_.contains( pair ) ) {
+        if ( depender.handle().get_local_id() == 13 * 16 + 9 ) {
+          std::cerr << "Bonjour\n" << depender << " and " << dependee << std::endl;
+        }
+        inverted_dependency_graph_.insert( { pair, dependee } );
+        break;
+      }
+      // avoid inserting a duplicate dependency
+      if ( inverted_dependency_graph_.at( pair ) == dependee ) {
         break;
       }
     }
@@ -85,6 +118,9 @@ private:
       auto pair = std::make_pair( finished, i );
       if ( dependency_graph_.contains( pair ) ) {
         Task requestor = dependency_graph_.at( pair );
+        if ( fixcache_.contains( requestor ) && fixcache_.at( requestor ).has_value() ) {
+          throw std::runtime_error( "attempting to reduce blocked count of already finished task" );
+        }
         size_t blocked = blocked_count_.at( requestor )->fetch_sub( 1 ) - 1;
         if ( blocked == 0 ) {
           queue( requestor );
@@ -120,6 +156,7 @@ public:
   FixCache()
     : fixcache_()
     , dependency_graph_()
+    , inverted_dependency_graph_()
     , blocked_count_()
     , fixcache_mutex_()
     , fixcache_cv_()
@@ -199,10 +236,11 @@ public:
   {
     std::unique_lock lock( fixcache_mutex_ );
     add_task( dependee, queue );
+    insert_reverse_dependency( dependee, depender );
     if ( fixcache_.at( dependee ).has_value() ) {
       return fixcache_.at( dependee );
     }
-    insert_dependency( dependee, depender );
+    insert_pending_dependency( dependee, depender );
     blocked_count_.at( depender )->fetch_add( 1 );
     return {};
   }
@@ -240,10 +278,11 @@ public:
   {
     std::unique_lock lock( fixcache_mutex_ );
     add_task( dependee, queue );
+    insert_reverse_dependency( dependee, depender );
     if ( fixcache_.at( dependee ).has_value() ) {
       return blocked_count_.at( depender )->fetch_sub( 1 ) - 1;
     }
-    insert_dependency( dependee, depender );
+    insert_pending_dependency( dependee, depender );
     return *blocked_count_.at( depender );
   }
 
@@ -260,5 +299,21 @@ public:
     fixcache_cv_.wait(
       lock, [this, target] { return fixcache_.contains( target ) and fixcache_.at( target ).has_value(); } );
     return fixcache_.at( target ).value();
+  }
+
+  std::vector<Task> get_dependees( Task depender )
+  {
+    std::shared_lock lock( fixcache_mutex_ );
+    std::vector<Task> result = {};
+
+    for ( size_t i = 1;; ++i ) {
+      auto pair = std::make_pair( depender, i );
+      if ( !inverted_dependency_graph_.contains( pair ) ) {
+        break;
+      }
+      result.push_back( inverted_dependency_graph_.at( pair ) );
+    }
+
+    return result;
   }
 };
