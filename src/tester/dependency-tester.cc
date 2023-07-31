@@ -208,7 +208,7 @@ void program_body( span_view<char*> args )
       cout << "]" << endl;
 
       cout << "Fill dependees: [" << endl;
-      vector<Task> fill_entries = runtime.get_dependees( Task( input.value(), Operation::Fill) );
+      vector<Task> fill_entries = runtime.get_dependees( Task( input.value(), Operation::Fill ) );
       for ( auto& entry : fill_entries ) {
         cout << "  " << entry;
         if ( entry.handle().is_literal_blob() ) {
