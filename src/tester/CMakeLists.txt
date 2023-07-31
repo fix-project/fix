@@ -8,6 +8,10 @@ add_executable(stateless-tester "stateless-tester.cc" "tester-utils.cc")
 target_link_libraries(stateless-tester ${FIXPOINT_LIBS})
 target_link_libraries(stateless-tester cryptopp wasmrt absl::flat_hash_map)
 
+add_executable(dependency-tester "dependency-tester.cc" "tester-utils.cc")
+target_link_libraries(dependency-tester ${FIXPOINT_LIBS})
+target_link_libraries(dependency-tester cryptopp wasmrt absl::flat_hash_map)
+
 add_executable(distributed-tester "distributed-tester.cc" "tester-utils.cc")
 target_link_libraries(distributed-tester ${FIXPOINT_LIBS})
 target_link_libraries(distributed-tester cryptopp wasmrt absl::flat_hash_map)

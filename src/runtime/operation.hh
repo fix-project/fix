@@ -18,4 +18,6 @@ enum class Operation : uint8_t
   Apply,
   /// Evaluate an Object (non-blocking)
   Eval,
+  /// Fill a Tree or Tag (non-blocking)
+  Fill,
 };

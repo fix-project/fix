@@ -160,4 +160,16 @@ public:
 
   // Get the total storage size downstream of this name
   size_t get_total_size( Handle name );
+
+  // Get dependees. A list of tasks that must complete before this task may be unblocked
+  std::vector<Task> get_dependees( Task depender ) { return fix_cache_.get_dependees( depender ); }
+  // Get dependees
+  std::optional<Handle> get_status( Task task ) { return fix_cache_.get( task ); };
+
+  // get entries in local storage for debugging purposes
+  Object& local_storage_at( size_t index ) { return local_storage_.at( index ); }
+
+  size_t get_local_storage_size() { return local_storage_.size(); }
+
+  Handle get_local_handle( Handle canonical ) { return canonical_to_local_.at( canonical ); }
 };
