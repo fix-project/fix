@@ -47,6 +47,8 @@ public:
     Compiling,
     Linking,
     Populating,
+    Nonblock,
+    WaitingForEvent,
     count
   };
 
@@ -60,41 +62,43 @@ public:
                                                                                "Create tree",
                                                                                "Compiling Wasm to C",
                                                                                "Linking C to Elf",
-                                                                               "Populating instances" } };
+                                                                               "Populating instances",
+                                                                               "Nonblocking operations",
+                                                                               "Waiting for event" } };
 
   static uint64_t baseline_;
 
 private:
-  uint64_t _beginning_timestamp = __rdtsc();
+  uint64_t _beginning_timestamp = read_tsc();
   std::array<Record, num_categories> _records {};
   std::optional<Category> _current_category {};
   uint64_t _start_time {};
 
 public:
+  static uint64_t read_tsc()
+  {
+    uint64_t ret = __rdtsc();
+    _mm_lfence();
+    return ret;
+  }
+
   template<Category category>
-  void start()
+  void start( const uint64_t now = read_tsc() )
   {
     if ( _current_category.has_value() ) {
       std::cout << static_cast<size_t>( _current_category.value() ) << std::endl;
       abort();
     }
-
-    const uint64_t now = __rdtsc();
-    _mm_lfence();
-
     _current_category = category;
     _start_time = now;
   }
 
   template<Category category>
-  void stop()
+  void stop( const uint64_t now = read_tsc() )
   {
     if ( not _current_category.has_value() or _current_category.value() != category ) {
       abort();
     }
-
-    _mm_lfence();
-    const uint64_t now = __rdtsc();
 
     _records[static_cast<size_t>( category )].log( now - _start_time );
     _current_category.reset();
@@ -174,5 +178,31 @@ inline GlobalScopeTimer<Timer::Category::Execution>::GlobalScopeTimer()
 template<>
 inline GlobalScopeTimer<Timer::Category::Execution>::~GlobalScopeTimer()
 {}
-
 #endif
+
+template<Timer::Category category>
+class MultiTimer
+{
+  Timer::Record *_timer1, *_timer2;
+  uint64_t _start_time;
+
+public:
+  MultiTimer( Timer::Record& timer1, Timer::Record& timer2 )
+    : _timer1( &timer1 )
+    , _timer2( &timer2 )
+    , _start_time( Timer::read_tsc() )
+  {
+    global_timer().start<category>( _start_time );
+  }
+
+  ~MultiTimer()
+  {
+    const uint64_t now = Timer::read_tsc();
+    _timer1->log( now - _start_time );
+    _timer2->log( now - _start_time );
+    global_timer().stop<category>( now );
+  }
+
+  MultiTimer( const MultiTimer& ) = delete;
+  MultiTimer& operator=( const MultiTimer& ) = delete;
+};
