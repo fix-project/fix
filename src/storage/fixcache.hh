@@ -300,7 +300,7 @@ public:
 
   /**
    * Gets the dependees of a certain Task that may be in process or completed.
-   * 
+   *
    * @param depender  The Task to lookup.
    * @return          All tasks that are currently registered as blocking @p depender.
    */
@@ -322,27 +322,27 @@ public:
 
   /**
    * Creates a map from Handle to all possible Tasks that created that Handle.
-   * 
+   *
    * Time complexity grows linearly with the size of fixcache_.
-   * 
+   *
    * @return  A map from all Handles (results of computations) to Tasks that may
    *          have created them.
    */
-  absl::flat_hash_map<Handle, std::vector<Task>, absl::Hash<Handle>> get_parent_map() 
+  absl::flat_hash_map<Handle, std::vector<Task>, absl::Hash<Handle>> get_parent_map()
   {
     std::shared_lock lock( fixcache_mutex_ );
     absl::flat_hash_map<Handle, std::vector<Task>, absl::Hash<Handle>> result = {};
 
-    for (auto &[task, handle] : fixcache_ ) {
-      if (handle.has_value()) {
+    for ( auto& [task, handle] : fixcache_ ) {
+      if ( handle.has_value() ) {
         Handle value = handle.value();
-        if (!result.contains(value)) {
-          result.insert({value, {}});
+        if ( !result.contains( value ) ) {
+          result.insert( { value, {} } );
         }
-        result.at(value).push_back(task);
+        result.at( value ).push_back( task );
       }
     }
-    
+
     return result;
   }
 };
