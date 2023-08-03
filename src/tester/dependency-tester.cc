@@ -108,8 +108,10 @@ void program_body( span_view<char*> args )
   cout << "Result handle: " << result << endl;
   cout << endl;
 
+  absl::flat_hash_map<Handle, std::vector<Task>, absl::Hash<Handle>> parent_map = runtime.get_parent_map();
+
   while ( true ) {
-    cout << "Enter [content(c)|dependees(d)] and a local id or handle in form ab|cd|ef|01 (empty to "
+    cout << "Enter [parents(p)|content(c)|dependees(d)] and a local id or handle in form ab|cd|ef|01 (empty to "
             "quit):"
          << endl;
     string input;
@@ -120,14 +122,29 @@ void program_body( span_view<char*> args )
     size_t pos = input.find( " " );
 
     if ( pos == string::npos ) {
-      cout << "Put a space between [content|dependees] and [local-id|handle]" << endl;
+      cout << "Put a space between [parents(p)|content|dependees] and [local-id|handle]" << endl;
       continue;
     }
 
     string command = input.substr( 0, pos );
     string id_input = input.substr( pos + 1 );
 
-    if ( command == "content" || command == "c" ) {
+    if ( command == "parents" || command == "p" ) {
+      auto input = parse_handle( id_input );
+      if ( !input.has_value() ) {
+        cout << "Could not parse handle (parents command must take a handle)." << endl;
+        continue;
+      }
+      if ( !parent_map.contains( input.value() ) ) {
+        cout << "Could not find handle in parent_map" << endl;
+        continue;
+      }
+      cout << "[\n";
+      for ( auto& task : parent_map.at( input.value() ) ) {
+        cout << "  " << task << ",\n";
+      }
+      cout << "]\n";
+    } else if ( command == "content" || command == "c" ) {
 
       size_t id;
       if ( id_input.find( "|" ) == string::npos ) {
