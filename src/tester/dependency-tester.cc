@@ -129,18 +129,18 @@ void program_body( span_view<char*> args )
     string command = input.substr( 0, pos );
     string id_input = input.substr( pos + 1 );
 
-    if (command == "parents" || command == "p") {
+    if ( command == "parents" || command == "p" ) {
       auto input = parse_handle( id_input );
       if ( !input.has_value() ) {
         cout << "Could not parse handle (parents command must take a handle)." << endl;
         continue;
       }
-      if (!parent_map.contains(input.value())) {
+      if ( !parent_map.contains( input.value() ) ) {
         cout << "Could not find handle in parent_map" << endl;
         continue;
       }
       cout << "[\n";
-      for (auto &task : parent_map.at(input.value())) {
+      for ( auto& task : parent_map.at( input.value() ) ) {
         cout << "  " << task << ",\n";
       }
       cout << "]\n";
