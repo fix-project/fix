@@ -62,8 +62,6 @@ void kick_off( span_view<char*> args )
   runtime.eval_thunk_nonblocking( thunk_name );
 
   cout << "Thunk name: " << base64::encode( thunk_name ) << endl;
-
-  cout << flush;
 }
 
 ptree list_dependees( Handle handle )
@@ -180,7 +178,7 @@ void program_body( span_view<char*> args )
         auto map = decode_url_params( target );
         if ( target == "/start" ) {
           kick_off( args );
-          response = "done";
+          response = "{\"data\": \"started\"}";
         } else if ( target.starts_with( "/list" ) ) {
           stringstream ptree;
           write_json( ptree, list_dependees( base64::decode( map.at( "handle" ) ) ) );
@@ -195,7 +193,7 @@ void program_body( span_view<char*> args )
         the_response.http_version = "HTTP/1.1";
         the_response.status_code = "200";
         the_response.reason_phrase = "OK";
-        the_response.headers.content_type = "text/html";
+        the_response.headers.content_type = "text/json";
         the_response.headers.content_length = response.size();
         the_response.body = response;
         http_server.push_response( move( the_response ) );
