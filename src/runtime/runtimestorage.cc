@@ -38,11 +38,11 @@ optional<Handle> RuntimeStorage::eval_thunk_nonblocking( Handle name )
 
 Handle RuntimeStorage::eval_thunk( Handle name )
 {
-  auto cached = eval_thunk_nonblocking(name);
+  auto cached = eval_thunk_nonblocking( name );
   if ( cached )
     return cached.value();
 
-  return fix_cache_.get_or_block( Task ( name, Operation::Eval ));
+  return fix_cache_.get_or_block( Task( name, Operation::Eval ) );
 }
 
 Handle RuntimeStorage::add_blob( Blob&& blob )
