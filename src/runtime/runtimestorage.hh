@@ -136,6 +136,9 @@ public:
   // add Thunk
   Handle add_thunk( Thunk thunk );
 
+  // Nonblocking eval operations
+  std::optional<Handle> eval_thunk_nonblocking( Handle name );
+
   // Blocking eval operations
   Handle eval_thunk( Handle name );
 
