@@ -58,9 +58,10 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
   // make a Thunk that points to the combination
   Handle thunk_name = runtime.add_thunk( Thunk { encode_name } );
 
-  runtime.eval_thunk_nonblocking( thunk_name );
+  Handle result = runtime.eval_thunk( thunk_name );
 
   cout << "Thunk name: " << base64::encode( thunk_name ) << endl;
+  cout << "Result name: " << base64::encode( result ) << endl;
 }
 
 ptree list_dependees( Handle handle )
