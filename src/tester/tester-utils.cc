@@ -13,6 +13,10 @@ T to_int( const std::string_view str );
 template<std::integral T>
 T from_int( const std::string_view str );
 
+/**
+ * Adds the args to RuntimeStorage, loading files and creating objects as necessary. 
+ * Make sure to keep open_files alive as long as RuntimeStorage needs to access its' objects.
+ */
 Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
 {
   auto& runtime = RuntimeStorage::get_instance();

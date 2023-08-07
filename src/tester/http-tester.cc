@@ -9,6 +9,7 @@
 #include "base64.hh"
 #include "eventloop.hh"
 #include "http_server.hh"
+#include "mmap.hh"
 #include "operation.hh"
 #include "runtimestorage.hh"
 #include "socket.hh"
@@ -40,10 +41,8 @@ Handle parse_handle( string id )
   return Handle( numbers[0], numbers[1], numbers[2], numbers[3] );
 }
 
-void kick_off( span_view<char*> args )
+void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 {
-  vector<ReadOnlyFile> open_files;
-
   // make the combination from the given arguments
   Handle encode_name = parse_args( args, open_files );
 
@@ -82,9 +81,15 @@ ptree list_dependees( Handle handle )
 ptree get_value( Handle handle, Operation operation )
 {
   ptree pt;
-  optional<Handle> result = RuntimeStorage::get_instance().get_status( Task( handle, operation ) );
+  optional<optional<Handle>> result = RuntimeStorage::get_instance().get_status( Task( handle, operation ) );
   if ( result.has_value() ) {
-    pt.push_back( ptree::value_type( "data", base64::encode( result.value() ) ) );
+    ptree data;
+    if ( result.value().has_value() ) {
+      data.push_back( ptree::value_type( "entry", base64::encode( result.value().value() ) ) );
+    } else {
+      data.push_back( ptree::value_type( "entry", "" ));
+    }
+    pt.push_back( ptree::value_type("data", data));
   } else {
     pt.push_back( ptree::value_type( "data", "" ) );
   }
@@ -160,6 +165,8 @@ void program_body( span_view<char*> args )
   HTTPServer http_server;
   HTTPRequest request_in_progress;
 
+  vector<ReadOnlyFile> open_files;
+
   events.add_rule(
     "Read bytes from client",
     connection,
@@ -177,7 +184,7 @@ void program_body( span_view<char*> args )
 
         auto map = decode_url_params( target );
         if ( target == "/start" ) {
-          kick_off( args );
+          kick_off( args, open_files );
           response = "{\"data\": \"started\"}";
         } else if ( target.starts_with( "/list" ) ) {
           stringstream ptree;
