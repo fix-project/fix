@@ -15,7 +15,7 @@ T from_int( const std::string_view str );
 
 /**
  * Adds the args to RuntimeStorage, loading files and creating objects as necessary.
- * Make sure to keep open_files alive as long as RuntimeStorage needs to access its' objects.
+ * The contents of @p open_files must outlive this RuntimeStorage instance.
  */
 Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
 {
