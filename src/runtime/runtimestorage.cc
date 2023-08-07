@@ -24,23 +24,14 @@ bool RuntimeStorage::steal_work( Task& task, size_t tid )
   return false;
 }
 
-optional<Handle> RuntimeStorage::eval_thunk_nonblocking( Handle name )
+Handle RuntimeStorage::eval_thunk( Handle name )
 {
   Task task( name, Operation::Eval );
   auto cached = fix_cache_.get( task );
-  if ( cached )
-    return cached.value();
+  if ( cached && cached.value() )
+    return cached.value().value();
 
   fix_cache_.start( task, workers_[0].get()->queue_cb );
-
-  return {};
-}
-
-Handle RuntimeStorage::eval_thunk( Handle name )
-{
-  auto cached = eval_thunk_nonblocking( name );
-  if ( cached )
-    return cached.value();
 
   return fix_cache_.get_or_block( Task( name, Operation::Eval ) );
 }
