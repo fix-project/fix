@@ -87,9 +87,9 @@ ptree get_value( Handle handle, Operation operation )
     if ( result.value().has_value() ) {
       data.push_back( ptree::value_type( "entry", base64::encode( result.value().value() ) ) );
     } else {
-      data.push_back( ptree::value_type( "entry", "" ));
+      data.push_back( ptree::value_type( "entry", "" ) );
     }
-    pt.push_back( ptree::value_type("data", data));
+    pt.push_back( ptree::value_type( "data", data ) );
   } else {
     pt.push_back( ptree::value_type( "data", "" ) );
   }

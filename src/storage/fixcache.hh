@@ -163,9 +163,9 @@ public:
    * Gets the cached result of a Task.
    *
    * @param task  The Task to lookup.
-   * @return      If a corresponding entry does not exist in the cache, then std::nullopt is returned. value(std::nullopt) 
-   *              is returned if the entry in the cache exists but the result is not cached yet. If the result is 
-   *              cached, then value(value(Handle)) of the result is returned.
+   * @return      If a corresponding entry does not exist in the cache, then std::nullopt is returned.
+   * value(std::nullopt) is returned if the entry in the cache exists but the result is not cached yet. If the
+   * result is cached, then value(value(Handle)) of the result is returned.
    */
   std::optional<std::optional<Handle>> get( Task task )
   {
