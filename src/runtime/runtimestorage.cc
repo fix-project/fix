@@ -33,7 +33,7 @@ Handle RuntimeStorage::eval_thunk( Handle name )
 
   fix_cache_.start( task, workers_[0].get()->queue_cb );
 
-  return fix_cache_.get_or_block( Task( name, Operation::Eval ) );
+  return fix_cache_.get_or_block( task );
 }
 
 Handle RuntimeStorage::add_blob( Blob&& blob )
