@@ -169,7 +169,7 @@ public:
   {
     std::shared_lock lock( fixcache_mutex_ );
     if ( fixcache_.contains( task ) ) {
-      return { fixcache_.at( task ) };
+      return fixcache_.at( task );
     } else {
       return {};
     }

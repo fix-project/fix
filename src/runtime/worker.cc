@@ -160,7 +160,6 @@ Handle RuntimeWorker::do_fill( Handle name )
         tree.mutable_data()[i] = entry;
 
         if ( entry.is_strict() and !entry.is_blob() ) {
-          // the entry must have been started (the first .value) and finished (the second .value)
           tree.mutable_data()[i] = runtimestorage_.fix_cache_.get( Task::Eval( entry ) ).value();
         }
       }
