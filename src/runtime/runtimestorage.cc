@@ -28,8 +28,8 @@ Handle RuntimeStorage::eval_thunk( Handle name )
 {
   Task task( name, Operation::Eval );
   auto cached = fix_cache_.get( task );
-  if ( cached && cached.value() )
-    return cached.value().value();
+  if ( cached )
+    return cached.value();
 
   fix_cache_.start( task, workers_[0].get()->queue_cb );
 

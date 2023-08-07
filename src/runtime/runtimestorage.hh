@@ -136,9 +136,6 @@ public:
   // add Thunk
   Handle add_thunk( Thunk thunk );
 
-  // Nonblocking eval operations
-  std::optional<Handle> eval_thunk_nonblocking( Handle name );
-
   // Blocking eval operations
   Handle eval_thunk( Handle name );
 
@@ -166,9 +163,9 @@ public:
 
   // Get dependees. A list of tasks that must complete before this task may be unblocked
   std::vector<Task> get_dependees( Task depender ) { return fix_cache_.get_dependees( depender ); }
-  // Get status. Returns none if the entry does not exist, value(none) if the entry exists
-  // but is not yet evaluated, and value(value(handle)) if the handle exists in cache.
-  std::optional<std::optional<Handle>> get_status( Task task ) { return fix_cache_.get( task ); };
+  // Get status. Returns none if the entry does not exist or does exist and is std::nullopt.
+  // Returns value(handle) if the handle exists in cache.
+  std::optional<Handle> get_status( Task task ) { return fix_cache_.get( task ); };
 
   // get entries in local storage for debugging purposes
   Object& local_storage_at( size_t index ) { return local_storage_.at( index ); }
