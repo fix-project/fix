@@ -161,7 +161,7 @@ Handle RuntimeWorker::do_fill( Handle name )
 
         if ( entry.is_strict() and !entry.is_blob() ) {
           // the entry must have been started (the first .value) and finished (the second .value)
-          tree.mutable_data()[i] = runtimestorage_.fix_cache_.get( Task::Eval( entry ) ).value().value();
+          tree.mutable_data()[i] = runtimestorage_.fix_cache_.get( Task::Eval( entry ) ).value();
         }
       }
 
@@ -174,7 +174,7 @@ Handle RuntimeWorker::do_fill( Handle name )
       span_view<Handle> tag = runtimestorage_.get_tree( new_name );
 
       auto first_entry = orig_tag[0];
-      tag.mutable_data()[0] = runtimestorage_.fix_cache_.get( Task::Eval( first_entry ) ).value().value();
+      tag.mutable_data()[0] = runtimestorage_.fix_cache_.get( Task::Eval( first_entry ) ).value();
       tag.mutable_data()[1] = orig_tag[1];
       tag.mutable_data()[2] = orig_tag[2];
 
