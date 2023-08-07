@@ -163,7 +163,8 @@ public:
 
   // Get dependees. A list of tasks that must complete before this task may be unblocked
   std::vector<Task> get_dependees( Task depender ) { return fix_cache_.get_dependees( depender ); }
-  // Get dependees
+  // Get status. Returns none if the entry does not exist or does exist and is std::nullopt.
+  // Returns value(handle) if the handle exists in cache.
   std::optional<Handle> get_status( Task task ) { return fix_cache_.get( task ); };
 
   // get entries in local storage for debugging purposes
