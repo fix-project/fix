@@ -108,8 +108,6 @@ void program_body( span_view<char*> args )
   cout << "Result handle: " << result << endl;
   cout << endl;
 
-  absl::flat_hash_map<Handle, std::vector<Task>, absl::Hash<Handle>> parent_map = runtime.get_parent_map();
-
   while ( true ) {
     cout << "Enter [parents(p)|content(c)|dependees(d)] and a local id or handle in form ab|cd|ef|01 (empty to "
             "quit):"
@@ -135,12 +133,8 @@ void program_body( span_view<char*> args )
         cout << "Could not parse handle (parents command must take a handle)." << endl;
         continue;
       }
-      if ( !parent_map.contains( input.value() ) ) {
-        cout << "Could not find handle in parent_map" << endl;
-        continue;
-      }
       cout << "[\n";
-      for ( auto& task : parent_map.at( input.value() ) ) {
+      for ( auto& task : runtime.get_parents( input.value() ) ) {
         cout << "  " << task << ",\n";
       }
       cout << "]\n";

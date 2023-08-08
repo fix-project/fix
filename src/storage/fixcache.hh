@@ -321,25 +321,20 @@ public:
   }
 
   /**
-   * Creates a map from Handle to all possible Tasks that created that Handle.
+   * Search for all possible Tasks that created a Handle.
    *
    * Time complexity grows linearly with the size of fixcache_.
    *
-   * @return  A map from all Handles (results of computations) to Tasks that may
-   *          have created them.
+   * @return  A vector of Tasks that could have created this Handle.
    */
-  absl::flat_hash_map<Handle, std::vector<Task>, absl::Hash<Handle>> get_parent_map()
+  std::vector<Task> get_parents( Handle child )
   {
     std::shared_lock lock( fixcache_mutex_ );
-    absl::flat_hash_map<Handle, std::vector<Task>, absl::Hash<Handle>> result = {};
+    std::vector<Task> result = {};
 
     for ( auto& [task, handle] : fixcache_ ) {
-      if ( handle.has_value() ) {
-        Handle value = handle.value();
-        if ( !result.contains( value ) ) {
-          result.insert( { value, {} } );
-        }
-        result.at( value ).push_back( task );
+      if ( handle.has_value() and handle.value() == child ) {
+        result.push_back( task );
       }
     }
 
