@@ -174,10 +174,6 @@ public:
 
   Handle get_local_handle( Handle canonical ) { return canonical_to_local_.at( canonical ); }
 
-  // Get the parent map of handle to tasks that produced handle. Potentially expensive operation
-  // Linear in size of fixcache
-  absl::flat_hash_map<Handle, std::vector<Task>, absl::Hash<Handle>> get_parent_map()
-  {
-    return fix_cache_.get_parent_map();
-  }
+  // Get the tasks that produced a handle. Linear time in size of fixcache
+  std::vector<Task> get_parents( Handle child ) { return fix_cache_.get_parents( child ); }
 };
