@@ -6,6 +6,9 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
+
 typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
 typedef struct filedesc
@@ -720,3 +723,5 @@ externref fixpoint_apply( externref encode )
 
   return create_tree_rw_table(ReturnRWTable, 3 );
 }
+
+#pragma clang diagnostic pop

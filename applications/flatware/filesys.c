@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
+
 bool is_dir( int32_t ro_table_index )
 {
   externref ret = get_content( ro_table_index );
@@ -130,3 +133,5 @@ int32_t find_file( int32_t path, // offset into main memory of sloth program, ne
 
   return result;
 }
+
+#pragma clang diagnostic pop

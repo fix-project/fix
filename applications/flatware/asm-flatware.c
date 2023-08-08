@@ -1,5 +1,8 @@
 #include "asm-flatware.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
+
 // copy flatware to rw mem
 extern void flatware_memory_to_rw_mem_0( int32_t rw_offset, const void* flatware_pointer, int32_t len )
   __attribute( ( import_module( "asm-flatware" ), import_name( "flatware_memory_to_rw_0" ) ) );
@@ -59,3 +62,5 @@ void ro_mem_to_flatware_mem( int32_t ro_mem_id, const char* flatware_pointer, in
 {
   ro_to_flatware_functions[ro_mem_id](flatware_pointer,ro_offset, len);
 }
+
+#pragma clang diagnostic pop
