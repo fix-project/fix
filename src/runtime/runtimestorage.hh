@@ -31,6 +31,7 @@ private:
 
   FixCache fix_cache_ {};
   absl::flat_hash_map<Handle, Handle, AbslHash> canonical_to_local_ {};
+  std::unordered_multimap<Handle, std::string> friendly_names_ {};
 
   // Maps a Wasm function Handle to corresponding compiled Program
   InMemoryStorage<Program> name_to_program_ {};
@@ -48,17 +49,15 @@ private:
   std::atomic<size_t> work_ = 0;
 
   inline static thread_local Handle current_procedure_;
+  inline static thread_local bool nondeterministic_api_allowed_ = false;
 
-  std::thread scheduler_thread_ {};
-  boost::lockfree::queue<Task> schedulable_tasks_;
-  std::atomic<size_t> schedulable_ = 0;
+  std::optional<Handle> scheduler_procedure_;
 
   RuntimeStorage()
     : num_workers_( 16 )
-    , schedulable_tasks_( 0 )
+    , scheduler_procedure_( std::nullopt )
   {
     wasm_rt_init();
-    scheduler_thread_ = std::thread( std::bind( &RuntimeStorage::schedule, this ) );
 
     for ( size_t i = 0; i < num_workers_; ++i ) {
       std::unique_ptr<RuntimeWorker> worker = std::make_unique<RuntimeWorker>( i, *this );
@@ -74,38 +73,15 @@ private:
     threads_active_ = false;
     work_ = 1;
     work_.notify_all();
-    schedulable_ = 1;
-    schedulable_.notify_all();
 
     for ( size_t i = 0; i < num_workers_; ++i ) {
       ( *workers_.at( i ) ).thread_.join();
     }
-    scheduler_thread_.join();
   }
 
-  void schedule_task( Task task )
-  {
-    schedulable_tasks_.push( task );
-    schedulable_++;
-    schedulable_.notify_all();
-  }
+  void schedule( Task task );
 
-  void schedule()
-  {
-    schedulable_.wait( 0 );
-    while ( threads_active_ ) {
-      Task task;
-      bool popped = schedulable_tasks_.pop( task );
-      schedulable_--;
-      if ( not popped ) {
-        throw std::runtime_error( "couldn't pop task" );
-      }
-      workers_.at( 0 )->runq_.push( task );
-      work_++;
-      work_.notify_all();
-      schedulable_.wait( 0 );
-    }
-  }
+  RuntimeWorker& current_worker() { return *workers_.at( RuntimeWorker::current_thread_id_ ); }
 
 public:
   // Return reference to static runtime storage
@@ -113,6 +89,14 @@ public:
   {
     static RuntimeStorage runtime_instance;
     return runtime_instance;
+  }
+
+  void set_scheduler( Handle& scheduler )
+  {
+    if ( scheduler_procedure_ ) {
+      throw std::runtime_error( "Attempted to overwrite scheduler procedure." );
+    }
+    scheduler_procedure_ = scheduler;
   }
 
   bool steal_work( Task& task, size_t tid );
@@ -158,9 +142,6 @@ public:
 
   Handle get_current_procedure() const { return current_procedure_; }
 
-  // Get the total storage size downstream of this name
-  size_t get_total_size( Handle name );
-
   // Get dependees. A list of tasks that must complete before this task may be unblocked
   std::vector<Task> get_dependees( Task depender ) { return fix_cache_.get_dependees( depender ); }
   // Get status. Returns none if the entry does not exist or does exist and is std::nullopt.
@@ -176,4 +157,31 @@ public:
 
   // Get the tasks that produced a handle. Linear time in size of fixcache
   std::vector<Task> get_parents( Handle child ) { return fix_cache_.get_parents( child ); }
+
+  // Tests if the Handle (with the specified accessibility) is valid with the current contents.
+  bool contains( Handle handle );
+
+  // Gets the evaluated version of the Handle, if it's been computed already.
+  std::optional<Handle> get_evaluated( Handle handle );
+
+  // Gets all the known friendly names for this handle.
+  std::vector<std::string> get_friendly_names( Handle handle );
+
+  // Gets the base64 encoded name of the handle.
+  std::string get_encoded_name( Handle handle );
+
+  // Gets the shortened base64 encoded name of the handle.
+  std::string get_short_name( Handle handle );
+
+  // Gets the best name for this Handle to display to users.
+  std::string get_display_name( Handle handle );
+
+  // Looks up a Handle by its ref (e.g., a friendly name)
+  std::optional<Handle> get_ref( std::string_view ref );
+
+  // Checks if RuntimeStorage has marked the currently-executing thread as nondeterministic.
+  static bool nondeterministic_api_allowed()
+  {
+    return RuntimeStorage::get_instance().nondeterministic_api_allowed_;
+  }
 };

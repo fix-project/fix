@@ -10,7 +10,7 @@ bool is_dir( int32_t ro_table_index )
 {
   externref ret = get_content( ro_table_index );
 
-  if ( value_type( ret ) == 0 ) { // if is tree
+  if ( get_value_type( ret ) == 0 ) { // if is tree
     return true;
   }
 
@@ -27,7 +27,7 @@ struct substring get_name( int32_t ro_table_index )
 
   attach_blob_ro_mem( FileSystemDataROMem, ret );
 
-  blob_size = byte_size_ro_mem(FileSystemDataROMem);
+  blob_size = byte_size_ro_mem( FileSystemDataROMem );
 
   buf = (char*)malloc( (unsigned long)blob_size );
 
@@ -48,9 +48,9 @@ uint64_t get_permissions( int32_t ro_table_index )
 
   attach_blob_ro_mem( FileSystemDataROMem, ret );
 
-  blob_size = byte_size_ro_mem(FileSystemDataROMem);
+  blob_size = byte_size_ro_mem( FileSystemDataROMem );
 
-  ro_mem_to_flatware_mem(FileSystemDataROMem, (char*)&buf, 0, blob_size );
+  ro_mem_to_flatware_mem( FileSystemDataROMem, (char*)&buf, 0, blob_size );
 
   return buf;
 }
@@ -67,14 +67,14 @@ int32_t find_local_file( struct substring path, int32_t curr_fd, bool must_be_di
 
   dirent_content = get_content( curr_fd );
   attach_tree_ro_table( ScratchROTable0, dirent_content );
-  num_of_dirents = size_ro_table(ScratchROTable0);
+  num_of_dirents = size_ro_table( ScratchROTable0 );
 
   for ( int i = 0; i < num_of_dirents; i++ ) {
     struct substring name;
     externref subdirent = get_ro_table( ScratchROTable0, i );
     attach_tree_ro_table( desired_fd, subdirent );
     name = get_name( desired_fd );
-    
+
     if ( memcmp( name.ptr, path.ptr, path.len ) == 0 && name.len == path.len ) {
       attach_tree_ro_table( desired_fd, subdirent );
       if ( !is_dir( desired_fd ) && must_be_dir ) {
