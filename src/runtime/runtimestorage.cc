@@ -15,6 +15,65 @@ using namespace std;
 
 const size_t SIZE_OF_BASE64_ENCODED_HANDLE = 43;
 
+void RuntimeStorage::schedule( Task task )
+{
+  uint32_t remote = 0;
+  if ( scheduler_procedure_ ) {
+    // TODO: refactor this to avoid allocating on the critical path
+    Tree task_tree { 3 };
+    task_tree.at( 0 ) = Handle( static_cast<uint8_t>( task.operation() ) );
+    task_tree.at( 1 ) = task.handle().as_lazy();
+    task_tree.at( 2 ) = Handle( static_cast<uint8_t>( task.handle().get_laziness() ) );
+
+    Tree this_remote { 1 };
+    this_remote.at( 0 ) = Handle( num_workers_ );
+
+    Tree remotes_tree { 1 };
+    remotes_tree.at( 0 ) = add_tree( std::move( this_remote ) );
+
+    Tree scheduler_encode { 4 };
+    scheduler_encode.at( 0 ) = Handle( "unused" );
+    scheduler_encode.at( 1 ) = *scheduler_procedure_;
+    scheduler_encode.at( 2 ) = add_tree( std::move( task_tree ) );
+    scheduler_encode.at( 3 ) = add_tree( std::move( remotes_tree ) );
+
+    // Scheduler Encode:
+    // Tree:
+    //  Tree: Resource Limits
+    //    - ...
+    //  Tag | Tree: Procedure
+    //    - ...
+    //  Tree: Task
+    //    - Operation
+    //    - Handle (always lazy)
+    //    - Accessibility
+    //  Tree: Remotes
+    //    - Tree: Remote
+    //      - Blob<i32>: Number of CPUs
+    //    - ...
+
+    Handle scheduler = add_tree( std::move( scheduler_encode ) );
+    // The scheduler is a "special form" in a sense; we don't pre-eval or post-eval to avoid recursion.
+    Task scheduler_task = Task::Apply( scheduler );
+    nondeterministic_api_allowed_ = true;
+    Handle scheduler_result = current_worker().do_apply( scheduler_task );
+    nondeterministic_api_allowed_ = false;
+    if ( not scheduler_result.is_literal_blob() or scheduler_result.get_length() != sizeof( uint32_t ) ) {
+      throw std::runtime_error( "scheduler did not return an i32" );
+    }
+    memcpy( &remote, scheduler_result.literal_blob().data(), 4 );
+  }
+  if ( remote == 0 ) {
+    // schedule locally
+    current_worker().runq_.push( task );
+    work_++;
+    work_.notify_all();
+  } else {
+    // schedule remotely
+    throw std::runtime_error( "scheduler picked an invalid node" );
+  }
+}
+
 bool RuntimeStorage::steal_work( Task& task, size_t tid )
 {
   // Starting at the next thread index after the current thread--look to steal work
@@ -34,6 +93,7 @@ Handle RuntimeStorage::eval_thunk( Handle name )
     return cached.value();
 
   fix_cache_.start( task, workers_[0].get()->queue_cb );
+  workers_[0]->schedule();
 
   return fix_cache_.get_or_block( task );
 }
@@ -243,12 +303,12 @@ string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& di
 
 void RuntimeStorage::deserialize()
 {
+  exit( 1 );
   deserialize_from_dir( FIX_DIR );
 }
 
 void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
 {
-
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
     Handle name( base64::decode( file.path().filename().string() ) );
 
@@ -348,45 +408,83 @@ void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
   }
 }
 
-size_t RuntimeStorage::get_total_size( Handle name )
+bool RuntimeStorage::contains( Handle handle )
 {
-  if ( name.is_lazy() ) {
-    return sizeof( __m256i ); // just a name
-  } else if ( name.is_shallow() ) {
-    if ( name.is_blob() ) {
-      return sizeof( __m256i ); // just a name (which includes the length)
-    } else if ( name.is_tree() or name.is_tag() ) {
-      return sizeof( __m256i ) * ( name.get_length() + 1 ); // name of current handle + names of each child
-    } else if ( name.is_thunk() ) {
-      return 2 * sizeof( __m256i ); // name of current handle + name of encode
-    } else {
-      // in case we add new Object types later
-      throw std::runtime_error( "get_total_size not fully implemented for shallow handle" );
-    }
-  } else if ( name.is_strict() ) {
-    if ( name.is_blob() ) {
-      if ( name.is_literal_blob() ) {
-        // just the name
-        return sizeof( __m256i );
-      } else {
-        // name + contents
-        return sizeof( __m256i ) + name.get_length();
-      }
-    } else if ( name.is_tree() or name.is_tag() ) {
-      // name + size of all children
-      size_t size = sizeof( __m256i );
-      for ( const auto& child : get_tree( name ) ) {
-        size += get_total_size( child );
-      }
-      return size;
-    } else if ( name.is_thunk() ) {
-      return sizeof( __m256i ) + get_total_size( get_thunk_encode_name( name ) );
-    } else {
-      // in case we add new Object types later
-      throw std::runtime_error( "get_total_size not fully implemented for strict handle" );
-    }
-  } else {
-    // in case we add new accessibilities later
-    throw std::runtime_error( "get_total_size not fully implemented" );
+  if ( handle.is_literal_blob() ) {
+    return true;
   }
+  if ( handle.is_lazy() ) {
+    return true;
+  }
+  if ( handle.is_thunk() ) {
+    return true;
+  }
+  switch ( handle.get_laziness() ) {
+    case Laziness::Lazy:
+      return true;
+    case Laziness::Shallow:
+      if ( handle.is_canonical() ) {
+        if ( not canonical_to_local_.contains( handle.as_strict() ) ) {
+          return false;
+        }
+        handle = canonical_to_local_.at( handle.as_strict() );
+      }
+      return local_storage_.size() > handle.get_local_id();
+    case Laziness::Strict:
+      if ( handle.is_canonical() ) {
+        if ( not canonical_to_local_.contains( handle.as_strict() ) ) {
+          return false;
+        }
+        handle = canonical_to_local_.at( handle.as_strict() );
+      }
+      // TODO: recurse on children for Tree-like structures
+      return local_storage_.size() > handle.get_local_id();
+  }
+  return false;
+}
+
+optional<Handle> RuntimeStorage::get_evaluated( Handle handle )
+{
+  return fix_cache_.get( Task::Eval( handle ) );
+}
+
+vector<string> RuntimeStorage::get_friendly_names( Handle handle )
+{
+  handle = handle.as_strict();
+  vector<string> names;
+  const auto [begin, end] = friendly_names_.equal_range( handle );
+  for ( auto it = begin; it != end; it++ ) {
+    auto x = *it;
+    names.push_back( x.second );
+  }
+  return names;
+}
+
+string RuntimeStorage::get_encoded_name( Handle handle )
+{
+  handle = handle.as_strict();
+  return base64::encode( handle );
+}
+
+string RuntimeStorage::get_short_name( Handle handle )
+{
+  if ( handle.is_canonical() )
+    return get_encoded_name( handle ).substr( 0, 7 );
+  else
+    return "local[" + to_string( handle.get_local_id() ) + "]";
+}
+
+string RuntimeStorage::get_display_name( Handle handle )
+{
+  string fullname = get_short_name( handle );
+  vector<string> friendly_names = get_friendly_names( handle );
+  if ( not friendly_names.empty() ) {
+    fullname += " (";
+    for ( const auto& name : friendly_names ) {
+      fullname += name + ", ";
+    }
+    fullname = fullname.substr( 0, fullname.size() - 2 );
+    fullname += ")";
+  }
+  return fullname;
 }

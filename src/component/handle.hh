@@ -62,10 +62,10 @@ protected:
  *
  *   struct local_handle {
  *     size_t local_id: 64;   // 255-192
- *     SBZ: 64;              // 191-128
+ *     SBZ: 64;               // 191-128
  *     size_t length: 64;     // 127-64
  *     uint8_t metadata: 8;   // 63-56
- *     SBZ: 56;              // 56-0
+ *     SBZ: 56;               // 56-0
  *   };
  *
  * Unused fields should be zeroed (SBZ).
@@ -186,13 +186,16 @@ public:
 
   size_t get_local_id() const { return _mm256_extract_epi64( content_, 0 ); }
 
-  bool is_strict() const { return ( ( metadata() & 0xc0 ) == static_cast<uint8_t>( Laziness::Strict ) ); }
+  bool is_strict() const { return ( ( ( metadata() & 0xc0 ) >> 6 ) == static_cast<uint8_t>( Laziness::Strict ) ); }
 
-  bool is_shallow() const { return ( ( metadata() & 0xc0 ) == static_cast<uint8_t>( Laziness::Shallow ) ); }
+  bool is_shallow() const
+  {
+    return ( ( ( metadata() & 0xc0 ) >> 6 ) == static_cast<uint8_t>( Laziness::Shallow ) );
+  }
 
-  bool is_lazy() const { return ( ( metadata() & 0xc0 ) == static_cast<uint8_t>( Laziness::Lazy ) ); }
+  bool is_lazy() const { return ( ( ( metadata() & 0xc0 ) >> 6 ) == static_cast<uint8_t>( Laziness::Lazy ) ); }
 
-  Laziness get_laziness() const { return Laziness( metadata() & 0xc0 ); }
+  Laziness get_laziness() const { return Laziness( ( metadata() & 0xc0 ) >> 6 ); }
 
   uint8_t get_metadata() { return metadata(); }
 
@@ -217,16 +220,35 @@ public:
     return _mm256_andnot_si256( mask, handle );
   }
 
+  static Handle make_strict( const Handle handle )
+  {
+    // 00xxxxxx
+    __m256i mask = _mm256_set_epi64x( 0xc0'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_andnot_si256( mask, handle );
+  }
+
   static Handle make_shallow( const Handle handle )
   {
-    if ( ( handle.is_tree() || handle.is_tag() ) && handle.is_strict() ) {
-      // 01000000
-      __m256i mask = _mm256_set_epi64x( 0x40'00'00'00'00'00'00'00, 0, 0, 0 );
-      return _mm256_or_si256( mask, handle );
-    } else {
-      return handle;
-    }
+    // 01xxxxxx
+    __m256i mask = _mm256_set_epi64x( 0xc0'00'00'00'00'00'00'00, 0, 0, 0 );
+    __m256i masked = _mm256_andnot_si256( mask, handle );
+    __m256i bits = _mm256_set_epi64x( 0x40'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_or_si256( bits, masked );
   }
+
+  static Handle make_lazy( const Handle handle )
+  {
+    // 11xxxxxx
+    auto mask = _mm256_set_epi64x( 0xc0'00'00'00'00'00'00'00, 0, 0, 0 );
+    auto masked = _mm256_andnot_si256( mask, handle );
+    auto bits = _mm256_set_epi64x( 0x80'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_or_si256( bits, masked );
+  }
+
+  Handle get_encode_name() { return Handle::get_encode_name( *this ); }
+  Handle as_strict() { return Handle::make_strict( *this ); }
+  Handle as_shallow() { return Handle::make_shallow( *this ); }
+  Handle as_lazy() { return Handle::make_lazy( *this ); }
 
   friend bool operator==( Handle lhs, Handle rhs );
   friend std::ostream& operator<<( std::ostream& s, const Handle name );
@@ -264,3 +286,12 @@ inline bool operator==( Handle lhs, Handle rhs )
 }
 
 std::ostream& operator<<( std::ostream& s, const Handle handle );
+
+template<>
+struct std::hash<Handle>
+{
+  std::size_t operator()( Handle const& handle ) const noexcept
+  {
+    return std::hash<uint64_t> {}( handle.get_local_id() );
+  }
+};

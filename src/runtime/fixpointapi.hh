@@ -18,7 +18,7 @@ __m256i create_blob_i32( uint32_t content );
 
 __m256i create_thunk( __m256i ro_handle );
 
-uint32_t value_type( __m256i handle );
+uint32_t get_value_type( __m256i handle );
 
 // Unsafe_io prints the contents mem[str_index: index + length]. Traps if
 // index + length - 1 is out of bounds.
@@ -29,6 +29,21 @@ uint32_t equality( __m256i lhs, __m256i rhs );
 // Length in elements (Tree-like) or bytes (Blobs)
 uint32_t get_length( __m256i handle );
 
-// Minimum number of bytes to transfer this Object to another node
-uint32_t get_total_size( __m256i handle );
+// Accessibility (0=strict, 1=shallow, 2=lazy)
+uint32_t get_access( __m256i handle );
+
+// Reduce the accessibility of a Handle
+__m256i lower( __m256i handle );
+
+}
+
+namespace fixpoint_debug {
+// Attempt to lift the current handle to a stronger accessibility (nondeterministic)
+__m256i try_lift( __m256i handle );
+
+// Attempt to get the Encode from a Handle to a Thunk (nondeterministic if we add GC)
+__m256i try_inspect( __m256i handle );
+
+// Attempt to get the evaluated version of a Handle (nondeterministic)
+__m256i try_evaluate( __m256i handle );
 }

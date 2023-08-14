@@ -241,14 +241,12 @@ Handle of a Tag `{x, current_procedure, y}`. Used to unforgeably mark Objects.
 Currently, `tag_data` is not being checked to be a `Blob` and the strict
 requirement is not known to be necessary.
 
-## value_type
+## get_value_type
 
 ```rust
-fn value_type(handle: &Object) -> i32;
-fn value_type(handle: &shallow Object) -> i32;
+fn get_value_type(handle: &any Object) -> i32;
 ```
-Retrieve type (Tree = 0, Thunk = 1, Blob = 2 or Tag = 3) from a strict or 
-shallow Handle. 
+Retrieve type (Tree = 0, Thunk = 1, Blob = 2 or Tag = 3) from a Handle. 
 
 ## get_length
 
@@ -259,22 +257,12 @@ fn get_length(handle: &shallow Object) -> i32;
 Given an strict or shallow Handle, returns the length (in bytes or number of 
 entries) of the corresponding Value.
 
-## get_total_size
+## get_access
 
 ```rust
-fn get_total_size(handle: &any Object) -> i32;
-```
-Given a Handle, returns the total downstream size (in bytes) required to
-transfer this Handle (with the specified accessibility) to another machine.
-
-## access
-
-```rust
-fn access(handle: &any Object) -> i32;
+fn get_access(handle: &any Object) -> i32;
 ```
 Retrieve accessibility type (Strict = 0, Shallow = 1, Lazy = 2) from a Handle.
-
-Not yet implemented. 
 
 ## shallow_get
 
@@ -318,3 +306,45 @@ the form of `(i64, i64, i64, i64)`.
 
 Not yet implemented. 
 
+# Debugging Functions
+
+A few additional API functions are provided for use from non-deterministic
+contexts, e.g., a debug-mode thunk.  These functions query state outside of
+Fix, such as whether a particular computation has already happened, but cannot
+modify any state.  While it is possible to call them in deterministic contexts,
+the result will always be a deterministic trap.
+
+These functions are all partially implemented; they currently don't trap from
+deterministic contexts.
+
+
+## debug_try_lift
+
+```rust
+fn debug_try_lift(handle: &any Object) -> &any Object;
+```
+
+Given a Handle, attempts to return the strictest possible Handle the system can
+validly construct for the same object.  The accessibility of the returned
+Handle is guaranteed to be *at least* as strict as the input Handle.
+
+## debug_try_inspect
+
+```rust
+fn debug_try_inspect(handle: &any Thunk) -> Result<&lazy Tree, &any Thunk>;
+```
+
+Given a Handle to a Thunk, attempt to return a handle to its encode.  It may
+not always be possible to recover the encode from a Thunk (e.g., if the encode
+was garbage collected), so this operation may fail by returning the original
+Thunk.
+
+## debug_try_evaluate
+
+```rust
+fn debug_try_evaluate(handle: &any Object) -> Result<&lazy Object, &any Object>;
+```
+
+Given a Handle, attempt to evaluate it.  This will query Fixcache, returning a
+lazy Handle to the evaluated result if it's found or the original Handle if
+it's not found.

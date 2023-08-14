@@ -20,11 +20,17 @@ private:
   /// A queue of runnable Tasks.
   boost::lockfree::queue<Task> runq_;
 
+  /// A queue of schedulable Tasks.
+  boost::lockfree::queue<Task> schedq_;
+
   /// The thread corresponding to this Worker.
   std::thread thread_;
 
   /// The thread's index in RuntimeStorage.
   size_t thread_id_;
+
+  /// This thread's thread id in RuntimeStorage (on any thread, this will be the same as thread_id_).
+  static inline thread_local size_t current_thread_id_;
 
   /// A reference to the parent RuntimeStorage corresponding to this thread's pool.
   RuntimeStorage& runtimestorage_;
@@ -59,21 +65,23 @@ private:
 
   /**
    * The callback to take ownership of a Task, which in this case adds it to the scheduleable queue of
-   * RuntimeStorage.
+   * RuntimeStorage.  RuntimeWorker::schedule must be called afterwards to schedule the new task on a worker.
    *
    * @param task  The inbound Task, which should be added to the runnable queue.
    */
   std::function<void( Task )> queue_cb;
 
 public:
-  RuntimeWorker( size_t thread_id, RuntimeStorage& runtimestorage )
+  RuntimeWorker( size_t thread_id, RuntimeStorage& runtimestorage, bool spawn = true )
     : runq_( 0 )
+    , schedq_( 0 )
     , thread_()
     , thread_id_( thread_id )
     , runtimestorage_( runtimestorage )
     , queue_cb( std::bind( &RuntimeWorker::queue_job, this, std::placeholders::_1 ) )
   {
-    thread_ = std::thread( &RuntimeWorker::work, this );
+    if ( spawn )
+      thread_ = std::thread( &RuntimeWorker::work, this );
   }
 
   /**
@@ -127,4 +135,10 @@ public:
    * Continuously execute all available tasks until RuntimeStorage::threads_active_ is set to false.
    */
   void work();
+
+  /**
+   * Transfer all scheduleable tasks from this worker's scheduler queue to some thread's runnable queue; in
+   * practice, this sends the tasks to RuntimeStorage to be scheduled.
+   */
+  void schedule();
 };
