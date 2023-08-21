@@ -26,7 +26,6 @@ string hex_encode( Handle handle )
   __m256i content = handle;
   os << std::hex <<  content[0] << "-" << content[1] <<
      "-" << content[2] << "-"<< content[3];
-  cout << handle;
 
   return os.str();
 }
@@ -89,7 +88,7 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
   Handle result = runtime.eval_thunk( thunk_name );
 
   cout << "Thunk name: " << hex_encode( thunk_name ) << endl;
-  cout << "Result name: " << hex_encode( result ) << endl;
+  cout << "Result name: " << hex_encode( result ) << endl << flush;
 }
 
 ptree list_dependees( Handle handle )
@@ -103,7 +102,9 @@ ptree list_dependees( Handle handle )
   }
 
   ptree data;
-  data.push_back( ptree::value_type( "data", pt ) );
+  if (pt.size() != 0) {
+    data.push_back( ptree::value_type( "dependees", pt ) );
+  }
   return data;
 }
 
@@ -115,18 +116,14 @@ ptree get_child( Handle handle, Operation operation )
     ptree data;
     if ( result.value().has_value() ) {
       data.push_back( ptree::value_type( "entry", hex_encode( result.value().value() ) ) );
-    } else {
-      data.push_back( ptree::value_type( "entry", "" ) );
     }
-    pt.push_back( ptree::value_type( "data", data ) );
-  } else {
-    pt.push_back( ptree::value_type( "data", "" ) );
+    pt.push_back( ptree::value_type( "child", data ) );
   }
 
   return pt;
 }
 
-ptree get_parent( Handle handle )
+ptree get_parents( Handle handle )
 {
   ptree pt;
   vector<Task> result = RuntimeStorage::get_instance().get_parents( handle );
@@ -137,7 +134,10 @@ ptree get_parent( Handle handle )
     entry.put( "operation", uint8_t( parent.operation() ) );
     data.push_back( ptree::value_type( "", entry ) );
   }
-  pt.push_back( ptree::value_type( "data", data ) );
+
+  if (data.size() != 0) {
+    pt.push_back( ptree::value_type( "parents", data ) );
+  }
 
   return pt;
 }
@@ -193,12 +193,15 @@ void program_body( span_view<char*> args )
 
   TCPSocket server_socket {};
   server_socket.set_reuseaddr();
-  server_socket.bind( { "0", args.at( 1 ) } );
+  server_socket.bind( { "127.0.0.1", args.at( 1 ) } );
   server_socket.listen();
 
   args.remove_prefix( 2 );
 
   cerr << "Listening on port " << server_socket.local_address().port() << "\n";
+
+  vector<ReadOnlyFile> open_files;
+  kick_off(args, open_files);
 
   TCPSocket connection = server_socket.accept();
   cerr << "Connection received from " << connection.peer_address().to_string() << "\n";
@@ -209,9 +212,6 @@ void program_body( span_view<char*> args )
 
   HTTPServer http_server;
   HTTPRequest request_in_progress;
-
-  vector<ReadOnlyFile> open_files;
-  kick_off(args, open_files);
 
   events.add_rule(
     "Read bytes from client",
@@ -225,8 +225,6 @@ void program_body( span_view<char*> args )
     [&] {
       if ( http_server.read( client_buffer, request_in_progress ) ) {
         cerr << "Got request: " << request_in_progress.request_target << "\n";
-        cerr << http_server.responses_empty();
-        cerr << request_in_progress.method;
         std::string target = request_in_progress.request_target;
         string response = "";
 
@@ -241,7 +239,7 @@ void program_body( span_view<char*> args )
           response = ptree.str();
         } else if ( target.starts_with( "/parents" ) ) {
           stringstream ptree;
-          write_json( ptree, get_parent( hex_decode( map.at( "handle" ) ) ) );
+          write_json( ptree, get_parents( hex_decode( map.at( "handle" ) ) ) );
           response = ptree.str();
         }
         HTTPResponse the_response;
@@ -251,7 +249,9 @@ void program_body( span_view<char*> args )
           the_response.reason_phrase = "OK";
           the_response.headers.content_type = "text/json";
           the_response.headers.content_length = response.size();
+          the_response.headers.access_control_allow_origin = "http://127.0.0.1:8800";
           the_response.body = response;
+          cout << "Responded" << endl;
         } else {
           the_response.status_code = "404";
           the_response.reason_phrase = "Not Found";

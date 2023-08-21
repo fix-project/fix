@@ -42,15 +42,6 @@ void print_string_view( string_view&& blob )
   }
 }
 
-void print_parents( vector<Task>& tasks )
-{
-  cout << "Found [" << endl;
-  for ( const Task& task : tasks ) {
-    cout << "  " << task << "," << endl;
-  }
-  cout << "]";
-}
-
 int parse_u64( string id )
 {
   return stoul( id, nullptr, 16 );
