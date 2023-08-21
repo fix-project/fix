@@ -286,7 +286,7 @@ public:
   /**
    * Gets the result of a Task if it's cached; otherwise blocks until the Task is finished.
    *
-   * @param target  The Task too lookup.
+   * @param target  The Task to lookup.
    * @return        The result of @target.
    */
   Handle get_or_block( Task target )
@@ -298,6 +298,12 @@ public:
     return fixcache_.at( target ).value();
   }
 
+  /**
+   * Gets the dependees of a certain Task that may be in process or completed.
+   *
+   * @param depender  The Task to lookup.
+   * @return          All tasks that are currently registered as blocking @p depender.
+   */
   std::vector<Task> get_dependees( Task depender )
   {
     std::shared_lock lock( fixcache_mutex_ );
@@ -309,6 +315,27 @@ public:
         break;
       }
       result.push_back( inverted_dependency_graph_.at( pair ) );
+    }
+
+    return result;
+  }
+
+  /**
+   * Search for all possible Tasks that created a Handle.
+   *
+   * Time complexity grows linearly with the size of fixcache_.
+   *
+   * @return  A vector of Tasks that could have created this Handle.
+   */
+  std::vector<Task> get_parents( Handle child )
+  {
+    std::shared_lock lock( fixcache_mutex_ );
+    std::vector<Task> result = {};
+
+    for ( auto& [task, handle] : fixcache_ ) {
+      if ( handle.has_value() and handle.value() == child ) {
+        result.push_back( task );
+      }
     }
 
     return result;

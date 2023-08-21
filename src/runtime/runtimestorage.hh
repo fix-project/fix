@@ -173,4 +173,7 @@ public:
   size_t get_local_storage_size() { return local_storage_.size(); }
 
   Handle get_local_handle( Handle canonical ) { return canonical_to_local_.at( canonical ); }
+
+  // Get the tasks that produced a handle. Linear time in size of fixcache
+  std::vector<Task> get_parents( Handle child ) { return fix_cache_.get_parents( child ); }
 };
