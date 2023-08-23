@@ -8,8 +8,6 @@
 #include "base64.hh"
 #include "tester-utils.hh"
 
-#define TRUSTED_COMPILE_ENCODE Handle( base64::decode( COMPILE_ENCODE ) )
-
 using namespace std;
 using path = filesystem::path;
 
@@ -43,7 +41,7 @@ void program_body( span_view<char*> args )
 
   Tree scheduler_compile { 3 };
   scheduler_compile.at( 0 ) = Handle( "unused" );
-  scheduler_compile.at( 1 ) = TRUSTED_COMPILE_ENCODE;
+  scheduler_compile.at( 1 ) = COMPILE_ENCODE;
   scheduler_compile.at( 2 ) = scheduler_blob;
   Handle scheduler_compile_thunk = runtime.add_thunk( Thunk( runtime.add_tree( std::move( scheduler_compile ) ) ) );
 

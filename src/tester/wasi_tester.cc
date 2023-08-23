@@ -6,14 +6,14 @@
 #include "option-parser.hh"
 #include "runtimestorage.hh"
 
+#include "tester-utils.hh"
+
 using namespace std;
 
 // from wasi-libc: sysexits.h
 #define EX_OK 0
 #define EX_SOFTWARE 70
 #define EX_OSERR 71
-
-#define TRUSTED_COMPILE_ENCODE Handle( base64::decode( COMPILE_ENCODE ) )
 
 static bool pretty_print = false;
 static const char* s_infile;
@@ -79,7 +79,7 @@ int main( int argc, char* argv[] )
 
   Tree wasm_compile { 3 };
   wasm_compile.at( 0 ) = Handle( "unused" );
-  wasm_compile.at( 1 ) = TRUSTED_COMPILE_ENCODE;
+  wasm_compile.at( 1 ) = COMPILE_ENCODE;
   wasm_compile.at( 2 ) = wasm_name;
   Handle compile_encode_tree = runtime.add_tree( std::move( wasm_compile ) );
 

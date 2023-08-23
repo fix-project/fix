@@ -25,6 +25,13 @@ void program_body( span_view<char*> args )
 
   open_files.emplace_back( string( str ) );
   args.remove_prefix( 1 );
+
+  optional<string> ref_name {};
+  if ( not args.empty() ) {
+    ref_name = args[0];
+    args.remove_prefix( 1 );
+  }
+
   if ( not args.empty() ) {
     throw runtime_error( "unexpected argument: "s + args.at( 0 ) );
   }
@@ -35,7 +42,7 @@ void program_body( span_view<char*> args )
   Handle blob = runtime.add_blob( static_cast<string_view>( open_files.back() ) );
   Tree encode { 3 };
   encode.at( 0 ) = Handle( "unused" );
-  encode.at( 1 ) = Handle( base64::decode( COMPILE_ENCODE ) );
+  encode.at( 1 ) = COMPILE_ENCODE;
   encode.at( 2 ) = blob;
   Handle encode_name = runtime.add_tree( std::move( encode ) );
   // make a Thunk that points to the combination
@@ -44,15 +51,21 @@ void program_body( span_view<char*> args )
   // force the Thunk
   Handle result = runtime.eval_thunk( thunk_name );
 
+  if ( ref_name ) {
+    runtime.set_ref( *ref_name, result );
+  }
   string serialized_result = runtime.serialize( result );
   // print the result
   cout << "Result:\n" << pretty_print( result );
-  cout << "Result serialized to :\n" << serialized_result;
+  cout << "Result serialized to: " << serialized_result << "\n";
+  if ( ref_name ) {
+    cout << "Created ref: " << *ref_name << "\n";
+  }
 }
 
 void usage_message( const char* argv0 )
 {
-  cerr << "Usage: " << argv0 << " file.wasm\n";
+  cerr << "Usage: " << argv0 << " file.wasm [label]\n";
 }
 
 int main( int argc, char* argv[] )

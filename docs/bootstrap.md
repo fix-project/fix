@@ -19,7 +19,7 @@ cmake --build fix-build --parallel {# of parallelism}
 ./build.sh
 ./serialize.sh
 ```
-After building, copy `./boot/` and `./.fix/` to the source directory of Fix.
+After building, copy `./.fix/` to the source directory of Fix.
 
 ## Way 1: Fetch from Release
 Either

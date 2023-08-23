@@ -2,18 +2,18 @@
 
 use strict;
 
-if ((scalar @ARGV) != 4) {
+if ((scalar @ARGV) != 3) {
   print STDERR @ARGV;
-  die qq{Usage: $0 stateless-tester compile-tool home-tree.txt open.wasm};
+  die qq{Usage: $0 stateless-tester home-tree.txt open.wasm};
 }
 
-my ($executable, $compile, $hometreefile, $wasm) = @ARGV;
+my ($executable, $hometreefile, $wasm) = @ARGV;
 
 sub check_return($) {
   my ($expected_retval) = @_;
 
   my $hometree = `cat $hometreefile`;
-  my $result = `$executable tree:4 string:\"0\" thunk: tree:3 string:unused name:$compile file:$wasm tree:0 name:$hometree 2>&1`;
+  my $result = `$executable tree:4 string:\"0\" thunk: tree:3 string:unused ref:compile-encode file:$wasm tree:0 name:$hometree 2>&1`;
 
   if ($?) {
     die qq{Failure in running return-test: $result};

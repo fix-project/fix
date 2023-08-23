@@ -2,17 +2,17 @@
 
 use strict;
 
-if ((scalar @ARGV) != 3) {
-  die qq{Usage: $0 stateless-tester compile-tool helloworld.wasm};
+if ((scalar @ARGV) != 2) {
+  die qq{Usage: $0 stateless-tester helloworld.wasm};
 }
 
-my ($executable, $compile, $wasm) = @ARGV;
+my ($executable, $wasm) = @ARGV;
 
 sub check_return($) {
   my ($expected_retval) = @_;
   my ($expected_stdout) = "Hello, World!";
 
-  my $result = `$executable tree:2 string:\"0\" thunk: tree:3 string:unused name:$compile file:$wasm 2>&1`;
+  my $result = `$executable tree:2 string:\"0\" thunk: tree:3 string:unused ref:compile-encode file:$wasm 2>&1`;
 
   if ($?) {
     die qq{Failure in running return-test: $result};

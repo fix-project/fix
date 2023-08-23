@@ -292,6 +292,7 @@ void usage_message( const char* argv0 )
   cerr << "            | tree:<n> (followed by <n> entries)\n";
   cerr << "            | thunk: (followed by tree:<n>)\n";
   cerr << "            | compile:<filename>\n";
+  cerr << "            | ref:<ref>\n";
 }
 
 int main( int argc, char* argv[] )

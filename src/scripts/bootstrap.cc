@@ -9,7 +9,7 @@ using namespace std;
 
 static string boot_path;
 
-static const char s_description[] = R"(./bootstrap path_to_boot)";
+static const char s_description[] = R"(./bootstrap)";
 
 static void ParseOptions( int argc, char* argv[] )
 {
@@ -28,19 +28,17 @@ int main( int argc, char* argv[] )
   array<std::string, 5> tasks = { "wasm-to-c-fix", "c-to-elf-fix", "link-elfs-fix", "compile", "map" };
   vector<Handle> wasm_names;
   for ( auto task : tasks ) {
-    ReadOnlyFile wasm_file { boot_path + "/" + task + "-wasm" };
-    wasm_names.push_back( base64::decode( string( wasm_file ) ) );
+    wasm_names.push_back( *runtime.get_ref( task + "-wasm" ) );
   }
-  ReadOnlyFile compile_tool { boot_path + "/compile-tool" };
-  Handle compile_tool_name( base64::decode( string( compile_tool ) ) );
+  Handle compile_encode_name( *runtime.get_ref( "compile-encode" ) );
 
-  // Apply compile-tool to each wasm
+  // Apply compile-encode to each wasm
   vector<Handle> new_elf_names;
   size_t index = 0;
   for ( auto task : tasks ) {
     vector<Handle> compile_encode;
     compile_encode.push_back( Handle( "empty" ) );
-    compile_encode.push_back( compile_tool_name );
+    compile_encode.push_back( compile_encode_name );
     compile_encode.push_back( wasm_names[index] );
     cout << "Compiling " << runtime.get_display_name( wasm_names[index] ) << endl;
     index++;

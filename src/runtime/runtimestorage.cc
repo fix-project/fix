@@ -270,7 +270,13 @@ filesystem::path RuntimeStorage::get_fix_repo()
 
 string RuntimeStorage::serialize( Handle name )
 {
-  return serialize_to_dir( name, get_fix_repo() );
+  const auto fix_dir = get_fix_repo();
+  Handle storage = local_to_storage( name );
+  for ( const auto& ref : get_friendly_names( name ) ) {
+    ofstream output_file { fix_dir / "refs" / ref, std::ios::trunc };
+    output_file << base64::encode( storage );
+  }
+  return serialize_to_dir( name, fix_dir / "objects" );
 }
 
 string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& dir )
@@ -343,7 +349,7 @@ void RuntimeStorage::deserialize()
     auto handles = read_handles( file );
     friendly_names_.insert( make_pair( handles.at( 0 ), file.path().filename() ) );
   }
-  deserialize_from_dir( fix_dir );
+  deserialize_from_dir( fix_dir / "objects" );
 }
 
 void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
@@ -528,4 +534,19 @@ string RuntimeStorage::get_display_name( Handle handle )
     fullname += ")";
   }
   return fullname;
+}
+
+optional<Handle> RuntimeStorage::get_ref( string_view ref )
+{
+  auto fix = get_fix_repo();
+  auto ref_file = fix / "refs" / ref;
+  if ( filesystem::exists( ref_file ) ) {
+    return read_handles( ref_file )[0];
+  }
+  return {};
+}
+
+void RuntimeStorage::set_ref( string_view ref, Handle handle )
+{
+  friendly_names_.insert( make_pair( handle, ref ) );
 }

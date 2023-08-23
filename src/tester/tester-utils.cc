@@ -42,10 +42,24 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
     }
     Tree compile_tree { 3 };
     compile_tree.at( 0 ) = Handle( "unused" );
-    compile_tree.at( 1 ) = Handle( base64::decode( COMPILE_ENCODE ) );
+    compile_tree.at( 1 ) = COMPILE_ENCODE;
     Handle blob = runtime.add_blob( static_cast<string_view>( open_files.back() ) );
     compile_tree.at( 2 ) = blob;
     return runtime.add_thunk( Thunk( runtime.add_tree( std::move( compile_tree ) ) ) );
+  }
+
+  if ( str.starts_with( "ref:" ) ) {
+    if ( !deserialized ) {
+      runtime.deserialize();
+      deserialized = true;
+    }
+    args.remove_prefix( 1 );
+    auto ref = runtime.get_ref( str.substr( 4 ) );
+    if ( ref ) {
+      return *ref;
+    } else {
+      throw runtime_error( string( "Ref not found: " ).append( str.substr( 4 ) ) );
+    }
   }
 
   if ( str.starts_with( "name:" ) ) {

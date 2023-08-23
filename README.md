@@ -13,8 +13,8 @@ git submodule update --init --recursive
 ```
 3. Build bootstrap as specified in `fix/docs/bootstrap.md`
 
-4. Now, you should have a working wasm-toolchain`in your `{HOME}` directory,
-and `boot` and `.fix` under your fix source directory. You are ready to build
+4. Now, you should have a working `wasm-toolchain` in your `$HOME` directory,
+   and `.fix` under your fix source directory. You are ready to build
 Fix now:
 ```
 cd ~/fix
@@ -33,13 +33,17 @@ cmake --build build/ --target fixpoint-check
 # Run Wasm modules in Fix
 The runtime of Fix accepts ELFs compiled from Wasm modules by a trusted compilation
 toolchain as valid inputs of procedures. The name of the trusted compilation toolchain 
-can be found at `boot/compile-encode`. 
+can be found at `.fix/refs/compile-encode`. 
 
-`thunk: tree:3 string:none name:{content of boot/compile-encode} file:{content of boot/compile-encode}`
+`thunk: tree:3 string:none ref:compile-encode file:{path to wasm file}`
 evaluates to the corresponding ELF in the required format. You can evaluate it directly in
 stateless-tester:
 ```
-./build/src/tester/stateless_tester tree:3 string:none name:{content of boot/compile-encode} file:{path to the Wasm module}
+./build/src/tester/stateless_tester tree:3 string:none ref:compile-encode file:{path to the Wasm module}
+```
+or, equivalently:
+```
+./build/src/tester/stateless_tester tree:3 string:none name:{contents of .fix/refs/compile-encode} file:{path to the Wasm module}
 ```
 or replace the procedure of an ENCODE with the specification to run an ENCODE.
 
@@ -57,10 +61,10 @@ tree:4
 ├─ $ARGUMENT_2
 ```
 
-where `$COMPILE_NAME` is the string contents of `boot/compile-encode`, e.g.
+where `$COMPILE_NAME` is the string contents of `.fix/refs/compile-encode`, e.g.
 
 ```
-COMPILE_NAME=$(cat boot/compile-encode)
+COMPILE_NAME=$(cat .fix/refs/compile-encode)
 ```
 
 ### Running Wasm Examples:
@@ -79,3 +83,22 @@ COMPILE_NAME=$(cat boot/compile-encode)
 
 # Useful commands:
 To figure out the serialized home directory run `./build/src/tester/serialization_test_deep`
+
+# Fix Repo Structure
+
+The `.fix` directory has the following structure (similar to `.git`):
+```
+.fix
+├─ objects
+|  ├─ <base64-encoded name>: contains a list of base64-encoded handles
+|  └─ [...]
+├─ refs
+|  ├─ <human-readable name>: contains single base64-encoded handle
+|  └─ [...]
+```
+
+The `refs` directory is, strictly speaking, optional; it's possible (and
+arguably better) to specify everything using content-addressed Fix names.
+However, it's pragmatically useful when debugging a Fix computation to be able
+to match specific Fix names with a semantically-meaningful string (and even
+just to know what Fix objects are semantically meaningful to the user).
