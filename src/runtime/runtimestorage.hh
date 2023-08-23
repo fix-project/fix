@@ -83,6 +83,8 @@ private:
 
   RuntimeWorker& current_worker() { return *workers_.at( RuntimeWorker::current_thread_id_ ); }
 
+  std::filesystem::path get_fix_repo();
+
 public:
   // Return reference to static runtime storage
   static RuntimeStorage& get_instance()
