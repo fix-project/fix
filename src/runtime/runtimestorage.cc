@@ -256,9 +256,21 @@ Handle RuntimeStorage::local_to_storage( Handle name )
   }
 }
 
+filesystem::path RuntimeStorage::get_fix_repo()
+{
+  auto current_directory = filesystem::current_path();
+  while ( not filesystem::exists( current_directory / ".fix" ) ) {
+    if ( not current_directory.has_parent_path() ) {
+      throw runtime_error( "Could not find .fix directory in any parent of the current directory." );
+    }
+    current_directory = current_directory.parent_path();
+  }
+  return current_directory / ".fix";
+}
+
 string RuntimeStorage::serialize( Handle name )
 {
-  return serialize_to_dir( name, FIX_DIR );
+  return serialize_to_dir( name, get_fix_repo() );
 }
 
 string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& dir )
@@ -301,15 +313,44 @@ string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& di
   return file_name;
 }
 
+vector<Handle> read_handles( filesystem::path file )
+{
+  ifstream input_file( file );
+  if ( !input_file.is_open() ) {
+    throw runtime_error( "File does not exist: " + file.string() );
+  }
+  input_file.seekg( 0, std::ios::end );
+  size_t size = input_file.tellg();
+  const size_t ENCODED_HANDLE_SIZE = 43;
+  if ( size % ENCODED_HANDLE_SIZE != 0 ) {
+    throw runtime_error( "File was an invalid size: " + file.string() + ": " + to_string( size ) );
+  }
+  size_t len = size / ENCODED_HANDLE_SIZE;
+  char* buf = static_cast<char*>( alloca( ENCODED_HANDLE_SIZE ) );
+  input_file.seekg( 0, std::ios::beg );
+  vector<Handle> handles;
+  for ( size_t i = 0; i < len; i++ ) {
+    input_file.read( buf, size );
+    handles.push_back( base64::decode( string_view( buf, ENCODED_HANDLE_SIZE ) ) );
+  }
+  return handles;
+}
+
 void RuntimeStorage::deserialize()
 {
-  exit( 1 );
-  deserialize_from_dir( FIX_DIR );
+  const auto fix_dir = get_fix_repo();
+  for ( const auto& file : filesystem::directory_iterator( fix_dir / "refs" ) ) {
+    auto handles = read_handles( file );
+    friendly_names_.insert( make_pair( handles.at( 0 ), file.path().filename() ) );
+  }
+  deserialize_from_dir( fix_dir );
 }
 
 void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
 {
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
+    if ( file.is_directory() )
+      continue;
     Handle name( base64::decode( file.path().filename().string() ) );
 
     if ( name.is_local() ) {
