@@ -2,13 +2,13 @@
 
 use strict;
 
-if ((scalar @ARGV) != 4) {
-  die qq{Usage: $0 stateless-tester compile-tool trap.wasm expected_trap_name};
+if ((scalar @ARGV) != 3) {
+  die qq{Usage: $0 stateless-tester trap.wasm expected_trap_name};
 }
 
-my ($executable, $compile, $trap_wasm, $expected_trap_name) = @ARGV;
+my ($executable, $trap_wasm, $expected_trap_name) = @ARGV;
 
-open (my $command, '-|', qq{$executable tree:2 string:unused thunk: tree:3 string:unused name:$compile file:${trap_wasm} 2>&1}) or die qq{$!};
+open (my $command, '-|', qq{$executable tree:2 string:unused thunk: tree:3 string:unused ref:compile-encode file:${trap_wasm} 2>&1}) or die qq{$!};
 
 my $found_trap = 0;
 my @output;

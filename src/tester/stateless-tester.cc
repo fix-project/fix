@@ -46,6 +46,7 @@ void usage_message( const char* argv0 )
   cerr << "            | tree:<n> (followed by <n> entries)\n";
   cerr << "            | thunk: (followed by tree:<n>)\n";
   cerr << "            | compile:<filename>\n";
+  cerr << "            | ref:<ref>\n";
 }
 
 int main( int argc, char* argv[] )
@@ -54,19 +55,13 @@ int main( int argc, char* argv[] )
     abort();
   }
 
-  try {
-    if ( argc < 2 ) {
-      usage_message( argv[0] );
-      return EXIT_FAILURE;
-    }
-
-    span_view<char*> args = { argv, static_cast<size_t>( argc ) };
-    program_body( args );
-  } catch ( const exception& e ) {
-    cerr << argv[0] << ": " << e.what() << "\n\n";
+  if ( argc < 2 ) {
     usage_message( argv[0] );
     return EXIT_FAILURE;
   }
+
+  span_view<char*> args = { argv, static_cast<size_t>( argc ) };
+  program_body( args );
 
   return EXIT_SUCCESS;
 }

@@ -2,11 +2,11 @@
 
 use strict;
 
-if ((scalar @ARGV) != 4) {
-  die qq{Usage: $0 stateless-tester compile-tool fib.wasm addblob.wasm};
+if ((scalar @ARGV) != 3) {
+  die qq{Usage: $0 stateless-tester fib.wasm addblob.wasm};
 }
 
-my ($executable, $compile, $fib_wasm, $add_wasm) = @ARGV;
+my ($executable, $fib_wasm, $add_wasm) = @ARGV;
 
 sub fib($) {
   if ( $_[0] eq 0 ) {
@@ -32,7 +32,7 @@ sub check_fib($) {
   my ($x, $y) = @_;
   my $expected_answer = unpack q{l}, (pack q{l}, fib($x));
 
-  my $result = `$executable tree:4 string:\"0\" thunk: tree:3 string:\"0\" name:$compile file:$fib_wasm uint32:$x thunk: tree:3 string:\"0\" name:$compile file:$add_wasm 2>&1`;
+  my $result = `$executable tree:4 string:\"0\" thunk: tree:3 string:\"0\" ref:compile-encode file:$fib_wasm uint32:$x thunk: tree:3 string:\"0\" ref:compile-encode file:$add_wasm 2>&1`;
 
   if ($?) {
     print STDERR qq{Got result:\n$result\n};

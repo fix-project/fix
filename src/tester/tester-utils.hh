@@ -6,6 +6,8 @@
 #include "mmap.hh"
 #include "runtimestorage.hh"
 
+#define COMPILE_ENCODE *RuntimeStorage::get_instance().get_ref( "compile-encode" )
+
 struct pretty_print
 {
   Handle name;

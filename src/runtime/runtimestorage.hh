@@ -135,7 +135,7 @@ public:
 
   Handle local_to_storage( Handle name );
 
-  std::string serialize( Handle name );
+  std::string serialize( Handle handle );
   std::string serialize_to_dir( Handle name, const std::filesystem::path& dir );
   void deserialize();
   void deserialize_from_dir( const std::filesystem::path& dir );
@@ -180,6 +180,9 @@ public:
 
   // Looks up a Handle by its ref (e.g., a friendly name)
   std::optional<Handle> get_ref( std::string_view ref );
+
+  // Adds a ref for a Handle in-memory (but does not serialize the ref to disk)
+  void set_ref( std::string_view ref, Handle handle );
 
   // Checks if RuntimeStorage has marked the currently-executing thread as nondeterministic.
   static bool nondeterministic_api_allowed()

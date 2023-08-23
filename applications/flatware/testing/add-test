@@ -2,11 +2,11 @@
 
 use strict;
 
-if ((scalar @ARGV) != 3) {
-  die qq{Usage: $0 stateless-tester compile-tool addarg.wasm};
+if ((scalar @ARGV) != 2) {
+  die qq{Usage: $0 stateless-tester addarg.wasm};
 }
 
-my ($executable, $compile, $wasm) = @ARGV;
+my ($executable, $wasm) = @ARGV;
 
 sub check_add($$) {
   my ($x, $y) = @_;
@@ -15,7 +15,7 @@ sub check_add($$) {
   my $expected_retval = unpack q{l}, (pack q{l}, ($x + $y) % 2**32);
   my $expected_stdout = "";
 
-  my $result = `$executable tree:3 string:\"0\" thunk: tree:3 string:unused name:$compile file:$wasm tree:3 string:\"add\" string:\"$x_char\" string:\"$y_char\" 2>&1`;
+  my $result = `$executable tree:3 string:\"0\" thunk: tree:3 string:unused ref:compile-encode file:$wasm tree:3 string:\"add\" string:\"$x_char\" string:\"$y_char\" 2>&1`;
 
   if ($?) {
     print STDERR qq{Got result:\n$result\n};
