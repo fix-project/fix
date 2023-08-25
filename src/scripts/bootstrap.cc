@@ -15,10 +15,6 @@ static void ParseOptions( int argc, char* argv[] )
 {
   OptionParser parser( "bootstrap", s_description );
 
-  parser.AddArgument( "path_to_boot", OptionParser::ArgumentCount::One, []( const char* argument ) {
-    boot_path = string( argument );
-  } );
-
   parser.Parse( argc, argv );
 }
 
@@ -46,6 +42,7 @@ int main( int argc, char* argv[] )
     compile_encode.push_back( Handle( "empty" ) );
     compile_encode.push_back( compile_tool_name );
     compile_encode.push_back( wasm_names[index] );
+    cout << "Compiling " << runtime.get_display_name( wasm_names[index] ) << endl;
     index++;
     Handle compile_encode_name
       = runtime.add_tree( span_view<Handle>( compile_encode.data(), compile_encode.size() ) );
