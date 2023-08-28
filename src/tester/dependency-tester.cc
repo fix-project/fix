@@ -100,7 +100,7 @@ void program_body( span_view<char*> args )
   cout << endl;
 
   while ( true ) {
-    cout << "Enter [parents(p)|content(c)|dependees(d)] and a local id or handle in form ab|cd|ef|01 (empty to "
+    cout << "Enter [parents(p)|content(c)|dependees(d)|child(k)] and a local id or handle in form ab|cd|ef|01 (empty to "
             "quit):"
          << endl;
     string input;
@@ -111,7 +111,7 @@ void program_body( span_view<char*> args )
     size_t pos = input.find( " " );
 
     if ( pos == string::npos ) {
-      cout << "Put a space between [parents(p)|content|dependees] and [local-id|handle]" << endl;
+      cout << "Put a space between [parents|content|dependees|child] and [local-id|handle]" << endl;
       continue;
     }
 
@@ -216,8 +216,48 @@ void program_body( span_view<char*> args )
       }
       cout << "]" << endl;
 
+    } else if ( command == "child" || command == "k" ) {
+      auto input = parse_handle( id_input );
+      if ( !input.has_value() ) {
+        cout << "Could not parse handle (child command must take a handle)." << endl;
+        continue;
+      }
+
+      cout << "Apply child: ";
+      optional<Handle> entry = runtime.get_status( Task( input.value(), Operation::Apply ) );
+      if ( entry.has_value() ) {
+        cout << entry.value();
+        if ( entry.value().is_literal_blob() ) {
+          cout << " = ";
+          print_string_view( entry.value().literal_blob() );
+        }
+      }
+      cout << endl;
+
+      cout << "Eval child: ";
+      entry = runtime.get_status( Task( input.value(), Operation::Eval ) );
+      if ( entry.has_value() ) {
+        cout << entry.value();
+        if ( entry.value().is_literal_blob() ) {
+          cout << " = ";
+          print_string_view( entry.value().literal_blob() );
+        }
+      }
+      cout << endl;
+
+      cout << "Fill child: ";
+      entry = runtime.get_status( Task( input.value(), Operation::Fill ) );
+      if ( entry.has_value() ) {
+        cout << entry.value();
+        if ( entry.value().is_literal_blob() ) {
+          cout << " = ";
+          print_string_view( entry.value().literal_blob() );
+        }
+      }
+      cout << endl;
+
     } else {
-      cout << "Enter parent, entries, or dependees as the first word";
+      cout << "Enter parent, entries, dependees, child as the first word";
       continue;
     }
   }
