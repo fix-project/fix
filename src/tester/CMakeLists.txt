@@ -8,6 +8,10 @@ add_executable(stateless-tester "stateless-tester.cc" "tester-utils.cc")
 target_link_libraries(stateless-tester ${FIXPOINT_LIBS})
 target_link_libraries(stateless-tester cryptopp wasmrt absl::flat_hash_map)
 
+add_executable(compiler-tester "compiler-tester.cc" "tester-utils.cc")
+target_link_libraries(compiler-tester ${FIXPOINT_LIBS})
+target_link_libraries(compiler-tester cryptopp wasmrt absl::flat_hash_map)
+
 add_executable(http-tester "http-tester.cc" "tester-utils.cc")
 target_link_libraries(http-tester ${FIXPOINT_LIBS})
 target_link_libraries(http-tester cryptopp wasmrt absl::flat_hash_map http)
