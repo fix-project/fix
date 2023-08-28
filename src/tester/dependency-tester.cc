@@ -100,7 +100,8 @@ void program_body( span_view<char*> args )
   cout << endl;
 
   while ( true ) {
-    cout << "Enter [parents(p)|content(c)|dependees(d)|child(k)] and a local id or handle in form ab|cd|ef|01 (empty to "
+    cout << "Enter [parents(p)|content(c)|dependees(d)|child(k)] and a local id or handle in form ab|cd|ef|01 "
+            "(empty to "
             "quit):"
          << endl;
     string input;

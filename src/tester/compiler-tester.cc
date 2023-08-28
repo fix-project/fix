@@ -22,7 +22,7 @@ void program_body( span_view<char*> args )
   if ( not str.ends_with( ".wasm" ) ) {
     throw runtime_error( "unexpected non-wasm file" );
   }
- 
+
   open_files.emplace_back( string( str ) );
   args.remove_prefix( 1 );
   if ( not args.empty() ) {
@@ -33,18 +33,18 @@ void program_body( span_view<char*> args )
   auto& runtime = RuntimeStorage::get_instance();
   runtime.deserialize();
   Handle blob = runtime.add_blob( static_cast<string_view>( open_files.back() ) );
- Tree encode { 3 };
-  encode.at(0) = Handle( "unused" );
-  encode.at(1) = Handle( base64::decode( COMPILE_ENCODE ) );
-  encode.at(2) = blob;
+  Tree encode { 3 };
+  encode.at( 0 ) = Handle( "unused" );
+  encode.at( 1 ) = Handle( base64::decode( COMPILE_ENCODE ) );
+  encode.at( 2 ) = blob;
   Handle encode_name = runtime.add_tree( std::move( encode ) );
   // make a Thunk that points to the combination
   Handle thunk_name = runtime.add_thunk( Thunk { encode_name } );
 
- // force the Thunk 
+  // force the Thunk
   Handle result = runtime.eval_thunk( thunk_name );
 
-  string serialized_result = runtime.serialize(result);
+  string serialized_result = runtime.serialize( result );
   // print the result
   cout << "Result:\n" << pretty_print( result );
   cout << "Result serialized to :\n" << serialized_result;
