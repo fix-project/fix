@@ -24,8 +24,7 @@ string hex_encode( Handle handle )
 {
   stringstream os;
   __m256i content = handle;
-  os << std::hex <<  content[0] << "-" << content[1] <<
-     "-" << content[2] << "-"<< content[3];
+  os << std::hex << content[0] << "-" << content[1] << "-" << content[2] << "-" << content[3];
 
   return os.str();
 }
@@ -33,15 +32,15 @@ string hex_encode( Handle handle )
 Handle hex_decode( string input )
 {
   size_t index;
-  index = input.find("-");
+  index = input.find( "-" );
   uint64_t a = std::stoull( input.substr( 0, index ), nullptr, 16 );
-  input = input.substr(index + 1);
-  index = input.find("-");
+  input = input.substr( index + 1 );
+  index = input.find( "-" );
   uint64_t b = std::stoull( input.substr( 0, index ), nullptr, 16 );
-  input = input.substr(index + 1);
-  index = input.find("-");
+  input = input.substr( index + 1 );
+  index = input.find( "-" );
   uint64_t c = std::stoull( input.substr( 0, index ), nullptr, 16 );
-  input = input.substr(index + 1);
+  input = input.substr( index + 1 );
   uint64_t d = std::stoull( input, nullptr, 16 );
 
   return Handle( a, b, c, d );
@@ -91,10 +90,10 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
   cout << "Result name: " << hex_encode( result ) << endl << flush;
 }
 
-ptree list_dependees( Handle handle )
+ptree list_dependees( Handle handle, Operation op )
 {
   ptree pt;
-  for ( auto& dependee : RuntimeStorage::get_instance().get_dependees( Task( handle, Operation::Eval ) ) ) {
+  for ( auto& dependee : RuntimeStorage::get_instance().get_dependees( Task( handle, op ) ) ) {
     ptree dependee_tree;
     dependee_tree.push_back( ptree::value_type( "handle", hex_encode( dependee.handle() ) ) );
     dependee_tree.put( "operation", uint8_t( dependee.operation() ) );
@@ -102,7 +101,7 @@ ptree list_dependees( Handle handle )
   }
 
   ptree data;
-  if (pt.size() != 0) {
+  if ( pt.size() != 0 ) {
     data.push_back( ptree::value_type( "dependees", pt ) );
   }
   return data;
@@ -110,17 +109,13 @@ ptree list_dependees( Handle handle )
 
 ptree get_child( Handle handle, Operation operation )
 {
-  ptree pt;
-  optional<optional<Handle>> result = RuntimeStorage::get_instance().get_status( Task( handle, operation ) );
+  optional<Handle> result = RuntimeStorage::get_instance().get_status( Task( handle, operation ) );
+  ptree data;
   if ( result.has_value() ) {
-    ptree data;
-    if ( result.value().has_value() ) {
-      data.push_back( ptree::value_type( "entry", hex_encode( result.value().value() ) ) );
-    }
-    pt.push_back( ptree::value_type( "child", data ) );
+    data.push_back( ptree::value_type( "handle", hex_encode( result.value() ) ) );
   }
 
-  return pt;
+  return data;
 }
 
 ptree get_parents( Handle handle )
@@ -135,7 +130,7 @@ ptree get_parents( Handle handle )
     data.push_back( ptree::value_type( "", entry ) );
   }
 
-  if (data.size() != 0) {
+  if ( data.size() != 0 ) {
     pt.push_back( ptree::value_type( "parents", data ) );
   }
 
@@ -201,7 +196,7 @@ void program_body( span_view<char*> args )
   cerr << "Listening on port " << server_socket.local_address().port() << "\n";
 
   vector<ReadOnlyFile> open_files;
-  kick_off(args, open_files);
+  kick_off( args, open_files );
 
   TCPSocket connection = server_socket.accept();
   cerr << "Connection received from " << connection.peer_address().to_string() << "\n";
@@ -231,7 +226,8 @@ void program_body( span_view<char*> args )
         auto map = decode_url_params( target );
         if ( target.starts_with( "/dependees" ) ) {
           stringstream ptree;
-          write_json( ptree, list_dependees( hex_decode( map.at( "handle" ) ) ) );
+          write_json( ptree,
+                      list_dependees( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
           response = ptree.str();
         } else if ( target.starts_with( "/child" ) ) {
           stringstream ptree;
