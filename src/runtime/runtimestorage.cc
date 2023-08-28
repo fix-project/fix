@@ -13,6 +13,8 @@
 
 using namespace std;
 
+const size_t SIZE_OF_BASE64_ENCODED_HANDLE = 43;
+
 bool RuntimeStorage::steal_work( Task& task, size_t tid )
 {
   // Starting at the next thread index after the current thread--look to steal work
@@ -266,7 +268,7 @@ void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
       case ContentType::Thunk: {
         input_file.seekg( 0, std::ios::end );
         size_t size = input_file.tellg();
-        assert( size == 43 );
+        assert( size == SIZE_OF_BASE64_ENCODED_HANDLE );
         char* buf = static_cast<char*>( malloc( size ) );
         input_file.seekg( 0, std::ios::beg );
         input_file.read( reinterpret_cast<char*>( buf ), size );
@@ -298,15 +300,17 @@ void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
         input_file.seekg( 0, std::ios::end );
         size_t size = input_file.tellg();
         char* buf = static_cast<char*>( malloc( size ) );
-        Handle* tree_buf = static_cast<Handle*>( aligned_alloc( alignof( Handle ), sizeof( Handle ) * size / 43 ) );
+        Handle* tree_buf = static_cast<Handle*>(
+          aligned_alloc( alignof( Handle ), sizeof( Handle ) * size / SIZE_OF_BASE64_ENCODED_HANDLE ) );
         input_file.seekg( 0, std::ios::beg );
         input_file.read( reinterpret_cast<char*>( buf ), size );
 
-        for ( size_t i = 0; i < size; i += 43 ) {
-          tree_buf[i / 43] = base64::decode( string( buf + i, 43 ) );
+        for ( size_t i = 0; i < size; i += SIZE_OF_BASE64_ENCODED_HANDLE ) {
+          tree_buf[i / SIZE_OF_BASE64_ENCODED_HANDLE]
+            = base64::decode( string( buf + i, SIZE_OF_BASE64_ENCODED_HANDLE ) );
         }
 
-        Tree tree( Tree_ptr( tree_buf ), size / 43 );
+        Tree tree( Tree_ptr( tree_buf ), size / SIZE_OF_BASE64_ENCODED_HANDLE );
         free( buf );
 
         Handle local_id = add_tree( std::move( tree ) );
@@ -319,15 +323,17 @@ void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
         input_file.seekg( 0, std::ios::end );
         size_t size = input_file.tellg();
         char* buf = static_cast<char*>( malloc( size ) );
-        Handle* tree_buf = static_cast<Handle*>( aligned_alloc( alignof( Handle ), sizeof( Handle ) * size / 43 ) );
+        Handle* tree_buf = static_cast<Handle*>(
+          aligned_alloc( alignof( Handle ), sizeof( Handle ) * size / SIZE_OF_BASE64_ENCODED_HANDLE ) );
         input_file.seekg( 0, std::ios::beg );
         input_file.read( reinterpret_cast<char*>( buf ), size );
 
-        for ( size_t i = 0; i < size; i += 43 ) {
-          tree_buf[i / 43] = base64::decode( string( buf + i, 43 ) );
+        for ( size_t i = 0; i < size; i += SIZE_OF_BASE64_ENCODED_HANDLE ) {
+          tree_buf[i / SIZE_OF_BASE64_ENCODED_HANDLE]
+            = base64::decode( string( buf + i, SIZE_OF_BASE64_ENCODED_HANDLE ) );
         }
 
-        Tree tree( Tree_ptr( tree_buf ), size / 43 );
+        Tree tree( Tree_ptr( tree_buf ), size / SIZE_OF_BASE64_ENCODED_HANDLE );
         free( buf );
 
         Handle local_id = add_tag( std::move( tree ) );
