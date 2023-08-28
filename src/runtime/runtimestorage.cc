@@ -176,7 +176,7 @@ Handle RuntimeStorage::local_to_storage( Handle name )
         }
 
         string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Handle ) );
-        Handle hash( sha256::encode( view ), tree.size(), ContentType::Tree );
+        Handle hash( sha256::encode( view ), tree.size(), name.get_content_type() );
 
         canonical_to_local_.insert_or_assign( hash, new_name );
 
