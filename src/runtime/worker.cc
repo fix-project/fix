@@ -124,7 +124,7 @@ Handle RuntimeWorker::do_apply( Task task )
   auto name = task.handle();
   Handle function_tag = runtimestorage_.get_tree( name ).at( 1 );
   while ( !runtimestorage_.get_tree( function_tag ).at( 1 ).is_blob() ) {
-    if ( not runtimestorage_.get_tree(function_tag).at(1).is_tag() ) {
+    if ( not runtimestorage_.get_tree( function_tag ).at( 1 ).is_tag() ) {
       throw std::runtime_error( "Procedure is not a tag." );
     }
     function_tag = runtimestorage_.get_tree( function_tag ).at( 1 );
