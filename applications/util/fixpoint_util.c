@@ -1,5 +1,8 @@
 #include "fixpoint_util.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
+
 void copy_ro_to_rw_mem( int32_t rw_mem_id, int32_t ro_mem_id, int32_t rw_offset, int32_t ro_offset, int32_t len )
 {
     copy_ro_table_to_rw_functions[ro_mem_id][rw_mem_id](rw_offset, ro_offset, len);
@@ -76,3 +79,5 @@ int32_t grow_rw_table( int32_t table_id, int32_t delta, externref init_value )
 int32_t page_size_rw_mem( int32_t mem_id ) {
   return page_size_rw_mem_functions[mem_id]();
 }
+
+#pragma clang diagnostic pop
