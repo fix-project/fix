@@ -20,6 +20,9 @@ using namespace boost::property_tree;
 
 static constexpr size_t mebi = 1024 * 1024;
 
+// Web server to expose computation graph through HTTP API for a viewer.
+// Client at https://github.com/Tweoss/fix-viewer.
+
 string hex_encode( Handle handle )
 {
   stringstream os;
