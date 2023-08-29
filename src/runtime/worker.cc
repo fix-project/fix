@@ -124,6 +124,9 @@ Handle RuntimeWorker::do_apply( Task task )
   auto name = task.handle();
   Handle function_tag = runtimestorage_.get_tree( name ).at( 1 );
   while ( !runtimestorage_.get_tree( function_tag ).at( 1 ).is_blob() ) {
+    if ( not runtimestorage_.get_tree( function_tag ).at( 1 ).is_tag() ) {
+      throw std::runtime_error( "Procedure is not a tag." );
+    }
     function_tag = runtimestorage_.get_tree( function_tag ).at( 1 );
   }
 
@@ -160,6 +163,7 @@ Handle RuntimeWorker::do_fill( Handle name )
         tree.mutable_data()[i] = entry;
 
         if ( entry.is_strict() and !entry.is_blob() ) {
+          // the entry must have been started (the first .value) and finished (the second .value)
           tree.mutable_data()[i] = runtimestorage_.fix_cache_.get( Task::Eval( entry ) ).value();
         }
       }

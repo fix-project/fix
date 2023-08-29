@@ -13,6 +13,7 @@ struct HTTPHeaders
   std::string origin {};
   std::string sec_websocket_key {}, sec_websocket_accept {};
   std::string location {};
+  std::string access_control_allow_origin {};
 };
 
 struct HTTPRequest
