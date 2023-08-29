@@ -3,10 +3,10 @@
 #include <charconv>
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <unistd.h>
 
-#include "base64.hh"
 #include "eventloop.hh"
 #include "http_server.hh"
 #include "mmap.hh"
@@ -19,6 +19,35 @@ using namespace std;
 using namespace boost::property_tree;
 
 static constexpr size_t mebi = 1024 * 1024;
+
+// Web server to expose computation graph through HTTP API for a viewer.
+// Client at https://github.com/Tweoss/fix-viewer.
+
+string hex_encode( Handle handle )
+{
+  stringstream os;
+  __m256i content = handle;
+  os << std::hex << content[0] << "-" << content[1] << "-" << content[2] << "-" << content[3];
+
+  return os.str();
+}
+
+Handle hex_decode( string input )
+{
+  size_t index;
+  index = input.find( "-" );
+  uint64_t a = std::stoull( input.substr( 0, index ), nullptr, 16 );
+  input = input.substr( index + 1 );
+  index = input.find( "-" );
+  uint64_t b = std::stoull( input.substr( 0, index ), nullptr, 16 );
+  input = input.substr( index + 1 );
+  index = input.find( "-" );
+  uint64_t c = std::stoull( input.substr( 0, index ), nullptr, 16 );
+  input = input.substr( index + 1 );
+  uint64_t d = std::stoull( input, nullptr, 16 );
+
+  return Handle( a, b, c, d );
+}
 
 Handle parse_handle( string id )
 {
@@ -60,39 +89,52 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 
   Handle result = runtime.eval_thunk( thunk_name );
 
-  cout << "Thunk name: " << base64::encode( thunk_name ) << endl;
-  cout << "Result name: " << base64::encode( result ) << endl;
+  cout << "Thunk name: " << hex_encode( thunk_name ) << endl;
+  cout << "Result name: " << hex_encode( result ) << endl << flush;
 }
 
-ptree list_dependees( Handle handle )
+ptree list_dependees( Handle handle, Operation op )
 {
   ptree pt;
-  for ( auto& dependee : RuntimeStorage::get_instance().get_dependees( Task( handle, Operation::Eval ) ) ) {
+  for ( auto& dependee : RuntimeStorage::get_instance().get_dependees( Task( handle, op ) ) ) {
     ptree dependee_tree;
-    dependee_tree.push_back( ptree::value_type( "handle", base64::encode( dependee.handle() ) ) );
+    dependee_tree.push_back( ptree::value_type( "handle", hex_encode( dependee.handle() ) ) );
     dependee_tree.put( "operation", uint8_t( dependee.operation() ) );
     pt.push_back( ptree::value_type( "", dependee_tree ) );
   }
 
   ptree data;
-  data.push_back( ptree::value_type( "data", pt ) );
+  if ( pt.size() != 0 ) {
+    data.push_back( ptree::value_type( "dependees", pt ) );
+  }
   return data;
 }
 
-ptree get_value( Handle handle, Operation operation )
+ptree get_child( Handle handle, Operation operation )
+{
+  optional<Handle> result = RuntimeStorage::get_instance().get_status( Task( handle, operation ) );
+  ptree data;
+  if ( result.has_value() ) {
+    data.push_back( ptree::value_type( "handle", hex_encode( result.value() ) ) );
+  }
+
+  return data;
+}
+
+ptree get_parents( Handle handle )
 {
   ptree pt;
-  optional<optional<Handle>> result = RuntimeStorage::get_instance().get_status( Task( handle, operation ) );
-  if ( result.has_value() ) {
-    ptree data;
-    if ( result.value().has_value() ) {
-      data.push_back( ptree::value_type( "entry", base64::encode( result.value().value() ) ) );
-    } else {
-      data.push_back( ptree::value_type( "entry", "" ) );
-    }
-    pt.push_back( ptree::value_type( "data", data ) );
-  } else {
-    pt.push_back( ptree::value_type( "data", "" ) );
+  vector<Task> result = RuntimeStorage::get_instance().get_parents( handle );
+  ptree data;
+  for ( auto& parent : result ) {
+    ptree entry;
+    entry.push_back( ptree::value_type( "handle", hex_encode( parent.handle() ) ) );
+    entry.put( "operation", uint8_t( parent.operation() ) );
+    data.push_back( ptree::value_type( "", entry ) );
+  }
+
+  if ( data.size() != 0 ) {
+    pt.push_back( ptree::value_type( "parents", data ) );
   }
 
   return pt;
@@ -149,12 +191,15 @@ void program_body( span_view<char*> args )
 
   TCPSocket server_socket {};
   server_socket.set_reuseaddr();
-  server_socket.bind( { "0", args.at( 1 ) } );
+  server_socket.bind( { "127.0.0.1", args.at( 1 ) } );
   server_socket.listen();
 
   args.remove_prefix( 2 );
 
   cerr << "Listening on port " << server_socket.local_address().port() << "\n";
+
+  vector<ReadOnlyFile> open_files;
+  kick_off( args, open_files );
 
   TCPSocket connection = server_socket.accept();
   cerr << "Connection received from " << connection.peer_address().to_string() << "\n";
@@ -165,8 +210,6 @@ void program_body( span_view<char*> args )
 
   HTTPServer http_server;
   HTTPRequest request_in_progress;
-
-  vector<ReadOnlyFile> open_files;
 
   events.add_rule(
     "Read bytes from client",
@@ -181,29 +224,42 @@ void program_body( span_view<char*> args )
       if ( http_server.read( client_buffer, request_in_progress ) ) {
         cerr << "Got request: " << request_in_progress.request_target << "\n";
         std::string target = request_in_progress.request_target;
-        string response = "Hello, user.";
+        string response = "";
 
         auto map = decode_url_params( target );
-        if ( target == "/start" ) {
-          kick_off( args, open_files );
-          response = "{\"data\": \"started\"}";
-        } else if ( target.starts_with( "/list" ) ) {
-          stringstream ptree;
-          write_json( ptree, list_dependees( base64::decode( map.at( "handle" ) ) ) );
-          response = ptree.str();
-        } else if ( target.starts_with( "/get" ) ) {
+        if ( target.starts_with( "/dependees" ) ) {
           stringstream ptree;
           write_json( ptree,
-                      get_value( base64::decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
+                      list_dependees( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
+          response = ptree.str();
+        } else if ( target.starts_with( "/child" ) ) {
+          stringstream ptree;
+          write_json( ptree, get_child( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
+          response = ptree.str();
+        } else if ( target.starts_with( "/parents" ) ) {
+          stringstream ptree;
+          write_json( ptree, get_parents( hex_decode( map.at( "handle" ) ) ) );
           response = ptree.str();
         }
         HTTPResponse the_response;
         the_response.http_version = "HTTP/1.1";
-        the_response.status_code = "200";
-        the_response.reason_phrase = "OK";
-        the_response.headers.content_type = "text/json";
-        the_response.headers.content_length = response.size();
-        the_response.body = response;
+        if ( response.size() != 0 ) {
+          the_response.status_code = "200";
+          the_response.reason_phrase = "OK";
+          the_response.headers.content_type = "text/json";
+          the_response.headers.content_length = response.size();
+          the_response.headers.access_control_allow_origin = "http://127.0.0.1:8800";
+          the_response.body = response;
+          cout << "Responded" << endl;
+        } else {
+          the_response.status_code = "404";
+          the_response.reason_phrase = "Not Found";
+          string not_found = "API not found";
+          the_response.headers.content_type = "text/plain";
+          the_response.headers.content_length = not_found.size();
+          the_response.body = not_found;
+        }
+
         http_server.push_response( move( the_response ) );
       }
     },
