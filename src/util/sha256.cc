@@ -1,5 +1,5 @@
 #include "sha256.hh"
-#include "picosha2.h"
+#include "PicoSHA2/picosha2.h"
 #include "timer.hh"
 
 using namespace std;
