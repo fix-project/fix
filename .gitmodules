@@ -4,3 +4,4 @@
 [submodule "src/util/PicoSHA2"]
 	path = src/util/PicoSHA2
 	url = https://github.com/okdshin/PicoSHA2.git
+	ignore = dirty
