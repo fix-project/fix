@@ -189,7 +189,7 @@ public:
   using Contained = typename Inner::Contained;
   Contained release()
   {
-    Contained output = std::move( target_.release() );
+    Contained output = target_.release();
 
     const size_t non_ws_location = output.find_last_not_of( " \t" );
     if ( non_ws_location == std::string_view::npos ) {
