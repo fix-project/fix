@@ -1,10 +1,10 @@
 #pragma once
 
-#include <boost/lockfree/queue.hpp>
 #include <condition_variable>
 #include <queue>
 #include <thread>
 
+#include "concurrentqueue/concurrentqueue.h"
 #include "task.hh"
 
 #include "elfloader.hh"
@@ -18,10 +18,10 @@ private:
   friend class Job;
 
   /// A queue of runnable Tasks.
-  boost::lockfree::queue<Task> runq_;
+  moodycamel::ConcurrentQueue<Task> runq_;
 
   /// A queue of schedulable Tasks.
-  boost::lockfree::queue<Task> schedq_;
+  moodycamel::ConcurrentQueue<Task> schedq_;
 
   /// The thread corresponding to this Worker.
   std::thread thread_;

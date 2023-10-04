@@ -99,14 +99,14 @@ std::optional<Handle> RuntimeWorker::do_eval( Task task )
 
 void RuntimeWorker::queue_job( Task task )
 {
-  schedq_.push( task );
+  schedq_.enqueue( task );
 }
 
 optional<Task> RuntimeWorker::dequeue_job()
 {
   // Try to pop off the local queue, steal work if that fails, return false if no work can be found
   Task task;
-  bool work = runq_.pop( task );
+  bool work = runq_.try_dequeue( task );
 
   if ( !work ) {
     work = runtimestorage_.steal_work( task, thread_id_ );
@@ -253,9 +253,9 @@ void RuntimeWorker::work()
 
 void RuntimeWorker::schedule()
 {
-  while ( not schedq_.empty() ) {
+  while ( not( schedq_.size_approx() == 0 ) ) {
     Task task;
-    if ( not schedq_.pop( task ) ) {
+    if ( not schedq_.try_dequeue( task ) ) {
       break;
     }
     runtimestorage_.schedule( task );

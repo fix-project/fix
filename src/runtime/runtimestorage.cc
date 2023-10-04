@@ -65,7 +65,7 @@ void RuntimeStorage::schedule( Task task )
   }
   if ( remote == 0 ) {
     // schedule locally
-    current_worker().runq_.push( task );
+    current_worker().runq_.enqueue( task );
     work_++;
     work_.notify_all();
   } else {
@@ -78,7 +78,7 @@ bool RuntimeStorage::steal_work( Task& task, size_t tid )
 {
   // Starting at the next thread index after the current thread--look to steal work
   for ( size_t i = 0; i < num_workers_; ++i ) {
-    if ( workers_[( i + tid + 1 ) % num_workers_]->runq_.pop( task ) ) {
+    if ( workers_[( i + tid + 1 ) % num_workers_]->runq_.try_dequeue( task ) ) {
       return true;
     }
   }

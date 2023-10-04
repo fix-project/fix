@@ -4,3 +4,6 @@
 [submodule "third-party/PicoSHA2"]
 	path = third-party/PicoSHA2
 	url = https://github.com/okdshin/PicoSHA2
+[submodule "third-party/concurrentqueue"]
+	path = third-party/concurrentqueue
+	url = https://github.com/cameron314/concurrentqueue
