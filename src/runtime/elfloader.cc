@@ -55,9 +55,9 @@ const static map<string, uint64_t> library_func_map
       { "fixpoint_equality", (uint64_t)fixpoint::equality },
       { "fixpoint_get_access", (uint64_t)fixpoint::get_access },
       { "fixpoint_get_length", (uint64_t)fixpoint::get_length },
-      { "fixpoint_debug_try_lift", (uint64_t)fixpoint_debug::try_lift },
-      { "fixpoint_debug_try_inspect", (uint64_t)fixpoint_debug::try_inspect },
-      { "fixpoint_debug_try_evaluate", (uint64_t)fixpoint_debug::try_evaluate },
+      // { "fixpoint_debug_try_lift", (uint64_t)fixpoint_debug::try_lift },
+      // { "fixpoint_debug_try_inspect", (uint64_t)fixpoint_debug::try_inspect },
+      // { "fixpoint_debug_try_evaluate", (uint64_t)fixpoint_debug::try_evaluate },
       { "fixpoint_lower", (uint64_t)fixpoint::lower },
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
@@ -158,9 +158,6 @@ Elf_Info load_program( const string_view program_content )
 
 Program link_program( const string_view program_content )
 {
-#if TIME_FIXPOINT == 2
-  global_timer().start<Timer::Category::Linking>();
-#endif
   Elf_Info elf_info = load_program( program_content );
 
   // Step 0: allocate memory for data and text
@@ -251,8 +248,5 @@ Program link_program( const string_view program_content )
   uint64_t main_entry = elf_info.func_map.at( "w2c_function_0x5Ffixpoint_apply" );
   uint64_t cleanup_entry = elf_info.func_map.at( "wasm2c_function_free" );
   uint64_t instance_size_entry = elf_info.func_map.at( "get_instance_size" );
-#if TIME_FIXPOINT == 2
-  global_timer().stop<Timer::Category::Linking>();
-#endif
   return Program( code, init_entry, main_entry, cleanup_entry, instance_size_entry );
 }

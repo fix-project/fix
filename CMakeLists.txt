@@ -52,8 +52,6 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/src/component")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 
 set(FIXPOINT_LIBS runtime component util)
-set(FIXPOINT_LIBS_TIMING runtime-timing component-timing util-timing)
-set(FIXPOINT_LIBS_TIMING_2 runtime-timing-2 component-timing-2 util-timing-2)
 #add_subdirectory("${PROJECT_SOURCE_DIR}/src/storage") # only headers
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/tester")

@@ -4,9 +4,9 @@
 #include <vector>
 
 #include "mmap.hh"
-#include "runtimestorage.hh"
+#include "runtime.hh"
 
-#define COMPILE_ENCODE *RuntimeStorage::get_instance().get_ref( "compile-encode" )
+#define COMPILE_ENCODE *Runtime::get_instance().storage().get_ref( "compile-encode" )
 
 struct pretty_print
 {

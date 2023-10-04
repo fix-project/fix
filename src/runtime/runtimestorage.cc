@@ -15,89 +15,6 @@ using namespace std;
 
 const size_t SIZE_OF_BASE64_ENCODED_HANDLE = 43;
 
-void RuntimeStorage::schedule( Task task )
-{
-  uint32_t remote = 0;
-  if ( scheduler_procedure_ ) {
-    // TODO: refactor this to avoid allocating on the critical path
-    Tree task_tree { 3 };
-    task_tree.at( 0 ) = Handle( static_cast<uint8_t>( task.operation() ) );
-    task_tree.at( 1 ) = task.handle().as_lazy();
-    task_tree.at( 2 ) = Handle( static_cast<uint8_t>( task.handle().get_laziness() ) );
-
-    Tree this_remote { 1 };
-    this_remote.at( 0 ) = Handle( num_workers_ );
-
-    Tree remotes_tree { 1 };
-    remotes_tree.at( 0 ) = add_tree( std::move( this_remote ) );
-
-    Tree scheduler_encode { 4 };
-    scheduler_encode.at( 0 ) = Handle( "unused" );
-    scheduler_encode.at( 1 ) = *scheduler_procedure_;
-    scheduler_encode.at( 2 ) = add_tree( std::move( task_tree ) );
-    scheduler_encode.at( 3 ) = add_tree( std::move( remotes_tree ) );
-
-    // Scheduler Encode:
-    // Tree:
-    //  Tree: Resource Limits
-    //    - ...
-    //  Tag | Tree: Procedure
-    //    - ...
-    //  Tree: Task
-    //    - Operation
-    //    - Handle (always lazy)
-    //    - Accessibility
-    //  Tree: Remotes
-    //    - Tree: Remote
-    //      - Blob<i32>: Number of CPUs
-    //    - ...
-
-    Handle scheduler = add_tree( std::move( scheduler_encode ) );
-    // The scheduler is a "special form" in a sense; we don't pre-eval or post-eval to avoid recursion.
-    Task scheduler_task = Task::Apply( scheduler );
-    nondeterministic_api_allowed_ = true;
-    Handle scheduler_result = current_worker().do_apply( scheduler_task );
-    nondeterministic_api_allowed_ = false;
-    if ( not scheduler_result.is_literal_blob() or scheduler_result.get_length() != sizeof( uint32_t ) ) {
-      throw std::runtime_error( "scheduler did not return an i32" );
-    }
-    memcpy( &remote, scheduler_result.literal_blob().data(), 4 );
-  }
-  if ( remote == 0 ) {
-    // schedule locally
-    current_worker().runq_.enqueue( task );
-    work_++;
-    work_.notify_all();
-  } else {
-    // schedule remotely
-    throw std::runtime_error( "scheduler picked an invalid node" );
-  }
-}
-
-bool RuntimeStorage::steal_work( Task& task, size_t tid )
-{
-  // Starting at the next thread index after the current thread--look to steal work
-  for ( size_t i = 0; i < num_workers_; ++i ) {
-    if ( workers_[( i + tid + 1 ) % num_workers_]->runq_.try_dequeue( task ) ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-Handle RuntimeStorage::eval_thunk( Handle name )
-{
-  Task task( name, Operation::Eval );
-  auto cached = fix_cache_.get( task );
-  if ( cached )
-    return cached.value();
-
-  fix_cache_.start( task, workers_[0].get()->queue_cb );
-  workers_[0]->schedule();
-
-  return fix_cache_.get_or_block( task );
-}
-
 Handle RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 31 ) {
@@ -276,10 +193,10 @@ string RuntimeStorage::serialize( Handle name )
     ofstream output_file { fix_dir / "refs" / ref, std::ios::trunc };
     output_file << base64::encode( storage );
   }
-  return serialize_to_dir( name, fix_dir / "objects" );
+  return serialize_objects( name, fix_dir / "objects" );
 }
 
-string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& dir )
+string RuntimeStorage::serialize_objects( Handle name, const filesystem::path& dir )
 {
   Handle new_name = local_to_storage( name );
   string file_name = base64::encode( new_name );
@@ -296,7 +213,7 @@ string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& di
     case ContentType::Tag: {
       span_view<Handle> tree = get_tree( new_name );
       for ( size_t i = 0; i < tree.size(); i++ ) {
-        serialize_to_dir( tree[i], dir );
+        serialize_objects( tree[i], dir );
       }
       for ( size_t i = 0; i < tree.size(); i++ ) {
         output_file << base64::encode( tree[i] );
@@ -307,7 +224,7 @@ string RuntimeStorage::serialize_to_dir( Handle name, const filesystem::path& di
     }
 
     case ContentType::Thunk: {
-      serialize_to_dir( Handle::get_encode_name( name ), dir );
+      serialize_objects( Handle::get_encode_name( name ), dir );
       output_file << base64::encode( Handle::get_encode_name( name ) );
       return file_name;
     }
@@ -349,10 +266,10 @@ void RuntimeStorage::deserialize()
     auto handles = read_handles( file );
     friendly_names_.insert( make_pair( handles.at( 0 ), file.path().filename() ) );
   }
-  deserialize_from_dir( fix_dir / "objects" );
+  deserialize_objects( fix_dir / "objects" );
 }
 
-void RuntimeStorage::deserialize_from_dir( const filesystem::path& dir )
+void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
 {
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
     if ( file.is_directory() )
@@ -488,11 +405,6 @@ bool RuntimeStorage::contains( Handle handle )
       return local_storage_.size() > handle.get_local_id();
   }
   return false;
-}
-
-optional<Handle> RuntimeStorage::get_evaluated( Handle handle )
-{
-  return fix_cache_.get( Task::Eval( handle ) );
 }
 
 vector<string> RuntimeStorage::get_friendly_names( Handle handle )

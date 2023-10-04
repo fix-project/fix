@@ -37,24 +37,25 @@ void program_body( span_view<char*> args )
   }
 
   // construct an encode for compiling the file
-  auto& runtime = RuntimeStorage::get_instance();
-  runtime.deserialize();
-  Handle blob = runtime.add_blob( static_cast<string_view>( open_files.back() ) );
+  auto& rt = Runtime::get_instance();
+  auto& storage = rt.storage();
+  storage.deserialize();
+  Handle blob = storage.add_blob( static_cast<string_view>( open_files.back() ) );
   Tree encode { 3 };
   encode.at( 0 ) = Handle( "unused" );
   encode.at( 1 ) = COMPILE_ENCODE;
   encode.at( 2 ) = blob;
-  Handle encode_name = runtime.add_tree( std::move( encode ) );
+  Handle encode_name = storage.add_tree( std::move( encode ) );
   // make a Thunk that points to the combination
-  Handle thunk_name = runtime.add_thunk( Thunk { encode_name } );
+  Handle thunk_name = storage.add_thunk( Thunk { encode_name } );
 
   // force the Thunk
-  Handle result = runtime.eval_thunk( thunk_name );
+  Handle result = rt.eval( thunk_name );
 
   if ( ref_name ) {
-    runtime.set_ref( *ref_name, result );
+    storage.set_ref( *ref_name, result );
   }
-  string serialized_result = runtime.serialize( result );
+  string serialized_result = storage.serialize( result );
   // print the result
   cout << "Result:\n" << pretty_print( result );
   cout << "Result serialized to: " << serialized_result << "\n";

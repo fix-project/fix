@@ -32,7 +32,7 @@ public:
    *
    * @return The worker's information, if known.
    */
-  virtual std::optional<Info> get_info() = 0;
+  virtual std::optional<Info> get_info() { return {}; }
   virtual ~ITaskRunner() {};
 };
 
