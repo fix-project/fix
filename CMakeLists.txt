@@ -56,6 +56,7 @@ set(FIXPOINT_LIBS runtime component util)
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/tester")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/scripts")
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/tests")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/testing/wasm-examples")
 add_subdirectory("${PROJECT_SOURCE_DIR}/testing/benchmark")
