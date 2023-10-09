@@ -20,13 +20,9 @@ add_executable(dependency-tester "dependency-tester.cc" "tester-utils.cc")
 target_link_libraries(dependency-tester ${FIXPOINT_LIBS})
 target_link_libraries(dependency-tester wasmrt absl::flat_hash_map)
 
-add_executable(distributed-tester "distributed-tester.cc" "tester-utils.cc")
-target_link_libraries(distributed-tester ${FIXPOINT_LIBS})
-target_link_libraries(distributed-tester wasmrt absl::flat_hash_map)
-
-add_executable(distributed-worker "distributed-worker.cc" "tester-utils.cc")
-target_link_libraries(distributed-worker ${FIXPOINT_LIBS})
-target_link_libraries(distributed-worker wasmrt absl::flat_hash_map)
+add_executable(network-tester "network-tester.cc" "tester-utils.cc")
+target_link_libraries(network-tester ${FIXPOINT_LIBS})
+target_link_libraries(network-tester wasmrt absl::flat_hash_map)
 
 add_executable(add_timing "add_timing.cc")
 target_compile_definitions(add_timing PUBLIC TIME_FIXPOINT=1)
