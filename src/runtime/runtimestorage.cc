@@ -25,11 +25,13 @@ void RuntimeStorage::schedule( Task task )
     task_tree.at( 1 ) = task.handle().as_lazy();
     task_tree.at( 2 ) = Handle( static_cast<uint8_t>( task.handle().get_laziness() ) );
 
-    Tree this_remote { 1 };
-    this_remote.at( 0 ) = Handle( num_workers_ );
-
+    /* Tree remotes_tree { static_cast<uint32_t>( remotes_.size() + 1 ) }; */
     Tree remotes_tree { 1 };
-    remotes_tree.at( 0 ) = add_tree( std::move( this_remote ) );
+    remotes_tree.at( 0 ) = Handle( num_workers_ );
+    /* for ( size_t i = 1; i <= remotes_.size(); i++ ) { */
+    /*   Remote& remote = remotes_[i - 1]; */
+    /*   remotes_tree.at( i ) = Handle( remote.get_parallelism() ); */
+    /* } */
 
     Tree scheduler_encode { 4 };
     scheduler_encode.at( 0 ) = Handle( "unused" );
@@ -47,9 +49,8 @@ void RuntimeStorage::schedule( Task task )
     //    - Operation
     //    - Handle (always lazy)
     //    - Accessibility
-    //  Tree: Remotes
-    //    - Tree: Remote
-    //      - Blob<i32>: Number of CPUs
+    //  Tree: Node
+    //    - Blob<i32>: Number of CPUs on Node 0
     //    - ...
 
     Handle scheduler = add_tree( std::move( scheduler_encode ) );

@@ -6,7 +6,10 @@
 #include <unistd.h>
 
 #include "base64.hh"
+#include "socket.hh"
 #include "tester-utils.hh"
+
+#include "channel.hh"
 
 using namespace std;
 using path = filesystem::path;
@@ -19,23 +22,9 @@ void program_body( span_view<char*> args )
 
   args.remove_prefix( 1 );
 
-  vector<tuple<string, int, int>> nodes;
-
-  // format: username@server:cores:bps
-  // e.g. username@stagecast.org/fix:256:100000
-  nodes.emplace_back( "localhost", std::thread::hardware_concurrency(), 0 );
-
-  while ( args.size() > 0 and args.at( 0 )[0] == '+' ) {
-    string arg = args[0];
-    args.remove_prefix( 1 );
-    string server = arg.substr( 1, arg.find( ':' ) - 1 );
-    arg = arg.substr( arg.find( ':' ) + 1 );
-    string cores = arg.substr( 0, arg.find( ':' ) );
-    string bps = arg.substr( arg.find( ':' ) + 1 );
-    nodes.emplace_back( server, stoi( cores ), stoi( bps ) );
-  }
-
   ReadOnlyFile scheduler_file( args[0] );
+
+  cerr << "Listening on " << runtime.start_server( { "0.0.0.0", 26232 } ).to_string() << "\n";
 
   Handle scheduler_blob = runtime.add_blob( string_view( scheduler_file ) );
 
@@ -56,10 +45,20 @@ void program_body( span_view<char*> args )
 
   Handle program_encode = parse_args( args, open_files );
 
-  cerr << "Running Thunk:...\n";
-  Handle result = runtime.eval_thunk( runtime.add_thunk( Thunk( program_encode ) ) );
+  Handle thunk = runtime.add_thunk( Thunk( program_encode ) );
 
-  cout << "Result:\n" << pretty_print( result );
+  Handle serialized = base64::decode( runtime.serialize( thunk ) );
+  cerr << "Program Thunk: " << base64::encode( serialized ) << "\n";
+  runtime.set_ref( "last-thunk", serialized );
+  runtime.serialize( serialized );
+  while ( true ) {
+    sleep( 1 );
+  }
+
+  /*   cerr << "Running Thunk:...\n"; */
+  /*   Handle result = runtime.eval_thunk( runtime.add_thunk( Thunk( program_encode ) ) ); */
+
+  /*   cout << "Result:\n" << pretty_print( result ); */
 }
 
 void usage_message( const char* argv0 )
@@ -80,19 +79,13 @@ int main( int argc, char* argv[] )
     abort();
   }
 
-  try {
-    if ( argc < 3 ) {
-      usage_message( argv[0] );
-      return EXIT_FAILURE;
-    }
-
-    span_view<char*> args = { argv, static_cast<size_t>( argc ) };
-    program_body( args );
-  } catch ( const exception& e ) {
-    cerr << argv[0] << ": " << e.what() << "\n\n";
+  if ( argc < 3 ) {
     usage_message( argv[0] );
     return EXIT_FAILURE;
   }
+
+  span_view<char*> args = { argv, static_cast<size_t>( argc ) };
+  program_body( args );
 
   return EXIT_SUCCESS;
 }

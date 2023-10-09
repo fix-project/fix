@@ -77,6 +77,15 @@ FIXPOINT_APPLY externref _fixpoint_apply( externref encode )
   externref lifted = debug_try_lift( handle );
   access = get_access( lifted );
   println( "lifted: %d (%s)", access, access_names[access] );
+  println( "nodes:" );
+  externref nodes = get_ro_table_0( 3 );
+  attach_tree_ro_table_1( nodes );
+  for ( size_t i = 0; i < size_ro_table_1(); i++ ) {
+    externref blob = get_ro_table_1( i );
+    attach_blob_ro_mem_0( blob );
+    uint32_t parallelism = get_i32_ro_mem_0( 0 );
+    println( "  %u: %u threads", i, parallelism );
+  }
   println( "" );
   return create_blob_i32( 0 );
 }

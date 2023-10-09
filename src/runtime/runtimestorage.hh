@@ -8,11 +8,13 @@
 #include <thread>
 #include <unordered_map>
 
+#include "channel.hh"
 #include "concurrent_storage.hh"
 #include "concurrent_vector.hh"
 #include "entry.hh"
 #include "fixcache.hh"
 #include "handle.hh"
+#include "network.hh"
 #include "object.hh"
 #include "program.hh"
 #include "spans.hh"
@@ -40,8 +42,9 @@ private:
   concurrent_vector<Object> local_storage_ {};
 
   std::vector<std::unique_ptr<RuntimeWorker>> workers_ {};
-
   size_t num_workers_;
+
+  std::unique_ptr<NetworkWorker> network_worker_ {};
 
   std::atomic<bool> threads_active_ = true;
   std::atomic<bool> threads_started_ = false;
@@ -189,4 +192,11 @@ public:
   {
     return RuntimeStorage::get_instance().nondeterministic_api_allowed_;
   }
+
+  // Starts a local server on the specified address, which other Fixpoint clients can connect to.  Returns the bound
+  // address.
+  Address start_server( const Address& address ) { return network_worker_->start_server( address ); }
+
+  /// Connects to another Fixpoint client.
+  void add_remote( const Address& address ) { network_worker_->connect( address ); }
 };

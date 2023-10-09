@@ -9,6 +9,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/hash/hash.h"
+#include "channel.hh"
 #include "entry.hh"
 #include "task.hh"
 
