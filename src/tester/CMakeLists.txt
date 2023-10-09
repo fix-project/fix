@@ -12,9 +12,19 @@ add_executable(compiler-tester "compiler-tester.cc" "tester-utils.cc")
 target_link_libraries(compiler-tester ${FIXPOINT_LIBS})
 target_link_libraries(compiler-tester cryptopp wasmrt absl::flat_hash_map)
 
-add_executable(http-tester "http-tester.cc" "tester-utils.cc")
-target_link_libraries(http-tester ${FIXPOINT_LIBS})
-target_link_libraries(http-tester cryptopp wasmrt absl::flat_hash_map http)
+find_program(TRUNK_EXECUTABLE, trunk)
+find_program(CARGO_EXECUTABLE, cargo)
+
+if ((NOT TRUNK_EXECUTABLE STREQUAL "TRUNK_EXECUTABLE,-NOTFOUND") AND (NOT CARGO_EXECUTABLE STREQUAL "CARGO_EXECUTABLE,-NOTFOUND") )
+  add_executable(http-tester "http-tester.cc" "tester-utils.cc")
+  target_link_libraries(http-tester ${FIXPOINT_LIBS})
+  target_link_libraries(http-tester cryptopp wasmrt absl::flat_hash_map http)
+
+  execute_process(
+    COMMAND trunk build --dist "${CMAKE_BINARY_DIR}/src/tester/http-client"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/src/tester/http-client"
+  )
+endif()
 
 add_executable(dependency-tester "dependency-tester.cc" "tester-utils.cc")
 target_link_libraries(dependency-tester ${FIXPOINT_LIBS})
