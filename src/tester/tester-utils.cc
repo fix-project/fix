@@ -19,7 +19,7 @@ T from_int( const std::string_view str );
  */
 Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
 {
-  auto& runtime = RuntimeStorage::get_instance();
+  auto& runtime = Runtime::get_instance().storage();
 
   if ( args.empty() ) {
     throw runtime_error( "not enough args" );
@@ -155,7 +155,7 @@ T from_int( const string_view str )
 
 ostream& operator<<( ostream& stream, const pretty_print& pp )
 {
-  auto& runtime = RuntimeStorage::get_instance();
+  auto& runtime = Runtime::get_instance().storage();
   const bool terminal
     = ( &stream == &cout and isatty( STDOUT_FILENO ) ) or ( &stream == &cerr and isatty( STDERR_FILENO ) );
   if ( pp.name.is_blob() ) {

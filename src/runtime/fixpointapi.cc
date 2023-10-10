@@ -1,6 +1,6 @@
 #include "fixpointapi.hh"
 #include "base64.hh"
-#include "runtimestorage.hh"
+#include "runtime.hh"
 #include "wasm-rt.h"
 
 #ifndef DEBUG
@@ -8,7 +8,7 @@
 #endif
 
 #define TRACE_NAME                                                                                                 \
-  RuntimeStorage::get_instance().get_display_name( RuntimeStorage::get_instance().get_current_procedure() )
+  Runtime::get_instance().storage().get_display_name( Runtime::get_instance().get_current_procedure() )
 
 #if DEBUG
 #define TRACE_1( A ) std::cerr << TRACE_NAME << " - " << __FUNCTION__ << "(" << A << ")" << std::endl
@@ -31,7 +31,7 @@ void attach_tree( __m256i handle, wasm_rt_externref_table_t* target_table )
   if ( not( tree_handle.is_tree() or tree_handle.is_tag() ) or not tree_handle.is_strict() ) {
     throw ERROR( "not a strict tree" );
   }
-  auto tree = RuntimeStorage::get_instance().get_tree( tree_handle );
+  auto tree = Runtime::get_instance().storage().get_tree( tree_handle );
   target_table->ref = tree_handle;
   target_table->data = reinterpret_cast<wasm_rt_externref_t*>( const_cast<Handle*>( tree.data() ) );
   target_table->size = tree.size();
@@ -52,7 +52,7 @@ void attach_blob( __m256i handle, wasm_rt_memory_t* target_memory )
   if ( blob_handle.is_literal_blob() ) {
     blob = { reinterpret_cast<const char*>( &target_memory->ref ), blob_handle.literal_blob_len() };
   } else {
-    blob = RuntimeStorage::get_instance().get_blob( blob_handle );
+    blob = Runtime::get_instance().storage().get_blob( blob_handle );
   }
 
   target_memory->data = reinterpret_cast<uint8_t*>( const_cast<char*>( blob.data() ) );
@@ -73,7 +73,7 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   memory->data = NULL;
   memory->pages = 0;
   memory->size = 0;
-  return RuntimeStorage::get_instance().add_blob( Blob( std::move( data ), size ) );
+  return Runtime::get_instance().storage().add_blob( Blob( std::move( data ), size ) );
 }
 
 __m256i create_blob_i32( uint32_t content )
@@ -95,7 +95,7 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
   Tree_ptr data { reinterpret_cast<Handle*>( table->data ) };
   table->data = NULL;
   table->size = 0;
-  return RuntimeStorage::get_instance().add_tree( Tree( std::move( data ), size ) );
+  return Runtime::get_instance().storage().add_tree( Tree( std::move( data ), size ) );
 }
 
 __m256i create_tag( __m256i handle, __m256i type )
@@ -103,11 +103,11 @@ __m256i create_tag( __m256i handle, __m256i type )
   TRACE_1( type );
   GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
 
-  Handle new_name = RuntimeStorage::get_instance().add_tag( 3 );
-  span_view<Handle> tag = RuntimeStorage::get_instance().get_tree( new_name );
+  Handle new_name = Runtime::get_instance().storage().add_tag( 3 );
+  span_view<Handle> tag = Runtime::get_instance().storage().get_tree( new_name );
 
   tag.mutable_data()[0] = handle;
-  tag.mutable_data()[1] = RuntimeStorage::get_instance().get_current_procedure();
+  tag.mutable_data()[1] = Runtime::get_instance().get_current_procedure();
   tag.mutable_data()[2] = type;
 
   return new_name;
@@ -180,9 +180,10 @@ __m256i lower( __m256i handle )
 }
 }
 
+/*
 namespace fixpoint_debug {
 #define NONDETERMINISTIC()                                                                                         \
-  if ( not RuntimeStorage::nondeterministic_api_allowed() )                                                        \
+  if ( true )                                                                                                      \
     throw ERROR( "deterministic code called a nondeterministic API function" );
 
 __m256i try_lift( __m256i handle )
@@ -191,7 +192,7 @@ __m256i try_lift( __m256i handle )
   NONDETERMINISTIC();
   Handle h( handle );
   Handle next;
-  auto& rt = RuntimeStorage::get_instance();
+  auto& rt = Runtime::get_instance().storage();
   switch ( h.get_laziness() ) {
     case Laziness::Lazy:
       next = h.as_shallow();
@@ -234,7 +235,7 @@ __m256i try_evaluate( __m256i handle )
   TRACE_1( handle );
   NONDETERMINISTIC();
   Handle h( handle );
-  auto& rt = RuntimeStorage::get_instance();
+  auto& rt = Runtime::get_instance().storage();
   auto result = rt.get_evaluated( h );
   if ( result ) {
     return result->as_lazy();
@@ -243,3 +244,5 @@ __m256i try_evaluate( __m256i handle )
   }
 }
 }
+
+*/

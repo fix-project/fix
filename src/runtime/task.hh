@@ -66,3 +66,14 @@ public:
   static Task Apply( Handle handle ) { return Task( handle, Operation::Apply ); }
   static Task Fill( Handle handle ) { return Task( handle, Operation::Fill ); }
 };
+
+namespace std {
+template<>
+struct hash<Task>
+{
+  size_t operator()( const Task& x ) const
+  {
+    return hash<Handle>()( x.handle() ) ^ hash<Operation>()( x.operation() );
+  }
+};
+}

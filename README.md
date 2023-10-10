@@ -25,9 +25,9 @@ cmake --build build/ --parallel 256
 # How to run tests:
 Fix contains a set of test cases. To run them:
 ```
-cmake --build build/ --target fixpoint-check
+cmake --build build/ --target test
 ```
-`etc/tests.cmake` contains the location of test scripts and files
+`etc/tests.cmake` contains the location of test files.
 
 
 # Run Wasm modules in Fix

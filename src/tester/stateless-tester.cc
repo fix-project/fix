@@ -24,13 +24,13 @@ void program_body( span_view<char*> args )
   // add the combination to the store, and print it
   cout << "Combination:\n" << pretty_print( encode_name ) << "\n";
 
-  auto& runtime = RuntimeStorage::get_instance();
+  auto& runtime = Runtime::get_instance();
 
   // make a Thunk that points to the combination
-  Handle thunk_name = runtime.add_thunk( Thunk { encode_name } );
+  Handle thunk_name = runtime.storage().add_thunk( Thunk { encode_name } );
 
   // force the Thunk and print it
-  Handle result = runtime.eval_thunk( thunk_name );
+  Handle result = runtime.eval( thunk_name );
 
   // print the result
   cout << "Result:\n" << pretty_print( result );
