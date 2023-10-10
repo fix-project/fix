@@ -1,5 +1,6 @@
 #pragma once
 
+#include <concurrentqueue/concurrentqueue.h>
 #include <condition_variable>
 #include <deque>
 #include <iostream>
@@ -8,6 +9,13 @@
 #include <optional>
 #include <shared_mutex>
 
+class ChannelClosed : public std::exception
+{
+public:
+  using std::exception::what;
+  const char* what() { return "Channel was closed."; }
+};
+
 /** An inter-thread communication data structure, analogous to Go's channels. Semantically, a Channel is a way to
  * transfer ownership of an object from one location to another, so for safety reasons it only
  * accepts rvalue references.
@@ -15,9 +23,9 @@
 template<typename T>
 class Channel
 {
-  std::deque<T> data_ {};
-  std::unique_ptr<std::shared_mutex> mutex_ = std::make_unique<std::shared_mutex>();
-  std::condition_variable_any cv_ {};
+  moodycamel::ConcurrentQueue<T> data_ {};
+  std::atomic<bool> shutdown_ = false;
+  std::atomic<size_t> size_ = 0;
 
 public:
   Channel() {};
@@ -30,41 +38,46 @@ public:
 
   void push( T&& item )
   {
-    std::unique_lock lock_( *mutex_ );
-    data_.push_back( std::move( item ) );
-    cv_.notify_all();
+    if ( shutdown_ ) {
+      throw ChannelClosed {};
+    }
+    data_.enqueue( std::move( item ) );
+    ++size_;
+    size_.notify_all();
   }
 
   std::optional<T> pop()
   {
-    std::unique_lock lock_( *mutex_ );
-    if ( data_.empty() )
-      return std::nullopt;
-    T item = std::move( data_.front() );
-    data_.pop_front();
-    return item;
+    if ( shutdown_ ) {
+      throw ChannelClosed();
+    }
+    T item;
+    if ( data_.try_dequeue( item ) ) {
+      --size_;
+      return item;
+    }
+    return {};
   }
 
   T pop_or_wait()
   {
-    std::unique_lock lock_( *mutex_ );
-    cv_.wait( lock_, [&] { return not data_.empty(); } );
-    T item = std::move( data_.front() );
-    data_.pop_front();
-    return item;
+    while ( true ) {
+      size_.wait( 0 );
+      auto result = pop();
+      if ( result )
+        return *result;
+    }
   }
 
-  bool empty()
-  {
-    std::shared_lock lock_( *mutex_ );
-    return data_.empty();
-  }
-  size_t size()
-  {
-    std::shared_lock lock_( *mutex_ );
-    return data_.size();
-  }
+  size_t size_approx() { return data_.size_approx(); }
 
   void operator<<( T&& item ) { push( std::move( item ) ); }
   void operator>>( std::optional<T>& item ) { item = pop(); }
+
+  void close()
+  {
+    shutdown_ = true;
+    ++size_;
+    size_.notify_all();
+  }
 };

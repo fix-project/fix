@@ -179,7 +179,7 @@ void NetworkWorker::run_loop()
         runtime_.add_task_runner( connections_.back() );
       } );
     },
-    [&] { return not listening_sockets_.empty(); } );
+    [&] { return listening_sockets_.size_approx() > 0; } );
 
   // When we've made a new outgoing connection, add it to the event loop
   events_.add_rule(
@@ -196,7 +196,7 @@ void NetworkWorker::run_loop()
                                  mutex_ );
       runtime_.add_task_runner( connections_.back() );
     },
-    [&] { return not connecting_sockets_.empty(); } );
+    [&] { return connecting_sockets_.size_approx() > 0; } );
 
   // Forward msg_q_ to Remotes
   events_.add_rule(
