@@ -1,5 +1,6 @@
 #include "sha256.hh"
 #pragma GCC diagnostic ignored "-Weffc++"
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
 #include "PicoSHA2/picosha2.h"
 #include "timer.hh"
 
