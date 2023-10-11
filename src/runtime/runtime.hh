@@ -2,6 +2,7 @@
 
 #include "dependency_graph.hh"
 #include "interface.hh"
+#include "network.hh"
 #include "runtimestorage.hh"
 #include "scheduler.hh"
 #include "worker_pool.hh"
@@ -13,6 +14,7 @@ class Runtime : IRuntime
   WorkerPool workers_;
   Scheduler scheduler_;
   DependencyGraph graph_;
+  NetworkWorker network_;
 
   static inline thread_local Handle current_procedure_;
 
@@ -23,8 +25,9 @@ public:
     , workers_( 16, *this, graph_, storage_ )
     , scheduler_( workers_ )
     , graph_( cache_, scheduler_ )
+    , network_( *this )
   {
-    scheduler_.add_task_runner( workers_ );
+    graph_.add_result_cache( network_ );
   }
 
   static Runtime& get_instance()
@@ -46,4 +49,8 @@ public:
   Handle get_current_procedure() { return current_procedure_; }
 
   RuntimeStorage& storage() { return storage_; }
+
+  Address start_server( const Address& address ) { return network_.start_server( address ); }
+
+  void connect( const Address& address ) { network_.connect( address ); }
 };

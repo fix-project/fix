@@ -15,8 +15,20 @@ class Scheduler : public ITaskRunner
       while ( true ) {
         Task next = to_be_scheduled_.pop_or_wait();
 
-        // always send to the zeroth runner
-        runners_[0].get().start( std::move( next ) );
+        // always send to the runner with the most cores
+        size_t destination = 0;
+        size_t ncores = 0;
+        for ( size_t i = 0; i < runners_.size(); i++ ) {
+          uint32_t cores
+            = runners_[i].get().get_info().value_or( ITaskRunner::Info { .parallelism = 0 } ).parallelism;
+          std::cerr << "Node " << i << " has " << cores << " cores.\n";
+          if ( cores > ncores ) {
+            destination = i;
+            ncores = cores;
+          }
+        }
+        std::cerr << "Scheduling " << next << " on " << destination << "\n";
+        runners_[destination].get().start( std::move( next ) );
       }
     } catch ( ChannelClosed& ) {
       return;
