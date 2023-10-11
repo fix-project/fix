@@ -55,7 +55,7 @@ class Remote : public ITaskRunner
   std::vector<EventLoop::RuleHandle> installed_rules_ {};
 
   size_t index_ {};
-  std::shared_ptr<MessageQueue> msg_q_ {};
+  MessageQueue& msg_q_;
 
   std::optional<ITaskRunner::Info> info_ {};
 
@@ -69,7 +69,7 @@ public:
           EventCategories categories,
           TCPSocket socket,
           size_t index,
-          std::shared_ptr<MessageQueue> msg_q,
+          MessageQueue& msg_q,
           IRuntime& runtime,
           absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to,
           std::shared_mutex& mutex );
@@ -106,7 +106,7 @@ private:
   std::vector<Remote> connections_ {};
   std::vector<TCPSocket> server_sockets_ {};
 
-  std::shared_ptr<MessageQueue> msg_q_ { std::make_shared<MessageQueue>() };
+  MessageQueue msg_q_ {};
   IRuntime& runtime_;
 
   absl::flat_hash_map<Task, size_t, absl::Hash<Task>> reply_to_ {};
@@ -127,7 +127,6 @@ public:
 
   Address start_server( const Address& address )
   {
-    std::cout << "Start server." << std::endl;
     TCPSocket socket;
     socket.set_reuseaddr();
     socket.bind( address );
@@ -140,7 +139,6 @@ public:
 
   void connect( const Address& address )
   {
-    std::cout << "Connect." << std::endl;
     TCPSocket socket;
     socket.connect( address );
     connecting_sockets_ << std::move( socket );

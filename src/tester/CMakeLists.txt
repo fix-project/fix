@@ -20,6 +20,14 @@ add_executable(network-tester "network-tester.cc" "tester-utils.cc")
 target_link_libraries(network-tester ${FIXPOINT_LIBS})
 target_link_libraries(network-tester wasmrt absl::flat_hash_map)
 
+add_executable(fixpoint-server "fixpoint-server.cc" "tester-utils.cc")
+target_link_libraries(fixpoint-server ${FIXPOINT_LIBS})
+target_link_libraries(fixpoint-server wasmrt absl::flat_hash_map)
+
+add_executable(fixpoint-client "fixpoint-client.cc" "tester-utils.cc")
+target_link_libraries(fixpoint-client ${FIXPOINT_LIBS})
+target_link_libraries(fixpoint-client wasmrt absl::flat_hash_map)
+
 # add_executable(distributed-tester "distributed-tester.cc" "tester-utils.cc")
 # target_link_libraries(distributed-tester ${FIXPOINT_LIBS})
 # target_link_libraries(distributed-tester cryptopp wasmrt absl::flat_hash_map)

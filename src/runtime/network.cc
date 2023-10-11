@@ -52,7 +52,7 @@ Remote::Remote( EventLoop& events,
                 EventCategories categories,
                 TCPSocket socket,
                 size_t index,
-                shared_ptr<MessageQueue> msg_q,
+                MessageQueue& msg_q,
                 IRuntime& runtime,
                 absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to,
                 shared_mutex& mutex )
@@ -99,7 +99,7 @@ Remote::Remote( EventLoop& events,
 std::optional<Handle> Remote::start( Task&& task )
 {
   RunPayload payload { .task = std::move( task ) };
-  msg_q_->enqueue( make_pair( index_, Message( Opcode::RUN, serialize( payload ) ) ) );
+  msg_q_.enqueue( make_pair( index_, Message( Opcode::RUN, serialize( payload ) ) ) );
   return {};
 }
 
@@ -203,12 +203,12 @@ void NetworkWorker::run_loop()
     categories_.forward_msg,
     [&] {
       std::pair<uint32_t, Message> entry;
-      while ( msg_q_->try_dequeue( entry ) ) {
+      while ( msg_q_.try_dequeue( entry ) ) {
         assert( entry.first < connections_.size() );
         connections_.at( entry.first ).push_message( std::move( entry.second ) );
       }
     },
-    [&] { return msg_q_->size_approx() > 0; } );
+    [&] { return msg_q_.size_approx() > 0; } );
 
   // TODO: kick
   while ( not should_exit_ ) {
@@ -221,6 +221,6 @@ void NetworkWorker::finish( Task&& task, Handle result )
   std::shared_lock lock( mutex_ );
   if ( reply_to_.contains( task ) ) {
     ResultPayload payload { .task = std::move( task ), .result = result };
-    msg_q_->enqueue( make_pair( reply_to_.at( task ), Message( Opcode::RESULT, serialize( payload ) ) ) );
+    msg_q_.enqueue( make_pair( reply_to_.at( task ), Message( Opcode::RESULT, serialize( payload ) ) ) );
   }
 }
