@@ -22,7 +22,7 @@ public:
   Runtime()
     : cache_()
     , storage_()
-    , workers_( 16, *this, graph_, storage_ )
+    , workers_( std::thread::hardware_concurrency(), *this, graph_, storage_ )
     , scheduler_( workers_ )
     , graph_( cache_, scheduler_ )
     , network_( *this )
