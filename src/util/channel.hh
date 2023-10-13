@@ -24,8 +24,10 @@ template<typename T>
 class Channel
 {
   moodycamel::ConcurrentQueue<T> data_ {};
-  std::atomic<bool> shutdown_ = false;
-  std::atomic<size_t> size_ = 0;
+  std::mutex mutex_ {};
+  std::condition_variable cv_ {};
+  bool shutdown_ = false;
+  size_t size_ = 0;
 
 public:
   Channel() {};
@@ -38,16 +40,18 @@ public:
 
   void push( T&& item )
   {
+    std::unique_lock lock( mutex_ );
     if ( shutdown_ ) {
       throw ChannelClosed {};
     }
     data_.enqueue( std::move( item ) );
     ++size_;
-    size_.notify_all();
+    cv_.notify_one();
   }
 
   std::optional<T> pop()
   {
+    std::unique_lock lock( mutex_ );
     if ( shutdown_ ) {
       throw ChannelClosed();
     }
@@ -61,11 +65,17 @@ public:
 
   T pop_or_wait()
   {
+    std::unique_lock lock( mutex_ );
     while ( true ) {
-      size_.wait( 0 );
-      auto result = pop();
-      if ( result )
-        return *result;
+      cv_.wait( lock, [&] { return size_ != 0; } );
+      if ( shutdown_ ) {
+        throw ChannelClosed();
+      }
+      T item;
+      if ( data_.try_dequeue( item ) ) {
+        --size_;
+        return item;
+      }
     }
   }
 
@@ -76,8 +86,9 @@ public:
 
   void close()
   {
+    std::unique_lock lock( mutex_ );
     shutdown_ = true;
     ++size_;
-    size_.notify_all();
+    cv_.notify_all();
   }
 };

@@ -10,7 +10,6 @@
 
 #include "concurrent_storage.hh"
 #include "concurrent_vector.hh"
-#include "entry.hh"
 #include "fixcache.hh"
 #include "handle.hh"
 #include "object.hh"
