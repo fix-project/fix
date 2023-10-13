@@ -145,7 +145,7 @@ public:
     }
   }
 
-  bool is_canonical() const { return !is_literal_blob() && metadata() & 0x04; }
+  bool is_canonical() const { return is_literal_blob() or metadata() & 0x04; }
 
   bool is_local() const { return !is_literal_blob() && !is_canonical(); }
 
@@ -245,10 +245,22 @@ public:
     return _mm256_or_si256( bits, masked );
   }
 
-  Handle get_encode_name() { return Handle::get_encode_name( *this ); }
-  Handle as_strict() { return Handle::make_strict( *this ); }
-  Handle as_shallow() { return Handle::make_shallow( *this ); }
-  Handle as_lazy() { return Handle::make_lazy( *this ); }
+  Handle get_encode_name() const { return Handle::get_encode_name( *this ); }
+  Handle as_strict() const { return Handle::make_strict( *this ); }
+  Handle as_shallow() const { return Handle::make_shallow( *this ); }
+  Handle as_lazy() const { return Handle::make_lazy( *this ); }
+  Handle with_laziness( Laziness laziness ) const
+  {
+    switch ( laziness ) {
+      case Laziness::Lazy:
+        return as_lazy();
+      case Laziness::Shallow:
+        return as_shallow();
+      case Laziness::Strict:
+        return as_strict();
+    }
+    __builtin_unreachable();
+  }
 
   friend bool operator==( Handle lhs, Handle rhs );
   friend std::ostream& operator<<( std::ostream& s, const Handle name );

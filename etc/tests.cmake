@@ -13,3 +13,5 @@ add_test(NAME t_add_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DI
 add_test(NAME t_open_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-open-flatware)
 add_test(NAME t_return_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-return-flatware)
 add_test(NAME t_helloworld_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-helloworld-flatware)
+
+add_test(NAME t_storage WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-storage)

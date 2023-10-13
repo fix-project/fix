@@ -72,7 +72,7 @@ public:
 
   void add_program( Handle function_name, std::string_view elf_content );
 
-  Handle local_to_storage( Handle name );
+  Handle canonicalize( Handle name );
 
   std::string serialize( Handle handle );
   void deserialize();
@@ -104,4 +104,27 @@ public:
 
   // Adds a ref for a Handle in-memory (but does not serialize the ref to disk)
   void set_ref( std::string_view ref, Handle handle );
+
+  /**
+   * Call @p visitor for every Handle in the "minimum repo" of @p root, i.e., the set of Handles needed for @p root
+   * to be valid as input to a Fix program.
+   *
+   * The iteration order is such that every child will be visited before its parents.
+   *
+   * @param root            The Handle from which to start traversing inputs.
+   * @param visitor         A function to call on every dependency.
+   * @param include_lazy    Whether or not to visit Lazy Handles, which have no data in their minrepo.
+   * @param include_thunks  Whether or not to visit Thunks, which have no data besides their Tree.
+   */
+  void visit( Handle root,
+              std::function<void( Handle )> visitor,
+              bool include_lazy = true,
+              bool include_thunks = true );
+
+  /**
+   * Determines if two Handles should be treated as equal.  This might canonicalize the Handles if necessary.
+   *
+   * @return  true if the Handles refer to the same object, false otherwise
+   */
+  bool compare_handles( Handle x, Handle y );
 };

@@ -29,3 +29,7 @@ target_link_libraries(test-helloworld-flatware cryptopp wasmrt absl::flat_hash_m
 add_executable(test-map test-map.cc)
 target_link_libraries(test-map ${FIXPOINT_LIBS})
 target_link_libraries(test-map cryptopp wasmrt absl::flat_hash_map)
+
+add_executable(test-storage test-storage.cc)
+target_link_libraries(test-storage ${FIXPOINT_LIBS})
+target_link_libraries(test-storage cryptopp wasmrt absl::flat_hash_map)
