@@ -130,10 +130,9 @@ uint32_t get_value_type( __m256i handle )
 uint32_t equality( __m256i lhs, __m256i rhs )
 {
   TRACE_2( lhs, rhs );
-  // XXX: proper equality
   Handle left( lhs );
   Handle right( rhs );
-  return ( left == right );
+  return Runtime::get_instance().storage().compare_handles( left, right );
 }
 
 void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
