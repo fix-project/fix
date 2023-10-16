@@ -1,7 +1,5 @@
 #pragma once
 
-#include <atomic>
-
 #include "handle.hh"
 #include "operation.hh"
 

@@ -21,13 +21,15 @@ class Scheduler : public ITaskRunner
         for ( size_t i = 0; i < runners_.size(); i++ ) {
           uint32_t cores
             = runners_[i].get().get_info().value_or( ITaskRunner::Info { .parallelism = 0 } ).parallelism;
-          std::cerr << "Node " << i << " has " << cores << " cores.\n";
+          if ( runners_.size() != 1 )
+            std::cerr << "Node " << i << " has " << cores << " cores.\n";
           if ( cores > ncores ) {
             destination = i;
             ncores = cores;
           }
         }
-        std::cerr << "Scheduling " << next << " on " << destination << "\n";
+        if ( runners_.size() != 1 )
+          std::cerr << "Scheduling " << next << " on " << destination << "\n";
         runners_[destination].get().start( std::move( next ) );
       }
     } catch ( ChannelClosed& ) {
