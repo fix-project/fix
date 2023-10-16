@@ -127,7 +127,7 @@ Handle RuntimeWorker::do_apply( Task task )
   }
 
   Handle function_name = tag.at( 0 );
-  Handle canonical_name = storage_.local_to_storage( function_name );
+  Handle canonical_name = storage_.canonicalize( function_name );
   if ( not storage_.name_to_program_.contains( canonical_name ) ) {
     /* Link program */
     Program program = link_program( storage_.get_blob( function_name ) );

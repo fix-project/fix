@@ -115,11 +115,12 @@ void RuntimeStorage::add_program( Handle function_name, string_view elf_content 
   return;
 }
 
-Handle RuntimeStorage::local_to_storage( Handle name )
+Handle RuntimeStorage::canonicalize( Handle name )
 {
-  if ( name.is_literal_blob() || !name.is_local() ) {
+  if ( name.is_canonical() ) {
     return name;
   }
+  Laziness laziness = name.get_laziness();
 
   switch ( name.get_content_type() ) {
     case ContentType::Blob: {
@@ -130,7 +131,7 @@ Handle RuntimeStorage::local_to_storage( Handle name )
         Handle hash( sha256::encode( blob ), blob.size(), ContentType::Blob );
         canonical_to_local_.insert_or_assign( hash, name );
 
-        return hash;
+        return hash.with_laziness( laziness );
       } else {
         throw runtime_error( "Handle type does not match content type" );
       }
@@ -149,7 +150,7 @@ Handle RuntimeStorage::local_to_storage( Handle name )
 
         for ( size_t i = 0; i < tree.size(); ++i ) {
           auto entry = orig_tree[i];
-          tree.mutable_data()[i] = local_to_storage( entry );
+          tree.mutable_data()[i] = canonicalize( entry );
         }
 
         string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Handle ) );
@@ -157,7 +158,7 @@ Handle RuntimeStorage::local_to_storage( Handle name )
 
         canonical_to_local_.insert_or_assign( hash, new_name );
 
-        return hash;
+        return hash.with_laziness( laziness );
       } else {
         throw runtime_error( "Handle type does not match content type" );
       }
@@ -165,7 +166,7 @@ Handle RuntimeStorage::local_to_storage( Handle name )
     }
 
     case ContentType::Thunk: {
-      return Handle::get_thunk_name( local_to_storage( Handle::get_encode_name( name ) ) );
+      return Handle::get_thunk_name( canonicalize( Handle::get_encode_name( name ) ) ).with_laziness( laziness );
     }
 
     default:
@@ -188,7 +189,7 @@ filesystem::path RuntimeStorage::get_fix_repo()
 string RuntimeStorage::serialize( Handle name )
 {
   const auto fix_dir = get_fix_repo();
-  Handle storage = local_to_storage( name );
+  Handle storage = canonicalize( name );
   for ( const auto& ref : get_friendly_names( name ) ) {
     ofstream output_file { fix_dir / "refs" / ref, std::ios::trunc };
     output_file << base64::encode( storage );
@@ -198,7 +199,7 @@ string RuntimeStorage::serialize( Handle name )
 
 string RuntimeStorage::serialize_objects( Handle name, const filesystem::path& dir )
 {
-  Handle new_name = local_to_storage( name );
+  Handle new_name = canonicalize( name );
   string file_name = base64::encode( new_name );
   ofstream output_file( dir / file_name );
 
@@ -461,4 +462,51 @@ optional<Handle> RuntimeStorage::get_ref( string_view ref )
 void RuntimeStorage::set_ref( string_view ref, Handle handle )
 {
   friendly_names_.insert( make_pair( handle, ref ) );
+}
+
+void RuntimeStorage::visit( Handle handle,
+                            function<void( Handle )> visitor,
+                            bool include_lazy,
+                            bool include_thunks )
+{
+  handle = canonicalize( handle );
+  if ( handle.is_lazy() ) {
+    if ( include_lazy ) {
+      if ( include_thunks or not handle.is_thunk() ) {
+        visitor( handle );
+      }
+    }
+  } else {
+    switch ( handle.get_content_type() ) {
+      case ContentType::Tree:
+      case ContentType::Tag:
+        for ( const auto& element : get_tree( handle ) ) {
+          visit( handle.is_shallow() ? element.as_lazy() : element, visitor, include_lazy, include_thunks );
+        }
+        visitor( handle );
+        break;
+      case ContentType::Blob:
+        visitor( handle );
+        break;
+      case ContentType::Thunk:
+        visit( handle.get_encode_name(), visitor, include_lazy, include_thunks );
+        if ( include_thunks )
+          visitor( handle );
+        break;
+    }
+  }
+}
+
+bool RuntimeStorage::compare_handles( Handle x, Handle y )
+{
+  if ( x == y ) {
+    return true;
+  }
+  if ( x.is_canonical() and y.is_canonical() ) {
+    return x == y;
+  } else {
+    x = canonicalize( x );
+    y = canonicalize( y );
+    return x == y;
+  }
 }
