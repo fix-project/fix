@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <queue>
+#include <string_view>
 #include <variant>
 
 #include "interface.hh"
@@ -32,17 +34,14 @@ private:
   Opcode opcode_ { Opcode::COUNT };
   std::variant<std::string, std::string_view, Blob, Tree> payload_ {};
 
+protected:
+  Message( Opcode opcode, std::variant<std::string, std::string_view, Blob, Tree>&& payload )
+    : opcode_( opcode )
+    , payload_( std::move( payload ) )
+  {}
+
 public:
   Message() {};
-
-  // Incoming messages
-  Message( std::string_view header, std::string&& payload );
-  Message( std::string_view header, Blob&& payload );
-  Message( std::string_view header, Tree&& payload );
-
-  // Outgoing messages
-  Message( const Opcode opcode, std::string&& payload );
-  Message( const Opcode opcode, std::string_view payload );
 
   Opcode opcode() { return opcode_; }
 
@@ -74,6 +73,27 @@ public:
   virtual ~Message() {}
 };
 
+class IncomingMessage : public Message
+{
+public:
+  IncomingMessage( std::string_view header, std::string&& payload );
+  IncomingMessage( std::string_view header, Blob&& payload );
+  IncomingMessage( std::string_view header, Tree&& payload );
+};
+
+class OutgoingMessage : public Message
+{
+private:
+  std::optional<Handle> data_dependnecy_ {};
+
+public:
+  OutgoingMessage() {};
+  OutgoingMessage( const Opcode opcode, std::string&& payload, std::optional<Handle> dependency = {} );
+  OutgoingMessage( const Opcode opcode, std::string_view payload, std::optional<Handle> dependency = {} );
+
+  std::optional<Handle> get_dependency() { return data_dependnecy_; }
+};
+
 class MessageParser
 {
 private:
@@ -84,7 +104,7 @@ private:
   std::variant<std::string, Blob, Tree> incomplete_payload_ {};
   size_t completed_payload_length_ {};
 
-  std::queue<Message> completed_messages_ {};
+  std::queue<IncomingMessage> completed_messages_ {};
 
   void complete_message();
 
@@ -92,7 +112,7 @@ public:
   size_t parse( std::string_view buf );
 
   bool empty() { return completed_messages_.empty(); }
-  Message& front() { return completed_messages_.front(); }
+  IncomingMessage& front() { return completed_messages_.front(); }
   void pop() { completed_messages_.pop(); }
   size_t size() { return completed_messages_.size(); }
 };

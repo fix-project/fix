@@ -1,9 +1,11 @@
 #include "network.hh"
+#include "eventloop.hh"
 #include "handle.hh"
 #include "message.hh"
 #include "runtime.hh"
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <shared_mutex>
 #include <stdexcept>
@@ -17,8 +19,6 @@ void Remote::load_tx_message()
   if ( not current_msg_unsent_header_.empty() or not current_msg_unsent_payload_.empty() or tx_messages_.empty() )
     throw runtime_error( "Unable to load" );
 
-  std::cout << "loading tx " << Message::OPCODE_NAMES[static_cast<uint8_t>( tx_messages_.front().opcode() )]
-            << std::endl;
   tx_messages_.front().serialize_header( current_msg_header_ );
   current_msg_unsent_header_ = current_msg_header_;
   current_msg_unsent_payload_ = tx_messages_.front().payload();
@@ -85,7 +85,7 @@ void Remote::send_object( Handle handle )
   }
 }
 
-void Remote::push_message( Message&& msg )
+void Remote::push_message( OutgoingMessage&& msg )
 {
   tx_messages_.push( std::move( msg ) );
 
@@ -122,18 +122,24 @@ Remote::Remote( EventLoop& events,
     } ) );
 
   install_rule( events_.add_rule(
-    categories.tx_write_data, [&] { tx_data_.pop_to_fd( socket_ ); }, [&] { return tx_data_.can_read(); } ) );
+    categories.tx_write_data,
+    socket_,
+    Direction::Out,
+    [&] { tx_data_.pop_to_fd( socket_ ); },
+    [&] { return tx_data_.can_read(); } ) );
 
   install_rule( events_.add_rule(
     categories.rx_parse_msg, [&] { read_from_rb(); }, [&] { return rx_data_.can_read(); } ) );
 
   install_rule( events_.add_rule(
-    categories.tx_serialize_msg, [&] { write_to_rb(); }, [&] { return not tx_messages_.empty(); } ) );
+    categories.tx_serialize_msg,
+    [&] { write_to_rb(); },
+    [&] { return not tx_messages_.empty() and tx_data_.can_write(); } ) );
 
   install_rule( events_.add_rule(
     categories.rx_process_msg,
     [&] {
-      Message message = std::move( rx_messages_.front() );
+      IncomingMessage message = std::move( rx_messages_.front() );
       rx_messages_.pop();
       process_incoming_message( std::move( message ) );
     },
@@ -144,12 +150,19 @@ Remote::Remote( EventLoop& events,
 
 std::optional<Handle> Remote::start( Task&& task )
 {
-  RunPayload payload { .task = std::move( task ) };
-  msg_q_.enqueue( make_pair( index_, Message( Opcode::RUN, serialize( payload ) ) ) );
+  // XXX
+  Handle canonical_handle = runtime_.storage().canonicalize( task.handle() );
+
+  Task canonical_task( canonical_handle, task.operation() );
+  RunPayload payload { .task = std::move( canonical_task ) };
+
+  // RunPayload payload { .task = std::move( task ) };
+  msg_q_.enqueue( make_pair( index_, OutgoingMessage( Opcode::RUN, serialize( payload ), canonical_handle ) ) );
+
   return {};
 }
 
-void Remote::process_incoming_message( Message&& msg )
+void Remote::process_incoming_message( IncomingMessage&& msg )
 {
   std::cout << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )]
             << std::endl;
@@ -169,6 +182,9 @@ void Remote::process_incoming_message( Message&& msg )
           std::unique_lock lock( mutex_ );
           if ( reply_to_.contains( task ) ) {
             reply_to_.erase( task );
+
+            send_object( res.value() );
+
             ResultPayload payload { .task = task, .result = res.value() };
             push_message( { Opcode::RESULT, serialize( payload ) } );
           }
@@ -265,9 +281,19 @@ void NetworkWorker::run_loop()
   events_.add_rule(
     categories_.forward_msg,
     [&] {
-      std::pair<uint32_t, Message> entry;
+      std::pair<uint32_t, OutgoingMessage> entry;
       while ( msg_q_.try_dequeue( entry ) ) {
         assert( entry.first < connections_.size() );
+
+        // push data dependency sending if existed
+        auto dependency = entry.second.get_dependency();
+        if ( dependency.has_value() ) {
+          Handle canonical_result = runtime_.storage().canonicalize( dependency.value() );
+          runtime_.storage().visit(
+            canonical_result,
+            std::bind( &Remote::send_object, &connections_.at( entry.first ), placeholders::_1 ) );
+        }
+
         connections_.at( entry.first ).push_message( std::move( entry.second ) );
       }
     },
@@ -283,7 +309,10 @@ void NetworkWorker::finish( Task&& task, Handle result )
 {
   std::shared_lock lock( mutex_ );
   if ( reply_to_.contains( task ) ) {
-    ResultPayload payload { .task = std::move( task ), .result = result };
-    msg_q_.enqueue( make_pair( reply_to_.at( task ), Message( Opcode::RESULT, serialize( payload ) ) ) );
+    // XXX move this to msg_q_
+    Handle canonical_result = runtime_.storage().canonicalize( result );
+    ResultPayload payload { .task = std::move( task ), .result = canonical_result };
+    msg_q_.enqueue( make_pair( reply_to_.at( task ),
+                               OutgoingMessage( Opcode::RESULT, serialize( payload ), canonical_result ) ) );
   }
 }

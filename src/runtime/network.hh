@@ -21,7 +21,7 @@
 
 using ResultChannel = Channel<std::pair<Task, Handle>>;
 using WorkChannel = Channel<Task>;
-using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, Message>>;
+using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, OutgoingMessage>>;
 
 struct EventCategories
 {
@@ -48,7 +48,7 @@ class Remote : public ITaskRunner
   RingBuffer tx_data_ { 8192 };
 
   MessageParser rx_messages_ {};
-  std::queue<Message> tx_messages_ {};
+  std::queue<OutgoingMessage> tx_messages_ {};
 
   std::string current_msg_header_ {};
   std::string_view current_msg_unsent_header_ {};
@@ -79,7 +79,7 @@ public:
   std::optional<Handle> start( Task&& task ) override;
   std::optional<ITaskRunner::Info> get_info() override { return info_; }
 
-  void push_message( Message&& msg );
+  void push_message( OutgoingMessage&& msg );
 
   bool is_connected();
   Address local_address() { return socket_.local_address(); }
@@ -92,7 +92,7 @@ private:
   void write_to_rb();
   void read_from_rb();
   void install_rule( EventLoop::RuleHandle rule ) { installed_rules_.push_back( rule ); }
-  void process_incoming_message( Message&& msg );
+  void process_incoming_message( IncomingMessage&& msg );
 
   void send_blob( std::string_view blob );
   void send_tree( span_view<Handle> tree );

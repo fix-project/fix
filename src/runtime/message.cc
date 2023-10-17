@@ -2,32 +2,30 @@
 #include "base64.hh"
 #include "object.hh"
 #include "parser.hh"
+#include <optional>
 
 using namespace std;
 
-Message::Message( string_view header, string&& payload )
-  : opcode_( Message::opcode( header ) )
-  , payload_( move( payload ) )
+IncomingMessage::IncomingMessage( string_view header, string&& payload )
+  : Message( Message::opcode( header ), move( payload ) )
 {}
 
-Message::Message( string_view header, Blob&& payload )
-  : opcode_( Message::opcode( header ) )
-  , payload_( move( payload ) )
+IncomingMessage::IncomingMessage( string_view header, Blob&& payload )
+  : Message( Message::opcode( header ), move( payload ) )
 {}
 
-Message::Message( string_view header, Tree&& payload )
-  : opcode_( Message::opcode( header ) )
-  , payload_( move( payload ) )
+IncomingMessage::IncomingMessage( string_view header, Tree&& payload )
+  : Message( Message::opcode( header ), move( payload ) )
 {}
 
-Message::Message( const Opcode opcode, string&& payload )
-  : opcode_( opcode )
-  , payload_( move( payload ) )
+OutgoingMessage::OutgoingMessage( const Opcode opcode, string&& payload, optional<Handle> dependency )
+  : Message( opcode, move( payload ) )
+  , data_dependnecy_( dependency )
 {}
 
-Message::Message( const Opcode opcode, string_view payload )
-  : opcode_( opcode )
-  , payload_( payload )
+OutgoingMessage::OutgoingMessage( const Opcode opcode, string_view payload, optional<Handle> dependency )
+  : Message( opcode, payload )
+  , data_dependnecy_( dependency )
 {}
 
 void Message::serialize_header( string& out )

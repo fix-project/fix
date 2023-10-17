@@ -41,7 +41,16 @@ public:
   }
 
   std::optional<Handle> start( Task&& task ) override { return graph_.start( std::move( task ) ); }
-  void finish( Task&& task, Handle result ) override { graph_.finish( std::move( task ), result ); }
+  void finish( Task&& task, Handle result ) override
+  {
+    auto local_handle = storage_.get_local_name( task.handle() );
+    if ( local_handle.has_value() ) {
+      Task local_task( local_handle.value(), task.operation() );
+      graph_.finish( std::move( local_task ), result );
+    }
+
+    graph_.finish( std::move( task ), result );
+  }
 
   std::optional<Info> get_info() override { return workers_.get_info(); }
 
