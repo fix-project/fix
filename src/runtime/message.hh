@@ -1,8 +1,10 @@
 #pragma once
 
 #include <queue>
+#include <variant>
 
 #include "interface.hh"
+#include "object.hh"
 #include "parser.hh"
 #include "task.hh"
 
@@ -15,26 +17,52 @@ public:
     RESULT,
     REQUESTINFO,
     INFO,
+    BLOBDATA,
+    TREEDATA,
+    TAGDATA,
     COUNT
   };
 
   static constexpr const char* OPCODE_NAMES[static_cast<uint8_t>( Opcode::COUNT )]
-    = { "RUN", "RESULT", "REQUESTINFO", "INFO" };
+    = { "RUN", "RESULT", "REQUESTINFO", "INFO", "BLOBDATA", "TREEDATA", "TAGDATA" };
 
   constexpr static size_t HEADER_LENGTH = sizeof( size_t ) + sizeof( Opcode );
 
 private:
   Opcode opcode_ { Opcode::COUNT };
-  std::string payload_ {};
+  std::variant<std::string, std::string_view, Blob, Tree> payload_ {};
 
 public:
   Message() {};
+
+  // Incoming messages
   Message( std::string_view header, std::string&& payload );
+  Message( std::string_view header, Blob&& payload );
+  Message( std::string_view header, Tree&& payload );
+
+  // Outgoing messages
   Message( const Opcode opcode, std::string&& payload );
+  Message( const Opcode opcode, std::string_view payload );
 
   Opcode opcode() { return opcode_; }
-  const std::string& payload() { return payload_; }
+
+  std::string_view payload();
+  size_t payload_length();
+
+  static Opcode opcode( std::string_view header );
   static size_t expected_payload_length( std::string_view header );
+
+  Blob&& get_blob()
+  {
+    assert( holds_alternative<Blob>( payload_ ) );
+    return std::move( get<Blob>( payload_ ) );
+  }
+
+  Tree&& get_tree()
+  {
+    assert( holds_alternative<Tree>( payload_ ) );
+    return std::move( get<Tree>( payload_ ) );
+  }
 
   void serialize_header( std::string& out );
 
@@ -42,6 +70,8 @@ public:
   Message& operator=( Message&& ) = default;
   Message( const Message& ) = delete;
   Message& operator=( const Message& ) = delete;
+
+  virtual ~Message() {}
 };
 
 class MessageParser
@@ -50,7 +80,9 @@ private:
   std::optional<uint32_t> expected_payload_length_ {};
 
   std::string incomplete_header_ {};
-  std::string incomplete_payload_ {};
+
+  std::variant<std::string, Blob, Tree> incomplete_payload_ {};
+  size_t completed_payload_length_ {};
 
   std::queue<Message> completed_messages_ {};
 

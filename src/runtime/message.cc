@@ -1,20 +1,31 @@
 #include "message.hh"
 #include "base64.hh"
+#include "object.hh"
 #include "parser.hh"
 
 using namespace std;
 
 Message::Message( string_view header, string&& payload )
-  : payload_( move( payload ) )
-{
-  if ( header.size() < HEADER_LENGTH ) {
-    throw runtime_error( "Incomplete header." );
-  }
+  : opcode_( Message::opcode( header ) )
+  , payload_( move( payload ) )
+{}
 
-  opcode_ = static_cast<Opcode>( header[8] );
-}
+Message::Message( string_view header, Blob&& payload )
+  : opcode_( Message::opcode( header ) )
+  , payload_( move( payload ) )
+{}
+
+Message::Message( string_view header, Tree&& payload )
+  : opcode_( Message::opcode( header ) )
+  , payload_( move( payload ) )
+{}
 
 Message::Message( const Opcode opcode, string&& payload )
+  : opcode_( opcode )
+  , payload_( move( payload ) )
+{}
+
+Message::Message( const Opcode opcode, string_view payload )
   : opcode_( opcode )
   , payload_( payload )
 {}
@@ -23,12 +34,36 @@ void Message::serialize_header( string& out )
 {
   out.resize( HEADER_LENGTH );
   Serializer s( string_span::from_view( out ) );
-  s.integer( payload_.length() );
+  s.integer( payload_length() );
   s.integer( static_cast<uint8_t>( opcode_ ) );
 
   if ( s.bytes_written() != HEADER_LENGTH ) {
     throw runtime_error( "Wrong header length" );
   }
+}
+
+string_view Message::payload()
+{
+  return std::visit(
+    [&]( auto& arg ) -> string_view {
+      return { reinterpret_cast<const char*>( arg.data() ), payload_length() };
+    },
+    payload_ );
+}
+
+size_t Message::payload_length()
+{
+  if ( std::holds_alternative<Tree>( payload_ ) ) {
+    return span_view<Handle>( get<Tree>( payload_ ) ).byte_size();
+  } else {
+    return std::visit( []( auto& arg ) -> size_t { return arg.size(); }, payload_ );
+  }
+}
+
+Message::Opcode Message::opcode( string_view header )
+{
+  assert( header.size() == HEADER_LENGTH );
+  return static_cast<Opcode>( header[8] );
 }
 
 size_t Message::expected_payload_length( string_view header )
@@ -46,11 +81,13 @@ size_t Message::expected_payload_length( string_view header )
 
 void MessageParser::complete_message()
 {
-  completed_messages_.emplace( incomplete_header_, move( incomplete_payload_ ) );
+  std::visit( [&]( auto&& arg ) { completed_messages_.emplace( incomplete_header_, move( arg ) ); },
+              incomplete_payload_ );
 
   expected_payload_length_.reset();
   incomplete_header_.clear();
-  incomplete_payload_.clear();
+  incomplete_payload_ = "";
+  completed_payload_length_ = 0;
 }
 
 size_t MessageParser::parse( string_view buf )
@@ -67,18 +104,50 @@ size_t MessageParser::parse( string_view buf )
         expected_payload_length_ = Message::expected_payload_length( incomplete_header_ );
 
         if ( expected_payload_length_.value() == 0 ) {
+          assert( Message::opcode( incomplete_header_ ) == Message::Opcode::REQUESTINFO );
           complete_message();
+        } else {
+          switch ( Message::opcode( incomplete_header_ ) ) {
+            case Message::Opcode::RUN:
+            case Message::Opcode::INFO:
+            case Message::Opcode::RESULT: {
+              incomplete_payload_ = "";
+              get<string>( incomplete_payload_ ).resize( expected_payload_length_.value() );
+              break;
+            }
+
+            case Message::Opcode::BLOBDATA: {
+              incomplete_payload_ = Blob( expected_payload_length_.value() );
+              break;
+            }
+
+            case Message::Opcode::TREEDATA:
+            case Message::Opcode::TAGDATA: {
+              incomplete_payload_ = Tree( expected_payload_length_.value() / sizeof( Handle ) );
+              break;
+            }
+
+            default:
+              throw runtime_error( "Invalid combination of message type and payload size." );
+          }
         }
       }
     } else {
-      const auto remaining_length
-        = min( buf.length(), expected_payload_length_.value() - incomplete_payload_.length() );
-      incomplete_payload_.append( buf.substr( 0, remaining_length ) );
-      buf.remove_prefix( remaining_length );
+      std::visit(
+        [&]( auto& arg ) {
+          char* data = const_cast<char*>( reinterpret_cast<const char*>( arg.data() ) ) + completed_payload_length_;
+          const auto remaining_length
+            = min( buf.length(), expected_payload_length_.value() - completed_payload_length_ );
+          memcpy( data, buf.data(), remaining_length );
 
-      if ( incomplete_payload_.length() == expected_payload_length_.value() ) {
-        complete_message();
-      }
+          buf.remove_prefix( remaining_length );
+          completed_payload_length_ += remaining_length;
+
+          if ( completed_payload_length_ == expected_payload_length_.value() ) {
+            complete_message();
+          }
+        },
+        incomplete_payload_ );
     }
   }
 

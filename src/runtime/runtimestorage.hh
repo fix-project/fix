@@ -46,6 +46,8 @@ private:
 public:
   // add blob
   Handle add_blob( Blob&& blob );
+  // add blob that needs a canonical name
+  Handle add_canonical_blob( Blob&& blob );
 
   // Return reference to blob content
   std::string_view get_blob( Handle name );
@@ -53,9 +55,13 @@ public:
 
   // add Tree
   Handle add_tree( Tree&& tree );
+  // add Tree that needs a canonical name
+  Handle add_canonical_tree( Tree&& tree );
 
   // add Tag
   Handle add_tag( Tree&& tree );
+  // add blob that needs a canonical name
+  Handle add_canonical_tag( Tree&& tree );
 
   // Return reference to Tree
   span_view<Handle> get_tree( Handle name );

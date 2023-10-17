@@ -1,6 +1,9 @@
 #include "network.hh"
+#include "handle.hh"
 #include "message.hh"
+#include "runtime.hh"
 #include <algorithm>
+#include <cstdint>
 #include <mutex>
 #include <shared_mutex>
 #include <stdexcept>
@@ -14,6 +17,8 @@ void Remote::load_tx_message()
   if ( not current_msg_unsent_header_.empty() or not current_msg_unsent_payload_.empty() or tx_messages_.empty() )
     throw runtime_error( "Unable to load" );
 
+  std::cout << "loading tx " << Message::OPCODE_NAMES[static_cast<uint8_t>( tx_messages_.front().opcode() )]
+            << std::endl;
   tx_messages_.front().serialize_header( current_msg_header_ );
   current_msg_unsent_header_ = current_msg_header_;
   current_msg_unsent_payload_ = tx_messages_.front().payload();
@@ -39,6 +44,47 @@ void Remote::read_from_rb()
   rx_data_.pop( rx_messages_.parse( rx_data_.readable_region() ) );
 }
 
+void Remote::send_blob( string_view blob )
+{
+  push_message( { Opcode::BLOBDATA, blob } );
+}
+
+void Remote::send_tree( span_view<Handle> tree )
+{
+  push_message(
+    { Opcode::TREEDATA, string_view( reinterpret_cast<const char*>( tree.data() ), tree.byte_size() ) } );
+}
+
+void Remote::send_tag( span_view<Handle> tag )
+{
+  push_message( { Opcode::TAGDATA, string_view( reinterpret_cast<const char*>( tag.data() ), tag.byte_size() ) } );
+}
+
+void Remote::send_object( Handle handle )
+{
+  if ( !handle.is_literal_blob() ) {
+    switch ( handle.get_content_type() ) {
+      case ContentType::Blob: {
+        send_blob( runtime_.storage().get_blob( handle ) );
+        break;
+      }
+
+      case ContentType::Tree: {
+        send_tree( runtime_.storage().get_tree( handle ) );
+        break;
+      }
+
+      case ContentType::Tag: {
+        send_tag( runtime_.storage().get_tree( handle ) );
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
+}
+
 void Remote::push_message( Message&& msg )
 {
   tx_messages_.push( std::move( msg ) );
@@ -53,7 +99,7 @@ Remote::Remote( EventLoop& events,
                 TCPSocket socket,
                 size_t index,
                 MessageQueue& msg_q,
-                IRuntime& runtime,
+                Runtime& runtime,
                 absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to,
                 shared_mutex& mutex )
   : events_( events )
@@ -93,7 +139,7 @@ Remote::Remote( EventLoop& events,
     },
     [&] { return not rx_messages_.empty(); } ) );
 
-  push_message( { Opcode::REQUESTINFO, {} } );
+  push_message( { Opcode::REQUESTINFO, string( "" ) } );
 }
 
 std::optional<Handle> Remote::start( Task&& task )
@@ -105,6 +151,8 @@ std::optional<Handle> Remote::start( Task&& task )
 
 void Remote::process_incoming_message( Message&& msg )
 {
+  std::cout << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )]
+            << std::endl;
   switch ( msg.opcode() ) {
     case Opcode::RUN: {
       auto payload = parse<RunPayload>( msg.payload() );
@@ -143,6 +191,21 @@ void Remote::process_incoming_message( Message&& msg )
 
     case Opcode::INFO: {
       info_ = parse<InfoPayload>( msg.payload() );
+      break;
+    }
+
+    case Opcode::BLOBDATA: {
+      runtime_.storage().add_canonical_blob( move( msg.get_blob() ) );
+      break;
+    }
+
+    case Opcode::TREEDATA: {
+      runtime_.storage().add_canonical_tree( move( msg.get_tree() ) );
+      break;
+    }
+
+    case Opcode::TAGDATA: {
+      runtime_.storage().add_canonical_tag( move( msg.get_tree() ) );
       break;
     }
 

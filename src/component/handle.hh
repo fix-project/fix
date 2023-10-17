@@ -147,7 +147,7 @@ public:
 
   bool is_canonical() const { return is_literal_blob() or metadata() & 0x04; }
 
-  bool is_local() const { return !is_literal_blob() && !is_canonical(); }
+  bool is_local() const { return !is_canonical(); }
 
   bool is_blob() const
   {
