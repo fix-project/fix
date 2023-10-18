@@ -28,7 +28,7 @@ class RuntimeStorage
 private:
   friend class RuntimeWorker;
 
-  absl::flat_hash_map<Handle, Handle, AbslHash> canonical_to_local_ {};
+  InMemoryStorage<Handle> canonical_to_local_ {};
   std::unordered_multimap<Handle, std::string> friendly_names_ {};
 
   // Maps a Wasm function Handle to corresponding compiled Program
@@ -73,6 +73,8 @@ public:
 
   Handle canonicalize( Handle name );
 
+  std::optional<Handle> get_local_name( Handle name );
+
   std::string serialize( Handle handle );
   void deserialize();
 
@@ -81,7 +83,7 @@ public:
 
   size_t get_local_storage_size() { return local_storage_.size(); }
 
-  Handle get_local_handle( Handle canonical ) { return canonical_to_local_.at( canonical ); }
+  Handle get_local_handle( Handle canonical ) { return canonical_to_local_.get( canonical ); }
 
   // Tests if the Handle (with the specified accessibility) is valid with the current contents.
   bool contains( Handle handle );

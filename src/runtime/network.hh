@@ -21,7 +21,7 @@
 
 using ResultChannel = Channel<std::pair<Task, Handle>>;
 using WorkChannel = Channel<Task>;
-using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, Message>>;
+using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, OutgoingMessage>>;
 
 struct EventCategories
 {
@@ -36,6 +36,8 @@ struct EventCategories
   size_t forward_msg;
 };
 
+class Runtime;
+
 class Remote : public ITaskRunner
 {
   EventLoop& events_;
@@ -46,7 +48,7 @@ class Remote : public ITaskRunner
   RingBuffer tx_data_ { 8192 };
 
   MessageParser rx_messages_ {};
-  std::queue<Message> tx_messages_ {};
+  std::queue<OutgoingMessage> tx_messages_ {};
 
   std::string current_msg_header_ {};
   std::string_view current_msg_unsent_header_ {};
@@ -62,7 +64,7 @@ class Remote : public ITaskRunner
   absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to_;
   std::shared_mutex& mutex_;
 
-  IRuntime& runtime_;
+  Runtime& runtime_;
 
 public:
   Remote( EventLoop& events,
@@ -70,25 +72,31 @@ public:
           TCPSocket socket,
           size_t index,
           MessageQueue& msg_q,
-          IRuntime& runtime,
+          Runtime& runtime,
           absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to,
           std::shared_mutex& mutex );
 
   std::optional<Handle> start( Task&& task ) override;
   std::optional<ITaskRunner::Info> get_info() override { return info_; }
 
-  void push_message( Message&& msg );
+  void push_message( OutgoingMessage&& msg );
 
   bool is_connected();
   Address local_address() { return socket_.local_address(); }
   Address peer_address() { return socket_.peer_address(); }
+
+  void send_object( Handle handle );
 
 private:
   void load_tx_message();
   void write_to_rb();
   void read_from_rb();
   void install_rule( EventLoop::RuleHandle rule ) { installed_rules_.push_back( rule ); }
-  void process_incoming_message( Message&& msg );
+  void process_incoming_message( IncomingMessage&& msg );
+
+  void send_blob( std::string_view blob );
+  void send_tree( span_view<Handle> tree );
+  void send_tag( span_view<Handle> tag );
 };
 
 class NetworkWorker : public IResultCache
@@ -107,7 +115,7 @@ private:
   std::vector<TCPSocket> server_sockets_ {};
 
   MessageQueue msg_q_ {};
-  IRuntime& runtime_;
+  Runtime& runtime_;
 
   absl::flat_hash_map<Task, size_t, absl::Hash<Task>> reply_to_ {};
   std::shared_mutex mutex_ {};
@@ -115,7 +123,7 @@ private:
   void run_loop();
 
 public:
-  NetworkWorker( IRuntime& runtime )
+  NetworkWorker( Runtime& runtime )
     : network_thread_( std::bind( &NetworkWorker::run_loop, this ) )
     , runtime_( runtime ) {};
 

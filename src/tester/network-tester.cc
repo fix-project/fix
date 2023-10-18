@@ -99,6 +99,16 @@ void client( DummyRuntime& runtime )
   Task t( handle, Operation::Eval );
   runtime.get_runner().start( move( t ) );
 
+  sleep( 1 );
+
+  Tree testing_tree { 3 };
+
+  testing_tree.at( 0 ) = Handle( "Testing entry 0" );
+  testing_tree.at( 1 ) = Handle( "Testing entry 1" );
+  testing_tree.at( 2 ) = Handle( "Testing entry 2" );
+
+  worker.send_tree( testing_tree );
+
   while ( true ) {
     sleep( 1 );
   }

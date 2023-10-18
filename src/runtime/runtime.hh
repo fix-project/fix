@@ -7,6 +7,10 @@
 #include "scheduler.hh"
 #include "worker_pool.hh"
 
+#ifndef RUNTIME_THREADS
+#define RUNTIME_THREADS std::thread::hardware_concurrency()
+#endif
+
 class Runtime : IRuntime
 {
   FixCache cache_;
@@ -22,7 +26,7 @@ public:
   Runtime()
     : cache_()
     , storage_()
-    , workers_( std::thread::hardware_concurrency(), *this, graph_, storage_ )
+    , workers_( RUNTIME_THREADS, *this, graph_, storage_ )
     , scheduler_( workers_ )
     , graph_( cache_, scheduler_ )
     , network_( *this )
@@ -37,7 +41,18 @@ public:
   }
 
   std::optional<Handle> start( Task&& task ) override { return graph_.start( std::move( task ) ); }
-  void finish( Task&& task, Handle result ) override { graph_.finish( std::move( task ), result ); }
+  void finish( Task&& task, Handle result ) override
+  {
+    auto local_handle = storage_.get_local_name( task.handle() );
+    if ( local_handle.has_value() ) {
+      Task local_task( local_handle.value(), task.operation() );
+      graph_.finish( std::move( local_task ), result );
+    }
+
+    graph_.finish( std::move( task ), result );
+  }
+
+  std::optional<Info> get_info() override { return workers_.get_info(); }
 
   void add_task_runner( ITaskRunner& runner ) override { scheduler_.add_task_runner( runner ); }
   void add_result_cache( IResultCache& cache ) override { graph_.add_result_cache( cache ); }

@@ -3,7 +3,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 
+#include "handle.hh"
 #include "object.hh"
 #include "operation.hh"
 #include "runtimestorage.hh"
@@ -34,7 +36,7 @@ string_view RuntimeStorage::get_blob( Handle name )
   } else if ( name.is_local() ) {
     return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Handle local_name = canonical_to_local_.at( Handle( name ) );
+    Handle local_name = canonical_to_local_.get( Handle( name ) );
     return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
@@ -48,7 +50,7 @@ string_view RuntimeStorage::user_get_blob( const Handle& name )
   } else if ( name.is_local() ) {
     return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Handle local_name = canonical_to_local_.at( Handle( name ) );
+    Handle local_name = canonical_to_local_.get( Handle( name ) );
     return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
   }
 
@@ -75,7 +77,7 @@ span_view<Handle> RuntimeStorage::get_tree( Handle name )
   if ( name.is_local() ) {
     return get<Tree>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Handle local_name = canonical_to_local_.at( Handle( name ) );
+    Handle local_name = canonical_to_local_.get( Handle( name ) );
     return get<Tree>( local_storage_.at( local_name.get_local_id() ) );
   }
 
@@ -166,7 +168,10 @@ Handle RuntimeStorage::canonicalize( Handle name )
     }
 
     case ContentType::Thunk: {
-      return Handle::get_thunk_name( canonicalize( Handle::get_encode_name( name ) ) ).with_laziness( laziness );
+      Handle new_name = Handle::get_thunk_name( canonicalize( Handle::get_encode_name( name ) ) );
+
+      canonical_to_local_.insert_or_assign( new_name, name );
+      return new_name.with_laziness( laziness );
     }
 
     default:
@@ -184,6 +189,15 @@ filesystem::path RuntimeStorage::get_fix_repo()
     current_directory = current_directory.parent_path();
   }
   return current_directory / ".fix";
+}
+
+optional<Handle> RuntimeStorage::get_local_name( Handle name )
+{
+  if ( !canonical_to_local_.contains( name ) ) {
+    return {};
+  } else {
+    return canonical_to_local_.get( name );
+  }
 }
 
 string RuntimeStorage::serialize( Handle name )
@@ -392,7 +406,7 @@ bool RuntimeStorage::contains( Handle handle )
         if ( not canonical_to_local_.contains( handle.as_strict() ) ) {
           return false;
         }
-        handle = canonical_to_local_.at( handle.as_strict() );
+        handle = canonical_to_local_.get( handle.as_strict() );
       }
       return local_storage_.size() > handle.get_local_id();
     case Laziness::Strict:
@@ -400,7 +414,7 @@ bool RuntimeStorage::contains( Handle handle )
         if ( not canonical_to_local_.contains( handle.as_strict() ) ) {
           return false;
         }
-        handle = canonical_to_local_.at( handle.as_strict() );
+        handle = canonical_to_local_.get( handle.as_strict() );
       }
       // TODO: recurse on children for Tree-like structures
       return local_storage_.size() > handle.get_local_id();

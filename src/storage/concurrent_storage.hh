@@ -52,6 +52,13 @@ public:
     return;
   }
 
+  void insert_or_assign( const Handle name, T content )
+  {
+    std::unique_lock lock( name_to_object_mutex_ );
+    name_to_object_.insert_or_assign( name, content );
+    return;
+  }
+
   size_t size()
   {
     std::shared_lock lock( name_to_object_mutex_ );

@@ -26,10 +26,7 @@ public:
     }
   }
 
-  std::optional<Info> get_info() override
-  {
-    return Info { .parallelism = static_cast<uint32_t>( std::thread::hardware_concurrency() ) };
-  }
+  std::optional<Info> get_info() override { return Info { .parallelism = static_cast<uint32_t>( num_workers_ ) }; }
 
   std::optional<Handle> start( Task&& task ) override
   {

@@ -1,6 +1,11 @@
 #include "network.hh"
+#include "eventloop.hh"
+#include "handle.hh"
 #include "message.hh"
+#include "runtime.hh"
 #include <algorithm>
+#include <cstdint>
+#include <functional>
 #include <mutex>
 #include <shared_mutex>
 #include <stdexcept>
@@ -39,7 +44,48 @@ void Remote::read_from_rb()
   rx_data_.pop( rx_messages_.parse( rx_data_.readable_region() ) );
 }
 
-void Remote::push_message( Message&& msg )
+void Remote::send_blob( string_view blob )
+{
+  push_message( { Opcode::BLOBDATA, blob } );
+}
+
+void Remote::send_tree( span_view<Handle> tree )
+{
+  push_message(
+    { Opcode::TREEDATA, string_view( reinterpret_cast<const char*>( tree.data() ), tree.byte_size() ) } );
+}
+
+void Remote::send_tag( span_view<Handle> tag )
+{
+  push_message( { Opcode::TAGDATA, string_view( reinterpret_cast<const char*>( tag.data() ), tag.byte_size() ) } );
+}
+
+void Remote::send_object( Handle handle )
+{
+  if ( !handle.is_literal_blob() ) {
+    switch ( handle.get_content_type() ) {
+      case ContentType::Blob: {
+        send_blob( runtime_.storage().get_blob( handle ) );
+        break;
+      }
+
+      case ContentType::Tree: {
+        send_tree( runtime_.storage().get_tree( handle ) );
+        break;
+      }
+
+      case ContentType::Tag: {
+        send_tag( runtime_.storage().get_tree( handle ) );
+        break;
+      }
+
+      default:
+        break;
+    }
+  }
+}
+
+void Remote::push_message( OutgoingMessage&& msg )
 {
   tx_messages_.push( std::move( msg ) );
 
@@ -53,7 +99,7 @@ Remote::Remote( EventLoop& events,
                 TCPSocket socket,
                 size_t index,
                 MessageQueue& msg_q,
-                IRuntime& runtime,
+                Runtime& runtime,
                 absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to,
                 shared_mutex& mutex )
   : events_( events )
@@ -76,35 +122,50 @@ Remote::Remote( EventLoop& events,
     } ) );
 
   install_rule( events_.add_rule(
-    categories.tx_write_data, [&] { tx_data_.pop_to_fd( socket_ ); }, [&] { return tx_data_.can_read(); } ) );
+    categories.tx_write_data,
+    socket_,
+    Direction::Out,
+    [&] { tx_data_.pop_to_fd( socket_ ); },
+    [&] { return tx_data_.can_read(); } ) );
 
   install_rule( events_.add_rule(
     categories.rx_parse_msg, [&] { read_from_rb(); }, [&] { return rx_data_.can_read(); } ) );
 
   install_rule( events_.add_rule(
-    categories.tx_serialize_msg, [&] { write_to_rb(); }, [&] { return not tx_messages_.empty(); } ) );
+    categories.tx_serialize_msg,
+    [&] { write_to_rb(); },
+    [&] { return not tx_messages_.empty() and tx_data_.can_write(); } ) );
 
   install_rule( events_.add_rule(
     categories.rx_process_msg,
     [&] {
-      Message message = std::move( rx_messages_.front() );
+      IncomingMessage message = std::move( rx_messages_.front() );
       rx_messages_.pop();
       process_incoming_message( std::move( message ) );
     },
     [&] { return not rx_messages_.empty(); } ) );
 
-  push_message( { Opcode::REQUESTINFO, {} } );
+  push_message( { Opcode::REQUESTINFO, string( "" ) } );
 }
 
 std::optional<Handle> Remote::start( Task&& task )
 {
-  RunPayload payload { .task = std::move( task ) };
-  msg_q_.enqueue( make_pair( index_, Message( Opcode::RUN, serialize( payload ) ) ) );
+  // XXX
+  Handle canonical_handle = runtime_.storage().canonicalize( task.handle() );
+
+  Task canonical_task( canonical_handle, task.operation() );
+  RunPayload payload { .task = std::move( canonical_task ) };
+
+  // RunPayload payload { .task = std::move( task ) };
+  msg_q_.enqueue( make_pair( index_, OutgoingMessage( Opcode::RUN, serialize( payload ), canonical_handle ) ) );
+
   return {};
 }
 
-void Remote::process_incoming_message( Message&& msg )
+void Remote::process_incoming_message( IncomingMessage&& msg )
 {
+  std::cout << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )]
+            << std::endl;
   switch ( msg.opcode() ) {
     case Opcode::RUN: {
       auto payload = parse<RunPayload>( msg.payload() );
@@ -121,6 +182,9 @@ void Remote::process_incoming_message( Message&& msg )
           std::unique_lock lock( mutex_ );
           if ( reply_to_.contains( task ) ) {
             reply_to_.erase( task );
+
+            send_object( res.value() );
+
             ResultPayload payload { .task = task, .result = res.value() };
             push_message( { Opcode::RESULT, serialize( payload ) } );
           }
@@ -136,13 +200,31 @@ void Remote::process_incoming_message( Message&& msg )
     }
 
     case Opcode::REQUESTINFO: {
-      InfoPayload payload { { .parallelism = thread::hardware_concurrency() } };
+      InfoPayload payload { runtime_.get_info().value_or( ITaskRunner::Info { .parallelism = 0 } ) };
       push_message( { Opcode::INFO, serialize( payload ) } );
       break;
     }
 
     case Opcode::INFO: {
       info_ = parse<InfoPayload>( msg.payload() );
+      break;
+    }
+
+    case Opcode::BLOBDATA: {
+      auto& storage = runtime_.storage();
+      storage.canonicalize( storage.add_blob( move( msg.get_blob() ) ) );
+      break;
+    }
+
+    case Opcode::TREEDATA: {
+      auto& storage = runtime_.storage();
+      storage.canonicalize( storage.add_tree( move( msg.get_tree() ) ) );
+      break;
+    }
+
+    case Opcode::TAGDATA: {
+      auto& storage = runtime_.storage();
+      storage.canonicalize( storage.add_tag( move( msg.get_tree() ) ) );
       break;
     }
 
@@ -202,9 +284,21 @@ void NetworkWorker::run_loop()
   events_.add_rule(
     categories_.forward_msg,
     [&] {
-      std::pair<uint32_t, Message> entry;
+      std::pair<uint32_t, OutgoingMessage> entry;
       while ( msg_q_.try_dequeue( entry ) ) {
         assert( entry.first < connections_.size() );
+
+        // push data dependency sending if existed
+        auto dependency = entry.second.get_dependency();
+        if ( dependency.has_value() ) {
+          Handle canonical_result = runtime_.storage().canonicalize( dependency.value() );
+          runtime_.storage().visit(
+            canonical_result,
+            std::bind( &Remote::send_object, &connections_.at( entry.first ), placeholders::_1 ),
+            false,
+            false );
+        }
+
         connections_.at( entry.first ).push_message( std::move( entry.second ) );
       }
     },
@@ -220,7 +314,10 @@ void NetworkWorker::finish( Task&& task, Handle result )
 {
   std::shared_lock lock( mutex_ );
   if ( reply_to_.contains( task ) ) {
-    ResultPayload payload { .task = std::move( task ), .result = result };
-    msg_q_.enqueue( make_pair( reply_to_.at( task ), Message( Opcode::RESULT, serialize( payload ) ) ) );
+    // XXX move this to msg_q_
+    Handle canonical_result = runtime_.storage().canonicalize( result );
+    ResultPayload payload { .task = std::move( task ), .result = canonical_result };
+    msg_q_.enqueue( make_pair( reply_to_.at( task ),
+                               OutgoingMessage( Opcode::RESULT, serialize( payload ), canonical_result ) ) );
   }
 }
