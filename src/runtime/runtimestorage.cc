@@ -29,11 +29,6 @@ Handle RuntimeStorage::add_blob( Blob&& blob )
   }
 }
 
-Handle RuntimeStorage::add_canonical_blob( Blob&& blob )
-{
-  return canonicalize( add_blob( move( blob ) ) );
-}
-
 string_view RuntimeStorage::get_blob( Handle name )
 {
   if ( name.is_literal_blob() ) {
@@ -69,22 +64,12 @@ Handle RuntimeStorage::add_tree( Tree&& tree )
   return name;
 }
 
-Handle RuntimeStorage::add_canonical_tree( Tree&& tree )
-{
-  return canonicalize( add_tree( move( tree ) ) );
-}
-
 Handle RuntimeStorage::add_tag( Tree&& tree )
 {
   assert( tree.size() == 3 );
   size_t local_id = local_storage_.push_back( std::move( tree ) );
   Handle name( local_id, tree.size(), ContentType::Tag );
   return name;
-}
-
-Handle RuntimeStorage::add_canonical_tag( Tree&& tree )
-{
-  return canonicalize( add_tag( move( tree ) ) );
 }
 
 span_view<Handle> RuntimeStorage::get_tree( Handle name )

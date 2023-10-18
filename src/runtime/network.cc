@@ -211,17 +211,20 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::BLOBDATA: {
-      runtime_.storage().add_canonical_blob( move( msg.get_blob() ) );
+      auto& storage = runtime_.storage();
+      storage.canonicalize( storage.add_blob( move( msg.get_blob() ) ) );
       break;
     }
 
     case Opcode::TREEDATA: {
-      runtime_.storage().add_canonical_tree( move( msg.get_tree() ) );
+      auto& storage = runtime_.storage();
+      storage.canonicalize( storage.add_tree( move( msg.get_tree() ) ) );
       break;
     }
 
     case Opcode::TAGDATA: {
-      runtime_.storage().add_canonical_tag( move( msg.get_tree() ) );
+      auto& storage = runtime_.storage();
+      storage.canonicalize( storage.add_tag( move( msg.get_tree() ) ) );
       break;
     }
 
@@ -291,7 +294,9 @@ void NetworkWorker::run_loop()
           Handle canonical_result = runtime_.storage().canonicalize( dependency.value() );
           runtime_.storage().visit(
             canonical_result,
-            std::bind( &Remote::send_object, &connections_.at( entry.first ), placeholders::_1 ) );
+            std::bind( &Remote::send_object, &connections_.at( entry.first ), placeholders::_1 ),
+            false,
+            false );
         }
 
         connections_.at( entry.first ).push_message( std::move( entry.second ) );

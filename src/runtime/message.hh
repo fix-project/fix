@@ -89,6 +89,7 @@ private:
 public:
   OutgoingMessage() {};
   OutgoingMessage( const Opcode opcode, std::string&& payload, std::optional<Handle> dependency = {} );
+  // Construct an non_owning data, backing data have to outlive the message
   OutgoingMessage( const Opcode opcode, std::string_view payload, std::optional<Handle> dependency = {} );
 
   std::optional<Handle> get_dependency() { return data_dependnecy_; }
