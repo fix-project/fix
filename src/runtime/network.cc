@@ -184,7 +184,7 @@ void Remote::process_incoming_message( Message&& msg )
     }
 
     case Opcode::REQUESTINFO: {
-      InfoPayload payload { { .parallelism = thread::hardware_concurrency() } };
+      InfoPayload payload { runtime_.get_info().value_or( ITaskRunner::Info { .parallelism = 0 } ) };
       push_message( { Opcode::INFO, serialize( payload ) } );
       break;
     }
