@@ -15,7 +15,7 @@ class Runtime : IRuntime
 {
   FixCache cache_;
   RuntimeStorage storage_;
-  WorkerPool workers_;
+  std::shared_ptr<WorkerPool> workers_;
   Scheduler scheduler_;
   DependencyGraph graph_;
   NetworkWorker network_;
@@ -26,7 +26,7 @@ public:
   Runtime()
     : cache_()
     , storage_()
-    , workers_( RUNTIME_THREADS, *this, graph_, storage_ )
+    , workers_( std::make_shared<WorkerPool>( RUNTIME_THREADS, *this, graph_, storage_ ) )
     , scheduler_( workers_ )
     , graph_( cache_, scheduler_ )
     , network_( *this )
@@ -52,9 +52,9 @@ public:
     graph_.finish( std::move( task ), result );
   }
 
-  std::optional<Info> get_info() override { return workers_.get_info(); }
+  std::optional<Info> get_info() override { return workers_->get_info(); }
 
-  void add_task_runner( ITaskRunner& runner ) override { scheduler_.add_task_runner( runner ); }
+  void add_task_runner( std::weak_ptr<ITaskRunner> runner ) override { scheduler_.add_task_runner( runner ); }
   void add_result_cache( IResultCache& cache ) override { graph_.add_result_cache( cache ); }
 
   Handle eval( Handle target ) { return graph_.run( Task::Eval( target ) ); }

@@ -70,11 +70,12 @@ class IRuntime
 public:
   /**
    * Register an ITaskRunner as a part of this IRuntime's runner pool.  This will make it visible to the
-   * IRuntime's scheduling system.
+   * IRuntime's scheduling system. The IRuntime holds a non-owning pointer to the runner, and the runner may be
+   * destroyed anytime.
    *
    * @param runner  A worker that can run Tasks.
    */
-  virtual void add_task_runner( ITaskRunner& runner ) = 0;
+  virtual void add_task_runner( std::weak_ptr<ITaskRunner> runner ) = 0;
 
   /**
    * Register an IResultCache as part of this IRuntime's notification receipient pool.  This cache will be notified,

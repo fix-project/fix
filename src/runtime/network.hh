@@ -21,7 +21,7 @@
 
 using ResultChannel = Channel<std::pair<Task, Handle>>;
 using WorkChannel = Channel<Task>;
-using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, OutgoingMessage>>;
+using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, MessagePayload>>;
 
 struct EventCategories
 {
@@ -64,6 +64,8 @@ class Remote : public ITaskRunner
   absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to_;
   std::shared_mutex& mutex_;
 
+  bool dead_ { false };
+
   Runtime& runtime_;
 
 public:
@@ -81,11 +83,15 @@ public:
 
   void push_message( OutgoingMessage&& msg );
 
-  bool is_connected();
   Address local_address() { return socket_.local_address(); }
   Address peer_address() { return socket_.peer_address(); }
 
   void send_object( Handle handle );
+
+  std::unordered_set<Task> pending_result_ {};
+
+  bool dead() const { return dead_; }
+  ~Remote();
 
 private:
   void load_tx_message();
@@ -97,6 +103,8 @@ private:
   void send_blob( std::string_view blob );
   void send_tree( span_view<Handle> tree );
   void send_tag( span_view<Handle> tag );
+
+  void clean_up();
 };
 
 class NetworkWorker : public IResultCache
@@ -111,7 +119,8 @@ private:
   Channel<TCPSocket> listening_sockets_ {};
   Channel<TCPSocket> connecting_sockets_ {};
 
-  std::vector<Remote> connections_ {};
+  std::size_t next_connection_id_ { 0 };
+  std::unordered_map<size_t, std::shared_ptr<Remote>> connections_ {};
   std::vector<TCPSocket> server_sockets_ {};
 
   MessageQueue msg_q_ {};
@@ -121,6 +130,7 @@ private:
   std::shared_mutex mutex_ {};
 
   void run_loop();
+  void process_outgoing_message( size_t remote_id, MessagePayload&& message );
 
 public:
   NetworkWorker( Runtime& runtime )
