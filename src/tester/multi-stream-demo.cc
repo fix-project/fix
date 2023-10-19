@@ -1,4 +1,6 @@
 #include "eventloop.hh"
+#include "http_server.hh"
+#include "ring_buffer.hh"
 #include "socket.hh"
 #include "spans.hh"
 
@@ -8,6 +10,17 @@
 
 using namespace std;
 
+struct EventCategories
+{
+  size_t read, respond, write;
+
+  EventCategories( EventLoop& loop )
+    : read( loop.add_category( "socket read" ) )
+    , respond( loop.add_category( "HTTP response" ) )
+    , write( loop.add_category( "socket write" ) )
+  {}
+};
+
 class Connection
 {
   TCPSocket sock_;
@@ -15,28 +28,71 @@ class Connection
   Address peer_;
   bool dead_ {};
 
-public:
-  void do_read()
+  RingBuffer incoming_ { 1024 * 1024 };
+  RingBuffer outgoing_ { 1024 * 1024 };
+
+  HTTPServer http_server_ {};
+  HTTPRequest req_in_progress_ {};
+
+  vector<EventLoop::RuleHandle> rules_ {};
+
+  void handle_request( const HTTPRequest& request )
   {
-    array<char, 64> buf;
-    string_span buf_span { buf.data(), buf.size() };
-    auto len = sock_.read( buf_span );
-    buf_span = buf_span.substr( 0, len );
-    cerr << "Got " << len << " bytes from connection " << id_ << " connected to " << peer_.to_string() << "\n";
+    HTTPResponse reply;
+    reply.http_version = "HTTP/1.1";
+    reply.status_code = "200";
+    reply.reason_phrase = "OK";
+    reply.headers.content_type = "text/plain";
+    reply.body = "Thank you for visiting our website!!! Your connection is ID " + to_string( id_ )
+                 + ". Your request had a body size of " + to_string( request.body.size() ) + " bytes.";
+    reply.headers.content_length = reply.body.size();
+    http_server_.push_response( move( reply ) );
   }
 
-  Connection( size_t id, TCPSocket&& sock, EventLoop& loop, size_t read_category )
+public:
+  Connection( size_t id, TCPSocket&& sock, EventLoop& loop, const EventCategories& categories )
     : sock_( std::move( sock ) )
     , id_( id )
     , peer_( sock_.peer_address() )
   {
     sock_.set_blocking( false );
 
-    loop.add_rule(
-      read_category, sock_, Direction::In, [&] { do_read(); }, [] { return true; }, [&] { dead_ = true; } );
+    rules_.push_back( loop.add_rule(
+      categories.read,
+      sock_,
+      Direction::In,
+      [&] {
+        incoming_.push_from_fd( sock_ );
+        if ( http_server_.read( incoming_, req_in_progress_ ) ) {
+          handle_request( req_in_progress_ );
+        }
+      },
+      [&] { return incoming_.can_write(); },
+      [&] { dead_ = true; } ) );
+
+    rules_.push_back( loop.add_rule(
+      categories.respond,
+      [&] { http_server_.write( outgoing_ ); },
+      [&] { return outgoing_.can_write() and not http_server_.responses_empty(); } ) );
+
+    rules_.push_back( loop.add_rule(
+      categories.write,
+      sock_,
+      Direction::Out,
+      [&] { outgoing_.pop_to_fd( sock_ ); },
+      [&] { return outgoing_.can_read(); },
+      [&] { dead_ = true; } ) );
   }
 
   bool dead() const { return dead_; }
+
+  ~Connection()
+  {
+    for ( auto& rule : rules_ ) {
+      rule.cancel();
+    }
+    rules_.clear(); // XXX???XXX
+  }
 };
 
 void program_body( span_view<char*> args )
@@ -52,24 +108,23 @@ void program_body( span_view<char*> args )
   cerr << "Listening on port " << server_socket.local_address().port() << "\n";
 
   EventLoop loop;
-
-  const auto socket_read_category = loop.add_category( "socket read" );
+  EventCategories event_categories { loop };
 
   list<Connection> connections;
 
   size_t connection_id_counter {};
 
   loop.add_rule( "new TCP connection", server_socket, Direction::In, [&] {
-    connections.emplace_back( connection_id_counter++, server_socket.accept(), loop, socket_read_category );
+    connections.emplace_back( connection_id_counter++, server_socket.accept(), loop, event_categories );
   } );
 
-  while ( loop.wait_next_event( 2000 ) != EventLoop::Result::Exit ) {
+  do {
     connections.remove_if( []( auto& x ) { return x.dead(); } );
-
+    cerr << "\033[H\033[2J\033[3J"; // clear screen
     cerr << "connection_id_counter: " << connection_id_counter << "\n";
     cerr << "active connection count: " << connections.size() << "\n";
-    cerr << "\n\n\n###\n\n\n";
-  }
+    loop.summary( cerr );
+  } while ( loop.wait_next_event( 500 ) != EventLoop::Result::Exit );
 
   cerr << "Exiting...\n";
 }

@@ -14,7 +14,7 @@ target_link_libraries(compiler-tester cryptopp wasmrt absl::flat_hash_map)
 
 add_executable(multi-stream-demo "multi-stream-demo.cc")
 target_link_libraries(multi-stream-demo ${FIXPOINT_LIBS})
-target_link_libraries(multi-stream-demo)
+target_link_libraries(multi-stream-demo http)
 
 # add_executable(dependency-tester "dependency-tester.cc" "tester-utils.cc")
 # target_link_libraries(dependency-tester ${FIXPOINT_LIBS})
