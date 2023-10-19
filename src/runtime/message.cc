@@ -2,7 +2,6 @@
 #include "base64.hh"
 #include "object.hh"
 #include "parser.hh"
-#include <optional>
 
 using namespace std;
 
@@ -18,14 +17,12 @@ IncomingMessage::IncomingMessage( string_view header, Tree&& payload )
   : Message( Message::opcode( header ), move( payload ) )
 {}
 
-OutgoingMessage::OutgoingMessage( const Opcode opcode, string&& payload, optional<Handle> dependency )
+OutgoingMessage::OutgoingMessage( const Opcode opcode, string&& payload )
   : Message( opcode, move( payload ) )
-  , data_dependnecy_( dependency )
 {}
 
-OutgoingMessage::OutgoingMessage( const Opcode opcode, string_view payload, optional<Handle> dependency )
+OutgoingMessage::OutgoingMessage( const Opcode opcode, string_view payload )
   : Message( opcode, payload )
-  , data_dependnecy_( dependency )
 {}
 
 void Message::serialize_header( string& out )
@@ -75,6 +72,16 @@ size_t Message::expected_payload_length( string_view header )
   }
 
   return payload_length;
+}
+
+OutgoingMessage OutgoingMessage::to_message( MessagePayload&& payload )
+{
+  return std::visit(
+    []( auto&& p ) -> OutgoingMessage {
+      using T = std::decay_t<decltype( p )>;
+      return { T::OPCODE, serialize( p ) };
+    },
+    payload );
 }
 
 void MessageParser::complete_message()

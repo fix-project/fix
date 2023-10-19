@@ -73,6 +73,40 @@ public:
   virtual ~Message() {}
 };
 
+struct RunPayload
+{
+  Task task {};
+
+  static RunPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::RUN;
+  constexpr static size_t PAYLOAD_LENGTH = 43 + sizeof( Operation );
+};
+
+struct ResultPayload
+{
+  Task task {};
+  Handle result {};
+
+  static ResultPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::RESULT;
+  constexpr static size_t PAYLOAD_LENGTH = 43 + 43 + sizeof( Operation );
+};
+
+struct InfoPayload : public ITaskRunner::Info
+{
+  static InfoPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::INFO;
+  constexpr static size_t PAYLOAD_LENGTH = sizeof( uint32_t );
+};
+
+using MessagePayload = std::variant<RunPayload, ResultPayload, InfoPayload>;
+
 class IncomingMessage : public Message
 {
 public:
@@ -83,16 +117,13 @@ public:
 
 class OutgoingMessage : public Message
 {
-private:
-  std::optional<Handle> data_dependnecy_ {};
-
 public:
   OutgoingMessage() {};
-  OutgoingMessage( const Opcode opcode, std::string&& payload, std::optional<Handle> dependency = {} );
+  OutgoingMessage( const Opcode opcode, std::string&& payload );
   // Construct an non_owning data, backing data have to outlive the message
-  OutgoingMessage( const Opcode opcode, std::string_view payload, std::optional<Handle> dependency = {} );
+  OutgoingMessage( const Opcode opcode, std::string_view payload );
 
-  std::optional<Handle> get_dependency() { return data_dependnecy_; }
+  static OutgoingMessage to_message( MessagePayload&& payload );
 };
 
 class MessageParser
@@ -116,35 +147,6 @@ public:
   IncomingMessage& front() { return completed_messages_.front(); }
   void pop() { completed_messages_.pop(); }
   size_t size() { return completed_messages_.size(); }
-};
-
-struct RunPayload
-{
-  Task task {};
-
-  static RunPayload parse( Parser& parser );
-  void serialize( Serializer& serializer ) const;
-
-  constexpr static size_t PAYLOAD_LENGTH = 43 + sizeof( Operation );
-};
-
-struct ResultPayload
-{
-  Task task {};
-  Handle result {};
-
-  static ResultPayload parse( Parser& parser );
-  void serialize( Serializer& serializer ) const;
-
-  constexpr static size_t PAYLOAD_LENGTH = 43 + 43 + sizeof( Operation );
-};
-
-struct InfoPayload : public ITaskRunner::Info
-{
-  static InfoPayload parse( Parser& parser );
-  void serialize( Serializer& serializer ) const;
-
-  constexpr static size_t PAYLOAD_LENGTH = sizeof( uint32_t );
 };
 
 template<class T>

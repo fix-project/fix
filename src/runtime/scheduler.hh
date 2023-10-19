@@ -6,7 +6,7 @@
 class Scheduler : public ITaskRunner
 {
   Channel<Task> to_be_scheduled_ {};
-  std::vector<std::reference_wrapper<ITaskRunner>> runners_;
+  std::list<std::weak_ptr<ITaskRunner>> runners_;
   std::thread scheduler_thread_;
 
   void schedule()
@@ -16,21 +16,30 @@ class Scheduler : public ITaskRunner
         Task next = to_be_scheduled_.pop_or_wait();
 
         // always send to the runner with the most cores
-        size_t destination = 0;
+        std::shared_ptr<ITaskRunner> destination;
         size_t ncores = 0;
-        for ( size_t i = 0; i < runners_.size(); i++ ) {
-          uint32_t cores
-            = runners_[i].get().get_info().value_or( ITaskRunner::Info { .parallelism = 0 } ).parallelism;
-          if ( runners_.size() != 1 )
-            std::cerr << "Node " << i << " has " << cores << " cores.\n";
-          if ( cores > ncores ) {
-            destination = i;
-            ncores = cores;
+
+        for ( auto it = runners_.begin(); it != runners_.end(); ) {
+          if ( auto p = it->lock() ) {
+            uint32_t cores = p->get_info().value_or( ITaskRunner::Info { .parallelism = 0 } ).parallelism;
+            if ( runners_.size() != 1 )
+              std::cerr << "Node " << p << " has " << cores << " cores.\n";
+            if ( cores > ncores ) {
+              destination = p;
+              ncores = cores;
+            }
+            it++;
+          } else {
+            it = runners_.erase( it );
           }
         }
-        if ( runners_.size() != 1 )
+
+        if ( destination ) {
           std::cerr << "Scheduling " << next << " on " << destination << "\n";
-        runners_[destination].get().start( std::move( next ) );
+          destination->start( std::move( next ) );
+        } else {
+          throw std::runtime_error( "No available runner" );
+        }
       }
     } catch ( ChannelClosed& ) {
       return;
@@ -38,12 +47,12 @@ class Scheduler : public ITaskRunner
   }
 
 public:
-  Scheduler( ITaskRunner& runner )
+  Scheduler( std::weak_ptr<ITaskRunner> runner )
     : runners_ { runner }
     , scheduler_thread_( std::bind( &Scheduler::schedule, this ) )
   {}
 
-  void add_task_runner( ITaskRunner& runner ) { runners_.emplace_back( runner ); }
+  void add_task_runner( std::weak_ptr<ITaskRunner> runner ) { runners_.emplace_back( runner ); }
 
   std::optional<Handle> start( Task&& task ) override
   {
