@@ -22,11 +22,20 @@ public:
     BLOBDATA,
     TREEDATA,
     TAGDATA,
-    COUNT
+    PROPOSE_TRANSFER,
+    ACCEPT_TRANSFER,
+    COUNT,
   };
 
-  static constexpr const char* OPCODE_NAMES[static_cast<uint8_t>( Opcode::COUNT )]
-    = { "RUN", "RESULT", "REQUESTINFO", "INFO", "BLOBDATA", "TREEDATA", "TAGDATA" };
+  static constexpr const char* OPCODE_NAMES[static_cast<uint8_t>( Opcode::COUNT )] = { "RUN",
+                                                                                       "RESULT",
+                                                                                       "REQUESTINFO",
+                                                                                       "INFO",
+                                                                                       "BLOBDATA",
+                                                                                       "TREEDATA",
+                                                                                       "TAGDATA",
+                                                                                       "PROPOSE_TRANSFER",
+                                                                                       "ACCEPT_TRANSFER" };
 
   constexpr static size_t HEADER_LENGTH = sizeof( size_t ) + sizeof( Opcode );
 
@@ -81,7 +90,7 @@ struct RunPayload
   void serialize( Serializer& serializer ) const;
 
   constexpr static Message::Opcode OPCODE = Message::Opcode::RUN;
-  constexpr static size_t PAYLOAD_LENGTH = 43 + sizeof( Operation );
+  size_t payload_length() const { return 43 + sizeof( Operation ); }
 };
 
 struct ResultPayload
@@ -93,7 +102,7 @@ struct ResultPayload
   void serialize( Serializer& serializer ) const;
 
   constexpr static Message::Opcode OPCODE = Message::Opcode::RESULT;
-  constexpr static size_t PAYLOAD_LENGTH = 43 + 43 + sizeof( Operation );
+  size_t payload_length() const { return 43 + 43 + sizeof( Operation ); }
 };
 
 struct InfoPayload : public ITaskRunner::Info
@@ -102,10 +111,32 @@ struct InfoPayload : public ITaskRunner::Info
   void serialize( Serializer& serializer ) const;
 
   constexpr static Message::Opcode OPCODE = Message::Opcode::INFO;
-  constexpr static size_t PAYLOAD_LENGTH = sizeof( uint32_t );
+  size_t payload_length() const { return sizeof( uint32_t ); }
 };
 
-using MessagePayload = std::variant<RunPayload, ResultPayload, InfoPayload>;
+template<Message::Opcode O>
+struct TransferPayload
+{
+  Task todo {};
+  std::optional<Handle> result {};
+  std::vector<Handle> handles {};
+
+  static TransferPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = O;
+  size_t payload_length() const
+  {
+    return 43 + sizeof( Operation ) + sizeof( bool ) + ( result ? 43 : 0 ) + +sizeof( size_t )
+           + handles.size() * 43;
+  }
+};
+
+using ProposeTransferPayload = TransferPayload<Message::Opcode::PROPOSE_TRANSFER>;
+using AcceptTransferPayload = TransferPayload<Message::Opcode::ACCEPT_TRANSFER>;
+
+using MessagePayload
+  = std::variant<RunPayload, ResultPayload, InfoPayload, ProposeTransferPayload, AcceptTransferPayload>;
 
 class IncomingMessage : public Message
 {
@@ -153,7 +184,7 @@ template<class T>
 std::string serialize( const T& obj )
 {
   std::string out;
-  out.resize( T::PAYLOAD_LENGTH );
+  out.resize( obj.payload_length() );
   Serializer s { string_span::from_view( out ) };
   obj.serialize( s );
   return out;

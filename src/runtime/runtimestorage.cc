@@ -389,14 +389,14 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
 
 bool RuntimeStorage::contains( Handle handle )
 {
-  if ( handle.is_literal_blob() ) {
-    return true;
-  }
   if ( handle.is_lazy() ) {
     return true;
   }
-  if ( handle.is_thunk() ) {
+  if ( handle.is_literal_blob() ) {
     return true;
+  }
+  if ( handle.is_thunk() ) {
+    return RuntimeStorage::contains( handle.get_encode_name() );
   }
   switch ( handle.get_laziness() ) {
     case Laziness::Lazy:
@@ -416,7 +416,6 @@ bool RuntimeStorage::contains( Handle handle )
         }
         handle = canonical_to_local_.get( handle.as_strict() );
       }
-      // TODO: recurse on children for Tree-like structures
       return local_storage_.size() > handle.get_local_id();
   }
   return false;
@@ -478,24 +477,19 @@ void RuntimeStorage::set_ref( string_view ref, Handle handle )
   friendly_names_.insert( make_pair( handle, ref ) );
 }
 
-void RuntimeStorage::visit( Handle handle,
-                            function<void( Handle )> visitor,
-                            bool include_lazy,
-                            bool include_thunks )
+void RuntimeStorage::visit( Handle handle, function<void( Handle )> visitor )
 {
   handle = canonicalize( handle );
   if ( handle.is_lazy() ) {
-    if ( include_lazy ) {
-      if ( include_thunks or not handle.is_thunk() ) {
-        visitor( handle );
-      }
-    }
+    visitor( handle );
   } else {
     switch ( handle.get_content_type() ) {
       case ContentType::Tree:
       case ContentType::Tag:
-        for ( const auto& element : get_tree( handle ) ) {
-          visit( handle.is_shallow() ? element.as_lazy() : element, visitor, include_lazy, include_thunks );
+        if ( contains( handle ) ) {
+          for ( const auto& element : get_tree( handle ) ) {
+            visit( handle.is_shallow() ? element.as_lazy() : element, visitor );
+          }
         }
         visitor( handle );
         break;
@@ -503,9 +497,8 @@ void RuntimeStorage::visit( Handle handle,
         visitor( handle );
         break;
       case ContentType::Thunk:
-        visit( handle.get_encode_name(), visitor, include_lazy, include_thunks );
-        if ( include_thunks )
-          visitor( handle );
+        visit( handle.get_encode_name(), visitor );
+        visitor( handle );
         break;
     }
   }
@@ -523,4 +516,37 @@ bool RuntimeStorage::compare_handles( Handle x, Handle y )
     y = canonicalize( y );
     return x == y;
   }
+}
+
+bool RuntimeStorage::complete( Handle handle )
+{
+  if ( not contains( handle ) ) {
+    return false;
+  }
+  if ( handle.is_lazy() ) {
+    return true;
+  }
+  switch ( handle.get_content_type() ) {
+    case ContentType::Blob:
+      return contains( handle );
+    case ContentType::Thunk:
+      return complete( handle.get_encode_name() );
+    case ContentType::Tree:
+    case ContentType::Tag: {
+      Tree tree = get_tree( handle );
+      bool full = true;
+      for ( const auto& element : get_tree( handle ) ) {
+        full |= handle.is_shallow() ? contains( element ) : complete( element );
+      }
+      return full;
+    }
+  }
+  __builtin_unreachable();
+}
+
+std::vector<Handle> RuntimeStorage::minrepo( Handle handle )
+{
+  vector<Handle> handles {};
+  visit( handle, [&]( Handle h ) { handles.push_back( h ); } );
+  return handles;
 }

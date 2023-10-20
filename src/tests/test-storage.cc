@@ -28,45 +28,11 @@ int main( int, char** )
   } );
 
   size_t count = 0;
-  s.visit(
-    data,
-    [&]( Handle h ) {
-      count++;
-      CHECK( not s.compare_handles( h, blob( "not visible" ) ) );
-      CHECK( not s.compare_handles( h, blob( "unused" ) ) );
-      CHECK( not s.compare_handles( h, blob( "elf" ) ) );
-    },
-    true,
-    true );
+  s.visit( data, [&]( Handle h ) {
+    count++;
+    CHECK( not s.compare_handles( h, blob( "not visible" ) ) );
+    CHECK( not s.compare_handles( h, blob( "unused" ) ) );
+    CHECK( not s.compare_handles( h, blob( "elf" ) ) );
+  } );
   CHECK( count == 6 );
-
-  count = 0;
-  s.visit(
-    data,
-    [&]( Handle h ) {
-      count++;
-      CHECK( not s.compare_handles( h, blob( "not visible" ) ) );
-      CHECK( not s.compare_handles( h, blob( "unused" ) ) );
-      CHECK( not s.compare_handles( h, blob( "elf" ) ) );
-      CHECK( not s.compare_handles( h, tree( { blob( "not visible" ) } ).as_lazy() ) );
-      CHECK( not h.is_lazy() );
-      CHECK( not h.is_thunk() );
-    },
-    false,
-    true );
-  CHECK( count == 4 );
-
-  count = 0;
-  s.visit(
-    data,
-    [&]( Handle h ) {
-      count++;
-      CHECK( not s.compare_handles( h, blob( "not visible" ) ) );
-      CHECK( not s.compare_handles( h, blob( "unused" ) ) );
-      CHECK( not s.compare_handles( h, blob( "elf" ) ) );
-      CHECK( not h.is_thunk() );
-    },
-    true,
-    false );
-  CHECK( count == 5 );
 }
