@@ -4,13 +4,13 @@
 
 using namespace std;
 
-#define CHECK( condition )                                                                                         \
+#define TEST( condition )                                                                                          \
   if ( not( condition ) ) {                                                                                        \
     fprintf( stderr, "%s:%d - assertion '%s' failed\n", __FILE__, __LINE__, #condition );                          \
     exit( 1 );                                                                                                     \
   }
 
-int main( int, char** )
+void test( void )
 {
   auto& rt = Runtime::get_instance();
   auto& s = rt.storage();
@@ -30,9 +30,9 @@ int main( int, char** )
   size_t count = 0;
   s.visit( data, [&]( Handle h ) {
     count++;
-    CHECK( not s.compare_handles( h, blob( "not visible" ) ) );
-    CHECK( not s.compare_handles( h, blob( "unused" ) ) );
-    CHECK( not s.compare_handles( h, blob( "elf" ) ) );
+    TEST( not s.compare_handles( h, blob( "not visible" ) ) );
+    TEST( not s.compare_handles( h, blob( "unused" ) ) );
+    TEST( not s.compare_handles( h, blob( "elf" ) ) );
   } );
-  CHECK( count == 6 );
+  TEST( count == 6 );
 }

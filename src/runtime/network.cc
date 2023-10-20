@@ -1,8 +1,3 @@
-#include "network.hh"
-#include "eventloop.hh"
-#include "handle.hh"
-#include "message.hh"
-#include "runtime.hh"
 #include <algorithm>
 #include <cstdint>
 #include <functional>
@@ -12,6 +7,14 @@
 #include <unordered_map>
 #include <utility>
 #include <variant>
+
+#include <glog/logging.h>
+
+#include "eventloop.hh"
+#include "handle.hh"
+#include "message.hh"
+#include "network.hh"
+#include "runtime.hh"
 
 using namespace std;
 using Opcode = Message::Opcode;
@@ -94,7 +97,7 @@ void Remote::send_object( Handle handle )
 
 void Remote::push_message( OutgoingMessage&& msg )
 {
-  std::cerr << "push_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )] << std::endl;
+  VLOG( 1 ) << "push_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
   tx_messages_.push( std::move( msg ) );
 
   if ( current_msg_unsent_header_.empty() and current_msg_unsent_payload_.empty() ) {
@@ -165,6 +168,7 @@ std::optional<Handle> Remote::start( Task&& task )
     .handles = runtime_.storage().minrepo( canonical_task.handle() ),
   };
 
+  VLOG( 2 ) << "Proposing " << payload.handles.size() << " objects.\n";
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
   return {};
@@ -172,7 +176,7 @@ std::optional<Handle> Remote::start( Task&& task )
 
 void Remote::process_incoming_message( IncomingMessage&& msg )
 {
-  cerr << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )] << endl;
+  VLOG( 1 ) << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
   switch ( msg.opcode() ) {
     case Opcode::RUN: {
       auto payload = parse<RunPayload>( msg.payload() );
@@ -221,8 +225,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::BLOBDATA: {
       auto& storage = runtime_.storage();
-      Handle h = storage.canonicalize( storage.add_blob( move( msg.get_blob() ) ) );
-      cerr << "Got " << h << "\n";
+      storage.canonicalize( storage.add_blob( move( msg.get_blob() ) ) );
       break;
     }
 
@@ -241,12 +244,17 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::PROPOSE_TRANSFER: {
       auto [todo, result, handles] = parse<ProposeTransferPayload>( msg.payload() );
 
+      size_t original = handles.size();
       for ( auto it = handles.begin(); it != handles.end(); ) {
         if ( runtime_.storage().contains( *it ) ) {
           it = handles.erase( it );
         } else {
           ++it;
         }
+      }
+      VLOG( 2 ) << "Accepting " << handles.size() << " of " << original << " objects.";
+      for ( const auto& h : handles ) {
+        VLOG( 3 ) << "Accepting " << h;
       }
       push_message( OutgoingMessage::to_message( AcceptTransferPayload { todo, result, handles } ) );
       break;
@@ -255,7 +263,9 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::ACCEPT_TRANSFER: {
       auto [todo, result, handles] = parse<AcceptTransferPayload>( msg.payload() );
 
+      VLOG( 2 ) << "Sending " << handles.size() << " objects.";
       for ( const auto& h : handles ) {
+        VLOG( 3 ) << "Sending " << h;
         send_object( h );
       }
       if ( result ) {
@@ -418,6 +428,7 @@ void NetworkWorker::finish( Task&& task, Handle result )
       .result = canonical_result,
       .handles = runtime_.storage().minrepo( canonical_result ),
     };
+    VLOG( 2 ) << "Proposing " << payload.handles.size() << " objects.\n";
     msg_q_.enqueue( make_pair( reply_to_.at( task ), move( payload ) ) );
   }
 }
