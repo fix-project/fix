@@ -185,6 +185,60 @@ unordered_map<string, string> decode_url_params( string url )
   return result;
 }
 
+optional<tuple<string, string>> try_read_file( string directory, string file_name )
+{
+  // Disallow going up directories.
+  if ( file_name.find( ".." ) != string::npos ) {
+    return {};
+  }
+  std::ifstream ifs( directory + "/" + file_name );
+  // File must exist.
+  if ( !ifs.good() ) {
+    return {};
+  }
+  std::string content( ( std::istreambuf_iterator<char>( ifs ) ), ( std::istreambuf_iterator<char>() ) );
+  std::string content_type = "";
+  if ( file_name.ends_with( ".html" ) ) {
+    content_type = "text/html";
+  } else if ( file_name.ends_with( ".wasm" ) ) {
+    content_type = "application/wasm";
+  } else if ( file_name.ends_with( ".js" ) ) {
+    content_type = "application/javascript";
+  } else {
+    return {};
+  }
+  return make_tuple( content, content_type );
+}
+
+optional<tuple<string, string>> try_get_response( string target, string source_directory )
+{
+  // Serve static files.
+  if ( target == "/" || target == "/index.html" ) {
+    return try_read_file( source_directory, "index.html" );
+  } else if ( target == "/fix_viewer_bg.wasm" ) {
+    return try_read_file( source_directory, "fix_viewer_bg.wasm" );
+  } else if ( target == "/fix_viewer.js" ) {
+    return try_read_file( source_directory, "fix_viewer.js" );
+  }
+
+  // Handle API calls.
+  auto map = decode_url_params( target );
+  if ( target.starts_with( "/dependees" ) ) {
+    stringstream ptree;
+    write_json( ptree, list_dependees( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
+    return make_tuple( ptree.str(), "text/json" );
+  } else if ( target.starts_with( "/child" ) ) {
+    stringstream ptree;
+    write_json( ptree, get_child( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
+    return make_tuple( ptree.str(), "text/json" );
+  } else if ( target.starts_with( "/parents" ) ) {
+    stringstream ptree;
+    write_json( ptree, get_parents( hex_decode( map.at( "handle" ) ) ) );
+    return make_tuple( ptree.str(), "text/json" );
+  }
+  return {};
+}
+
 void program_body( span_view<char*> args )
 {
   ios::sync_with_stdio( false );
@@ -194,7 +248,12 @@ void program_body( span_view<char*> args )
   server_socket.bind( { "127.0.0.1", args.at( 1 ) } );
   server_socket.listen();
 
-  args.remove_prefix( 2 );
+  string source_directory = args.at( 2 );
+  if ( source_directory.ends_with( '/' ) ) {
+    source_directory.pop_back();
+  }
+
+  args.remove_prefix( 3 );
 
   cerr << "Listening on port " << server_socket.local_address().port() << "\n";
 
@@ -216,7 +275,7 @@ void program_body( span_view<char*> args )
     connection,
     Direction::In,
     [&] { client_buffer.push_from_fd( connection ); },
-    [&] { return not client_buffer.writable_region().empty(); } );
+    [&] { cerr << client_buffer.writable_region().empty() << "\n"; return not client_buffer.writable_region().empty(); } );
 
   events.add_rule(
     "Parse bytes from client buffer",
@@ -224,32 +283,18 @@ void program_body( span_view<char*> args )
       if ( http_server.read( client_buffer, request_in_progress ) ) {
         cerr << "Got request: " << request_in_progress.request_target << "\n";
         std::string target = request_in_progress.request_target;
-        string response = "";
+        optional<tuple<string, string>> response = try_get_response( target, source_directory );
 
-        auto map = decode_url_params( target );
-        if ( target.starts_with( "/dependees" ) ) {
-          stringstream ptree;
-          write_json( ptree,
-                      list_dependees( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
-          response = ptree.str();
-        } else if ( target.starts_with( "/child" ) ) {
-          stringstream ptree;
-          write_json( ptree, get_child( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
-          response = ptree.str();
-        } else if ( target.starts_with( "/parents" ) ) {
-          stringstream ptree;
-          write_json( ptree, get_parents( hex_decode( map.at( "handle" ) ) ) );
-          response = ptree.str();
-        }
         HTTPResponse the_response;
         the_response.http_version = "HTTP/1.1";
-        if ( response.size() != 0 ) {
+        if ( response.has_value() ) {
+          const auto& [response_string, content_type] = response.value();
           the_response.status_code = "200";
           the_response.reason_phrase = "OK";
-          the_response.headers.content_type = "text/json";
-          the_response.headers.content_length = response.size();
+          the_response.headers.content_type = content_type;
+          the_response.headers.content_length = response_string.size();
           the_response.headers.access_control_allow_origin = "http://127.0.0.1:8800";
-          the_response.body = response;
+          the_response.body = response_string;
           cout << "Responded" << endl;
         } else {
           the_response.status_code = "404";
@@ -284,7 +329,7 @@ void program_body( span_view<char*> args )
 
 void usage_message( const char* argv0 )
 {
-  cerr << "Usage: " << argv0 << " PORT entry...\n";
+  cerr << "Usage: " << argv0 << " PORT SOURCE_DIR entry...\n";
   cerr << "   entry :=   file:<filename>\n";
   cerr << "            | string:<string>\n";
   cerr << "            | name:<base16-encoded name>\n";
