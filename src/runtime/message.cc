@@ -260,7 +260,13 @@ void TransferPayload<O>::serialize( Serializer& serializer ) const
   }
 }
 
-template ProposeTransferPayload ProposeTransferPayload::parse( Parser& parser );
-template void ProposeTransferPayload::serialize( Serializer& serializer ) const;
-template AcceptTransferPayload AcceptTransferPayload::parse( Parser& parser );
-template void AcceptTransferPayload::serialize( Serializer& serializer ) const;
+template<Message::Opcode O>
+using TxP = TransferPayload<O>;
+
+static constexpr Message::Opcode ACCEPT = Message::Opcode::ACCEPT_TRANSFER;
+static constexpr Message::Opcode PROPOSE = Message::Opcode::PROPOSE_TRANSFER;
+
+template TxP<PROPOSE> TxP<PROPOSE>::parse( Parser& parser );
+template void TxP<PROPOSE>::serialize( Serializer& serializer ) const;
+template TxP<ACCEPT> TxP<ACCEPT>::parse( Parser& parser );
+template void TxP<ACCEPT>::serialize( Serializer& serializer ) const;
