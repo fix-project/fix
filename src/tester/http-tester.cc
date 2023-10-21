@@ -28,7 +28,6 @@ string hex_encode( Handle handle )
   stringstream os;
   __m256i content = handle;
   os << std::hex << content[0] << "-" << content[1] << "-" << content[2] << "-" << content[3];
-
   return os.str();
 }
 
@@ -47,27 +46,6 @@ Handle hex_decode( string input )
   uint64_t d = std::stoull( input, nullptr, 16 );
 
   return Handle( a, b, c, d );
-}
-
-Handle parse_handle( string id )
-{
-  string delimiter = "|";
-  size_t pos;
-  vector<uint64_t> numbers;
-  for ( size_t i = 0; i < 4; i++ ) {
-    pos = id.find( delimiter );
-    if ( pos == string::npos ) {
-      numbers.push_back( stoull( id, nullptr, 16 ) );
-      break;
-    }
-    numbers.push_back( stoull( id.substr( 0, pos ), nullptr, 16 ) );
-    id = id.substr( pos + 1 );
-  }
-  if ( numbers.size() != 4 ) {
-    cerr << "Received invalid handle";
-    throw runtime_error( "Parsing invalid handle" );
-  }
-  return Handle( numbers[0], numbers[1], numbers[2], numbers[3] );
 }
 
 void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
@@ -185,6 +163,8 @@ unordered_map<string, string> decode_url_params( string url )
   return result;
 }
 
+// Try to read a file to a string. Returns a tuple of the file content and
+// the inferred mime type based on the file extension.
 optional<tuple<string, string>> try_read_file( string directory, string file_name )
 {
   // Disallow going up directories.
@@ -212,26 +192,30 @@ optional<tuple<string, string>> try_read_file( string directory, string file_nam
 
 optional<tuple<string, string>> try_get_response( string target, string source_directory )
 {
+  if ( not target.starts_with( '/' ) ) {
+    return {};
+  }
+  target = target.substr( 1 );
   // Serve static files.
-  if ( target == "/" || target == "/index.html" ) {
+  if ( target == "" or target == "index.html" ) {
     return try_read_file( source_directory, "index.html" );
-  } else if ( target == "/fix_viewer_bg.wasm" ) {
-    return try_read_file( source_directory, "fix_viewer_bg.wasm" );
-  } else if ( target == "/fix_viewer.js" ) {
-    return try_read_file( source_directory, "fix_viewer.js" );
+  } else if ( target.starts_with( "fix_viewer" ) and target.ends_with( "_bg.wasm" ) ) {
+    return try_read_file( source_directory, target );
+  } else if ( target.starts_with( "fix_viewer" ) and target.ends_with( ".js" ) ) {
+    return try_read_file( source_directory, target );
   }
 
   // Handle API calls.
   auto map = decode_url_params( target );
-  if ( target.starts_with( "/dependees" ) ) {
+  if ( target.starts_with( "dependees" ) ) {
     stringstream ptree;
     write_json( ptree, list_dependees( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
-  } else if ( target.starts_with( "/child" ) ) {
+  } else if ( target.starts_with( "child" ) ) {
     stringstream ptree;
     write_json( ptree, get_child( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
-  } else if ( target.starts_with( "/parents" ) ) {
+  } else if ( target.starts_with( "parents" ) ) {
     stringstream ptree;
     write_json( ptree, get_parents( hex_decode( map.at( "handle" ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
@@ -239,90 +223,152 @@ optional<tuple<string, string>> try_get_response( string target, string source_d
   return {};
 }
 
+struct EventCategories
+{
+  size_t read, respond, write;
+
+  EventCategories( EventLoop& loop )
+    : read( loop.add_category( "socket read" ) )
+    , respond( loop.add_category( "HTTP response" ) )
+    , write( loop.add_category( "socket write" ) )
+  {}
+};
+
+// Encapsulates the logic for handling a single http connection.
+class Connection
+{
+  TCPSocket sock_;
+  size_t id_;
+  Address peer_;
+  bool dead_ {};
+
+  RingBuffer incoming_ { mebi };
+  RingBuffer outgoing_ { mebi };
+
+  HTTPServer http_server_ {};
+  HTTPRequest req_in_progress_ {};
+
+  vector<EventLoop::RuleHandle> rules_ {};
+  string source_directory_;
+
+  void handle_request( const HTTPRequest& request )
+  {
+    cerr << "Incoming request: " << request.request_target << "\n";
+    std::string target = request.request_target;
+    optional<tuple<string, string>> response = try_get_response( target, source_directory_ );
+
+    HTTPResponse the_response;
+    the_response.http_version = "HTTP/1.1";
+    if ( response.has_value() ) {
+      const auto& [response_string, content_type] = response.value();
+      the_response.status_code = "200";
+      the_response.reason_phrase = "OK";
+      the_response.headers.content_type = content_type;
+      the_response.headers.content_length = response_string.size();
+      the_response.headers.access_control_allow_origin = "http://127.0.0.1:8800";
+      the_response.body = response_string;
+    } else {
+      the_response.status_code = "404";
+      the_response.reason_phrase = "Not Found";
+      string not_found = "API not found, connection id = " + to_string( id_ );
+      the_response.headers.content_type = "text/plain";
+      the_response.headers.content_length = not_found.size();
+      the_response.body = not_found;
+    }
+
+    http_server_.push_response( move( the_response ) );
+  }
+
+public:
+  Connection( size_t id,
+              TCPSocket&& sock,
+              EventLoop& loop,
+              const EventCategories& categories,
+              string source_directory )
+    : sock_( std::move( sock ) )
+    , id_( id )
+    , peer_( sock_.peer_address() )
+    , source_directory_( source_directory )
+  {
+    sock_.set_blocking( false );
+
+    rules_.push_back( loop.add_rule(
+      categories.read,
+      sock_,
+      Direction::In,
+      [&] {
+        incoming_.push_from_fd( sock_ );
+        if ( http_server_.read( incoming_, req_in_progress_ ) ) {
+          handle_request( req_in_progress_ );
+        }
+      },
+      [&] { return incoming_.can_write(); },
+      [&] { dead_ = true; } ) );
+
+    rules_.push_back( loop.add_rule(
+      categories.respond,
+      [&] { http_server_.write( outgoing_ ); },
+      [&] { return outgoing_.can_write() and not http_server_.responses_empty(); } ) );
+
+    rules_.push_back( loop.add_rule(
+      categories.write,
+      sock_,
+      Direction::Out,
+      [&] { outgoing_.pop_to_fd( sock_ ); },
+      [&] { return outgoing_.can_read(); },
+      [&] { dead_ = true; } ) );
+  }
+
+  bool dead() const { return dead_; }
+
+  ~Connection()
+  {
+    for ( auto& rule : rules_ ) {
+      rule.cancel();
+    }
+    rules_.clear(); // XXX???XXX beware of possible issues
+                    // if rules_ is already destroyed
+  }
+};
+
 void program_body( span_view<char*> args )
 {
   ios::sync_with_stdio( false );
 
+  // Start listening on the specified port.
   TCPSocket server_socket {};
   server_socket.set_reuseaddr();
   server_socket.bind( { "127.0.0.1", args.at( 1 ) } );
+  server_socket.set_blocking( false );
   server_socket.listen();
+  cerr << "Listening on port " << server_socket.local_address().port() << "\n";
 
+  // Process the arguments: source_directory and fix program
   string source_directory = args.at( 2 );
+  vector<ReadOnlyFile> open_files;
   if ( source_directory.ends_with( '/' ) ) {
     source_directory.pop_back();
   }
-
   args.remove_prefix( 3 );
-
-  cerr << "Listening on port " << server_socket.local_address().port() << "\n";
-
-  vector<ReadOnlyFile> open_files;
   kick_off( args, open_files );
 
-  TCPSocket connection = server_socket.accept();
-  cerr << "Connection received from " << connection.peer_address().to_string() << "\n";
+  // TCPSocket connection = server_socket.accept();
+  // cerr << "Connection received from " << connection.peer_address().to_string() << "\n";
 
   EventLoop events;
+  EventCategories event_categories { events };
 
-  RingBuffer client_buffer { mebi }, server_buffer { mebi };
+  list<Connection> connections;
+  size_t connection_id_counter {};
 
-  HTTPServer http_server;
-  HTTPRequest request_in_progress;
+  events.add_rule( "new TCP connection", server_socket, Direction::In, [&] {
+    connections.emplace_back(
+      connection_id_counter++, server_socket.accept(), events, event_categories, string( source_directory ) );
+  } );
 
-  events.add_rule(
-    "Read bytes from client",
-    connection,
-    Direction::In,
-    [&] { client_buffer.push_from_fd( connection ); },
-    [&] { cerr << client_buffer.writable_region().empty() << "\n"; return not client_buffer.writable_region().empty(); } );
-
-  events.add_rule(
-    "Parse bytes from client buffer",
-    [&] {
-      if ( http_server.read( client_buffer, request_in_progress ) ) {
-        cerr << "Got request: " << request_in_progress.request_target << "\n";
-        std::string target = request_in_progress.request_target;
-        optional<tuple<string, string>> response = try_get_response( target, source_directory );
-
-        HTTPResponse the_response;
-        the_response.http_version = "HTTP/1.1";
-        if ( response.has_value() ) {
-          const auto& [response_string, content_type] = response.value();
-          the_response.status_code = "200";
-          the_response.reason_phrase = "OK";
-          the_response.headers.content_type = content_type;
-          the_response.headers.content_length = response_string.size();
-          the_response.headers.access_control_allow_origin = "http://127.0.0.1:8800";
-          the_response.body = response_string;
-          cout << "Responded" << endl;
-        } else {
-          the_response.status_code = "404";
-          the_response.reason_phrase = "Not Found";
-          string not_found = "API not found";
-          the_response.headers.content_type = "text/plain";
-          the_response.headers.content_length = not_found.size();
-          the_response.body = not_found;
-        }
-
-        http_server.push_response( move( the_response ) );
-      }
-    },
-    [&] { return not client_buffer.readable_region().empty(); } );
-
-  events.add_rule(
-    "Serialize bytes from server into server buffer",
-    [&] { http_server.write( server_buffer ); },
-    [&] { return not http_server.responses_empty() and not server_buffer.writable_region().empty(); } );
-
-  events.add_rule(
-    "Write bytes to client",
-    connection,
-    Direction::Out,
-    [&] { server_buffer.pop_to_fd( connection ); },
-    [&] { return not server_buffer.readable_region().empty(); } );
-
-  while ( events.wait_next_event( -1 ) != EventLoop::Result::Exit ) {}
+  do {
+    connections.remove_if( []( auto& x ) { return x.dead(); } );
+  } while ( events.wait_next_event( 500 ) != EventLoop::Result::Exit );
 
   cerr << "Exiting...\n";
 }
