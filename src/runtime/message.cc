@@ -115,7 +115,9 @@ size_t MessageParser::parse( string_view buf )
           switch ( Message::opcode( incomplete_header_ ) ) {
             case Message::Opcode::RUN:
             case Message::Opcode::INFO:
-            case Message::Opcode::RESULT: {
+            case Message::Opcode::RESULT:
+            case Message::Opcode::PROPOSE_TRANSFER:
+            case Message::Opcode::ACCEPT_TRANSFER: {
               incomplete_payload_ = "";
               get<string>( incomplete_payload_ ).resize( expected_payload_length_.value() );
               break;
@@ -223,3 +225,48 @@ void InfoPayload::serialize( Serializer& serializer ) const
 {
   serializer.integer( parallelism );
 }
+
+template<Message::Opcode O>
+TransferPayload<O> TransferPayload<O>::parse( Parser& parser )
+{
+  Handle handle = parse_handle( parser );
+  Operation operation = parse_operation( parser );
+  TransferPayload payload { .todo = Task( handle, operation ) };
+  bool has_result = false;
+  parser.integer<bool>( has_result );
+  if ( has_result )
+    payload.result = parse_handle( parser );
+  size_t count = 0;
+  parser.integer<size_t>( count );
+  payload.handles.reserve( count );
+  for ( size_t i = 0; i < count; i++ ) {
+    payload.handles.push_back( parse_handle( parser ) );
+  }
+  return payload;
+}
+
+template<Message::Opcode O>
+void TransferPayload<O>::serialize( Serializer& serializer ) const
+{
+  serializer.string( base64::encode( todo.handle() ) );
+  serializer.integer<uint8_t>( static_cast<uint8_t>( todo.operation() ) );
+  serializer.integer<bool>( result.has_value() );
+  if ( result.has_value() ) {
+    serializer.string( base64::encode( *result ) );
+  }
+  serializer.integer<size_t>( handles.size() );
+  for ( const auto& h : handles ) {
+    serializer.string( base64::encode( h ) );
+  }
+}
+
+template<Message::Opcode O>
+using TxP = TransferPayload<O>;
+
+static constexpr Message::Opcode ACCEPT = Message::Opcode::ACCEPT_TRANSFER;
+static constexpr Message::Opcode PROPOSE = Message::Opcode::PROPOSE_TRANSFER;
+
+template TxP<PROPOSE> TxP<PROPOSE>::parse( Parser& parser );
+template void TxP<PROPOSE>::serialize( Serializer& serializer ) const;
+template TxP<ACCEPT> TxP<ACCEPT>::parse( Parser& parser );
+template void TxP<ACCEPT>::serialize( Serializer& serializer ) const;

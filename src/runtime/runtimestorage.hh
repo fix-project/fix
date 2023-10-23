@@ -114,13 +114,8 @@ public:
    *
    * @param root            The Handle from which to start traversing inputs.
    * @param visitor         A function to call on every dependency.
-   * @param include_lazy    Whether or not to visit Lazy Handles, which have no data in their minrepo.
-   * @param include_thunks  Whether or not to visit Thunks, which have no data besides their Tree.
    */
-  void visit( Handle root,
-              std::function<void( Handle )> visitor,
-              bool include_lazy = true,
-              bool include_thunks = true );
+  void visit( Handle root, std::function<void( Handle )> visitor );
 
   /**
    * Determines if two Handles should be treated as equal.  This might canonicalize the Handles if necessary.
@@ -128,4 +123,14 @@ public:
    * @return  true if the Handles refer to the same object, false otherwise
    */
   bool compare_handles( Handle x, Handle y );
+
+  /**
+   * Checks if @p root, as well as all its dependencies, are resident in storage.
+   */
+  bool complete( Handle root );
+
+  /**
+   * Computes the minimum repository of @p root.
+   */
+  std::vector<Handle> minrepo( Handle root );
 };

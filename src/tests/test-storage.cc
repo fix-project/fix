@@ -4,13 +4,13 @@
 
 using namespace std;
 
-#define CHECK( condition )                                                                                         \
+#define TEST( condition )                                                                                          \
   if ( not( condition ) ) {                                                                                        \
     fprintf( stderr, "%s:%d - assertion '%s' failed\n", __FILE__, __LINE__, #condition );                          \
     exit( 1 );                                                                                                     \
   }
 
-int main( int, char** )
+void test( void )
 {
   auto& rt = Runtime::get_instance();
   auto& s = rt.storage();
@@ -28,45 +28,11 @@ int main( int, char** )
   } );
 
   size_t count = 0;
-  s.visit(
-    data,
-    [&]( Handle h ) {
-      count++;
-      CHECK( not s.compare_handles( h, blob( "not visible" ) ) );
-      CHECK( not s.compare_handles( h, blob( "unused" ) ) );
-      CHECK( not s.compare_handles( h, blob( "elf" ) ) );
-    },
-    true,
-    true );
-  CHECK( count == 6 );
-
-  count = 0;
-  s.visit(
-    data,
-    [&]( Handle h ) {
-      count++;
-      CHECK( not s.compare_handles( h, blob( "not visible" ) ) );
-      CHECK( not s.compare_handles( h, blob( "unused" ) ) );
-      CHECK( not s.compare_handles( h, blob( "elf" ) ) );
-      CHECK( not s.compare_handles( h, tree( { blob( "not visible" ) } ).as_lazy() ) );
-      CHECK( not h.is_lazy() );
-      CHECK( not h.is_thunk() );
-    },
-    false,
-    true );
-  CHECK( count == 4 );
-
-  count = 0;
-  s.visit(
-    data,
-    [&]( Handle h ) {
-      count++;
-      CHECK( not s.compare_handles( h, blob( "not visible" ) ) );
-      CHECK( not s.compare_handles( h, blob( "unused" ) ) );
-      CHECK( not s.compare_handles( h, blob( "elf" ) ) );
-      CHECK( not h.is_thunk() );
-    },
-    true,
-    false );
-  CHECK( count == 5 );
+  s.visit( data, [&]( Handle h ) {
+    count++;
+    TEST( not s.compare_handles( h, blob( "not visible" ) ) );
+    TEST( not s.compare_handles( h, blob( "unused" ) ) );
+    TEST( not s.compare_handles( h, blob( "elf" ) ) );
+  } );
+  TEST( count == 6 );
 }

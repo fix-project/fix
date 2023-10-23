@@ -7,6 +7,9 @@
 
 using namespace std;
 
+int min_args = 2;
+int max_args = -1;
+
 void program_body( span_view<char*> args )
 {
   ios::sync_with_stdio( false );
@@ -47,21 +50,4 @@ void usage_message( const char* argv0 )
   cerr << "            | thunk: (followed by tree:<n>)\n";
   cerr << "            | compile:<filename>\n";
   cerr << "            | ref:<ref>\n";
-}
-
-int main( int argc, char* argv[] )
-{
-  if ( argc <= 0 ) {
-    abort();
-  }
-
-  if ( argc < 2 ) {
-    usage_message( argv[0] );
-    return EXIT_FAILURE;
-  }
-
-  span_view<char*> args = { argv, static_cast<size_t>( argc ) };
-  program_body( args );
-
-  return EXIT_SUCCESS;
 }

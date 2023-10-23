@@ -33,7 +33,7 @@ void check_add( uint32_t a, uint32_t b )
   check_add( a, b, add_simple, "add-simple" );
 }
 
-int main( int, char** )
+void test( void )
 {
   auto& rt = Runtime::get_instance();
   rt.storage().deserialize();

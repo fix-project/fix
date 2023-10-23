@@ -36,7 +36,7 @@ void check_add( uint8_t a, uint8_t b )
   check_add( a, b, add_flatware, "add-fixpoint" );
 }
 
-int main( int, char** )
+void test( void )
 {
   auto& rt = Runtime::get_instance();
   rt.storage().deserialize();

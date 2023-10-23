@@ -4,7 +4,7 @@
 
 using namespace std;
 
-int main( int, char** )
+void test( void )
 {
   auto& rt = Runtime::get_instance();
   rt.storage().deserialize();

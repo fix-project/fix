@@ -7,7 +7,17 @@
 #include "base64.hh"
 #include "tester-utils.hh"
 
+#include <glog/logging.h>
+
 using namespace std;
+
+int min_args = 2;
+int max_args = 3;
+
+void usage_message( const char* argv0 )
+{
+  cerr << "Usage: " << argv0 << " file.wasm [label]\n";
+}
 
 void program_body( span_view<char*> args )
 {
@@ -62,32 +72,4 @@ void program_body( span_view<char*> args )
   if ( ref_name ) {
     cout << "Created ref: " << *ref_name << "\n";
   }
-}
-
-void usage_message( const char* argv0 )
-{
-  cerr << "Usage: " << argv0 << " file.wasm [label]\n";
-}
-
-int main( int argc, char* argv[] )
-{
-  if ( argc <= 0 ) {
-    abort();
-  }
-
-  try {
-    if ( argc < 2 ) {
-      usage_message( argv[0] );
-      return EXIT_FAILURE;
-    }
-
-    span_view<char*> args = { argv, static_cast<size_t>( argc ) };
-    program_body( args );
-  } catch ( const exception& e ) {
-    cerr << argv[0] << ": " << e.what() << "\n\n";
-    usage_message( argv[0] );
-    return EXIT_FAILURE;
-  }
-
-  return EXIT_SUCCESS;
 }

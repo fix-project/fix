@@ -6,16 +6,13 @@ project(fixpoint)
 
 find_package(PkgConfig)
 find_package(Boost 1.74.0 REQUIRED COMPONENTS headers)
-
-include_directories(${CRYPT_INCLUDE_DIRS})
-add_compile_options(${CRYPT_CFLAGS_OTHER})
-add_compile_options(-g)
+pkg_search_module(GLOG REQUIRED libglog IMPORTED_TARGET glog)
 
 include(FetchContent)
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp
-  GIT_TAG        20220623.0
+  GIT_TAG        20230802.1
   )
 set(ABSL_PROPAGATE_CXX_STD on)
 FetchContent_MakeAvailable(absl)
@@ -35,8 +32,6 @@ include(etc/tests.cmake)
 include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-src")
 include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-build")
 
-file(REAL_PATH .fix FIX_DIR BASE_DIRECTORY ${PROJECT_SOURCE_DIR} EXPAND_TILDE)
-
 include_directories("${PROJECT_SOURCE_DIR}/src/util")
 include_directories("${PROJECT_SOURCE_DIR}/src/http")
 include_directories("${PROJECT_SOURCE_DIR}/src/runtime")
@@ -51,7 +46,6 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/src/runtime")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/component")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 
-set(FIXPOINT_LIBS runtime component util)
 #add_subdirectory("${PROJECT_SOURCE_DIR}/src/storage") # only headers
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/tester")

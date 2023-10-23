@@ -1,8 +1,3 @@
-#include "network.hh"
-#include "eventloop.hh"
-#include "handle.hh"
-#include "message.hh"
-#include "runtime.hh"
 #include <algorithm>
 #include <cstdint>
 #include <functional>
@@ -12,6 +7,14 @@
 #include <unordered_map>
 #include <utility>
 #include <variant>
+
+#include <glog/logging.h>
+
+#include "eventloop.hh"
+#include "handle.hh"
+#include "message.hh"
+#include "network.hh"
+#include "runtime.hh"
 
 using namespace std;
 using Opcode = Message::Opcode;
@@ -64,6 +67,11 @@ void Remote::send_tag( span_view<Handle> tag )
 
 void Remote::send_object( Handle handle )
 {
+  if ( handle.is_lazy() )
+    return;
+  if ( handle.is_thunk() )
+    return;
+
   if ( !handle.is_literal_blob() ) {
     switch ( handle.get_content_type() ) {
       case ContentType::Blob: {
@@ -89,6 +97,7 @@ void Remote::send_object( Handle handle )
 
 void Remote::push_message( OutgoingMessage&& msg )
 {
+  VLOG( 1 ) << "push_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
   tx_messages_.push( std::move( msg ) );
 
   if ( current_msg_unsent_header_.empty() and current_msg_unsent_payload_.empty() ) {
@@ -154,8 +163,12 @@ std::optional<Handle> Remote::start( Task&& task )
   Handle canonical_handle = runtime_.storage().canonicalize( task.handle() );
 
   Task canonical_task( canonical_handle, task.operation() );
-  RunPayload payload { .task = std::move( canonical_task ) };
+  ProposeTransferPayload payload {
+    .todo = canonical_task,
+    .handles = runtime_.storage().minrepo( canonical_task.handle() ),
+  };
 
+  VLOG( 2 ) << "Proposing " << payload.handles.size() << " objects.\n";
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
   return {};
@@ -163,7 +176,7 @@ std::optional<Handle> Remote::start( Task&& task )
 
 void Remote::process_incoming_message( IncomingMessage&& msg )
 {
-  cerr << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )] << endl;
+  VLOG( 1 ) << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
   switch ( msg.opcode() ) {
     case Opcode::RUN: {
       auto payload = parse<RunPayload>( msg.payload() );
@@ -184,10 +197,8 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
         }
 
         if ( need_send ) {
-          runtime_.storage().visit(
-            canonical_result, std::bind( &Remote::send_object, this, placeholders::_1 ), false, false );
-
-          ResultPayload payload { .task = task, .result = canonical_result };
+          ProposeTransferPayload payload {
+            .todo = task, .result = canonical_result, .handles = runtime_.storage().minrepo( canonical_result ) };
           push_message( OutgoingMessage::to_message( move( payload ) ) );
         }
       }
@@ -227,6 +238,41 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::TAGDATA: {
       auto& storage = runtime_.storage();
       storage.canonicalize( storage.add_tag( move( msg.get_tree() ) ) );
+      break;
+    }
+
+    case Opcode::PROPOSE_TRANSFER: {
+      auto [todo, result, handles] = parse<ProposeTransferPayload>( msg.payload() );
+
+      size_t original = handles.size();
+      for ( auto it = handles.begin(); it != handles.end(); ) {
+        if ( runtime_.storage().contains( *it ) ) {
+          it = handles.erase( it );
+        } else {
+          ++it;
+        }
+      }
+      VLOG( 2 ) << "Accepting " << handles.size() << " of " << original << " objects.";
+      for ( const auto& h : handles ) {
+        VLOG( 3 ) << "Accepting " << h;
+      }
+      push_message( OutgoingMessage::to_message( AcceptTransferPayload { todo, result, handles } ) );
+      break;
+    }
+
+    case Opcode::ACCEPT_TRANSFER: {
+      auto [todo, result, handles] = parse<AcceptTransferPayload>( msg.payload() );
+
+      VLOG( 2 ) << "Sending " << handles.size() << " objects.";
+      for ( const auto& h : handles ) {
+        VLOG( 3 ) << "Sending " << h;
+        send_object( h );
+      }
+      if ( result ) {
+        push_message( OutgoingMessage::to_message( ResultPayload { .task = todo, .result = *result } ) );
+      } else {
+        push_message( OutgoingMessage::to_message( RunPayload { .task = todo } ) );
+      }
       break;
     }
 
@@ -291,11 +337,6 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
     }
 
     if ( need_send ) {
-      if ( dependency.has_value() ) {
-        runtime_.storage().visit(
-          dependency.value(), std::bind( &Remote::send_object, &connection, placeholders::_1 ), false, false );
-      }
-
       connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
     }
   }
@@ -382,7 +423,12 @@ void NetworkWorker::finish( Task&& task, Handle result )
   std::shared_lock lock( mutex_ );
   if ( reply_to_.contains( task ) ) {
     Handle canonical_result = runtime_.storage().canonicalize( result );
-    ResultPayload payload { .task = std::move( task ), .result = canonical_result };
+    ProposeTransferPayload payload {
+      .todo = task,
+      .result = canonical_result,
+      .handles = runtime_.storage().minrepo( canonical_result ),
+    };
+    VLOG( 2 ) << "Proposing " << payload.handles.size() << " objects.\n";
     msg_q_.enqueue( make_pair( reply_to_.at( task ), move( payload ) ) );
   }
 }

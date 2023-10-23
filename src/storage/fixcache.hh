@@ -7,6 +7,8 @@
 #include <shared_mutex>
 #include <stdexcept>
 
+#include <glog/logging.h>
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/hash/hash.h"
 #include "task.hh"
@@ -40,7 +42,7 @@ public:
   {
     std::unique_lock lock( mutex_ );
     if ( cache_.contains( task ) ) {
-      std::cerr << "Warning: task " << task << " was finished more than once.\n";
+      LOG( WARNING ) << "Warning: task " << task << " was finished more than once.\n";
       if ( cache_[task] != handle ) {
         throw std::runtime_error( "Task was finished multiple times with different results!\n" );
       }

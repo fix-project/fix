@@ -63,6 +63,13 @@ public:
   static Task Eval( Handle handle ) { return Task( handle, Operation::Eval ); }
   static Task Apply( Handle handle ) { return Task( handle, Operation::Apply ); }
   static Task Fill( Handle handle ) { return Task( handle, Operation::Fill ); }
+
+  Task& operator=( const Task& other )
+  {
+    handle_ = other.handle_;
+    operation_ = other.operation_;
+    return *this;
+  }
 };
 
 namespace std {
