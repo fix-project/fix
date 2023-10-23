@@ -310,24 +310,23 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
 {
   if ( !connections_.contains( remote_idx ) ) {
     // Forward back any run
-    if ( holds_alternative<RunPayload>( payload ) ) {
-      auto run_payload = get<RunPayload>( payload );
-      runtime_.start( move( run_payload.task ) );
+    if ( holds_alternative<ProposeTransferPayload>( payload ) ) {
+      auto proposed_payload = get<ProposeTransferPayload>( payload );
+      runtime_.start( move( proposed_payload.todo ) );
     }
   } else {
     Remote& connection = *connections_.at( remote_idx );
 
     bool need_send = false;
-    std::optional<Handle> dependency;
 
-    if ( holds_alternative<RunPayload>( payload ) ) {
-      const auto& run_payload = get<RunPayload>( payload );
-      connection.pending_result_.insert( run_payload.task );
-      dependency = run_payload.task.handle();
+    if ( holds_alternative<ProposeTransferPayload>( payload ) ) {
+      const auto& proposed_payload = get<ProposeTransferPayload>( payload );
+      if ( !proposed_payload.result.has_value() ) {
+        connection.pending_result_.insert( proposed_payload.todo );
+      }
       need_send = true;
     } else if ( holds_alternative<ResultPayload>( payload ) ) {
       const auto& result_payload = get<ResultPayload>( payload );
-      dependency = result_payload.result;
       {
         std::unique_lock lock( mutex_ );
         need_send = reply_to_.erase( result_payload.task );
