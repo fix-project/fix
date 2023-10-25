@@ -38,8 +38,8 @@ private:
   // Storage for Object/Handles with a local name
   std::vector<ObjectOrName> local_storage_ {};
 
-  // Keeping track of canonical and local task translation
-  absl::flat_hash_map<Handle, std::list<Handle>, AbslHash> canonical_tasks_to_local_ {};
+  // Keeping track of canonical and local task handle translation
+  absl::flat_hash_map<Handle, std::list<Handle>, AbslHash> canonical_to_local_cache_for_tasks_ {};
 
   // Maps a Wasm function Handle to corresponding compiled Program
   InMemoryStorage<Program> name_to_program_ {};
@@ -80,7 +80,7 @@ public:
 
   void add_program( Handle function_name, std::string_view elf_content );
 
-  Handle canonicalize( Handle name );
+  Handle canonicalize( Handle handle );
 
   Task canonicalize( Task task );
 
@@ -138,6 +138,8 @@ public:
 
   /**
    * Return the canonical name if the Name @name has been canonicalized. No work is done if it is not canonicalized
+   *
+   * @param name            The name for which to request the canonical name
    */
   std::optional<Handle> get_canonical_name( Handle name );
 

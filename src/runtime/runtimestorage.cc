@@ -163,8 +163,8 @@ std::list<Task> RuntimeStorage::get_local_tasks( Task task )
   }
 
   shared_lock lock( storage_mutex_ );
-  if ( canonical_tasks_to_local_.contains( task.handle() ) ) {
-    auto local_handles = canonical_tasks_to_local_.at( task.handle() );
+  if ( canonical_to_local_cache_for_tasks_.contains( task.handle() ) ) {
+    auto local_handles = canonical_to_local_cache_for_tasks_.at( task.handle() );
     std::list<Task> result;
     for ( const auto& handle : local_handles ) {
       result.push_back( Task( handle, task.operation() ) );
@@ -176,14 +176,14 @@ std::list<Task> RuntimeStorage::get_local_tasks( Task task )
   return {};
 }
 
-Handle RuntimeStorage::canonicalize( Handle name )
+Handle RuntimeStorage::canonicalize( Handle handle )
 {
-  if ( name.is_canonical() ) {
-    return name;
+  if ( handle.is_canonical() ) {
+    return handle;
   }
 
-  Laziness laziness = name.get_laziness();
-  Handle name_only = Handle::name_only( name );
+  Laziness laziness = handle.get_laziness();
+  Handle name = Handle::name_only( handle );
 
   {
     shared_lock lock( storage_mutex_ );
@@ -194,7 +194,7 @@ Handle RuntimeStorage::canonicalize( Handle name )
 
   switch ( name.get_content_type() ) {
     case ContentType::Blob: {
-      auto blob = get_object<Blob>( name_only );
+      auto blob = get_object<Blob>( name );
       Handle hash( sha256::encode( blob ), blob.size(), ContentType::Blob );
 
       {
@@ -214,7 +214,7 @@ Handle RuntimeStorage::canonicalize( Handle name )
 
     case ContentType::Tree:
     case ContentType::Tag: {
-      auto orig_tree = get_object<Tree>( name_only );
+      auto orig_tree = get_object<Tree>( name );
 
       Tree new_tree( orig_tree.size() );
       span_view<Handle> new_tree_view = new_tree;
@@ -259,7 +259,7 @@ Task RuntimeStorage::canonicalize( Task task )
     Task canonical_task( canonicalize( task.handle() ), task.operation() );
     {
       shared_lock lock( storage_mutex_ );
-      canonical_tasks_to_local_[canonical_task.handle()].push_back( task.handle() );
+      canonical_to_local_cache_for_tasks_[canonical_task.handle()].push_back( task.handle() );
     }
     return canonical_task;
   }
