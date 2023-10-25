@@ -3,13 +3,16 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <shared_mutex>
 #include <stdexcept>
+#include <variant>
 
 #include "handle.hh"
 #include "object.hh"
 #include "operation.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
+#include "spans.hh"
 #include "task.hh"
 #include "wasm-rt-content.h"
 
@@ -17,11 +20,31 @@ using namespace std;
 
 const size_t SIZE_OF_BASE64_ENCODED_HANDLE = 43;
 
+template<typename T>
+typename T::view RuntimeStorage::get_object( Handle name )
+{
+  shared_lock lock( storage_mutex_ );
+  if ( name.is_canonical() ) {
+    return get<T>( canonical_storage_.at( name ) );
+  } else if ( name.is_local() ) {
+    if ( holds_alternative<Handle>( local_storage_.at( name.get_local_id() ) ) ) {
+      return get<T>( canonical_storage_.at( get<Handle>( local_storage_.at( name.get_local_id() ) ) ) );
+    } else {
+      return get<T>( get<Object>( local_storage_.at( name.get_local_id() ) ) );
+    }
+  }
+
+  throw out_of_range( "Invalid handle." );
+}
+
 Handle RuntimeStorage::add_blob( Blob&& blob )
 {
   if ( blob.size() > 31 ) {
-    size_t local_id = local_storage_.push_back( std::move( blob ) );
-    Handle name( local_id, blob.size(), ContentType::Blob );
+    unique_lock lock( storage_mutex_ );
+    auto local_id = local_storage_.size();
+    auto blob_size = blob.size();
+    local_storage_.push_back( std::move( blob ) );
+    Handle name( local_id, blob_size, ContentType::Blob );
     return name;
   } else {
     Handle name( blob );
@@ -33,11 +56,8 @@ string_view RuntimeStorage::get_blob( Handle name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
-  } else if ( name.is_local() ) {
-    return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Handle local_name = canonical_to_local_.get( Handle( name ) );
-    return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
+    return get_object<Blob>( name );
   }
 
   throw out_of_range( "Blob does not exist." );
@@ -47,41 +67,35 @@ string_view RuntimeStorage::user_get_blob( const Handle& name )
 {
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
-  } else if ( name.is_local() ) {
-    return get<Blob>( local_storage_.at( name.get_local_id() ) );
   } else {
-    Handle local_name = canonical_to_local_.get( Handle( name ) );
-    return get<Blob>( local_storage_.at( local_name.get_local_id() ) );
+    return get_object<Blob>( name );
   }
-
-  throw out_of_range( "Blob does not exist." );
 }
 
 Handle RuntimeStorage::add_tree( Tree&& tree )
 {
-  size_t local_id = local_storage_.push_back( std::move( tree ) );
-  Handle name( local_id, tree.size(), ContentType::Tree );
+  unique_lock lock( storage_mutex_ );
+  auto local_id = local_storage_.size();
+  auto tree_size = tree.size();
+  local_storage_.push_back( std::move( tree ) );
+  Handle name( local_id, tree_size, ContentType::Tree );
   return name;
 }
 
 Handle RuntimeStorage::add_tag( Tree&& tree )
 {
   assert( tree.size() == 3 );
-  size_t local_id = local_storage_.push_back( std::move( tree ) );
-  Handle name( local_id, tree.size(), ContentType::Tag );
+  unique_lock lock( storage_mutex_ );
+  auto local_id = local_storage_.size();
+  auto tree_size = tree.size();
+  local_storage_.push_back( std::move( tree ) );
+  Handle name( local_id, tree_size, ContentType::Tag );
   return name;
 }
 
 span_view<Handle> RuntimeStorage::get_tree( Handle name )
 {
-  if ( name.is_local() ) {
-    return get<Tree>( local_storage_.at( name.get_local_id() ) );
-  } else {
-    Handle local_name = canonical_to_local_.get( Handle( name ) );
-    return get<Tree>( local_storage_.at( local_name.get_local_id() ) );
-  }
-
-  throw out_of_range( "Tree does not exist." );
+  return get_object<Tree>( name );
 }
 
 Handle RuntimeStorage::add_thunk( Thunk thunk )
@@ -117,25 +131,82 @@ void RuntimeStorage::add_program( Handle function_name, string_view elf_content 
   return;
 }
 
-Handle RuntimeStorage::canonicalize( Handle name )
+std::optional<Handle> RuntimeStorage::get_canonical_name( Handle name )
 {
+  if ( name.is_thunk() ) {
+    auto canonical_encode = get_canonical_name( Handle::get_encode_name( name ) );
+    if ( canonical_encode ) {
+      return Handle::get_thunk_name( canonical_encode.value() );
+    } else {
+      return {};
+    }
+  }
+
   if ( name.is_canonical() ) {
     return name;
   }
-  Laziness laziness = name.get_laziness();
+
+  {
+    shared_lock lock( storage_mutex_ );
+    if ( holds_alternative<Handle>( local_storage_.at( name.get_local_id() ) ) ) {
+      return get<Handle>( local_storage_.at( name.get_local_id() ) );
+    }
+  }
+
+  return {};
+}
+
+std::list<Task> RuntimeStorage::get_local_tasks( Task task )
+{
+  if ( task.handle().is_local() ) {
+    return {};
+  }
+
+  shared_lock lock( storage_mutex_ );
+  if ( canonical_to_local_cache_for_tasks_.contains( task.handle() ) ) {
+    auto local_handles = canonical_to_local_cache_for_tasks_.at( task.handle() );
+    std::list<Task> result;
+    for ( const auto& handle : local_handles ) {
+      result.push_back( Task( handle, task.operation() ) );
+    }
+
+    return result;
+  }
+
+  return {};
+}
+
+Handle RuntimeStorage::canonicalize( Handle handle )
+{
+  if ( handle.is_canonical() ) {
+    return handle;
+  }
+
+  Laziness laziness = handle.get_laziness();
+  Handle name = Handle::name_only( handle );
+
+  {
+    shared_lock lock( storage_mutex_ );
+    if ( holds_alternative<Handle>( local_storage_.at( name.get_local_id() ) ) ) {
+      return get<Handle>( local_storage_.at( name.get_local_id() ) ).with_laziness( laziness );
+    }
+  }
 
   switch ( name.get_content_type() ) {
     case ContentType::Blob: {
-      const Object& obj = local_storage_.at( name.get_local_id() );
-      if ( holds_alternative<Blob>( obj ) ) {
-        string_view blob = get<Blob>( obj );
+      auto blob = get_object<Blob>( name );
+      Handle hash( sha256::encode( blob ), blob.size(), ContentType::Blob );
 
-        Handle hash( sha256::encode( blob ), blob.size(), ContentType::Blob );
-        canonical_to_local_.insert_or_assign( hash, name );
+      {
+        unique_lock lock( storage_mutex_ );
+        if ( !canonical_storage_.contains( hash ) ) {
+          canonical_storage_.insert_or_assign(
+            hash, std::move( get<Object>( local_storage_.at( name.get_local_id() ) ) ) );
+        }
+
+        local_storage_.at( name.get_local_id() ) = hash;
 
         return hash.with_laziness( laziness );
-      } else {
-        throw runtime_error( "Handle type does not match content type" );
       }
 
       break;
@@ -143,39 +214,54 @@ Handle RuntimeStorage::canonicalize( Handle name )
 
     case ContentType::Tree:
     case ContentType::Tag: {
-      const Object& obj = local_storage_.at( name.get_local_id() );
-      if ( holds_alternative<Tree>( obj ) ) {
-        span_view<Handle> orig_tree = get<Tree>( obj );
+      auto orig_tree = get_object<Tree>( name );
 
-        Handle new_name = add_tree( Tree( orig_tree.size() ) );
-        span_view<Handle> tree = get_tree( new_name );
+      Tree new_tree( orig_tree.size() );
+      span_view<Handle> new_tree_view = new_tree;
 
-        for ( size_t i = 0; i < tree.size(); ++i ) {
-          auto entry = orig_tree[i];
-          tree.mutable_data()[i] = canonicalize( entry );
+      for ( size_t i = 0; i < new_tree.size(); ++i ) {
+        auto entry = orig_tree[i];
+        new_tree_view.mutable_data()[i] = canonicalize( entry );
+      }
+
+      string_view view( reinterpret_cast<char*>( new_tree_view.mutable_data() ), new_tree_view.byte_size() );
+      Handle hash( sha256::encode( view ), new_tree.size(), name.get_content_type() );
+
+      {
+        unique_lock lock( storage_mutex_ );
+        if ( !canonical_storage_.contains( hash ) ) {
+          canonical_storage_.insert_or_assign( hash, std::move( new_tree ) );
         }
 
-        string_view view( reinterpret_cast<char*>( tree.mutable_data() ), tree.size() * sizeof( Handle ) );
-        Handle hash( sha256::encode( view ), tree.size(), name.get_content_type() );
-
-        canonical_to_local_.insert_or_assign( hash, new_name );
+        local_storage_.at( name.get_local_id() ) = hash;
 
         return hash.with_laziness( laziness );
-      } else {
-        throw runtime_error( "Handle type does not match content type" );
       }
+
       break;
     }
 
     case ContentType::Thunk: {
       Handle new_name = Handle::get_thunk_name( canonicalize( Handle::get_encode_name( name ) ) );
-
-      canonical_to_local_.insert_or_assign( new_name, name );
       return new_name.with_laziness( laziness );
     }
 
     default:
       throw runtime_error( "Unknown content type." );
+  }
+}
+
+Task RuntimeStorage::canonicalize( Task task )
+{
+  if ( task.handle().is_canonical() ) {
+    return task;
+  } else {
+    Task canonical_task( canonicalize( task.handle() ), task.operation() );
+    {
+      shared_lock lock( storage_mutex_ );
+      canonical_to_local_cache_for_tasks_[canonical_task.handle()].push_back( task.handle() );
+    }
+    return canonical_task;
   }
 }
 
@@ -189,15 +275,6 @@ filesystem::path RuntimeStorage::get_fix_repo()
     current_directory = current_directory.parent_path();
   }
   return current_directory / ".fix";
-}
-
-optional<Handle> RuntimeStorage::get_local_name( Handle name )
-{
-  if ( !canonical_to_local_.contains( name ) ) {
-    return {};
-  } else {
-    return canonical_to_local_.get( name );
-  }
 }
 
 string RuntimeStorage::serialize( Handle name )
@@ -305,19 +382,6 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
 
     switch ( name.get_content_type() ) {
       case ContentType::Thunk: {
-        input_file.seekg( 0, std::ios::end );
-        size_t size = input_file.tellg();
-        assert( size == SIZE_OF_BASE64_ENCODED_HANDLE );
-        char* buf = static_cast<char*>( malloc( size ) );
-        input_file.seekg( 0, std::ios::beg );
-        input_file.read( reinterpret_cast<char*>( buf ), size );
-
-        Handle handle;
-        handle = base64::decode( buf );
-
-        Thunk thunk( handle );
-        Handle local_id = add_thunk( thunk );
-        canonical_to_local_.insert_or_assign( name, local_id );
         continue;
       }
 
@@ -329,8 +393,11 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
         input_file.read( buf, size );
 
         Blob blob( Blob_ptr( buf ), size );
-        Handle local_id = add_blob( std::move( blob ) );
-        canonical_to_local_.insert_or_assign( name, local_id );
+
+        {
+          unique_lock lock( storage_mutex_ );
+          canonical_storage_.insert_or_assign( name, std::move( blob ) );
+        }
 
         continue;
       }
@@ -352,8 +419,10 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
         Tree tree( Tree_ptr( tree_buf ), size / SIZE_OF_BASE64_ENCODED_HANDLE );
         free( buf );
 
-        Handle local_id = add_tree( std::move( tree ) );
-        canonical_to_local_.insert_or_assign( name, local_id );
+        {
+          unique_lock lock( storage_mutex_ );
+          canonical_storage_.insert_or_assign( name, std::move( tree ) );
+        }
 
         continue;
       }
@@ -375,8 +444,10 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
         Tree tree( Tree_ptr( tree_buf ), size / SIZE_OF_BASE64_ENCODED_HANDLE );
         free( buf );
 
-        Handle local_id = add_tag( std::move( tree ) );
-        canonical_to_local_.insert_or_assign( name, local_id );
+        {
+          unique_lock lock( storage_mutex_ );
+          canonical_storage_.insert_or_assign( name, std::move( tree ) );
+        }
 
         continue;
       }
@@ -395,6 +466,9 @@ bool RuntimeStorage::contains( Handle handle )
   if ( handle.is_literal_blob() ) {
     return true;
   }
+
+  shared_lock lock( storage_mutex_ );
+
   if ( handle.is_thunk() ) {
     return RuntimeStorage::contains( handle.get_encode_name() );
   }
@@ -403,20 +477,16 @@ bool RuntimeStorage::contains( Handle handle )
       return true;
     case Laziness::Shallow:
       if ( handle.is_canonical() ) {
-        if ( not canonical_to_local_.contains( handle.as_strict() ) ) {
-          return false;
-        }
-        handle = canonical_to_local_.get( handle.as_strict() );
+        return canonical_storage_.contains( handle );
+      } else {
+        return local_storage_.size() > handle.get_local_id();
       }
-      return local_storage_.size() > handle.get_local_id();
     case Laziness::Strict:
       if ( handle.is_canonical() ) {
-        if ( not canonical_to_local_.contains( handle.as_strict() ) ) {
-          return false;
-        }
-        handle = canonical_to_local_.get( handle.as_strict() );
+        return canonical_storage_.contains( handle.as_strict() );
+      } else {
+        return local_storage_.size() > handle.get_local_id();
       }
-      return local_storage_.size() > handle.get_local_id();
   }
   return false;
 }

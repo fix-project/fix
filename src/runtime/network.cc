@@ -160,9 +160,8 @@ Remote::Remote( EventLoop& events,
 
 std::optional<Handle> Remote::start( Task&& task )
 {
-  Handle canonical_handle = runtime_.storage().canonicalize( task.handle() );
+  Task canonical_task = runtime_.storage().canonicalize( task );
 
-  Task canonical_task( canonical_handle, task.operation() );
   ProposeTransferPayload payload {
     .todo = canonical_task,
     .handles = runtime_.storage().minrepo( canonical_task.handle() ),
