@@ -31,6 +31,7 @@ class Value
 {
 public:
   using ptr_type = std::unique_ptr<T, OptionalFree<T>>;
+  using view = View;
 
   Value( ptr_type&& data, const uint32_t size )
     : data_( std::move( data ) )

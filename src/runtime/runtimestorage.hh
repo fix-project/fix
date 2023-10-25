@@ -1,8 +1,10 @@
 #pragma once
 
+#include <absl/container/flat_hash_set.h>
 #include <condition_variable>
 #include <filesystem>
 #include <map>
+#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -23,21 +25,28 @@
 #define TRUSTED
 #endif
 
+using ObjectOrName = std::variant<Object, Handle>;
+
 class RuntimeStorage
 {
 private:
   friend class RuntimeWorker;
 
-  InMemoryStorage<Handle> canonical_to_local_ {};
-  std::unordered_multimap<Handle, std::string> friendly_names_ {};
+  std::shared_mutex storage_mutex_ {};
+  // Storage for Object/Handles with a canonical name
+  absl::flat_hash_map<Handle, Object, AbslHash> canonical_storage_ {};
+  // Storage for Object/Handles with a local name
+  std::vector<ObjectOrName> local_storage_ {};
+
+  // Keeping track of canonical and local task translation
+  absl::flat_hash_map<Handle, std::list<Handle>, AbslHash> canonical_tasks_to_local_ {};
 
   // Maps a Wasm function Handle to corresponding compiled Program
   InMemoryStorage<Program> name_to_program_ {};
+  std::unordered_multimap<Handle, std::string> friendly_names_ {};
 
-  // Storage for Object/Handles with a local name
-  concurrent_vector<Object> local_storage_ {};
-
-  void schedule( Task task );
+  template<typename T>
+  typename T::view get_object( Handle name );
 
   std::filesystem::path get_fix_repo();
   std::string serialize_objects( Handle name, const std::filesystem::path& dir );
@@ -73,17 +82,10 @@ public:
 
   Handle canonicalize( Handle name );
 
-  std::optional<Handle> get_local_name( Handle name );
+  Task canonicalize( Task task );
 
   std::string serialize( Handle handle );
   void deserialize();
-
-  // get entries in local storage for debugging purposes
-  Object& local_storage_at( size_t index ) { return local_storage_.at( index ); }
-
-  size_t get_local_storage_size() { return local_storage_.size(); }
-
-  Handle get_local_handle( Handle canonical ) { return canonical_to_local_.get( canonical ); }
 
   // Tests if the Handle (with the specified accessibility) is valid with the current contents.
   bool contains( Handle handle );
@@ -133,4 +135,14 @@ public:
    * Computes the minimum repository of @p root.
    */
   std::vector<Handle> minrepo( Handle root );
+
+  /**
+   * Return the canonical name if the Name @name has been canonicalized. No work is done if it is not canonicalized
+   */
+  std::optional<Handle> get_canonical_name( Handle name );
+
+  /**
+   * Return the local task if the Task @task has been canonicalized.
+   */
+  std::list<Task> get_local_tasks( Task task );
 };
