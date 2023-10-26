@@ -25,7 +25,7 @@
 #define TRUSTED
 #endif
 
-using MutObjectOrName = std::variant<MutObject, Handle>;
+using ObjectOrName = std::variant<OwnedObject, Handle>;
 
 class RuntimeStorage
 {
@@ -34,9 +34,9 @@ private:
 
   std::shared_mutex storage_mutex_ {};
   // Storage for Object/Handles with a canonical name
-  absl::flat_hash_map<Handle, MutObject, AbslHash> canonical_storage_ {};
+  absl::flat_hash_map<Handle, OwnedObject, AbslHash> canonical_storage_ {};
   // Storage for Object/Handles with a local name
-  std::vector<MutObjectOrName> local_storage_ {};
+  std::vector<ObjectOrName> local_storage_ {};
 
   // Keeping track of canonical and local task handle translation
   absl::flat_hash_map<Handle, std::list<Handle>, AbslHash> canonical_to_local_cache_for_tasks_ {};
@@ -44,10 +44,13 @@ private:
   // Maps a Wasm function Handle to corresponding compiled Program
   std::unordered_multimap<Handle, std::string> friendly_names_ {};
 
-  template<typename T>
+  template<owned_object T>
+  T& get_object_owned( Handle name );
+
+  template<mutable_object T>
   T get_object_mut( Handle name );
 
-  template<typename T>
+  template<object T>
   T get_object( Handle name );
 
   void schedule( Task task );
@@ -57,14 +60,11 @@ private:
   void deserialize_objects( const std::filesystem::path& dir );
 
 public:
+  // Take ownership of a Blob
   Handle add_blob( OwnedBlob&& blob );
+
+  // Take ownership of a Tree
   Handle add_tree( OwnedTree&& tree );
-
-  // Allocate a Blob and return a local Handle
-  std::tuple<MutBlob, Handle> create_blob( size_t size );
-
-  // Allocate a Tree and return a local Handle
-  std::tuple<MutTree, Handle> create_tree( size_t size );
 
   // Return reference to blob content
   Blob get_blob( Handle name );

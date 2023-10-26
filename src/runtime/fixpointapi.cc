@@ -84,13 +84,13 @@ __m256i create_tag( __m256i handle, __m256i type )
 {
   GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
 
-  auto [tree, name] = Runtime::get_instance().storage().create_tree( 3 );
+  OwnedTree tree( 3 );
 
   tree[0] = handle;
   tree[1] = Runtime::get_instance().get_current_procedure();
   tree[2] = type;
 
-  return name.as_tag();
+  return Runtime::get_instance().storage().add_tree( std::move( tree ) ).as_tag();
 }
 
 __m256i create_thunk( __m256i handle )

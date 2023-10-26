@@ -18,9 +18,33 @@ using Blob = std::span<const char>;
 using Tree = std::span<const Handle>;
 using Object = std::variant<Blob, Tree>;
 
+template<typename T>
+constexpr inline bool is_object = false;
+
+template<>
+constexpr inline bool is_object<Blob> = true;
+
+template<>
+constexpr inline bool is_object<Tree> = true;
+
+template<typename T>
+concept object = is_object<T>;
+
 using MutBlob = std::span<char>;
 using MutTree = std::span<Handle>;
 using MutObject = std::variant<MutBlob, MutTree>;
+
+template<typename T>
+constexpr inline bool is_mutable_object = false;
+
+template<>
+constexpr inline bool is_mutable_object<MutBlob> = true;
+
+template<>
+constexpr inline bool is_mutable_object<MutTree> = true;
+
+template<typename T>
+concept mutable_object = is_mutable_object<T>;
 
 /**
  * A combination of std::span and std::unique_ptr; acts as a smart pointer for a span of memory of known
@@ -68,6 +92,14 @@ public:
     return *this;
   }
 
+  S::value_type& operator[]( size_t index )
+  {
+    assert( index <= span_.size() );
+    return span_[index];
+  }
+
+  S::value_type& at( size_t index ) { return this[index]; }
+
   ~Owned()
   {
     free( span_.data() );
@@ -78,3 +110,15 @@ public:
 using OwnedBlob = Owned<MutBlob>;
 using OwnedTree = Owned<MutTree>;
 using OwnedObject = std::variant<OwnedBlob, OwnedTree>;
+
+template<typename T>
+constexpr inline bool is_owned_object = false;
+
+template<>
+constexpr inline bool is_owned_object<OwnedBlob> = true;
+
+template<>
+constexpr inline bool is_owned_object<OwnedTree> = true;
+
+template<typename T>
+concept owned_object = is_owned_object<T>;

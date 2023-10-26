@@ -18,18 +18,18 @@
 
 using namespace std;
 
-template<typename T>
-T RuntimeStorage::get_object_mut( Handle name )
+template<owned_object T>
+T& RuntimeStorage::get_object_owned( Handle name )
 {
   shared_lock lock( storage_mutex_ );
   if ( name.is_canonical() ) {
     return get<T>( canonical_storage_.at( name ) );
   } else if ( name.is_local() ) {
-    auto entry = local_storage_.at( name.get_local_id() );
+    auto& entry = local_storage_.at( name.get_local_id() );
     if ( holds_alternative<Handle>( entry ) ) {
       return get<T>( canonical_storage_.at( get<Handle>( entry ) ) );
     } else {
-      auto object = get<MutObject>( entry );
+      auto& object = get<OwnedObject>( entry );
       return get<T>( object );
     }
   }
@@ -37,7 +37,13 @@ T RuntimeStorage::get_object_mut( Handle name )
   throw out_of_range( "Invalid handle." );
 }
 
-template<typename T>
+template<mutable_object T>
+T RuntimeStorage::get_object_mut( Handle name )
+{
+  return get_object_owned<Owned<T>>( name ).span();
+}
+
+template<object T>
 T RuntimeStorage::get_object( Handle name )
 {
   return get_object_mut<std::span<typename std::remove_const<typename T::value_type>::type>>( name );
@@ -47,34 +53,18 @@ Handle RuntimeStorage::add_blob( OwnedBlob&& blob )
 {
   unique_lock lock( storage_mutex_ );
   size_t local_id = local_storage_.size();
-  MutBlob mut_blob = blob.span();
-  local_storage_.push_back( mut_blob );
-  // TODO: RuntimeStorage should manage this memory
-  blob.release();
-  return Handle( local_id, blob.size(), ContentType::Blob );
+  size_t size = blob.size();
+  local_storage_.push_back( std::move( blob ) );
+  return Handle( local_id, size, ContentType::Blob );
 }
 
 Handle RuntimeStorage::add_tree( OwnedTree&& tree )
 {
   unique_lock lock( storage_mutex_ );
   size_t local_id = local_storage_.size();
-  MutTree mut_tree = tree.span();
-  local_storage_.push_back( mut_tree );
-  // TODO: RuntimeStorage should manage this memory
-  tree.release();
-  return Handle( local_id, tree.size(), ContentType::Tree );
-}
-
-std::tuple<MutBlob, Handle> RuntimeStorage::create_blob( size_t size )
-{
-  OwnedBlob blob( size );
-  return { blob.span(), add_blob( std::move( blob ) ) };
-}
-
-std::tuple<MutTree, Handle> RuntimeStorage::create_tree( size_t size )
-{
-  OwnedTree tree( size );
-  return { tree.span(), add_tree( std::move( tree ) ) };
+  size_t size = tree.size();
+  local_storage_.push_back( std::move( tree ) );
+  return Handle( local_id, size, ContentType::Tree );
 }
 
 Blob RuntimeStorage::get_blob( Handle name )
@@ -92,7 +82,7 @@ Blob RuntimeStorage::get_blob( Handle name )
 Tree RuntimeStorage::get_tree( Handle name )
 {
   assert( not name.is_blob() );
-  return get_object_mut<MutTree>( name );
+  return get_object<Tree>( name );
 }
 
 std::list<Task> RuntimeStorage::get_local_tasks( Task task )
@@ -138,11 +128,13 @@ Handle RuntimeStorage::canonicalize( Handle handle )
 
       {
         unique_lock lock( storage_mutex_ );
-        if ( !canonical_storage_.contains( hash ) ) {
-          canonical_storage_.insert_or_assign( hash, get<MutObject>( local_storage_.at( name.get_local_id() ) ) );
-        }
+        std::variant<OwnedObject, Handle> replacement = hash;
+        std::swap( replacement, local_storage_.at( name.get_local_id() ) );
 
-        local_storage_.at( name.get_local_id() ) = hash;
+        if ( !canonical_storage_.contains( hash ) ) {
+          OwnedObject object = std::move( get<OwnedObject>( replacement ) );
+          canonical_storage_.insert_or_assign( hash, std::move( object ) );
+        }
 
         return hash.with_laziness( laziness );
       }
@@ -153,11 +145,10 @@ Handle RuntimeStorage::canonicalize( Handle handle )
     case ContentType::Tree: {
       auto orig_tree = get_object<Tree>( name );
 
-      auto [new_tree, new_name] = create_tree( orig_tree.size() );
+      OwnedTree new_tree( orig_tree.size() );
 
       for ( size_t i = 0; i < new_tree.size(); ++i ) {
-        auto entry = orig_tree[i];
-        new_tree[i] = canonicalize( entry );
+        new_tree[i] = canonicalize( orig_tree[i] );
       }
 
       string_view view( reinterpret_cast<char*>( new_tree.data() ), new_tree.size() * sizeof( Handle ) );
@@ -169,6 +160,7 @@ Handle RuntimeStorage::canonicalize( Handle handle )
           canonical_storage_.insert_or_assign( hash, std::move( new_tree ) );
         }
 
+        // NOTE: this will implicitly free the memory of the non-canonicalized tree
         local_storage_.at( name.get_local_id() ) = hash;
 
         return hash.with_laziness( laziness );
@@ -178,11 +170,11 @@ Handle RuntimeStorage::canonicalize( Handle handle )
     }
 
     case ContentType::Tag: {
-      return canonicalize( name.as_tree() ).as_tag().with_laziness( laziness );
+      return canonicalize( handle.as_tree() ).as_tag();
     }
 
     case ContentType::Thunk: {
-      return canonicalize( name.as_tree() ).as_thunk().with_laziness( laziness );
+      return canonicalize( handle.as_tree() ).as_thunk();
     }
 
     default:
@@ -322,7 +314,7 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
       case ContentType::Blob: {
         input_file.seekg( 0, std::ios::end );
         size_t size = input_file.tellg();
-        auto [blob, handle] = create_blob( size );
+        OwnedBlob blob( size );
         input_file.seekg( 0, std::ios::beg );
         input_file.read( blob.data(), size );
         {
@@ -335,7 +327,7 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
       case ContentType::Tree: {
         input_file.seekg( 0, std::ios::end );
         size_t size = input_file.tellg();
-        auto [tree, handle] = create_tree( size );
+        OwnedTree tree( size / sizeof( Handle ) );
         input_file.seekg( 0, std::ios::beg );
         input_file.read( reinterpret_cast<char*>( tree.data() ), size );
         {

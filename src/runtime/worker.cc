@@ -139,7 +139,7 @@ Handle RuntimeWorker::do_fill( Handle name )
   switch ( name.get_content_type() ) {
     case ContentType::Tree: {
       auto orig_tree = storage_.get_tree( name );
-      auto [tree, new_name] = storage_.create_tree( orig_tree.size() );
+      OwnedTree tree( orig_tree.size() );
 
       for ( size_t i = 0; i < tree.size(); ++i ) {
         auto entry = orig_tree[i];
@@ -150,7 +150,7 @@ Handle RuntimeWorker::do_fill( Handle name )
         }
       }
 
-      return new_name;
+      return storage_.add_tree( std::move( orig_tree.size() ) );
     }
 
     default:
