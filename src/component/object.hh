@@ -39,6 +39,12 @@ constexpr inline bool is_const_span<std::span<const T>> = true;
 template<typename T>
 concept const_span = is_const_span<T>;
 
+template<any_span T>
+size_t byte_size( T& span )
+{
+  return span.size() * sizeof( typename T::element_type );
+}
+
 using Blob = std::span<const char>;
 using Tree = std::span<const Handle>;
 using Object = std::variant<Blob, Tree>;
@@ -134,16 +140,15 @@ public:
   }
 
   static Owned from_file( const std::filesystem::path path )
+    requires std::is_const_v<element_type>
   {
-    VLOG( 1 ) << "mapping " << path;
+    VLOG( 1 ) << "mapping " << path << " as read-only";
     size_t size = std::filesystem::file_size( path );
     int fd = open( path.c_str(), O_RDONLY );
     assert( fd >= 0 );
     void* p = mmap( NULL, size, PROT_READ, MAP_PRIVATE, fd, 0 );
     assert( p );
-    span_type span = { reinterpret_cast<pointer>( p ), size };
-    VLOG( 1 ) << "mapped " << size << " bytes at " << reinterpret_cast<const void*>( span.data() );
-    return Owned( span, AllocationType::Mapped );
+    return claim_mapped( { reinterpret_cast<pointer>( p ), size / sizeof( element_type ) } );
   }
 
   Owned( Owned&& other )
@@ -173,6 +178,17 @@ public:
     , allocation_type_( original.allocation_type() )
   {
     original.leak();
+    if ( allocation_type_ == AllocationType::Mapped ) {
+      VLOG( 2 ) << "Setting allocation at " << reinterpret_cast<const void*>( span_.data() ) << " "
+                << "(" << byte_size( span_ ) << " bytes) to RO.";
+      int result = mprotect( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ),
+                             byte_size( span_ ),
+                             PROT_READ | PROT_EXEC );
+      if ( result != 0 ) {
+        perror( "mprotect: " );
+        assert( result == 0 );
+      }
+    }
   };
 
   Owned& operator=( Owned<std::span<value_type>>&& original )
@@ -181,6 +197,17 @@ public:
     span_ = original.span();
     allocation_type_ = original.allocation_type();
     original.leak();
+    if ( allocation_type_ == AllocationType::Mapped ) {
+      VLOG( 2 ) << "Setting allocation at " << reinterpret_cast<const void*>( span_.data() ) << " "
+                << "(" << byte_size( span_ ) << " bytes) to RO.";
+      int result = mprotect( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ),
+                             byte_size( span_ ),
+                             PROT_READ | PROT_EXEC );
+      if ( result != 0 ) {
+        perror( "mprotect: " );
+        assert( result == 0 );
+      }
+    }
     return *this;
   }
 
@@ -211,11 +238,11 @@ public:
       case AllocationType::Static:
         break;
       case AllocationType::Allocated:
-        /* VLOG( 1 ) << "freeing " << span_.size() << " bytes at " << reinterpret_cast<void*>( span_.data() ); */
+        VLOG( 1 ) << "freeing " << span_.size() << " bytes at " << reinterpret_cast<const void*>( span_.data() );
         free( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ) );
         break;
       case AllocationType::Mapped:
-        /* VLOG( 1 ) << "unmapping " << span_.size() << " bytes at " << reinterpret_cast<void*>( span_.data() ); */
+        VLOG( 1 ) << "unmapping " << span_.size() << " bytes at " << reinterpret_cast<const void*>( span_.data() );
         munmap( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), span_.size() );
         break;
     }

@@ -33,7 +33,7 @@ void program_body( span_view<char*> args )
     throw runtime_error( "unexpected non-wasm file" );
   }
 
-  auto wasm = OwnedMutBlob::from_file( str );
+  auto wasm = OwnedBlob::from_file( str );
   args.remove_prefix( 1 );
 
   optional<string> ref_name {};
