@@ -17,8 +17,27 @@
 
 #include "exception.hh"
 #include "handle.hh"
+#include "sha256.hh"
 #include "spans.hh"
 #include "thunk.hh"
+
+template<typename T>
+constexpr inline bool is_span = false;
+
+template<typename T>
+constexpr inline bool is_span<std::span<T>> = true;
+
+template<typename T>
+concept any_span = is_span<T>;
+
+template<typename T>
+constexpr inline bool is_const_span = false;
+
+template<typename T>
+constexpr inline bool is_const_span<std::span<const T>> = true;
+
+template<typename T>
+concept const_span = is_const_span<T>;
 
 using Blob = std::span<const char>;
 using Tree = std::span<const Handle>;
@@ -52,42 +71,69 @@ constexpr inline bool is_mutable_object<MutTree> = true;
 template<typename T>
 concept mutable_object = is_mutable_object<T>;
 
-/**
- * A combination of std::span and std::unique_ptr; acts as a smart pointer for a span of memory of known
- * length.  Calls `malloc` on creation and `free` on deletion when used normally, but can also take ownership of an
- * already-allocated region or give up ownership to another owner.
- */
-template<class S>
+enum class AllocationType
+{
+  Static,
+  Allocated,
+  Mapped,
+};
+
+template<any_span S>
 class Owned
 {
-public:
-  enum class Deallocation
-  {
-    None,
-    Free,
-    Unmap,
-  };
-
-private:
   S span_;
-  Deallocation deallocation_;
+  AllocationType allocation_type_;
 
-  Owned( S span, Deallocation deallocation )
+  Owned( S span, AllocationType allocation_type )
     : span_( span )
-    , deallocation_( deallocation )
+    , allocation_type_( allocation_type )
   {}
 
 public:
-  Owned( size_t size )
+  using span_type = S;
+  using element_type = S::element_type;
+  using value_type = S::value_type;
+  using pointer = element_type*;
+  using reference = element_type&;
+  using const_pointer = const element_type*;
+  using const_reference = element_type&;
+
+  using mutable_span = std::span<value_type>;
+  using const_span = std::span<const element_type>;
+
+  static Owned allocate( size_t size )
   {
-    span_ = {
-      reinterpret_cast<S::value_type*>( malloc( size * sizeof( typename S::value_type ) ) ),
+    span_type span = {
+      reinterpret_cast<pointer>( malloc( size * sizeof( element_type ) ) ),
       size,
     };
-    VLOG( 1 ) << "allocated " << size << " bytes at " << reinterpret_cast<void*>( span_.data() );
+    VLOG( 1 ) << "allocated " << size << " bytes at " << reinterpret_cast<void*>( span.data() );
+    return {
+      span,
+      AllocationType::Allocated,
+    };
   }
 
-  Owned( const std::filesystem::path path )
+  static Owned claim_static( S span )
+  {
+    VLOG( 1 ) << "claimed " << span.size() << " static bytes at " << reinterpret_cast<const void*>( span.data() );
+    return Owned { span, AllocationType::Static };
+  }
+
+  static Owned claim_allocated( S span )
+  {
+    VLOG( 1 ) << "claimed " << span.size() << " allocated bytes at "
+              << reinterpret_cast<const void*>( span.data() );
+    return Owned { span, AllocationType::Allocated };
+  }
+
+  static Owned claim_mapped( S span )
+  {
+    VLOG( 1 ) << "claimed " << span.size() << " mapped bytes at " << reinterpret_cast<const void*>( span.data() );
+    return Owned { span, AllocationType::Mapped };
+  }
+
+  static Owned from_file( const std::filesystem::path path )
   {
     VLOG( 1 ) << "mapping " << path;
     size_t size = std::filesystem::file_size( path );
@@ -95,42 +141,59 @@ public:
     assert( fd >= 0 );
     void* p = mmap( NULL, size, PROT_READ, MAP_PRIVATE, fd, 0 );
     assert( p );
-    span_ = { reinterpret_cast<S::value_type*>( p ), size };
-    deallocation_ = Deallocation::Unmap;
-    VLOG( 1 ) << "mapped " << size << " bytes at " << reinterpret_cast<void*>( span_.data() );
-  }
-
-  static Owned claim( S span, Deallocation deallocation )
-  {
-    VLOG( 1 ) << "claimed " << span.size() << " bytes at " << reinterpret_cast<void*>( span.data() );
-    return Owned { span, deallocation };
+    span_type span = { reinterpret_cast<pointer>( p ), size };
+    VLOG( 1 ) << "mapped " << size << " bytes at " << reinterpret_cast<const void*>( span.data() );
+    return Owned( span, AllocationType::Mapped );
   }
 
   Owned( Owned&& other )
     : span_( other.span_ )
-    , deallocation_( other.deallocation_ )
+    , allocation_type_( other.allocation_type_ )
   {
-    other.release();
+    other.leak();
   }
 
-  Deallocation deallocation() const { return deallocation_; }
+  AllocationType allocation_type() const { return allocation_type_; }
 
-  S::value_type* data() const { return span_.data(); };
+  pointer data() const { return span_.data(); };
   size_t size() const { return span_.size(); };
 
-  S span() const { return span_; }
-  operator S() const { return span(); }
+  span_type span() const { return span_; }
 
-  void release()
+  operator span_type() const { return span(); }
+  operator const_span() const
+    requires( not std::is_const_v<element_type> )
+  {
+    return span();
+  }
+
+  Owned( Owned<std::span<value_type>>&& original )
+    requires std::is_const_v<element_type>
+    : span_( original.span() )
+    , allocation_type_( original.allocation_type() )
+  {
+    original.leak();
+  };
+
+  Owned& operator=( Owned<std::span<value_type>>&& original )
+    requires std::is_const_v<element_type>
+  {
+    span_ = original.span();
+    allocation_type_ = original.allocation_type();
+    original.leak();
+    return *this;
+  }
+
+  void leak()
   {
     span_ = { reinterpret_cast<S::value_type*>( 0 ), 0 };
-    deallocation_ = Deallocation::None;
+    allocation_type_ = AllocationType::Static;
   }
 
   Owned& operator=( Owned&& other )
   {
     this->span_ = other.span_;
-    other.release();
+    other.leak();
     return *this;
   }
 
@@ -144,24 +207,40 @@ public:
 
   ~Owned()
   {
-    switch ( deallocation_ ) {
-      case Deallocation::None:
+    switch ( allocation_type_ ) {
+      case AllocationType::Static:
         break;
-      case Deallocation::Free:
-        VLOG( 1 ) << "freeing " << span_.size() << " bytes at " << reinterpret_cast<void*>( span_.data() );
-        free( span_.data() );
+      case AllocationType::Allocated:
+        /* VLOG( 1 ) << "freeing " << span_.size() << " bytes at " << reinterpret_cast<void*>( span_.data() ); */
+        free( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ) );
         break;
-      case Deallocation::Unmap:
-        VLOG( 1 ) << "unmapping " << span_.size() << " bytes at " << reinterpret_cast<void*>( span_.data() );
-        munmap( span_.data(), span_.size() );
+      case AllocationType::Mapped:
+        /* VLOG( 1 ) << "unmapping " << span_.size() << " bytes at " << reinterpret_cast<void*>( span_.data() ); */
+        munmap( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), span_.size() );
         break;
     }
-    release();
+    leak();
   }
 };
 
-using OwnedBlob = Owned<MutBlob>;
-using OwnedTree = Owned<MutTree>;
+using OwnedMutBlob = Owned<MutBlob>;
+using OwnedMutTree = Owned<MutTree>;
+using OwnedMutObject = std::variant<OwnedMutBlob, OwnedMutTree>;
+
+template<typename T>
+constexpr inline bool is_owned_mut_object = false;
+
+template<>
+constexpr inline bool is_owned_mut_object<OwnedMutBlob> = true;
+
+template<>
+constexpr inline bool is_owned_mut_object<OwnedMutTree> = true;
+
+template<typename T>
+concept owned_mut_object = is_owned_mut_object<T>;
+
+using OwnedBlob = Owned<Blob>;
+using OwnedTree = Owned<Tree>;
 using OwnedObject = std::variant<OwnedBlob, OwnedTree>;
 
 template<typename T>

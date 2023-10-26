@@ -117,27 +117,27 @@ using MessagePayload
 
 class IncomingMessage : public Message
 {
-  std::variant<std::string_view, OwnedBlob, OwnedTree> payload_;
+  std::variant<std::string_view, OwnedMutBlob, OwnedMutTree> payload_;
 
 public:
   IncomingMessage( const Message::Opcode opcode, std::string_view payload );
-  IncomingMessage( const Message::Opcode opcode, OwnedBlob&& payload );
-  IncomingMessage( const Message::Opcode opcode, OwnedTree&& payload );
+  IncomingMessage( const Message::Opcode opcode, OwnedMutBlob&& payload );
+  IncomingMessage( const Message::Opcode opcode, OwnedMutTree&& payload );
 
-  OwnedBlob get_blob()
+  OwnedMutBlob get_blob()
   {
     assert( holds_alternative<OwnedBlob>( payload_ ) );
-    return std::move( get<OwnedBlob>( payload_ ) );
+    return std::move( get<OwnedMutBlob>( payload_ ) );
   }
 
-  OwnedTree get_tree()
+  OwnedMutTree get_tree()
   {
     assert( holds_alternative<OwnedTree>( payload_ ) );
-    return std::move( get<OwnedTree>( payload_ ) );
+    return std::move( get<OwnedMutTree>( payload_ ) );
   }
 
   static size_t expected_payload_length( std::string_view header );
-  std::variant<std::string_view, OwnedBlob, OwnedTree>& payload() { return payload_; }
+  auto& payload() { return payload_; }
 };
 
 class OutgoingMessage : public Message
@@ -161,7 +161,7 @@ private:
 
   std::string incomplete_header_ {};
 
-  std::variant<std::string, OwnedBlob, OwnedTree> incomplete_payload_ {};
+  std::variant<std::string, OwnedMutBlob, OwnedMutTree> incomplete_payload_ {};
   size_t completed_payload_length_ {};
 
   std::queue<IncomingMessage> completed_messages_ {};

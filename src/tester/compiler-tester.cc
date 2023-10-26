@@ -33,7 +33,7 @@ void program_body( span_view<char*> args )
     throw runtime_error( "unexpected non-wasm file" );
   }
 
-  OwnedBlob wasm { str };
+  auto wasm = OwnedMutBlob::from_file( str );
   args.remove_prefix( 1 );
 
   optional<string> ref_name {};
@@ -51,7 +51,7 @@ void program_body( span_view<char*> args )
   auto& storage = rt.storage();
   storage.deserialize();
   Handle blob = storage.add_blob( std::move( wasm ) );
-  OwnedTree encode( 3 );
+  auto encode = OwnedMutTree::allocate( 3 );
   encode.at( 0 ) = Handle( "unused" );
   encode.at( 1 ) = storage.get_ref( "compile-encode" ).value();
   encode.at( 2 ) = blob;

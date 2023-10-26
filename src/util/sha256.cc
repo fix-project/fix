@@ -8,10 +8,12 @@
 
 using namespace std;
 
-string sha256::encode( std::span<const char> input )
+namespace sha256 {
+string encode( std::string_view input )
 {
   GlobalScopeTimer<Timer::Category::Hash> record_timer;
   string digest( picosha2::k_digest_size, 0 );
   picosha2::hash256( input, digest );
   return digest;
+}
 }

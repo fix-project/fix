@@ -11,12 +11,12 @@ IncomingMessage::IncomingMessage( const Message::Opcode opcode, std::string_view
   , payload_( payload )
 {}
 
-IncomingMessage::IncomingMessage( const Message::Opcode opcode, OwnedBlob&& payload )
+IncomingMessage::IncomingMessage( const Message::Opcode opcode, OwnedMutBlob&& payload )
   : Message( opcode )
   , payload_( std::move( payload ) )
 {}
 
-IncomingMessage::IncomingMessage( const Message::Opcode opcode, OwnedTree&& payload )
+IncomingMessage::IncomingMessage( const Message::Opcode opcode, OwnedMutTree&& payload )
   : Message( opcode )
   , payload_( std::move( payload ) )
 {}
@@ -131,12 +131,12 @@ size_t MessageParser::parse( string_view buf )
             }
 
             case Message::Opcode::BLOBDATA: {
-              incomplete_payload_ = OwnedBlob( expected_payload_length_.value() );
+              incomplete_payload_ = OwnedMutBlob::allocate( expected_payload_length_.value() );
               break;
             }
 
             case Message::Opcode::TREEDATA: {
-              incomplete_payload_ = OwnedTree( expected_payload_length_.value() / sizeof( Handle ) );
+              incomplete_payload_ = OwnedMutTree::allocate( expected_payload_length_.value() / sizeof( Handle ) );
               break;
             }
 
