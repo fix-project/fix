@@ -1,13 +1,19 @@
 #pragma once
 
+#include <fcntl.h>
+#include <sys/mman.h>
+
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <span>
 #include <stdexcept>
 #include <string_view>
 #include <variant>
+
+#include <glog/logging.h>
 
 #include "exception.hh"
 #include "handle.hh"
@@ -54,10 +60,21 @@ concept mutable_object = is_mutable_object<T>;
 template<class S>
 class Owned
 {
-  S span_;
+public:
+  enum class Deallocation
+  {
+    None,
+    Free,
+    Unmap,
+  };
 
-  Owned( S span )
+private:
+  S span_;
+  Deallocation deallocation_;
+
+  Owned( S span, Deallocation deallocation )
     : span_( span )
+    , deallocation_( deallocation )
   {}
 
 public:
@@ -67,15 +84,36 @@ public:
       reinterpret_cast<S::value_type*>( malloc( size * sizeof( typename S::value_type ) ) ),
       size,
     };
+    VLOG( 1 ) << "allocated " << size << " bytes at " << reinterpret_cast<void*>( span_.data() );
   }
 
-  static Owned claim( S span ) { return Owned( span ); }
+  Owned( const std::filesystem::path path )
+  {
+    VLOG( 1 ) << "mapping " << path;
+    size_t size = std::filesystem::file_size( path );
+    int fd = open( path.c_str(), O_RDONLY );
+    assert( fd >= 0 );
+    void* p = mmap( NULL, size, PROT_READ, MAP_PRIVATE, fd, 0 );
+    assert( p );
+    span_ = { reinterpret_cast<S::value_type*>( p ), size };
+    deallocation_ = Deallocation::Unmap;
+    VLOG( 1 ) << "mapped " << size << " bytes at " << reinterpret_cast<void*>( span_.data() );
+  }
+
+  static Owned claim( S span, Deallocation deallocation )
+  {
+    VLOG( 1 ) << "claimed " << span.size() << " bytes at " << reinterpret_cast<void*>( span.data() );
+    return Owned { span, deallocation };
+  }
 
   Owned( Owned&& other )
     : span_( other.span_ )
+    , deallocation_( other.deallocation_ )
   {
     other.release();
   }
+
+  Deallocation deallocation() const { return deallocation_; }
 
   S::value_type* data() const { return span_.data(); };
   size_t size() const { return span_.size(); };
@@ -83,7 +121,11 @@ public:
   S span() const { return span_; }
   operator S() const { return span(); }
 
-  void release() { span_ = { reinterpret_cast<S::value_type*>( 0 ), 0 }; }
+  void release()
+  {
+    span_ = { reinterpret_cast<S::value_type*>( 0 ), 0 };
+    deallocation_ = Deallocation::None;
+  }
 
   Owned& operator=( Owned&& other )
   {
@@ -98,11 +140,22 @@ public:
     return span_[index];
   }
 
-  S::value_type& at( size_t index ) { return this[index]; }
+  S::value_type& at( size_t index ) { return ( *this )[index]; }
 
   ~Owned()
   {
-    free( span_.data() );
+    switch ( deallocation_ ) {
+      case Deallocation::None:
+        break;
+      case Deallocation::Free:
+        VLOG( 1 ) << "freeing " << span_.size() << " bytes at " << reinterpret_cast<void*>( span_.data() );
+        free( span_.data() );
+        break;
+      case Deallocation::Unmap:
+        VLOG( 1 ) << "unmapping " << span_.size() << " bytes at " << reinterpret_cast<void*>( span_.data() );
+        munmap( span_.data(), span_.size() );
+        break;
+    }
     release();
   }
 };

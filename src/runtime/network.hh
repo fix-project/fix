@@ -41,7 +41,6 @@ class Runtime;
 class Remote : public ITaskRunner
 {
   EventLoop& events_;
-  EventCategories categories_;
   TCPSocket socket_;
 
   MessageQueue& msg_q_;

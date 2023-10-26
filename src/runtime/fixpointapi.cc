@@ -47,10 +47,12 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   if ( size > memory->size ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
-  auto blob = OwnedBlob::claim( {
-    reinterpret_cast<char*>( memory->data ),
-    size,
-  } );
+  auto blob = OwnedBlob::claim(
+    {
+      reinterpret_cast<char*>( memory->data ),
+      size,
+    },
+    OwnedBlob::Deallocation::Free );
   memory->data = NULL;
   memory->pages = 0;
   memory->size = 0;
@@ -71,10 +73,12 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
 
-  auto tree = OwnedTree::claim( {
-    reinterpret_cast<Handle*>( table->data ),
-    size,
-  } );
+  auto tree = OwnedTree::claim(
+    {
+      reinterpret_cast<Handle*>( table->data ),
+      size,
+    },
+    OwnedTree::Deallocation::Free );
   table->data = NULL;
   table->size = 0;
   return Runtime::get_instance().storage().add_tree( std::move( tree ) );

@@ -104,7 +104,6 @@ Remote::Remote( EventLoop& events,
                 absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to,
                 shared_mutex& mutex )
   : events_( events )
-  , categories_( categories )
   , socket_( move( socket ) )
   , msg_q_( msg_q )
   , runtime_( runtime )
