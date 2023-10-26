@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include <glog/logging.h>
+
 #include "handle.hh"
 #include "object.hh"
 #include "operation.hh"
@@ -107,6 +109,7 @@ std::list<Task> RuntimeStorage::get_local_tasks( Task task )
 
 Handle RuntimeStorage::canonicalize( Handle handle )
 {
+  VLOG( 1 ) << "canonicalizing " << handle;
   if ( handle.is_canonical() ) {
     return handle;
   }
@@ -184,6 +187,7 @@ Handle RuntimeStorage::canonicalize( Handle handle )
 
 Task RuntimeStorage::canonicalize( Task task )
 {
+  VLOG( 1 ) << "canonicalizing " << task;
   if ( task.handle().is_canonical() ) {
     return task;
   } else {
@@ -297,6 +301,7 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
     if ( file.is_directory() )
       continue;
     Handle name( base64::decode( file.path().filename().string() ) );
+    VLOG( 2 ) << "deserializing " << file << " to " << name;
 
     if ( name.is_local() ) {
       throw runtime_error( "Attempted to deserialize a local name." );
@@ -305,36 +310,14 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
       continue;
     }
 
-    ifstream input_file( file.path() );
-    if ( !input_file.is_open() ) {
-      throw runtime_error( "Serialized file does not exist." );
-    }
-
     switch ( name.get_content_type() ) {
       case ContentType::Blob: {
-        input_file.seekg( 0, std::ios::end );
-        size_t size = input_file.tellg();
-        OwnedBlob blob( size );
-        input_file.seekg( 0, std::ios::beg );
-        input_file.read( blob.data(), size );
-        {
-          unique_lock lock( storage_mutex_ );
-          canonical_storage_.insert_or_assign( name, std::move( blob ) );
-        }
+        canonicalize( add_blob( OwnedBlob( file ) ) );
         break;
       }
 
       case ContentType::Tree: {
-        input_file.seekg( 0, std::ios::end );
-        size_t size = input_file.tellg();
-        OwnedTree tree( size / sizeof( Handle ) );
-        input_file.seekg( 0, std::ios::beg );
-        input_file.read( reinterpret_cast<char*>( tree.data() ), size );
-        {
-          unique_lock lock( storage_mutex_ );
-          canonical_storage_.insert_or_assign( name, std::move( tree ) );
-        }
-        break;
+        canonicalize( add_tree( OwnedTree( file ) ) );
       }
 
       case ContentType::Thunk:
