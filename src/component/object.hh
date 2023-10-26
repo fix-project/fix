@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <limits>
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <variant>
@@ -13,89 +14,67 @@
 #include "spans.hh"
 #include "thunk.hh"
 
-template<typename T>
-struct OptionalFree
-{
-  bool own { true };
-
-  void operator()( T* ptr ) const
-  {
-    if ( own ) {
-      free( ptr );
-    };
-  }
-};
-
-template<typename T, typename View>
-class Value
-{
-public:
-  using ptr_type = std::unique_ptr<T, OptionalFree<T>>;
-  using view = View;
-
-  Value( ptr_type&& data, const uint32_t size )
-    : data_( std::move( data ) )
-    , size_( size )
-  {}
-
-  Value( View str )
-    : data_( const_cast<T*>( str.data() ) )
-    , size_( str.size() )
-  {
-    data_.get_deleter().own = false;
-    if ( str.size() > std::numeric_limits<uint32_t>::max() ) {
-      throw std::out_of_range( "Value size too big" );
-    }
-  }
-
-  Value( const uint32_t size )
-    : data_( notnull( "aligned_alloc", static_cast<T*>( aligned_alloc( alignof( T ), size * sizeof( T ) ) ) ) )
-    , size_( size )
-  {
-    /* XXX should probably not leave uninitialized */
-  }
-
-  Value( const Value& ) = delete;
-  Value& operator=( const Value& ) = delete;
-
-  Value( Value&& other ) = default;
-  Value& operator=( Value&& other ) = default;
-
-  operator View() const { return { data_.get(), size_ }; }
-  const T* data() const { return data_.get(); }
-  uint32_t size() const { return size_; }
-
-  T& at( const uint32_t N )
-  {
-    if ( N >= size() ) {
-      throw std::out_of_range( "Value::at: " + std::to_string( N ) + " >= " + std::to_string( size() ) );
-    }
-    return *( data_.get() + N );
-  }
-
-  T& operator[]( const size_t N ) const { return *( data() + N ); }
-
-private:
-  ptr_type data_;
-  uint32_t size_;
-};
-
-static_assert( sizeof( __m256i ) == sizeof( Handle ) );
-
-using Blob = Value<char, std::string_view>;
-using Tree = Value<Handle, span_view<Handle>>;
+using Blob = std::span<const char>;
+using Tree = std::span<const Handle>;
 using Object = std::variant<Blob, Tree>;
 
-using Blob_ptr = Blob::ptr_type;
-using Tree_ptr = Tree::ptr_type;
+using MutBlob = std::span<char>;
+using MutTree = std::span<Handle>;
+using MutObject = std::variant<MutBlob, MutTree>;
 
-template<typename T>
-Blob make_blob( const T& t )
+/**
+ * A combination of std::span and std::unique_ptr; acts as a smart pointer for a span of memory of known
+ * length.  Calls `malloc` on creation and `free` on deletion when used normally, but can also take ownership of an
+ * already-allocated region or give up ownership to another owner.
+ */
+template<class S>
+class Owned
 {
-  Blob_ptr t_storage { static_cast<char*>( malloc( sizeof( T ) ) ) };
-  if ( not t_storage ) {
-    throw std::bad_alloc();
+  S span_;
+
+  Owned( S span )
+    : span_( span )
+  {}
+
+public:
+  Owned( size_t size )
+  {
+    span_ = {
+      reinterpret_cast<S::value_type*>( malloc( size * sizeof( typename S::value_type ) ) ),
+      size,
+    };
   }
-  memcpy( t_storage.get(), &t, sizeof( T ) );
-  return { std::move( t_storage ), sizeof( T ) };
-}
+
+  static Owned claim( S span ) { return Owned( span ); }
+
+  Owned( Owned&& other )
+    : span_( other.span_ )
+  {
+    other.release();
+  }
+
+  S::value_type* data() const { return span_.data(); };
+  size_t size() const { return span_.size(); };
+
+  S span() const { return span_; }
+  operator S() const { return span(); }
+
+  void release() { span_ = { reinterpret_cast<S::value_type*>( 0 ), 0 }; }
+
+  Owned& operator=( Owned&& other )
+  {
+    this->span_ = other.span_;
+    other.release();
+    return *this;
+  }
+
+  ~Owned()
+  {
+    free( span_.data() );
+    release();
+  }
+};
+
+using OwnedBlob = Owned<MutBlob>;
+using OwnedTree = Owned<MutTree>;
+using OwnedObject = std::variant<OwnedBlob, OwnedTree>;

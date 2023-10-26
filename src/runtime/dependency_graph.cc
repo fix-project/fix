@@ -48,12 +48,12 @@ std::optional<Handle> DependencyGraph::start_after( Task& target, Task& blocked 
   return {};
 }
 
-bool DependencyGraph::start_after( Tree& targets, Task& blocked )
+bool DependencyGraph::start_after( Tree targets, Task& blocked )
 {
   std::unique_lock lock( mutex_ );
   bool found_all = true;
   for ( size_t i = 0; i < targets.size(); i++ ) {
-    auto target = Task::Eval( targets.at( i ) );
+    auto target = Task::Eval( targets[i] );
     if ( not cache_.contains( target ) ) {
       forward_dependencies_[target].insert( blocked );
       backward_dependencies_[blocked].insert( target );

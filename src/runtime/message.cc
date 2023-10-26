@@ -2,42 +2,48 @@
 #include "base64.hh"
 #include "object.hh"
 #include "parser.hh"
+#include "runtime.hh"
 
 using namespace std;
 
-IncomingMessage::IncomingMessage( string_view header, string&& payload )
-  : Message( Message::opcode( header ), move( payload ) )
+IncomingMessage::IncomingMessage( const Message::Opcode opcode, std::string_view payload )
+  : Message( opcode )
+  , payload_( payload )
 {}
 
-IncomingMessage::IncomingMessage( string_view header, Blob&& payload )
-  : Message( Message::opcode( header ), move( payload ) )
+IncomingMessage::IncomingMessage( const Message::Opcode opcode, OwnedBlob&& payload )
+  : Message( opcode )
+  , payload_( std::move( payload ) )
 {}
 
-IncomingMessage::IncomingMessage( string_view header, Tree&& payload )
-  : Message( Message::opcode( header ), move( payload ) )
+IncomingMessage::IncomingMessage( const Message::Opcode opcode, OwnedTree&& payload )
+  : Message( opcode )
+  , payload_( std::move( payload ) )
 {}
 
-OutgoingMessage::OutgoingMessage( const Opcode opcode, string&& payload )
-  : Message( opcode, move( payload ) )
+OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, Blob payload )
+  : Message( opcode )
+  , payload_( payload )
 {}
 
-OutgoingMessage::OutgoingMessage( const Opcode opcode, string_view payload )
-  : Message( opcode, payload )
+OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, Tree payload )
+  : Message( opcode )
+  , payload_( payload )
 {}
 
-void Message::serialize_header( string& out )
+void OutgoingMessage::serialize_header( string& out )
 {
-  out.resize( HEADER_LENGTH );
+  out.resize( Message::HEADER_LENGTH );
   Serializer s( string_span::from_view( out ) );
   s.integer( payload_length() );
-  s.integer( static_cast<uint8_t>( opcode_ ) );
+  s.integer( static_cast<uint8_t>( opcode() ) );
 
-  if ( s.bytes_written() != HEADER_LENGTH ) {
+  if ( s.bytes_written() != Message::HEADER_LENGTH ) {
     throw runtime_error( "Wrong header length" );
   }
 }
 
-string_view Message::payload()
+string_view OutgoingMessage::payload()
 {
   return std::visit(
     [&]( auto& arg ) -> string_view {
@@ -46,10 +52,10 @@ string_view Message::payload()
     payload_ );
 }
 
-size_t Message::payload_length()
+size_t OutgoingMessage::payload_length()
 {
   if ( std::holds_alternative<Tree>( payload_ ) ) {
-    return span_view<Handle>( get<Tree>( payload_ ) ).byte_size();
+    return get<Tree>( payload_ ).size() * sizeof( Tree::element_type );
   } else {
     return std::visit( []( auto& arg ) -> size_t { return arg.size(); }, payload_ );
   }
@@ -61,7 +67,7 @@ Message::Opcode Message::opcode( string_view header )
   return static_cast<Opcode>( header[8] );
 }
 
-size_t Message::expected_payload_length( string_view header )
+size_t IncomingMessage::expected_payload_length( string_view header )
 {
   Parser p { header };
   size_t payload_length = 0;
@@ -86,8 +92,9 @@ OutgoingMessage OutgoingMessage::to_message( MessagePayload&& payload )
 
 void MessageParser::complete_message()
 {
-  std::visit( [&]( auto&& arg ) { completed_messages_.emplace( incomplete_header_, move( arg ) ); },
-              incomplete_payload_ );
+  std::visit(
+    [&]( auto&& arg ) { completed_messages_.emplace( Message::opcode( incomplete_header_ ), std::move( arg ) ); },
+    incomplete_payload_ );
 
   expected_payload_length_.reset();
   incomplete_header_.clear();
@@ -106,7 +113,7 @@ size_t MessageParser::parse( string_view buf )
       buf.remove_prefix( remaining_length );
 
       if ( incomplete_header_.length() == Message::HEADER_LENGTH ) {
-        expected_payload_length_ = Message::expected_payload_length( incomplete_header_ );
+        expected_payload_length_ = IncomingMessage::expected_payload_length( incomplete_header_ );
 
         if ( expected_payload_length_.value() == 0 ) {
           assert( Message::opcode( incomplete_header_ ) == Message::Opcode::REQUESTINFO );
@@ -124,13 +131,12 @@ size_t MessageParser::parse( string_view buf )
             }
 
             case Message::Opcode::BLOBDATA: {
-              incomplete_payload_ = Blob( expected_payload_length_.value() );
+              incomplete_payload_ = OwnedBlob( expected_payload_length_.value() );
               break;
             }
 
-            case Message::Opcode::TREEDATA:
-            case Message::Opcode::TAGDATA: {
-              incomplete_payload_ = Tree( expected_payload_length_.value() / sizeof( Handle ) );
+            case Message::Opcode::TREEDATA: {
+              incomplete_payload_ = OwnedTree( expected_payload_length_.value() / sizeof( Handle ) );
               break;
             }
 

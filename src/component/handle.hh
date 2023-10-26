@@ -2,6 +2,7 @@
 
 #include <bit>
 #include <iostream>
+#include <span>
 #include <string>
 #include <variant>
 #include <vector>
@@ -57,18 +58,6 @@ protected:
  * 1) if the handle is a literal:     | strict/shallow/lazy (2 bits) | other/literal | size of the blob (5 bits)
  * 2) if the handle is not a literal: | strict/shallow/lazy (2 bits) | other/literal | 0 | 0 | canonical/local |
  * Blob/Tree/Thunk/Tag (2 bits)
- *
- * A local handle is treated like a bitfield struct with the following pseudo-declaration:
- *
- *   struct local_handle {
- *     size_t local_id: 64;   // 255-192
- *     SBZ: 64;               // 191-128
- *     size_t length: 64;     // 127-64
- *     uint8_t metadata: 8;   // 63-56
- *     SBZ: 56;               // 56-0
- *   };
- *
- * Unused fields should be zeroed (SBZ).
  */
 class Handle : public cookie
 {
@@ -178,10 +167,10 @@ public:
     }
   }
 
-  std::string_view literal_blob() const
+  std::span<const char> literal_blob() const
   {
     assert( is_literal_blob() );
-    return { data(), literal_blob_len() };
+    return { data(), (size_t)literal_blob_len() };
   }
 
   size_t get_local_id() const { return _mm256_extract_epi64( content_, 0 ); }
@@ -213,13 +202,6 @@ public:
     return _mm256_or_si256( mask, handle );
   }
 
-  static Handle get_encode_name( const Handle handle )
-  {
-    assert( handle.is_thunk() );
-    __m256i mask = _mm256_set_epi64x( 0x01'00'00'00'00'00'00'00, 0, 0, 0 );
-    return _mm256_andnot_si256( mask, handle );
-  }
-
   static Handle make_strict( const Handle handle )
   {
     // 00xxxxxx
@@ -245,7 +227,32 @@ public:
     return _mm256_or_si256( bits, masked );
   }
 
-  Handle get_encode_name() const { return Handle::get_encode_name( *this ); }
+  static Handle make_tree( const Handle handle )
+  {
+    // xxxxxx00
+    assert( handle.is_tag() or handle.is_tree() );
+    __m256i mask = _mm256_set_epi64x( 0x03'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_andnot_si256( mask, handle );
+  }
+
+  static Handle make_tag( const Handle handle )
+  {
+    assert( handle.is_tree() );
+    // xxxxxx11
+    __m256i bits = _mm256_set_epi64x( 0x03'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_or_si256( bits, handle );
+  }
+
+  static Handle make_thunk( const Handle handle )
+  {
+    assert( handle.is_tree() );
+    // xxxxxx01
+    __m256i mask = _mm256_set_epi64x( 0x03'00'00'00'00'00'00'00, 0, 0, 0 );
+    __m256i masked = _mm256_andnot_si256( mask, handle );
+    __m256i bits = _mm256_set_epi64x( 0x01'00'00'00'00'00'00'00, 0, 0, 0 );
+    return _mm256_or_si256( bits, masked );
+  }
+
   Handle as_strict() const { return Handle::make_strict( *this ); }
   Handle as_shallow() const { return Handle::make_shallow( *this ); }
   Handle as_lazy() const { return Handle::make_lazy( *this ); }
@@ -258,6 +265,26 @@ public:
         return as_shallow();
       case Laziness::Strict:
         return as_strict();
+    }
+    __builtin_unreachable();
+  }
+
+  Handle as_tree() const { return Handle::make_tree( *this ); }
+  Handle as_thunk() const { return Handle::make_tag( *this ); }
+  Handle as_tag() const { return Handle::make_tag( *this ); }
+  Handle with_type( ContentType type ) const
+  {
+    if ( get_content_type() == type )
+      return *this;
+    switch ( type ) {
+      case ContentType::Blob:
+        assert( false );
+      case ContentType::Tree:
+        return as_tree();
+      case ContentType::Tag:
+        return as_tag();
+      case ContentType::Thunk:
+        return as_thunk();
     }
     __builtin_unreachable();
   }
@@ -307,3 +334,5 @@ struct std::hash<Handle>
     return std::hash<uint64_t> {}( handle.get_local_id() );
   }
 };
+
+static_assert( sizeof( __m256i ) == sizeof( Handle ) );

@@ -27,7 +27,7 @@ void attach_blob( __m256i handle, wasm_rt_memory_t* target_memory )
   CHECK( blob_handle.is_strict() );
 
   target_memory->ref = blob_handle;
-  std::string_view blob;
+  Blob blob;
   if ( blob_handle.is_literal_blob() ) {
     blob = { reinterpret_cast<const char*>( &target_memory->ref ), blob_handle.literal_blob_len() };
   } else {
@@ -47,11 +47,14 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   if ( size > memory->size ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
-  Blob_ptr data { reinterpret_cast<char*>( memory->data ) };
+  auto blob = OwnedBlob::claim( {
+    reinterpret_cast<char*>( memory->data ),
+    size,
+  } );
   memory->data = NULL;
   memory->pages = 0;
   memory->size = 0;
-  return Runtime::get_instance().storage().add_blob( Blob( std::move( data ), size ) );
+  return Runtime::get_instance().storage().add_blob( std::move( blob ) );
 }
 
 __m256i create_blob_i32( uint32_t content )
@@ -68,24 +71,26 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
 
-  Tree_ptr data { reinterpret_cast<Handle*>( table->data ) };
+  auto tree = OwnedTree::claim( {
+    reinterpret_cast<Handle*>( table->data ),
+    size,
+  } );
   table->data = NULL;
   table->size = 0;
-  return Runtime::get_instance().storage().add_tree( Tree( std::move( data ), size ) );
+  return Runtime::get_instance().storage().add_tree( std::move( tree ) );
 }
 
 __m256i create_tag( __m256i handle, __m256i type )
 {
   GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
 
-  Handle new_name = Runtime::get_instance().storage().add_tag( 3 );
-  span_view<Handle> tag = Runtime::get_instance().storage().get_tree( new_name );
+  auto [tree, name] = Runtime::get_instance().storage().create_tree( 3 );
 
-  tag.mutable_data()[0] = handle;
-  tag.mutable_data()[1] = Runtime::get_instance().get_current_procedure();
-  tag.mutable_data()[2] = type;
+  tree[0] = handle;
+  tree[1] = Runtime::get_instance().get_current_procedure();
+  tree[2] = type;
 
-  return new_name;
+  return name.as_tag();
 }
 
 __m256i create_thunk( __m256i handle )

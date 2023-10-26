@@ -21,65 +21,42 @@ public:
     INFO,
     BLOBDATA,
     TREEDATA,
-    TAGDATA,
     PROPOSE_TRANSFER,
     ACCEPT_TRANSFER,
     COUNT,
   };
 
-  static constexpr const char* OPCODE_NAMES[static_cast<uint8_t>( Opcode::COUNT )] = { "RUN",
-                                                                                       "RESULT",
-                                                                                       "REQUESTINFO",
-                                                                                       "INFO",
-                                                                                       "BLOBDATA",
-                                                                                       "TREEDATA",
-                                                                                       "TAGDATA",
-                                                                                       "PROPOSE_TRANSFER",
-                                                                                       "ACCEPT_TRANSFER" };
+  static constexpr const char* OPCODE_NAMES[static_cast<uint8_t>( Opcode::COUNT )]
+    = { "RUN", "RESULT", "REQUESTINFO", "INFO", "BLOBDATA", "TREEDATA", "PROPOSE_TRANSFER", "ACCEPT_TRANSFER" };
 
   constexpr static size_t HEADER_LENGTH = sizeof( size_t ) + sizeof( Opcode );
 
 private:
   Opcode opcode_ { Opcode::COUNT };
-  std::variant<std::string, std::string_view, Blob, Tree> payload_ {};
 
 protected:
-  Message( Opcode opcode, std::variant<std::string, std::string_view, Blob, Tree>&& payload )
+  Message( Opcode opcode )
     : opcode_( opcode )
-    , payload_( std::move( payload ) )
   {}
 
 public:
-  Message() {};
-
   Opcode opcode() { return opcode_; }
 
-  std::string_view payload();
-  size_t payload_length();
+  /*   std::string_view payload(); */
+  /*   size_t payload_length(); */
 
   static Opcode opcode( std::string_view header );
-  static size_t expected_payload_length( std::string_view header );
 
-  Blob&& get_blob()
-  {
-    assert( holds_alternative<Blob>( payload_ ) );
-    return std::move( get<Blob>( payload_ ) );
-  }
+  /*   Handle get_handle() { return handle_; } */
 
-  Tree&& get_tree()
-  {
-    assert( holds_alternative<Tree>( payload_ ) );
-    return std::move( get<Tree>( payload_ ) );
-  }
+  /*   void serialize_header( std::string& out ); */
 
-  void serialize_header( std::string& out );
+  /*   Message( Message&& ) = default; */
+  /*   Message& operator=( Message&& ) = default; */
+  /*   Message( const Message& ) = delete; */
+  /*   Message& operator=( const Message& ) = delete; */
 
-  Message( Message&& ) = default;
-  Message& operator=( Message&& ) = default;
-  Message( const Message& ) = delete;
-  Message& operator=( const Message& ) = delete;
-
-  virtual ~Message() {}
+  /*   virtual ~Message() {} */
 };
 
 struct RunPayload
@@ -140,21 +117,41 @@ using MessagePayload
 
 class IncomingMessage : public Message
 {
+  std::variant<std::string_view, OwnedBlob, OwnedTree> payload_;
+
 public:
-  IncomingMessage( std::string_view header, std::string&& payload );
-  IncomingMessage( std::string_view header, Blob&& payload );
-  IncomingMessage( std::string_view header, Tree&& payload );
+  IncomingMessage( const Message::Opcode opcode, std::string_view payload );
+  IncomingMessage( const Message::Opcode opcode, OwnedBlob&& payload );
+  IncomingMessage( const Message::Opcode opcode, OwnedTree&& payload );
+
+  OwnedBlob get_blob()
+  {
+    assert( holds_alternative<OwnedBlob>( payload_ ) );
+    return std::move( get<OwnedBlob>( payload_ ) );
+  }
+
+  OwnedTree get_tree()
+  {
+    assert( holds_alternative<OwnedTree>( payload_ ) );
+    return std::move( get<OwnedTree>( payload_ ) );
+  }
+
+  static size_t expected_payload_length( std::string_view header );
+  std::variant<std::string_view, OwnedBlob, OwnedTree>& payload() { return payload_; }
 };
 
 class OutgoingMessage : public Message
 {
+  Object payload_;
+
 public:
-  OutgoingMessage() {};
-  OutgoingMessage( const Opcode opcode, std::string&& payload );
-  // Construct an non_owning data, backing data have to outlive the message
-  OutgoingMessage( const Opcode opcode, std::string_view payload );
+  OutgoingMessage( const Message::Opcode opcode, Blob payload );
+  OutgoingMessage( const Message::Opcode opcode, Tree payload );
 
   static OutgoingMessage to_message( MessagePayload&& payload );
+  std::string_view payload();
+  void serialize_header( std::string& out );
+  size_t payload_length();
 };
 
 class MessageParser
@@ -164,7 +161,7 @@ private:
 
   std::string incomplete_header_ {};
 
-  std::variant<std::string, Blob, Tree> incomplete_payload_ {};
+  std::variant<std::string, OwnedBlob, OwnedTree> incomplete_payload_ {};
   size_t completed_payload_length_ {};
 
   std::queue<IncomingMessage> completed_messages_ {};

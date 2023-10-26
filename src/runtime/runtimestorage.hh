@@ -25,7 +25,7 @@
 #define TRUSTED
 #endif
 
-using ObjectOrName = std::variant<Object, Handle>;
+using MutObjectOrName = std::variant<MutObject, Handle>;
 
 class RuntimeStorage
 {
@@ -34,57 +34,49 @@ private:
 
   std::shared_mutex storage_mutex_ {};
   // Storage for Object/Handles with a canonical name
-  absl::flat_hash_map<Handle, Object, AbslHash> canonical_storage_ {};
+  absl::flat_hash_map<Handle, MutObject, AbslHash> canonical_storage_ {};
   // Storage for Object/Handles with a local name
-  std::vector<ObjectOrName> local_storage_ {};
+  std::vector<MutObjectOrName> local_storage_ {};
 
   // Keeping track of canonical and local task handle translation
   absl::flat_hash_map<Handle, std::list<Handle>, AbslHash> canonical_to_local_cache_for_tasks_ {};
 
   // Maps a Wasm function Handle to corresponding compiled Program
-  InMemoryStorage<Program> name_to_program_ {};
   std::unordered_multimap<Handle, std::string> friendly_names_ {};
 
   template<typename T>
-  typename T::view get_object( Handle name );
+  T get_object_mut( Handle name );
+
+  template<typename T>
+  T get_object( Handle name );
+
+  void schedule( Task task );
 
   std::filesystem::path get_fix_repo();
-  std::string serialize_objects( Handle name, const std::filesystem::path& dir );
+  void serialize_objects( Handle name, const std::filesystem::path& dir );
   void deserialize_objects( const std::filesystem::path& dir );
 
 public:
-  // add blob
-  Handle add_blob( Blob&& blob );
+  Handle add_blob( OwnedBlob&& blob );
+  Handle add_tree( OwnedTree&& tree );
+
+  // Allocate a Blob and return a local Handle
+  std::tuple<MutBlob, Handle> create_blob( size_t size );
+
+  // Allocate a Tree and return a local Handle
+  std::tuple<MutTree, Handle> create_tree( size_t size );
 
   // Return reference to blob content
-  std::string_view get_blob( Handle name );
-  std::string_view user_get_blob( const Handle& name );
+  Blob get_blob( Handle name );
 
-  // add Tree
-  Handle add_tree( Tree&& tree );
-
-  // add Tag
-  Handle add_tag( Tree&& tree );
-
-  // Return reference to Tree
-  span_view<Handle> get_tree( Handle name );
-
-  // add Thunk
-  Handle add_thunk( Thunk thunk );
-
-  // Return encode name referred to by thunk
-  Handle get_thunk_encode_name( Handle thunk_name );
-
-  // Populate a program
-  void populate_program( Handle function_name );
-
-  void add_program( Handle function_name, std::string_view elf_content );
+  // Return reference to tree content
+  Tree get_tree( Handle name );
 
   Handle canonicalize( Handle handle );
 
   Task canonicalize( Task task );
 
-  std::string serialize( Handle handle );
+  void serialize( Handle handle );
   void deserialize();
 
   // Tests if the Handle (with the specified accessibility) is valid with the current contents.

@@ -1,8 +1,8 @@
+#include <span>
 #include <string>
-#include <string_view>
 
 namespace sha256 {
-std::string encode( std::string_view input );
+std::string encode( std::span<const char> input );
 
 bool verify( const std::string& ret, const std::string& input );
 }
