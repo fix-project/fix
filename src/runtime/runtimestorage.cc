@@ -174,10 +174,10 @@ Handle RuntimeStorage::canonicalize( Handle handle )
         unique_lock lock( storage_mutex_ );
         std::variant<OwnedMutObject, Handle> replacement = hash;
         std::swap( replacement, local_storage_.at( name.get_local_id() ) );
-        OwnedMutObject object = std::move( std::get<OwnedMutObject>( replacement ) );
+        OwnedMutObject mut_object = std::move( std::get<OwnedMutObject>( replacement ) );
 
         if ( !canonical_storage_.contains( hash ) ) {
-          OwnedObject object = std::move( std::get<OwnedBlob>( object ) );
+          OwnedObject object = std::move( std::get<OwnedMutBlob>( mut_object ) );
           canonical_storage_.insert_or_assign( hash, std::move( object ) );
         }
 
