@@ -60,6 +60,11 @@ public:
 
   void add_result_cache( IResultCache& cache ) override { graph_.add_result_cache( cache ); }
 
+#ifdef ENABLE_TRACING
+  absl::flat_hash_map<Task, absl::flat_hash_set<Task>> get_graph() { return graph_.get_graph(); }
+  absl::flat_hash_map<Task, Handle, absl::Hash<Task>> get_results() { return cache_.get_results(); };
+#endif
+
   Handle eval( Handle target ) { return graph_.run( Task::Eval( target ) ); }
 
   std::optional<Relation> get_task_relation( Task task ) { return cache_.get_task_relation( task ); }

@@ -11,6 +11,7 @@
 #include "http_server.hh"
 #include "mmap.hh"
 #include "operation.hh"
+#include "runtime.hh"
 #include "runtimestorage.hh"
 #include "socket.hh"
 #include "tester-utils.hh"
@@ -60,12 +61,13 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
   // add the combination to the store, and print it
   cout << "Combination:\n" << pretty_print( encode_name ) << "\n";
 
-  auto& runtime = RuntimeStorage::get_instance();
+  auto& runtime = Runtime::get_instance();
+  auto& runtime_storage = runtime.storage();
 
   // make a Thunk that points to the combination
-  Handle thunk_name = runtime.add_thunk( Thunk { encode_name } );
+  Handle thunk_name = runtime_storage.add_thunk( Thunk { encode_name } );
 
-  Handle result = runtime.eval_thunk( thunk_name );
+  Handle result = runtime.eval( thunk_name );
 
   cout << "Thunk name: " << hex_encode( thunk_name ) << endl;
   cout << "Result name: " << hex_encode( result ) << endl << flush;
@@ -74,7 +76,11 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 ptree list_dependees( Handle handle, Operation op )
 {
   ptree pt;
-  for ( auto& dependee : RuntimeStorage::get_instance().get_dependees( Task( handle, op ) ) ) {
+  auto graph = Runtime::get_instance().get_graph();
+  if (not graph.contains(Task(handle, op))) {
+    return pt;
+  }
+  for ( auto& dependee : graph.at( Task( handle, op ) ) ) {
     ptree dependee_tree;
     dependee_tree.push_back( ptree::value_type( "handle", hex_encode( dependee.handle() ) ) );
     dependee_tree.put( "operation", uint8_t( dependee.operation() ) );
@@ -90,10 +96,10 @@ ptree list_dependees( Handle handle, Operation op )
 
 ptree get_child( Handle handle, Operation operation )
 {
-  optional<Handle> result = RuntimeStorage::get_instance().get_status( Task( handle, operation ) );
+  auto results = Runtime::get_instance().get_results();
   ptree data;
-  if ( result.has_value() ) {
-    data.push_back( ptree::value_type( "handle", hex_encode( result.value() ) ) );
+  if ( results.contains( Task( handle, operation ) ) ) {
+    data.push_back( ptree::value_type( "handle", hex_encode( results.at( Task( handle, operation ) ) ) ) );
   }
 
   return data;
@@ -102,7 +108,13 @@ ptree get_child( Handle handle, Operation operation )
 ptree get_parents( Handle handle )
 {
   ptree pt;
-  vector<Task> result = RuntimeStorage::get_instance().get_parents( handle );
+  auto results = Runtime::get_instance().get_results();
+  vector<Task> result;
+  for ( auto& pair : results ) {
+    if ( pair.second == handle ) {
+      result.push_back( pair.first );
+    }
+  }
   ptree data;
   for ( auto& parent : result ) {
     ptree entry;
@@ -223,11 +235,11 @@ optional<tuple<string, string>> try_get_response( string target, string source_d
   return {};
 }
 
-struct EventCategories
+struct EventLoopCategories
 {
   size_t read, respond, write;
 
-  EventCategories( EventLoop& loop )
+  EventLoopCategories( EventLoop& loop )
     : read( loop.add_category( "socket read" ) )
     , respond( loop.add_category( "HTTP response" ) )
     , write( loop.add_category( "socket write" ) )
@@ -283,7 +295,7 @@ public:
   Connection( size_t id,
               TCPSocket&& sock,
               EventLoop& loop,
-              const EventCategories& categories,
+              const EventLoopCategories& categories,
               string source_directory )
     : sock_( std::move( sock ) )
     , id_( id )
@@ -356,7 +368,7 @@ void program_body( span_view<char*> args )
   // cerr << "Connection received from " << connection.peer_address().to_string() << "\n";
 
   EventLoop events;
-  EventCategories event_categories { events };
+  EventLoopCategories event_categories { events };
 
   list<Connection> connections;
   size_t connection_id_counter {};

@@ -129,4 +129,9 @@ public:
     cv_.wait( lock, [&] { return cache_.contains( task ); } );
     return cache_.at( task );
   }
+
+  /**
+   * Returns a copy of the whole cache.
+   */
+  absl::flat_hash_map<Task, Handle, absl::Hash<Task>> get_results() { return cache_; };
 };

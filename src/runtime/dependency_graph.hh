@@ -9,6 +9,8 @@
 #include "object.hh"
 #include "scheduler.hh"
 
+#define ENABLE_TRACING
+
 /**
  * Serves the purpose of a "blocked queue" in a conventional OS; since we know computations are deterministic, we
  * instead use a directed graph to deduplicate redundant work.
@@ -25,6 +27,9 @@ class DependencyGraph
   absl::flat_hash_set<Task> running_ {};
   absl::flat_hash_map<Task, absl::flat_hash_set<Task>> forward_dependencies_ {};
   absl::flat_hash_map<Task, absl::flat_hash_set<Task>> backward_dependencies_ {};
+#ifdef ENABLE_TRACING
+  absl::flat_hash_map<Task, absl::flat_hash_set<Task>> retained_dependencies_ {};
+#endif
 
   /**
    * Starts a Task, @p task, if and only if it has not already been started.
@@ -53,6 +58,15 @@ public:
    * @return      The result, if it's already known.
    */
   std::optional<Handle> get( Task task );
+
+#ifdef ENABLE_TRACING
+  /**
+   * Returns a copy of the forward dependency graph, from tasks to tasks which depend on them.
+   *
+   * @return   A map from tasks to a set of tasks which depend on the key.
+   */
+  absl::flat_hash_map<Task, absl::flat_hash_set<Task>> get_graph() { return retained_dependencies_; }
+#endif
 
   /**
    * Starts @p task if its result is not already known.
