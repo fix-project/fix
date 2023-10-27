@@ -324,6 +324,7 @@ inline bool operator==( Handle lhs, Handle rhs )
   return _mm256_testz_si256( pxor, pxor );
 }
 
+std::ostream& operator<<( std::ostream& s, const ContentType content_type );
 std::ostream& operator<<( std::ostream& s, const Handle handle );
 
 template<>

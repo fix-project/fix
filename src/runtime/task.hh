@@ -39,7 +39,6 @@ public:
 
   friend std::ostream& operator<<( std::ostream& s, const Task task )
   {
-    s << task.handle_ << ": ";
     switch ( task.operation() ) {
       case Operation::Apply:
         s << "Apply";
@@ -51,6 +50,7 @@ public:
         s << "Fill";
         break;
     }
+    s << "( " << task.handle_ << " )";
     return s;
   }
 
