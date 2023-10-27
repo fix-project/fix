@@ -77,7 +77,7 @@ ptree list_dependees( Handle handle, Operation op )
 {
   ptree pt;
   auto graph = Runtime::get_instance().get_graph();
-  if (not graph.contains(Task(handle, op))) {
+  if ( not graph.contains( Task( handle, op ) ) ) {
     return pt;
   }
   for ( auto& dependee : graph.at( Task( handle, op ) ) ) {
