@@ -14,15 +14,6 @@ constexpr inline bool is_span<std::span<T>> = true;
 template<typename T>
 concept any_span = is_span<T>;
 
-template<typename T>
-constexpr inline bool is_const_span = false;
-
-template<typename T>
-constexpr inline bool is_const_span<std::span<const T>> = true;
-
-template<typename T>
-concept const_span = is_const_span<T>;
-
 using Blob = std::span<const char>;
 using Tree = std::span<const Handle>;
 using Object = std::variant<Blob, Tree>;
@@ -130,30 +121,6 @@ using OwnedMutBlob = Owned<MutBlob>;
 using OwnedMutTree = Owned<MutTree>;
 using OwnedMutObject = std::variant<OwnedMutBlob, OwnedMutTree>;
 
-template<typename T>
-constexpr inline bool is_owned_mut_object = false;
-
-template<>
-constexpr inline bool is_owned_mut_object<OwnedMutBlob> = true;
-
-template<>
-constexpr inline bool is_owned_mut_object<OwnedMutTree> = true;
-
-template<typename T>
-concept owned_mut_object = is_owned_mut_object<T>;
-
 using OwnedBlob = Owned<Blob>;
 using OwnedTree = Owned<Tree>;
 using OwnedObject = std::variant<OwnedBlob, OwnedTree>;
-
-template<typename T>
-constexpr inline bool is_owned_object = false;
-
-template<>
-constexpr inline bool is_owned_object<OwnedBlob> = true;
-
-template<>
-constexpr inline bool is_owned_object<OwnedTree> = true;
-
-template<typename T>
-concept owned_object = is_owned_object<T>;
