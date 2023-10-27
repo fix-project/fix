@@ -64,10 +64,10 @@ public:
   Handle add_tree( OwnedMutTree&& tree );
 
   // Take ownership of an immutable Blob
-  Handle add_blob( OwnedBlob&& blob );
+  Handle add_blob( OwnedBlob&& blob, std::optional<Handle> name = {} );
 
   // Take ownership of an immutable Tree
-  Handle add_tree( OwnedTree&& tree );
+  Handle add_tree( OwnedTree&& tree, std::optional<Handle> name = {} );
 
   // Return reference to blob content
   Blob get_blob( Handle name );

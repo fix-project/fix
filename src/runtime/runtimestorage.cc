@@ -81,9 +81,14 @@ Handle RuntimeStorage::add_tree( OwnedMutTree&& tree )
   return Handle( local_id, size, ContentType::Tree );
 }
 
-Handle RuntimeStorage::add_blob( OwnedBlob&& blob )
+Handle RuntimeStorage::add_blob( OwnedBlob&& blob, optional<Handle> name )
 {
-  Handle handle( sha256::encode_span( Blob( blob ) ), blob.size(), ContentType::Blob );
+  Handle handle;
+  if ( name ) {
+    handle = *name;
+  } else {
+    handle = Handle( sha256::encode_span( Blob( blob ) ), blob.size(), ContentType::Blob );
+  }
   {
     unique_lock lock( storage_mutex_ );
     if ( not canonical_storage_.contains( handle ) ) {
@@ -94,9 +99,14 @@ Handle RuntimeStorage::add_blob( OwnedBlob&& blob )
   return handle;
 }
 
-Handle RuntimeStorage::add_tree( OwnedTree&& tree )
+Handle RuntimeStorage::add_tree( OwnedTree&& tree, optional<Handle> name )
 {
-  Handle handle( sha256::encode_span( Tree( tree ) ), tree.size(), ContentType::Tree );
+  Handle handle;
+  if ( name ) {
+    handle = *name;
+  } else {
+    handle = Handle( sha256::encode_span( Tree( tree ) ), tree.size(), ContentType::Blob );
+  }
   {
     unique_lock lock( storage_mutex_ );
     if ( not canonical_storage_.contains( handle ) ) {
@@ -353,12 +363,12 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
 
     switch ( name.get_content_type() ) {
       case ContentType::Blob: {
-        add_blob( OwnedBlob::from_file( file ) );
+        add_blob( OwnedBlob::from_file( file ), name );
         break;
       }
 
       case ContentType::Tree: {
-        add_tree( OwnedTree::from_file( file ) );
+        add_tree( OwnedTree::from_file( file ), name );
       }
 
       case ContentType::Thunk:
