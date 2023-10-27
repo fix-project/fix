@@ -19,9 +19,8 @@ find_program(TRUNK_EXECUTABLE, trunk)
 find_program(CARGO_EXECUTABLE, cargo)
 
 if ((NOT TRUNK_EXECUTABLE STREQUAL "TRUNK_EXECUTABLE,-NOTFOUND") AND (NOT CARGO_EXECUTABLE STREQUAL "CARGO_EXECUTABLE,-NOTFOUND") )
-  add_executable(http-tester "http-tester.cc" "tester-utils.cc")
-  target_link_libraries(http-tester ${FIXPOINT_LIBS})
-  target_link_libraries(http-tester cryptopp wasmrt absl::flat_hash_map http)
+  add_executable(http-tester "http-tester.cc" "main.cc" "tester-utils.cc")
+  target_link_libraries(http-tester runtime http)
 
   execute_process(
     COMMAND trunk build --dist "${CMAKE_BINARY_DIR}/src/tester/http-client"

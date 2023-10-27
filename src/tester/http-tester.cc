@@ -343,6 +343,9 @@ public:
   }
 };
 
+int min_args = 4;
+int max_args = -1;
+
 void program_body( span_view<char*> args )
 {
   ios::sync_with_stdio( false );
@@ -398,25 +401,25 @@ void usage_message( const char* argv0 )
   cerr << "            | ref:<ref>\n";
 }
 
-int main( int argc, char* argv[] )
-{
-  if ( argc <= 0 ) {
-    abort();
-  }
+// int main( int argc, char* argv[] )
+// {
+//   if ( argc <= 0 ) {
+//     abort();
+//   }
 
-  try {
-    if ( argc <= 2 ) {
-      usage_message( argv[0] );
-      return EXIT_FAILURE;
-    }
+//   try {
+//     if ( argc <= 2 ) {
+//       usage_message( argv[0] );
+//       return EXIT_FAILURE;
+//     }
 
-    span_view<char*> args = { argv, static_cast<size_t>( argc ) };
-    program_body( args );
-  } catch ( const exception& e ) {
-    cerr << argv[0] << ": " << e.what() << "\n\n";
-    usage_message( argv[0] );
-    return EXIT_FAILURE;
-  }
+//     span_view<char*> args = { argv, static_cast<size_t>( argc ) };
+//     program_body( args );
+//   } catch ( const exception& e ) {
+//     cerr << argv[0] << ": " << e.what() << "\n\n";
+//     usage_message( argv[0] );
+//     return EXIT_FAILURE;
+//   }
 
-  return EXIT_SUCCESS;
-}
+//   return EXIT_SUCCESS;
+// }
