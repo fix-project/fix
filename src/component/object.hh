@@ -171,9 +171,9 @@ public:
   {
     VLOG( 1 ) << "mapping " << path << " as read-only";
     size_t size = std::filesystem::file_size( path );
-    int fd = open( path.c_str(), O_RDWR );
+    int fd = open( path.c_str(), O_RDONLY );
     CHECK( fd >= 0 );
-    void* p = mmap( NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+    void* p = mmap( NULL, size, PROT_READ, MAP_SHARED, fd, 0 );
     CHECK( p );
     close( fd );
     return claim_mapped( { reinterpret_cast<pointer>( p ), size / sizeof( element_type ) } );
@@ -198,8 +198,8 @@ public:
     close( fd );
     VLOG( 2 ) << "memcpying " << reinterpret_cast<const void*>( span_.data() ) << " to " << p;
     memmove( p, const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), bytes );
-    /* VLOG( 2 ) << "mprotecting " << path; */
-    /* mprotect( p, bytes, PROT_READ ); */
+    VLOG( 2 ) << "mprotecting " << path;
+    mprotect( p, bytes, PROT_READ );
 
     // Transfer the old span to another object, which will deallocate it.
     auto discard = Owned { span_, allocation_type_ };
@@ -238,12 +238,12 @@ public:
     if ( allocation_type_ == AllocationType::Mapped ) {
       VLOG( 2 ) << "Setting allocation at " << reinterpret_cast<const void*>( span_.data() ) << " "
                 << "(" << byte_size( span_ ) << " bytes) to RO.";
-      /* int result = mprotect( */
-      /*   const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), byte_size( span_ ), PROT_READ ); */
-      /* if ( result != 0 ) { */
-      /*   perror( "mprotect" ); */
-      /*   CHECK( result == 0 ); */
-      /* } */
+      int result = mprotect(
+        const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), byte_size( span_ ), PROT_READ );
+      if ( result != 0 ) {
+        perror( "mprotect" );
+        CHECK( result == 0 );
+      }
     }
   };
 
@@ -256,12 +256,12 @@ public:
     if ( allocation_type_ == AllocationType::Mapped ) {
       VLOG( 2 ) << "Setting allocation at " << reinterpret_cast<const void*>( span_.data() ) << " "
                 << "(" << byte_size( span_ ) << " bytes) to RO.";
-      /* int result = mprotect( */
-      /*   const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), byte_size( span_ ), PROT_READ ); */
-      /* if ( result != 0 ) { */
-      /*   perror( "mprotect" ); */
-      /*   CHECK( result == 0 ); */
-      /* } */
+      int result = mprotect(
+        const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), byte_size( span_ ), PROT_READ );
+      if ( result != 0 ) {
+        perror( "mprotect" );
+        CHECK( result == 0 );
+      }
     }
     return *this;
   }
