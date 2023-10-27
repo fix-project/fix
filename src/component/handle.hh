@@ -270,7 +270,7 @@ public:
   }
 
   Handle as_tree() const { return Handle::make_tree( *this ); }
-  Handle as_thunk() const { return Handle::make_tag( *this ); }
+  Handle as_thunk() const { return Handle::make_thunk( *this ); }
   Handle as_tag() const { return Handle::make_tag( *this ); }
   Handle with_type( ContentType type ) const
   {

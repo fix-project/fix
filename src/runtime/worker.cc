@@ -11,6 +11,8 @@
 
 #include "wasm-rt-content.h"
 
+#include <glog/logging.h>
+
 using namespace std;
 
 #ifndef COMPILE
@@ -37,20 +39,27 @@ std::optional<Handle> RuntimeWorker::do_eval( Task task )
   optional<Handle> result;
 
   switch ( handle.get_content_type() ) {
-    case ContentType::Blob:
+    case ContentType::Blob: {
       return handle;
+    }
 
-    case ContentType::Tree:
+    case ContentType::Tree: {
       if ( !await_tree( task ) )
         return {};
 
       return await( Task::Fill( handle ), task );
-
-    case ContentType::Tag: {
-      return await( Task::Eval( handle.as_tree() ), task );
     }
 
-    case ContentType::Thunk:
+    case ContentType::Tag: {
+      Handle tree = handle.as_tree();
+      result = await( Task::Eval( tree ), task );
+      if ( not result )
+        return {};
+
+      return result->as_tag();
+    }
+
+    case ContentType::Thunk: {
       Handle encode = handle.as_tree();
 
       result = await( Task::Eval( encode ), task );
@@ -65,6 +74,7 @@ std::optional<Handle> RuntimeWorker::do_eval( Task task )
         result = Handle::make_shallow( result.value() );
 
       return await( Task::Eval( result.value() ), task );
+    }
   }
 
   throw std::runtime_error( "unhandled case in eval" );
@@ -73,29 +83,29 @@ std::optional<Handle> RuntimeWorker::do_eval( Task task )
 Handle RuntimeWorker::do_apply( Task task )
 {
   auto name = task.handle();
-  if ( not( name.is_strict() and name.is_tree() ) ) {
-    if ( name.is_thunk() ) {
-      throw std::runtime_error( "Attempted to apply a Thunk, not an Encode." );
-    }
-    throw std::runtime_error( "Attempted to apply something besides a strict tree." );
-  }
+  CHECK( name.is_tree() );
+  CHECK( name.is_strict() );
 
-  Tree current = storage_.get_tree( name );
+  Handle current = name;
   Handle function_tag;
+  VLOG( 3 ) << "finding procedure.";
   while ( true ) {
-    assert( current.is_tag() or current.is_tree() );
-    assert( current.size() >= 2 );
-    function_tag = current[1];
-    if ( function_tag.is_blob() ) {
-      assert( current.is_tag() );
+    VLOG( 3 ) << "looking at " << current;
+    CHECK( current.is_tag() or current.is_tree() );
+    CHECK( current.get_length() >= 2 );
+    Handle next = runtime_.storage().get_tree( current )[1];
+    if ( next.is_blob() ) {
+      VLOG( 3 ) << "found " << current << " and " << next;
+      CHECK( current.is_tag() );
+      CHECK( current.get_length() == 3 );
+      function_tag = current;
       break;
     }
-    current = storage_.get_tree( function_tag );
+    current = next;
   }
 
   auto tag = storage_.get_tree( function_tag );
-  assert( tag.is_tag() );
-  assert( tag.size() == 3 );
+  CHECK( tag.size() == 3 );
 
   const static Handle COMPILE_ELF = storage_.get_ref( "compile-elf" ).value();
   if ( tag[1] != COMPILE_ELF ) {
@@ -131,6 +141,7 @@ Handle RuntimeWorker::do_apply( Task task )
   Lambda f = (Lambda)function.data();
 
   runtime_.set_current_procedure( canonical_name );
+  VLOG( 1 ) << "jumping to " << reinterpret_cast<void*>( f );
   return f( std::addressof( runtime_ ), name );
 }
 
@@ -139,15 +150,13 @@ Handle RuntimeWorker::do_fill( Handle name )
   switch ( name.get_content_type() ) {
     case ContentType::Tree: {
       auto orig_tree = storage_.get_tree( name );
-      auto tree = OwnedMutTree::allocate( orig_tree.size() );
-
+      auto tree = OwnedMutTree::map( orig_tree.size() );
+      VLOG( 3 ) << "filling " << tree.size() << " elements";
       for ( size_t i = 0; i < tree.size(); ++i ) {
-        auto entry = orig_tree[i];
-        tree[i] = entry;
-
-        if ( entry.is_strict() and !entry.is_blob() ) {
-          tree[i] = graph_.get( Task::Eval( entry ) ).value();
-        }
+        const auto entry = orig_tree[i];
+        Handle evalled = graph_.get( Task::Eval( entry ) ).value();
+        VLOG( 3 ) << "filling " << name << "[" << i << "] = " << evalled;
+        tree[i] = evalled;
       }
 
       return storage_.add_tree( std::move( tree ) );
@@ -178,9 +187,14 @@ void RuntimeWorker::work()
   try {
     while ( true ) {
       auto task = runq_.pop_or_wait();
+      VLOG( 1 ) << "Starting " << task;
       auto result = progress( task );
-      if ( result )
+      if ( result ) {
+        VLOG( 2 ) << "Got " << task << " = " << *result;
         graph_.finish( std::move( task ), *result );
+      } else {
+        VLOG( 2 ) << "Did not finish " << task;
+      }
     }
   } catch ( ChannelClosed& ) {
     return;

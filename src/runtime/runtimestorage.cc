@@ -1,5 +1,3 @@
-#include "base64.hh"
-#include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -9,6 +7,7 @@
 
 #include <glog/logging.h>
 
+#include "base16.hh"
 #include "handle.hh"
 #include "object.hh"
 #include "operation.hh"
@@ -26,25 +25,12 @@ T RuntimeStorage::get( Handle name )
   using owned = Owned<T>;
 
   shared_lock lock( storage_mutex_ );
-  assert( name.is_local() );
+  CHECK( name.is_local() );
 
   auto& entry = local_storage_.at( name.get_local_id() );
   auto& object = std::get<OwnedMutObject>( entry );
 
   return std::get<owned>( object );
-
-  /* if ( name.is_canonical() ) { */
-  /*   return std::get<O>( canonical_storage_.at( name ) ); */
-  /* } else if ( name.is_local() ) { */
-  /*   if ( holds_alternative<Handle>( entry ) ) { */
-  /*     return std::get<T>( canonical_storage_.at( std::get<Handle>( entry ) ) ); */
-  /*   } else { */
-  /*     auto& object = std::get<OwnedMutObject>( entry ); */
-  /*     return std::get<T>( object ); */
-  /*   } */
-  /* } */
-
-  /* throw out_of_range( "Invalid handle." ); */
 }
 
 template<object T>
@@ -54,12 +40,21 @@ T RuntimeStorage::get( Handle name )
   using owned_mut = Owned<typename owned::mutable_span>;
   shared_lock lock( storage_mutex_ );
 
-  assert( name.is_local() and name.is_canonical() );
+  if constexpr ( std::is_same_v<T, Blob> ) {
+    if ( name.is_literal_blob() ) {
+      return name.literal_blob();
+    }
+  }
+
+  CHECK( name.is_local() or name.is_canonical() );
   if ( name.is_canonical() ) {
+    VLOG( 2 ) << "get " << name << ": canonical";
     return std::get<owned>( canonical_storage_.at( name ) );
   } else {
+    VLOG( 2 ) << "get " << name << ": local @ " << name.get_local_id();
     auto& entry = local_storage_.at( name.get_local_id() );
     if ( std::holds_alternative<Handle>( entry ) ) {
+      VLOG( 2 ) << "get " << name << " -> canonical @ " << std::get<Handle>( entry );
       return std::get<owned>( canonical_storage_.at( std::get<Handle>( entry ) ) );
     }
     auto& object = std::get<OwnedMutObject>( entry );
@@ -92,6 +87,7 @@ Handle RuntimeStorage::add_blob( OwnedBlob&& blob )
   {
     unique_lock lock( storage_mutex_ );
     if ( not canonical_storage_.contains( handle ) ) {
+      VLOG( 2 ) << "inserting " << handle << " as canonical";
       canonical_storage_.insert_or_assign( handle, std::move( blob ) );
     }
   }
@@ -104,6 +100,7 @@ Handle RuntimeStorage::add_tree( OwnedTree&& tree )
   {
     unique_lock lock( storage_mutex_ );
     if ( not canonical_storage_.contains( handle ) ) {
+      VLOG( 2 ) << "inserting " << handle << " as canonical";
       canonical_storage_.insert_or_assign( handle, std::move( tree ) );
     }
   }
@@ -112,7 +109,8 @@ Handle RuntimeStorage::add_tree( OwnedTree&& tree )
 
 Blob RuntimeStorage::get_blob( Handle name )
 {
-  assert( name.is_blob() );
+  VLOG( 2 ) << "get_blob " << name;
+  CHECK( name.is_blob() );
   if ( name.is_literal_blob() ) {
     return name.literal_blob();
   } else {
@@ -124,7 +122,8 @@ Blob RuntimeStorage::get_blob( Handle name )
 
 Tree RuntimeStorage::get_tree( Handle name )
 {
-  assert( not name.is_blob() );
+  VLOG( 2 ) << "get_tree " << name;
+  CHECK( not name.is_blob() );
   return get<Tree>( name );
 }
 
@@ -152,6 +151,7 @@ Handle RuntimeStorage::canonicalize( Handle handle )
 {
   VLOG( 1 ) << "canonicalizing " << handle;
   if ( handle.is_canonical() ) {
+    VLOG( 2 ) << "already canonical";
     return handle;
   }
 
@@ -161,12 +161,14 @@ Handle RuntimeStorage::canonicalize( Handle handle )
   {
     shared_lock lock( storage_mutex_ );
     if ( holds_alternative<Handle>( local_storage_.at( name.get_local_id() ) ) ) {
+      VLOG( 2 ) << "using gravestone";
       return std::get<Handle>( local_storage_.at( name.get_local_id() ) ).with_laziness( laziness );
     }
   }
 
   switch ( name.get_content_type() ) {
     case ContentType::Blob: {
+      VLOG( 2 ) << "canonicalizing blob";
       auto blob = get<Blob>( name );
       Handle hash( sha256::encode_span( blob ), blob.size(), ContentType::Blob );
 
@@ -188,6 +190,7 @@ Handle RuntimeStorage::canonicalize( Handle handle )
     }
 
     case ContentType::Tree: {
+      VLOG( 2 ) << "canonicalizing tree";
       auto orig_tree = get<Tree>( name );
 
       auto new_tree = OwnedMutTree::allocate( orig_tree.size() );
@@ -215,10 +218,12 @@ Handle RuntimeStorage::canonicalize( Handle handle )
     }
 
     case ContentType::Tag: {
+      VLOG( 2 ) << "canonicalizing tag";
       return canonicalize( handle.as_tree() ).as_tag();
     }
 
     case ContentType::Thunk: {
+      VLOG( 2 ) << "canonicalizing thunk";
       return canonicalize( handle.as_tree() ).as_thunk();
     }
 
@@ -260,35 +265,33 @@ void RuntimeStorage::serialize( Handle name )
   Handle storage = canonicalize( name );
   for ( const auto& ref : get_friendly_names( name ) ) {
     ofstream output_file { fix_dir / "refs" / ref, std::ios::trunc };
-    output_file << base64::encode( storage );
+    output_file << base16::encode( storage );
   }
   serialize_objects( name, fix_dir / "objects" );
 }
 
 void RuntimeStorage::serialize_objects( Handle name, const filesystem::path& dir )
 {
+  VLOG( 1 ) << "Serializing " << name;
   Handle new_name = canonicalize( name );
-  string file_name = base64::encode( new_name );
+  if ( new_name.is_literal_blob() )
+    return;
+  string file_name = base16::encode( new_name );
 
   switch ( new_name.get_content_type() ) {
     case ContentType::Blob: {
-      ofstream output_file( dir / file_name );
-      Blob blob = get_blob( new_name );
-      output_file.write( blob.data(), blob.size() );
-      output_file.close();
+      shared_lock lock( storage_mutex_ );
+      std::get<OwnedBlob>( canonical_storage_.at( new_name ) ).to_file( dir / file_name );
       return;
     }
 
     case ContentType::Tree: {
-      ofstream output_file( dir / file_name );
+      shared_lock lock( storage_mutex_ );
       Tree tree = get_tree( new_name );
-      for ( size_t i = 0; i < tree.size(); i++ ) {
-        serialize_objects( tree[i], dir );
+      for ( const Handle& h : tree ) {
+        serialize_objects( h, dir );
       }
-      for ( size_t i = 0; i < tree.size(); i++ ) {
-        output_file << base64::encode( tree[i] );
-      }
-      output_file.close();
+      std::get<OwnedTree>( canonical_storage_.at( new_name ) ).to_file( dir / file_name );
       return;
     }
 
@@ -304,7 +307,7 @@ void RuntimeStorage::serialize_objects( Handle name, const filesystem::path& dir
   }
 }
 
-vector<Handle> read_handles( filesystem::path file )
+Handle read_handle( filesystem::path file )
 {
   ifstream input_file( file );
   if ( !input_file.is_open() ) {
@@ -312,27 +315,23 @@ vector<Handle> read_handles( filesystem::path file )
   }
   input_file.seekg( 0, std::ios::end );
   size_t size = input_file.tellg();
-  const size_t ENCODED_HANDLE_SIZE = 43;
-  if ( size % ENCODED_HANDLE_SIZE != 0 ) {
+  if ( size != 64 ) {
     throw runtime_error( "File was an invalid size: " + file.string() + ": " + to_string( size ) );
   }
-  size_t len = size / ENCODED_HANDLE_SIZE;
-  char* buf = static_cast<char*>( alloca( ENCODED_HANDLE_SIZE ) );
   input_file.seekg( 0, std::ios::beg );
-  vector<Handle> handles;
-  for ( size_t i = 0; i < len; i++ ) {
-    input_file.read( buf, size );
-    handles.push_back( base64::decode( string_view( buf, ENCODED_HANDLE_SIZE ) ) );
-  }
-  return handles;
+  char buf[64];
+  input_file.read( buf, size );
+  Handle h = base16::decode( { buf, 64 } );
+  VLOG( 1 ) << "decoded " << string_view( buf, 64 ) << " into " << h;
+  return h;
 }
 
 void RuntimeStorage::deserialize()
 {
   const auto fix_dir = get_fix_repo();
   for ( const auto& file : filesystem::directory_iterator( fix_dir / "refs" ) ) {
-    auto handles = read_handles( file );
-    friendly_names_.insert( make_pair( handles.at( 0 ), file.path().filename() ) );
+    auto handle = read_handle( file );
+    friendly_names_.insert( make_pair( handle, file.path().filename() ) );
   }
   deserialize_objects( fix_dir / "objects" );
 }
@@ -342,7 +341,7 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
   for ( const auto& file : filesystem::directory_iterator( dir ) ) {
     if ( file.is_directory() )
       continue;
-    Handle name( base64::decode( file.path().filename().string() ) );
+    Handle name( base16::decode( file.path().filename().string() ) );
     VLOG( 2 ) << "deserializing " << file << " to " << name;
 
     if ( name.is_local() ) {
@@ -354,12 +353,12 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
 
     switch ( name.get_content_type() ) {
       case ContentType::Blob: {
-        canonicalize( add_blob( OwnedBlob::from_file( file ) ) );
+        add_blob( OwnedBlob::from_file( file ) );
         break;
       }
 
       case ContentType::Tree: {
-        canonicalize( add_tree( OwnedTree::from_file( file ) ) );
+        add_tree( OwnedTree::from_file( file ) );
       }
 
       case ContentType::Thunk:
@@ -421,7 +420,7 @@ vector<string> RuntimeStorage::get_friendly_names( Handle handle )
 string RuntimeStorage::get_encoded_name( Handle handle )
 {
   handle = handle.as_strict();
-  return base64::encode( handle );
+  return base16::encode( handle );
 }
 
 string RuntimeStorage::get_short_name( Handle handle )
@@ -452,7 +451,7 @@ optional<Handle> RuntimeStorage::get_ref( string_view ref )
   auto fix = get_fix_repo();
   auto ref_file = fix / "refs" / ref;
   if ( filesystem::exists( ref_file ) ) {
-    return read_handles( ref_file )[0];
+    return read_handle( ref_file );
   }
   return {};
 }

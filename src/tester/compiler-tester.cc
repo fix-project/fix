@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <unistd.h>
 
-/* #include "base64.hh" */
+#include "base16.hh"
 #include "runtime.hh"
 /* #include "tester-utils.hh" */
 
@@ -65,7 +65,7 @@ void program_body( span_view<char*> args )
   Handle canonical = storage.canonicalize( result );
   storage.serialize( result );
   // print the result
-  cout << "Result serialized to: " << base64::encode( canonical ) << "\n";
+  cout << "Result serialized to: " << base16::encode( canonical ) << "\n";
   if ( ref_name ) {
     cout << "Created ref: " << *ref_name << "\n";
   }

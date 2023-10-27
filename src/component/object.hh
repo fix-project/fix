@@ -108,15 +108,40 @@ public:
   using const_span = std::span<const element_type>;
 
   static Owned allocate( size_t size )
+    requires( not std::is_const_v<element_type> )
   {
+    void* p = calloc( size, sizeof( element_type ) );
+    CHECK( p );
     span_type span = {
-      reinterpret_cast<pointer>( malloc( size * sizeof( element_type ) ) ),
+      reinterpret_cast<pointer>( p ),
       size,
     };
-    VLOG( 1 ) << "allocated " << size << " bytes at " << reinterpret_cast<void*>( span.data() );
+    VLOG( 1 ) << "allocated " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
+              << reinterpret_cast<void*>( span.data() );
     return {
       span,
       AllocationType::Allocated,
+    };
+  }
+
+  static Owned map( size_t size )
+    requires( not std::is_const_v<element_type> )
+  {
+    void* p = mmap( 0, size * sizeof( element_type ), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 );
+    if ( p == (void*)-1 ) {
+      perror( "mmap: " );
+      CHECK( p != (void*)-1 );
+    }
+    CHECK( p );
+    span_type span = {
+      reinterpret_cast<pointer>( p ),
+      size,
+    };
+    VLOG( 1 ) << "mapped " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
+              << reinterpret_cast<void*>( span.data() );
+    return {
+      span,
+      AllocationType::Mapped,
     };
   }
 
@@ -144,11 +169,41 @@ public:
   {
     VLOG( 1 ) << "mapping " << path << " as read-only";
     size_t size = std::filesystem::file_size( path );
-    int fd = open( path.c_str(), O_RDONLY );
-    assert( fd >= 0 );
-    void* p = mmap( NULL, size, PROT_READ, MAP_PRIVATE, fd, 0 );
-    assert( p );
+    int fd = open( path.c_str(), O_RDWR );
+    CHECK( fd >= 0 );
+    void* p = mmap( NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+    CHECK( p );
+    close( fd );
     return claim_mapped( { reinterpret_cast<pointer>( p ), size / sizeof( element_type ) } );
+  }
+
+  void to_file( const std::filesystem::path path )
+    requires std::is_const_v<element_type>
+  {
+    VLOG( 1 ) << "writing " << path << " to disk";
+    size_t bytes = byte_size( span_ );
+    std::filesystem::resize_file( path, bytes );
+    VLOG( 2 ) << "resized " << path << " to " << bytes;
+    int fd = open( path.c_str(), O_RDWR );
+    CHECK( fd >= 0 );
+    VLOG( 2 ) << "mmapping " << path;
+    void* p = mmap( NULL, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
+    if ( p == (void*)-1 ) {
+      perror( "mmap: " );
+      CHECK( p != (void*)-1 );
+    }
+    CHECK( p );
+    close( fd );
+    VLOG( 2 ) << "memcpying " << reinterpret_cast<const void*>( span_.data() ) << " to " << p;
+    memmove( p, const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), bytes );
+    /* VLOG( 2 ) << "mprotecting " << path; */
+    /* mprotect( p, bytes, PROT_READ ); */
+
+    // Transfer the old span to another object, which will deallocate it.
+    auto discard = Owned { span_, allocation_type_ };
+
+    span_ = { reinterpret_cast<pointer>( p ), span_.size() };
+    allocation_type_ = AllocationType::Mapped;
   }
 
   Owned( Owned&& other )
@@ -181,13 +236,12 @@ public:
     if ( allocation_type_ == AllocationType::Mapped ) {
       VLOG( 2 ) << "Setting allocation at " << reinterpret_cast<const void*>( span_.data() ) << " "
                 << "(" << byte_size( span_ ) << " bytes) to RO.";
-      int result = mprotect( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ),
-                             byte_size( span_ ),
-                             PROT_READ | PROT_EXEC );
-      if ( result != 0 ) {
-        perror( "mprotect: " );
-        assert( result == 0 );
-      }
+      /* int result = mprotect( */
+      /*   const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), byte_size( span_ ), PROT_READ ); */
+      /* if ( result != 0 ) { */
+      /*   perror( "mprotect: " ); */
+      /*   CHECK( result == 0 ); */
+      /* } */
     }
   };
 
@@ -200,13 +254,12 @@ public:
     if ( allocation_type_ == AllocationType::Mapped ) {
       VLOG( 2 ) << "Setting allocation at " << reinterpret_cast<const void*>( span_.data() ) << " "
                 << "(" << byte_size( span_ ) << " bytes) to RO.";
-      int result = mprotect( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ),
-                             byte_size( span_ ),
-                             PROT_READ | PROT_EXEC );
-      if ( result != 0 ) {
-        perror( "mprotect: " );
-        assert( result == 0 );
-      }
+      /* int result = mprotect( */
+      /*   const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), byte_size( span_ ), PROT_READ ); */
+      /* if ( result != 0 ) { */
+      /*   perror( "mprotect: " ); */
+      /*   CHECK( result == 0 ); */
+      /* } */
     }
     return *this;
   }
@@ -224,13 +277,13 @@ public:
     return *this;
   }
 
-  S::value_type& operator[]( size_t index )
+  element_type& operator[]( size_t index )
   {
-    assert( index <= span_.size() );
+    CHECK( index < span_.size() );
     return span_[index];
   }
 
-  S::value_type& at( size_t index ) { return ( *this )[index]; }
+  element_type& at( size_t index ) { return ( *this )[index]; }
 
   ~Owned()
   {
