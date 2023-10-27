@@ -150,7 +150,7 @@ Handle RuntimeWorker::do_fill( Handle name )
   switch ( name.get_content_type() ) {
     case ContentType::Tree: {
       auto orig_tree = storage_.get_tree( name );
-      auto tree = OwnedMutTree::map( orig_tree.size() );
+      auto tree = OwnedMutTree::allocate( orig_tree.size() );
       VLOG( 3 ) << "filling " << tree.size() << " elements";
       for ( size_t i = 0; i < tree.size(); ++i ) {
         const auto entry = orig_tree[i];

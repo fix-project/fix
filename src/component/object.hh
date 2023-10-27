@@ -110,7 +110,7 @@ public:
   static Owned allocate( size_t size )
     requires( not std::is_const_v<element_type> )
   {
-    void* p = calloc( size, sizeof( element_type ) );
+    void* p = aligned_alloc( std::alignment_of<element_type>(), size * sizeof( element_type ) );
     CHECK( p );
     span_type span = {
       reinterpret_cast<pointer>( p ),
@@ -129,7 +129,7 @@ public:
   {
     void* p = mmap( 0, size * sizeof( element_type ), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 );
     if ( p == (void*)-1 ) {
-      perror( "mmap: " );
+      perror( "mmap" );
       CHECK( p != (void*)-1 );
     }
     CHECK( p );
@@ -147,20 +147,22 @@ public:
 
   static Owned claim_static( S span )
   {
-    VLOG( 1 ) << "claimed " << span.size() << " static bytes at " << reinterpret_cast<const void*>( span.data() );
+    VLOG( 1 ) << "claimed " << byte_size( span ) << " static bytes at "
+              << reinterpret_cast<const void*>( span.data() );
     return Owned { span, AllocationType::Static };
   }
 
   static Owned claim_allocated( S span )
   {
-    VLOG( 1 ) << "claimed " << span.size() << " allocated bytes at "
+    VLOG( 1 ) << "claimed " << byte_size( span ) << " allocated bytes at "
               << reinterpret_cast<const void*>( span.data() );
     return Owned { span, AllocationType::Allocated };
   }
 
   static Owned claim_mapped( S span )
   {
-    VLOG( 1 ) << "claimed " << span.size() << " mapped bytes at " << reinterpret_cast<const void*>( span.data() );
+    VLOG( 1 ) << "claimed " << byte_size( span ) << " mapped bytes at "
+              << reinterpret_cast<const void*>( span.data() );
     return Owned { span, AllocationType::Mapped };
   }
 
@@ -189,7 +191,7 @@ public:
     VLOG( 2 ) << "mmapping " << path;
     void* p = mmap( NULL, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 );
     if ( p == (void*)-1 ) {
-      perror( "mmap: " );
+      perror( "mmap" );
       CHECK( p != (void*)-1 );
     }
     CHECK( p );
@@ -239,7 +241,7 @@ public:
       /* int result = mprotect( */
       /*   const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), byte_size( span_ ), PROT_READ ); */
       /* if ( result != 0 ) { */
-      /*   perror( "mprotect: " ); */
+      /*   perror( "mprotect" ); */
       /*   CHECK( result == 0 ); */
       /* } */
     }
@@ -257,7 +259,7 @@ public:
       /* int result = mprotect( */
       /*   const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), byte_size( span_ ), PROT_READ ); */
       /* if ( result != 0 ) { */
-      /*   perror( "mprotect: " ); */
+      /*   perror( "mprotect" ); */
       /*   CHECK( result == 0 ); */
       /* } */
     }
