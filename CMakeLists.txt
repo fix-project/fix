@@ -49,7 +49,6 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/src/wasm-rt")
 #add_subdirectory("${PROJECT_SOURCE_DIR}/src/storage") # only headers
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/tester")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/scripts")
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/tests")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/testing/wasm-examples")

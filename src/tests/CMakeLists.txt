@@ -24,3 +24,6 @@ target_link_libraries(test-map runtime)
 
 add_executable(test-storage test-storage.cc main.cc)
 target_link_libraries(test-storage runtime)
+
+add_executable(test-self-host test-self-host.cc main.cc)
+target_link_libraries(test-self-host runtime)
