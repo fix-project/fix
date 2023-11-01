@@ -2,6 +2,7 @@
 #include <utility>
 
 #include "base64.hh"
+#include "elf.hh"
 #include "handle.hh"
 #include "operation.hh"
 #include "runtime.hh"
@@ -137,12 +138,22 @@ Handle RuntimeWorker::do_apply( Task task )
 
   Blob function = storage_.get_blob( canonical_name );
 
-  using Lambda = Handle ( * )( Runtime*, Handle );
-  Lambda f = (Lambda)function.data();
+  const void* fn = function.data();
+  const char* disasm = reinterpret_cast<const char*>( fn );
+  const auto f = reinterpret_cast<Handle ( * )( Runtime*, Handle )>( const_cast<void*>( fn ) );
+
+  cerr << hex;
+  for ( size_t i = 0; i < 10; i++ ) {
+    cerr << (int)disasm[i] << " ";
+  }
+  cerr << endl;
 
   runtime_.set_current_procedure( canonical_name );
   VLOG( 1 ) << "jumping to " << reinterpret_cast<void*>( f );
-  return f( std::addressof( runtime_ ), name );
+  Handle result = f( std::addressof( runtime_ ), name );
+  VLOG( 1 ) << "apply(" << name << ") = " << result;
+  exit( 1 );
+  return result;
 }
 
 Handle RuntimeWorker::do_fill( Handle name )

@@ -6,7 +6,6 @@
 
 #include "channel.hh"
 #include "dependency_graph.hh"
-#include "elfloader.hh"
 #include "task.hh"
 
 class Runtime;
