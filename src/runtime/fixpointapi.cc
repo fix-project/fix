@@ -1,20 +1,22 @@
-#include <glog/logging.h>
-
+#include "fixpointapi.hh"
 #include "api.hh"
 #include "base64.hh"
-#include "fixpointapi.hh"
 #include "runtime.hh"
 #include "wasm-rt.h"
+
+#include <glog/logging.h>
 
 namespace fixpoint {
 void attach_tree( w2c_fixpoint*, __m256i handle, wasm_rt_externref_table_t* target_table )
 {
+  LOG( INFO ) << "attaching " << handle;
   GlobalScopeTimer<Timer::Category::AttachTree> record_timer;
   Handle tree_handle( handle );
   CHECK( tree_handle.is_tree() or tree_handle.is_tag() );
   CHECK( tree_handle.is_strict() );
   auto tree = Runtime::get_instance().storage().get_tree( tree_handle );
-  target_table->ref = tree_handle;
+  memcpy( &target_table->ref, &tree_handle, sizeof( tree_handle ) );
+  /* target_table->ref = tree_handle; */
   target_table->data = reinterpret_cast<wasm_rt_externref_t*>( const_cast<Handle*>( tree.data() ) );
   target_table->size = tree.size();
   target_table->max_size = tree.size();
@@ -22,6 +24,7 @@ void attach_tree( w2c_fixpoint*, __m256i handle, wasm_rt_externref_table_t* targ
 
 void attach_blob( w2c_fixpoint*, __m256i handle, wasm_rt_memory_t* target_memory )
 {
+  LOG( INFO ) << "attaching " << handle;
   GlobalScopeTimer<Timer::Category::AttachBlob> record_timer;
   Handle blob_handle( handle );
   CHECK( blob_handle.is_blob() );

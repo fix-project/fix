@@ -26,6 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <glog/logging.h>
+
 #if WASM_RT_MEMCHECK_SIGNAL_HANDLER && !WASM_RT_SKIP_SIGNAL_RECOVERY && !defined( _WIN32 )
 #include <signal.h>
 #include <unistd.h>
@@ -68,6 +70,7 @@ static WASM_RT_THREAD_LOCAL wasm_rt_jmp_buf* g_unwind_target;
 
 void wasm_rt_trap( wasm_rt_trap_t code )
 {
+  LOG( INFO ) << "trapped with code " << code;
   assert( code != WASM_RT_TRAP_NONE );
 #if WASM_RT_USE_STACK_DEPTH_COUNT
   wasm_rt_call_stack_depth = wasm_rt_saved_call_stack_depth;
