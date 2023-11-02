@@ -27,6 +27,7 @@ ElfFile::ElfFile( const std::span<const char> file )
                                         static_cast<size_t>( header->e_phnum ) };
 
   for ( const auto& phdr : phdrs ) {
+    VLOG( 2 ) << "ELF Segment:";
     VLOG( 2 ) << "Type: " << phdr.p_type;
     VLOG( 2 ) << "Offset: " << phdr.p_offset;
     VLOG( 2 ) << "Flags: " << phdr.p_flags;
@@ -35,7 +36,7 @@ ElfFile::ElfFile( const std::span<const char> file )
     VLOG( 2 ) << "Memory Size: " << phdr.p_memsz;
     if ( phdr.p_type == PT_LOAD and phdr.p_offset != 0 ) {
       if ( phdr.p_vaddr != phdr.p_offset ) {
-        LOG( ERROR ) << "ELF file contains non-identity mapped segment.";
+        LOG( ERROR ) << "ELF file contains non-identity mapped segment!";
       }
     }
   }

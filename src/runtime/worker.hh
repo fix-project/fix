@@ -95,6 +95,8 @@ private:
    */
   std::optional<Handle> progress( Task task );
 
+  void setup();
+
 public:
   RuntimeWorker( size_t thread_id,
                  Runtime& runtime,

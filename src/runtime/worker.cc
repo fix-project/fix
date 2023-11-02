@@ -1,6 +1,11 @@
 #include <string_view>
 #include <utility>
 
+#include <asm/prctl.h>
+#include <sys/mman.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
 #include "base64.hh"
 #include "elf.hh"
 #include "handle.hh"
@@ -10,7 +15,7 @@
 #include "sha256.hh"
 #include "task.hh"
 
-#include "wasm-rt-content.h"
+#include "api.hh"
 
 #include <glog/logging.h>
 
@@ -136,24 +141,20 @@ Handle RuntimeWorker::do_apply( Task task )
   Handle function_name = tag[0];
   Handle canonical_name = runtime_.storage().canonicalize( function_name );
 
-  Blob function = storage_.get_blob( canonical_name );
+  Blob blob = storage_.get_blob( canonical_name );
 
-  const void* fn = function.data();
-  const char* disasm = reinterpret_cast<const char*>( fn );
-  const auto f = reinterpret_cast<Handle ( * )( Runtime*, Handle )>( const_cast<void*>( fn ) );
-
-  cerr << hex;
-  for ( size_t i = 0; i < 10; i++ ) {
-    cerr << (int)disasm[i] << " ";
-  }
-  cerr << endl;
+  const void* fn = blob.data();
+  const auto f = reinterpret_cast<unsigned long ( * )( void*, Handle )>( const_cast<void*>( fn ) );
 
   runtime_.set_current_procedure( canonical_name );
-  VLOG( 1 ) << "jumping to " << reinterpret_cast<void*>( f );
-  Handle result = f( std::addressof( runtime_ ), name );
-  VLOG( 1 ) << "apply(" << name << ") = " << result;
+
+  FixpointApi api( runtime_ );
+  VLOG( 1 ) << "jumping to " << (void*)f;
+  unsigned long result = f( api.get_context(), name );
+  VLOG( 1 ) << "context is " << api.get_context();
+  VLOG( 1 ) << "apply(" << name << ") = " << (void*)result;
   exit( 1 );
-  return result;
+  return canonical_name;
 }
 
 Handle RuntimeWorker::do_fill( Handle name )
@@ -191,9 +192,18 @@ optional<Handle> RuntimeWorker::progress( Task task )
   throw std::runtime_error( "invalid operation for progress" );
 }
 
+void RuntimeWorker::setup()
+{
+  void* scratch
+    = mmap( (void*)0, (size_t)getpagesize(), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0 );
+  CHECK( scratch != NULL );
+  syscall( SYS_arch_prctl, ARCH_SET_GS, scratch );
+}
+
 void RuntimeWorker::work()
 {
   current_thread_id_ = thread_id_;
+  setup();
 
   try {
     while ( true ) {

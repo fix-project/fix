@@ -1,12 +1,13 @@
 #include <glog/logging.h>
 
+#include "api.hh"
 #include "base64.hh"
 #include "fixpointapi.hh"
 #include "runtime.hh"
 #include "wasm-rt.h"
 
 namespace fixpoint {
-void attach_tree( __m256i handle, wasm_rt_externref_table_t* target_table )
+void attach_tree( w2c_fixpoint*, __m256i handle, wasm_rt_externref_table_t* target_table )
 {
   GlobalScopeTimer<Timer::Category::AttachTree> record_timer;
   Handle tree_handle( handle );
@@ -19,7 +20,7 @@ void attach_tree( __m256i handle, wasm_rt_externref_table_t* target_table )
   target_table->max_size = tree.size();
 }
 
-void attach_blob( __m256i handle, wasm_rt_memory_t* target_memory )
+void attach_blob( w2c_fixpoint*, __m256i handle, wasm_rt_memory_t* target_memory )
 {
   GlobalScopeTimer<Timer::Category::AttachBlob> record_timer;
   Handle blob_handle( handle );
@@ -41,7 +42,7 @@ void attach_blob( __m256i handle, wasm_rt_memory_t* target_memory )
 }
 
 // module_instance points to the WASM instance
-__m256i create_blob( wasm_rt_memory_t* memory, size_t size )
+__m256i create_blob( w2c_fixpoint*, uint32_t size, wasm_rt_memory_t* memory )
 {
   GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
   if ( size > memory->size ) {
@@ -57,13 +58,13 @@ __m256i create_blob( wasm_rt_memory_t* memory, size_t size )
   return Runtime::get_instance().storage().add_blob( std::move( blob ) );
 }
 
-__m256i create_blob_i32( uint32_t content )
+__m256i create_blob_i32( w2c_fixpoint*, uint32_t content )
 {
   GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
   return _mm256_set_epi32( 0x24'00'00'00, 0, 0, 0, 0, 0, 0, content );
 }
 
-__m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
+__m256i create_tree( w2c_fixpoint*, uint32_t size, wasm_rt_externref_table_t* table )
 {
   GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
 
@@ -80,7 +81,7 @@ __m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
   return Runtime::get_instance().storage().add_tree( std::move( tree ) );
 }
 
-__m256i create_tag( __m256i handle, __m256i type )
+__m256i create_tag( w2c_fixpoint*, __m256i handle, __m256i type )
 {
   GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
 
@@ -93,49 +94,49 @@ __m256i create_tag( __m256i handle, __m256i type )
   return Runtime::get_instance().storage().add_tree( std::move( tree ) ).as_tag();
 }
 
-__m256i create_thunk( __m256i handle )
+__m256i create_thunk( w2c_fixpoint*, __m256i handle )
 {
   Handle encode( handle );
   return Handle::get_thunk_name( encode );
 }
 
-uint32_t get_value_type( __m256i handle )
+uint32_t get_value_type( w2c_fixpoint*, __m256i handle )
 {
   Handle object( handle );
   return static_cast<uint32_t>( object.get_content_type() );
 }
 
-uint32_t equality( __m256i lhs, __m256i rhs )
+uint32_t equality( w2c_fixpoint*, __m256i lhs, __m256i rhs )
 {
   Handle left( lhs );
   Handle right( rhs );
   return Runtime::get_instance().storage().compare_handles( left, right );
 }
 
-void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
+void unsafely_log( w2c_fixpoint*, uint32_t index, uint32_t length, wasm_rt_memory_t* mem )
 {
   if ( index + length > (int64_t)mem->size ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
-  for ( int i = index; i < index + length; i++ ) {
+  for ( uint32_t i = index; i < index + length; i++ ) {
     std::cout << mem->data[i];
   }
   std::cout << std::endl;
   std::flush( std::cout );
 }
 
-uint32_t get_length( __m256i handle )
+uint32_t get_length( w2c_fixpoint*, __m256i handle )
 {
   Handle h( handle );
   CHECK( not h.is_lazy() );
   return Handle( h ).get_length();
 }
 
-uint32_t get_access( __m256i handle )
+uint32_t get_access( w2c_fixpoint*, __m256i handle )
 {
   return static_cast<uint32_t>( Handle( handle ).get_laziness() );
 }
-__m256i lower( __m256i handle )
+__m256i lower( w2c_fixpoint*, __m256i handle )
 {
   Handle h( handle );
   switch ( h.get_laziness() ) {
