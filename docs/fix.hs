@@ -31,18 +31,14 @@ instance DataId TreeId StoredTree where
 -- Thunk (a computation)
 data Name = Blob BlobId | Tree TreeId | Tag TreeId | Thunk TreeId deriving (Eq, Ord)
 
--- | Sometimes a computation doesn't need access to the full data of a Name,
--- but only an opaque reference to it that it can pass along to another
--- computation.  A Handle represents a certain access level for a certain Name.
-data Handle = Handle (Name, Accessibility) deriving (Eq, Ord)
-
--- | Strict accessibility means a running computation can see the full contents
--- of a Name, essentially calling `load` as described above.  Shallow
--- accessibility means a running computation can see certain information about
--- a Handle, including getting lazy versions of the first layer of Trees.  Lazy
+-- | A Handle represents a certain access level for a certain Name. Strict
+-- accessibility means a running computation can see the full contents of a
+-- Name, essentially calling `load` as described above.  Shallow accessibility
+-- means a running computation can see certain information about a Handle,
+-- including getting lazy versions of the first layer of Trees.  Lazy
 -- accessibility means a running computation cannot inspect a Name at all, but
 -- only include it in its result.
-data Accessibility = Lazy | Shallow | Strict deriving (Eq, Ord)
+data Handle = Strict Name | Shallow Name | Lazy Name deriving (Eq, Ord)
 
 -- | When sending the "data" of an object, we can be selective about what we
 -- send.  Lazy Handles only need the name itself, Shallow Handles only need the
@@ -66,44 +62,46 @@ size (TreeData t) = length t
 -- | Given a Handle, select the Data it represents.
 dat :: Handle -> NameData
 dat handle = case handle of
-  Handle (n, Lazy) -> JustName n
-  Handle (n, Shallow) -> NameAndSize (n, size $ deref n)
-  Handle (n, Strict) -> NameAndData (n, deref n)
+  Lazy n -> JustName n
+  Shallow (n) -> NameAndSize (n, size $ deref n)
+  Strict (n) -> NameAndData (n, deref n)
 
 -- | A core Fix operation; apply runs a computation represented by a Tree in a
 -- specified (ENCODE) format.
 apply :: Handle -> Handle
-apply (Handle (Tree _, Strict)) = undefined
+apply (Strict (Tree _)) = undefined
 
 -- | A core Fix operation; eval applies any strict or shallow Thunks within an
 -- Object.
 eval :: Handle -> Handle
 eval handle = case handle of
-  Handle (_, Lazy) -> handle
-  Handle (Blob b, _) -> handle
-  Handle (Tree t, Shallow) -> handle
-  Handle (Tag t, Shallow) -> handle
-  Handle (Thunk t, Shallow) -> eval $ shallow $ apply $ eval $ encode t
-  Handle (Tree t, Strict) -> Handle(Tree $ recurse t, Strict)
-  Handle (Tag t, Strict) -> Handle(Tag $ recurse t, Strict)
-  Handle (Thunk t, Strict) -> eval $ apply $ eval $ encode t
+  Lazy _ -> handle
+  Shallow (Blob _) -> handle
+  Shallow (Tree t) -> handle
+  Shallow (Tag t) -> handle
+  Shallow (Thunk t) -> eval $ shallow $ apply $ eval $ encode t
+  Strict (Blob _) -> handle
+  Strict (Tree t) -> Strict (Tree $ recurse t)
+  Strict (Tag t) -> Strict (Tag $ recurse t)
+  Strict (Thunk t) -> eval $ apply $ eval $ encode t
   where recurse = create . map eval . load
-        encode t = Handle(Tree t, Strict)
+        encode t = Strict (Tree t)
         shallow x = case x of
-          Handle (Tree t, Strict) -> Handle (Tree t, Shallow)
-          Handle (Tag t, Strict) -> Handle (Tag t, Shallow)
+          Strict (Tree t) -> Shallow (Tree t)
+          Strict (Tag t) -> Shallow (Tag t)
           h -> h
 
 -- | Calculates the set of Handles which are necessary to begin application of
 -- a Thunk.
 attachableSet :: Handle -> Set Handle
 attachableSet handle = case handle of
-  Handle (_, Lazy) -> Set.singleton handle
-  Handle (Thunk t, _) -> Set.insert handle $ recurse t
-  Handle (_, Shallow) -> Set.singleton $ handle
-  Handle (Blob _, Strict) -> Set.singleton $ handle
-  Handle (Tree t, Strict) -> Set.insert handle $ recurse t
-  Handle (Tag t, Strict) -> Set.insert handle $ recurse t
+  Lazy _ -> Set.singleton handle
+  Shallow (Thunk t) -> Set.insert handle $ recurse t
+  Strict (Thunk t) -> Set.insert handle $ recurse t
+  Shallow _ -> Set.singleton $ handle
+  Strict (Blob _) -> Set.singleton $ handle
+  Strict (Tree t) -> Set.insert handle $ recurse t
+  Strict (Tag t) -> Set.insert handle $ recurse t
   where recurse id = foldr
                       Set.union
                       Set.empty
@@ -124,7 +122,9 @@ reachableSet name = case name of
                       Set.union
                       Set.empty
                       (map (reachableSet . getName) $ load id)
-        getName (Handle (n, _)) = n
+        getName (Strict (n)) = n
+        getName (Shallow (n)) = n
+        getName (Lazy (n)) = n
 
 main :: IO ()
 main = do
