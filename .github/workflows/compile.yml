@@ -88,3 +88,11 @@ jobs:
         run: cmake --build out-sanitize --parallel 8
       - name: test
         run: cmake --build out-sanitize --target fixpoint-check
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: haskell-actions/setup@v2
+    - name: Compile
+      run: ghc docs/fix.hs
+
