@@ -1,2 +1,2 @@
-file (GLOB LIB_SOURCES "*.cc")
-add_library (util STATIC ${LIB_SOURCES})
+file (GLOB LIB_SOURCES *.cc)
+add_library (util STATIC ${LIB_SOURCES} hello.s)
