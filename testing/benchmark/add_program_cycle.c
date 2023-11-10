@@ -3,7 +3,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-int main( int argc __attribute((unused)), char* argv[] )
+int main( int argc __attribute( ( unused ) ), char* argv[] )
 {
   char* add_program_name = argv[1];
   int N = atoi( argv[2] );
