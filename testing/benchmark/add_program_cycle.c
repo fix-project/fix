@@ -3,11 +3,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-int main( int argc, char* argv[] )
+int main( int argc __attribute((unused)), char* argv[] )
 {
   char* add_program_name = argv[1];
   int N = atoi( argv[2] );
-  for ( int i = 0; i < N; i++ ) {
+  for ( volatile int i = 0; i < N; i++ ) {
     char const* arg1 = "a";
     char const* arg2 = "b";
     pid_t pid = vfork();

@@ -104,9 +104,12 @@ public:
   Handle( std::string_view literal_content )
   {
     assert( literal_content.size() < 32 );
+    if ( literal_content.size() ) {
+      assert( literal_content.data() );
+      __builtin_memcpy( (char*)&content_, literal_content.data(), literal_content.size() );
+    }
     // set the handle to literal
     uint8_t metadata = 0x20 | literal_content.size();
-    __builtin_memcpy( (char*)&content_, literal_content.data(), literal_content.size() );
     __builtin_memcpy( (char*)&content_ + 31, &metadata, 1 );
   }
 

@@ -58,7 +58,7 @@ jobs:
       - name: Unzip
         run: unzip bootstrap.zip
       - name: cmake
-        run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=DebugASan
+        run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=Debug -DUSE_ASAN=ON -DUSE_UBSAN=ON
       - name: compile
         run: cmake --build out-sanitize --parallel 8
       - name: test
@@ -83,7 +83,7 @@ jobs:
       - name: Unzip
         run: unzip bootstrap.zip
       - name: cmake
-        run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=DebugTSan
+        run: cmake -S . -B out-sanitize -DUSE_TSAN=ON
       - name: compile
         run: cmake --build out-sanitize --parallel 8
       - name: test
