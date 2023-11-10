@@ -36,4 +36,13 @@ public:
     vector_.push_back( std::move( value ) );
     return local_id;
   }
+
+  template<class... Args>
+  size_t emplace_back( Args&&... args )
+  {
+    std::unique_lock lock( vector_mutex_ );
+    size_t local_id = vector_.size();
+    vector_.emplace_back( args... );
+    return local_id;
+  }
 };

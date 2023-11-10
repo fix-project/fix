@@ -81,7 +81,7 @@ public:
    * @param blocked The Task to resume afterwards.
    * @return        True if all the targets are already evaluated.
    */
-  bool start_after( Tree& targets, Task& blocked );
+  bool start_after( Tree targets, Task& blocked );
 
   /**
    * Mark that @p task has been finished with the result @p handle, and resume any other Tasks which were blocked on

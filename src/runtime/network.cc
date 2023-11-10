@@ -49,20 +49,15 @@ void Remote::read_from_rb()
   rx_data_.pop( rx_messages_.parse( rx_data_.readable_region() ) );
 }
 
-void Remote::send_blob( string_view blob )
+void Remote::send_blob( Blob blob )
 {
   push_message( { Opcode::BLOBDATA, blob } );
 }
 
-void Remote::send_tree( span_view<Handle> tree )
+void Remote::send_tree( Tree tree )
 {
-  push_message(
-    { Opcode::TREEDATA, string_view( reinterpret_cast<const char*>( tree.data() ), tree.byte_size() ) } );
-}
-
-void Remote::send_tag( span_view<Handle> tag )
-{
-  push_message( { Opcode::TAGDATA, string_view( reinterpret_cast<const char*>( tag.data() ), tag.byte_size() ) } );
+  push_message( { Opcode::TREEDATA,
+                  string_view( reinterpret_cast<const char*>( tree.data() ), tree.size() * sizeof( Handle ) ) } );
 }
 
 void Remote::send_object( Handle handle )
@@ -81,11 +76,6 @@ void Remote::send_object( Handle handle )
 
       case ContentType::Tree: {
         send_tree( runtime_.storage().get_tree( handle ) );
-        break;
-      }
-
-      case ContentType::Tag: {
-        send_tag( runtime_.storage().get_tree( handle ) );
         break;
       }
 
@@ -114,13 +104,12 @@ Remote::Remote( EventLoop& events,
                 absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to,
                 shared_mutex& mutex )
   : events_( events )
-  , categories_( categories )
   , socket_( move( socket ) )
-  , index_( index )
   , msg_q_( msg_q )
+  , runtime_( runtime )
+  , index_( index )
   , reply_to_( reply_to )
   , mutex_( mutex )
-  , runtime_( runtime )
 {
   install_rule( events_.add_rule(
     categories.rx_read_data,
@@ -178,7 +167,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
   VLOG( 1 ) << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
   switch ( msg.opcode() ) {
     case Opcode::RUN: {
-      auto payload = parse<RunPayload>( msg.payload() );
+      auto payload = parse<RunPayload>( std::get<string_view>( msg.payload() ) );
       auto task = payload.task;
       {
         std::unique_lock lock( mutex_ );
@@ -205,7 +194,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::RESULT: {
-      auto payload = parse<ResultPayload>( msg.payload() );
+      auto payload = parse<ResultPayload>( std::get<string_view>( msg.payload() ) );
       pending_result_.erase( payload.task );
       runtime_.finish( std::move( payload.task ), payload.result );
       break;
@@ -218,30 +207,24 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::INFO: {
-      info_ = parse<InfoPayload>( msg.payload() );
+      info_ = parse<InfoPayload>( std::get<string_view>( msg.payload() ) );
       break;
     }
 
     case Opcode::BLOBDATA: {
       auto& storage = runtime_.storage();
-      storage.canonicalize( storage.add_blob( move( msg.get_blob() ) ) );
+      storage.canonicalize( storage.add_blob( msg.get_blob() ) );
       break;
     }
 
     case Opcode::TREEDATA: {
       auto& storage = runtime_.storage();
-      storage.canonicalize( storage.add_tree( move( msg.get_tree() ) ) );
-      break;
-    }
-
-    case Opcode::TAGDATA: {
-      auto& storage = runtime_.storage();
-      storage.canonicalize( storage.add_tag( move( msg.get_tree() ) ) );
+      storage.canonicalize( storage.add_tree( msg.get_tree() ) );
       break;
     }
 
     case Opcode::PROPOSE_TRANSFER: {
-      auto [todo, result, handles] = parse<ProposeTransferPayload>( msg.payload() );
+      auto [todo, result, handles] = parse<ProposeTransferPayload>( std::get<string_view>( msg.payload() ) );
 
       size_t original = handles.size();
       for ( auto it = handles.begin(); it != handles.end(); ) {
@@ -260,7 +243,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::ACCEPT_TRANSFER: {
-      auto [todo, result, handles] = parse<AcceptTransferPayload>( msg.payload() );
+      auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string_view>( msg.payload() ) );
 
       VLOG( 2 ) << "Sending " << handles.size() << " objects.";
       for ( const auto& h : handles ) {

@@ -287,7 +287,7 @@ void usage_message( const char* argv0 )
   cerr << "Usage: " << argv0 << " PORT entry...\n";
   cerr << "   entry :=   file:<filename>\n";
   cerr << "            | string:<string>\n";
-  cerr << "            | name:<base64-encoded name>\n";
+  cerr << "            | name:<base16-encoded name>\n";
   cerr << "            | uint<n>:<integer> (with <n> = 8 | 16 | 32 | 64)\n";
   cerr << "            | tree:<n> (followed by <n> entries)\n";
   cerr << "            | thunk: (followed by tree:<n>)\n";

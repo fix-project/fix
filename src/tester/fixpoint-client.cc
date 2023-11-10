@@ -43,7 +43,7 @@ void program_body( span_view<char*> args )
   cout << "Combination:\n" << pretty_print( encode_name ) << endl;
 
   // make a Thunk that points to the combination
-  Handle thunk_name = runtime.storage().add_thunk( Thunk { encode_name } );
+  Handle thunk_name = encode_name.as_thunk();
 
   // Wait for the handshake
   sleep( 1 );
@@ -60,7 +60,7 @@ void usage_message( const char* argv0 )
   cerr << "Usage: " << argv0 << " [+server:port]... entry...\n";
   cerr << "   entry :=   file:<filename>\n";
   cerr << "            | string:<string>\n";
-  cerr << "            | name:<base64-encoded name>\n";
+  cerr << "            | name:<base16-encoded name>\n";
   cerr << "            | uint<n>:<integer> (with <n> = 8 | 16 | 32 | 64)\n";
   cerr << "            | tree:<n> (followed by <n> entries)\n";
   cerr << "            | thunk: (followed by tree:<n>)\n";

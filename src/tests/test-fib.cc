@@ -12,7 +12,7 @@ uint32_t fix_fib( uint32_t x )
   auto& rt = Runtime::get_instance();
   Handle result = rt.eval( t );
   uint32_t y = -1;
-  memcpy( &y, result.literal_blob().data(), sizeof( uint32_t ) );
+  memcpy( &y, rt.storage().get_blob( result ).data(), sizeof( uint32_t ) );
   return y;
 }
 

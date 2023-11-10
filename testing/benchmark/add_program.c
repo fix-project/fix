@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int main( int argc __attribute((unused)), char* argv[] )
+int main( int argc __attribute( ( unused ) ), char* argv[] )
 {
   uint8_t a;
   uint8_t b;

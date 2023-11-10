@@ -16,7 +16,7 @@ void test( void )
   Tree result = rt.storage().get_tree( rt.eval( t ) );
   uint32_t results[3];
   for ( size_t i = 0; i < 3; i++ ) {
-    memcpy( &results[i], result.at( i ).literal_blob().data(), sizeof( uint32_t ) );
+    memcpy( &results[i], result[i].literal_blob().data(), sizeof( uint32_t ) );
   }
   if ( results[0] == 6 and results[1] == 10 and results[2] == 3 ) {
     exit( 0 );

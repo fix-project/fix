@@ -10,19 +10,14 @@ void test( void )
   rt.storage().deserialize();
   Tree result = rt.storage().get_tree( rt.eval( thunk( tree( {
     blob( "unused" ),
-    compile(
-      file( "applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm" ) ),
+    compile( file( "applications-prefix/src/applications-build/flatware/examples/return3/return3-fixpoint.wasm" ) ),
   } ) ) ) );
 
-  uint32_t x = -1;
-  memcpy( &x, result.at( 0 ).literal_blob().data(), sizeof( uint32_t ) );
-  if ( x != 0 ) {
-    fprintf( stderr, "Return failed, returned %d != 0\n", x );
-    exit( 1 );
-  }
-  auto out = result.at( 1 ).literal_blob();
-  if ( out != "Hello, World!" ) {
-    fprintf( stderr, "Output did not match expected 'Hello, World!'" );
+  auto blob = rt.storage().get_blob( result[0] );
+  CHECK( blob.size() == 4 );
+  uint32_t x = *( reinterpret_cast<const uint32_t*>( blob.data() ) );
+  if ( x != 3 ) {
+    fprintf( stderr, "Return failed, returned %d != 3\n", x );
     exit( 1 );
   }
 }

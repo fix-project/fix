@@ -56,7 +56,7 @@ MMap_Region& MMap_Region::operator=( MMap_Region&& other ) noexcept
 
 ReadOnlyFile::ReadOnlyFile( FileDescriptor&& fd )
   : MMap_Region( nullptr, fd.size(), PROT_READ, MAP_SHARED, fd.fd_num() )
-  , fd_( move( fd ) )
+  , fd_( std::move( fd ) )
 {}
 
 ReadOnlyFile::ReadOnlyFile( const string& filename )
@@ -66,5 +66,5 @@ ReadOnlyFile::ReadOnlyFile( const string& filename )
 
 ReadWriteFile::ReadWriteFile( FileDescriptor&& fd )
   : MMap_Region( nullptr, fd.size(), PROT_READ | PROT_WRITE, MAP_SHARED, fd.fd_num() )
-  , fd_( move( fd ) )
+  , fd_( std::move( fd ) )
 {}

@@ -25,7 +25,7 @@
 #define TRUSTED
 #endif
 
-using ObjectOrName = std::variant<Object, Handle>;
+using MutObjectOrName = std::variant<OwnedMutObject, Handle>;
 
 class RuntimeStorage
 {
@@ -34,57 +34,59 @@ private:
 
   std::shared_mutex storage_mutex_ {};
   // Storage for Object/Handles with a canonical name
-  absl::flat_hash_map<Handle, Object, AbslHash> canonical_storage_ {};
+  absl::flat_hash_map<Handle, OwnedObject, AbslHash> canonical_storage_ {};
   // Storage for Object/Handles with a local name
-  std::vector<ObjectOrName> local_storage_ {};
+  std::vector<MutObjectOrName> local_storage_ {};
 
   // Keeping track of canonical and local task handle translation
   absl::flat_hash_map<Handle, std::list<Handle>, AbslHash> canonical_to_local_cache_for_tasks_ {};
 
   // Maps a Wasm function Handle to corresponding compiled Program
-  InMemoryStorage<Program> name_to_program_ {};
+  std::unordered_map<Handle, Program> linked_programs_ {};
+
+  // Maps a Handle to its user-facing names
   std::unordered_multimap<Handle, std::string> friendly_names_ {};
 
-  template<typename T>
-  typename T::view get_object( Handle name );
+  template<mutable_object T>
+  T get( Handle name );
+
+  template<object T>
+  T get( Handle name );
+
+  void schedule( Task task );
 
   std::filesystem::path get_fix_repo();
-  std::string serialize_objects( Handle name, const std::filesystem::path& dir );
+  void serialize_objects( Handle name, const std::filesystem::path& dir );
   void deserialize_objects( const std::filesystem::path& dir );
 
+  Handle canonicalize( Handle handle, std::unique_lock<std::shared_mutex>& lock );
+
 public:
-  // add blob
-  Handle add_blob( Blob&& blob );
+  RuntimeStorage() { canonical_storage_.reserve( 1024 ); }
+
+  // Take ownership of a mutable Blob
+  Handle add_blob( OwnedMutBlob&& blob );
+
+  // Take ownership of a mutable Tree
+  Handle add_tree( OwnedMutTree&& tree );
+
+  // Take ownership of an immutable Blob
+  Handle add_blob( OwnedBlob&& blob, std::optional<Handle> name = {} );
+
+  // Take ownership of an immutable Tree
+  Handle add_tree( OwnedTree&& tree, std::optional<Handle> name = {} );
 
   // Return reference to blob content
-  std::string_view get_blob( Handle name );
-  std::string_view user_get_blob( const Handle& name );
+  Blob get_blob( const Handle& name );
 
-  // add Tree
-  Handle add_tree( Tree&& tree );
-
-  // add Tag
-  Handle add_tag( Tree&& tree );
-
-  // Return reference to Tree
-  span_view<Handle> get_tree( Handle name );
-
-  // add Thunk
-  Handle add_thunk( Thunk thunk );
-
-  // Return encode name referred to by thunk
-  Handle get_thunk_encode_name( Handle thunk_name );
-
-  // Populate a program
-  void populate_program( Handle function_name );
-
-  void add_program( Handle function_name, std::string_view elf_content );
+  // Return reference to tree content
+  Tree get_tree( Handle name );
 
   Handle canonicalize( Handle handle );
 
   Task canonicalize( Task task );
 
-  std::string serialize( Handle handle );
+  void serialize( Handle handle );
   void deserialize();
 
   // Tests if the Handle (with the specified accessibility) is valid with the current contents.
@@ -93,10 +95,10 @@ public:
   // Gets all the known friendly names for this handle.
   std::vector<std::string> get_friendly_names( Handle handle );
 
-  // Gets the base64 encoded name of the handle.
+  // Gets the base16 encoded name of the handle.
   std::string get_encoded_name( Handle handle );
 
-  // Gets the shortened base64 encoded name of the handle.
+  // Gets the shortened bbase16 encoded name of the handle.
   std::string get_short_name( Handle handle );
 
   // Gets the best name for this Handle to display to users.
@@ -147,4 +149,9 @@ public:
    * Return the local task if the Task @task has been canonicalized.
    */
   std::list<Task> get_local_tasks( Task task );
+
+  /**
+   * Links an ELF file and returns a runnable Program.
+   */
+  const Program& link( Handle handle );
 };

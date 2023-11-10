@@ -74,15 +74,16 @@ void __stack_chk_fail( void )
   cerr << "stack smashing detected." << endl;
 }
 
-Elf_Info load_program( const string_view program_content )
+Elf_Info load_program( std::span<const char> program_content )
 {
   Elf_Info res;
 
   // Check ELF magic bytes
-  if ( !program_content.starts_with( "\177ELF" ) ) {
-    if ( program_content.starts_with( "\0asm" ) ) {
-      throw std::runtime_error( "Not a valid ELF file: WebAssembly (wasm) binary module" );
-    }
+  string_view program {
+    program_content.data(),
+    program_content.size(),
+  };
+  if ( !program.starts_with( "\177ELF" ) ) {
     throw std::runtime_error( "Not a valid ELF file" );
   }
 
@@ -156,7 +157,7 @@ Elf_Info load_program( const string_view program_content )
   return res;
 }
 
-Program link_program( const string_view program_content )
+Program link_program( std::span<const char> program_content )
 {
   Elf_Info elf_info = load_program( program_content );
 
