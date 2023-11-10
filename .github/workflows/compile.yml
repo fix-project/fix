@@ -25,7 +25,7 @@ jobs:
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - name: Download release asset
-        run: gh release download v0.4 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+        run: gh release download v0.4.1 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Unzip
@@ -52,7 +52,7 @@ jobs:
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - name: Download release asset
-        run: gh release download v0.4 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+        run: gh release download v0.4.1 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Unzip
@@ -77,7 +77,7 @@ jobs:
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - name: Download release asset
-        run: gh release download v0.4 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+        run: gh release download v0.4.1 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Unzip

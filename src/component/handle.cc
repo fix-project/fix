@@ -1,22 +1,27 @@
 #include "handle.hh"
+#include "base16.hh"
 
 using namespace std;
 
-ostream& operator<<( ostream& s, const Handle handle )
+ostream& operator<<( ostream& s, const Laziness laziness )
 {
-  s << "&";
-  switch ( handle.get_laziness() ) {
+  switch ( laziness ) {
     case Laziness::Lazy:
-      s << "lazy ";
+      s << "Lazy";
       break;
     case Laziness::Shallow:
-      s << "shallow ";
+      s << "Shallow";
       break;
     case Laziness::Strict:
-      s << "strict ";
+      s << "Strict";
       break;
   }
-  switch ( handle.get_content_type() ) {
+  return s;
+}
+
+ostream& operator<<( ostream& s, const ContentType content_type )
+{
+  switch ( content_type ) {
     case ContentType::Blob:
       s << "Blob";
       break;
@@ -30,13 +35,44 @@ ostream& operator<<( ostream& s, const Handle handle )
       s << "Thunk";
       break;
   }
-  s << "(";
-  s << hex << handle.content_[0] << "|" << hex << handle.content_[1] << "|" << hex << handle.content_[2] << "|"
-    << hex << handle.content_[3];
-  s << ")";
+  return s;
+}
 
-  if ( handle.is_literal_blob() )
-    s << "!";
+string escape( std::span<const char> data )
+{
+  char chars[17] = "0123456789abcdef";
+  string x;
+  for ( char i : data ) {
+    if ( isprint( i ) ) {
+      x += i;
+    } else {
+      x += "\\x";
+      x += chars[i >> 4];
+      x += chars[i & 0xf];
+    }
+  }
+  return x;
+}
+
+ostream& operator<<( ostream& s, const Handle handle )
+{
+  s << handle.get_content_type();
+  s << " { ";
+  s << handle.get_laziness();
+  s << ", ";
+  if ( handle.is_literal_blob() ) {
+    s << "Literal=\"" << escape( handle.literal_blob() );
+    s << "\", ";
+
+  } else if ( handle.is_local() ) {
+    s << "Local=" << handle.get_local_id();
+    s << ", ";
+  } else {
+    s << "Canonical=" << base16::encode( handle );
+    s << ", ";
+  }
+  s << "Length=" << handle.get_length();
+  s << " }";
 
   return s;
 }

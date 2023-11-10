@@ -11,7 +11,7 @@ uint32_t fix_add( uint32_t a, uint32_t b, Handle add_elf )
   (void)a, (void)b;
   Handle result = rt.eval( add );
   uint32_t x = -1;
-  memcpy( &x, result.literal_blob().data(), sizeof( uint32_t ) );
+  memcpy( &x, rt.storage().get_blob( result ).data(), sizeof( uint32_t ) );
   return x;
 }
 

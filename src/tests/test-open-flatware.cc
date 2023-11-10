@@ -42,7 +42,7 @@ int run_flatware( const string& name, Handle elf, Handle home )
   auto& rt = Runtime::get_instance();
   Tree result = rt.storage().get_tree( rt.eval( exe ) );
   uint32_t code = -1;
-  memcpy( &code, result.at( 0 ).literal_blob().data(), sizeof( uint32_t ) );
+  memcpy( &code, result[0].literal_blob().data(), sizeof( uint32_t ) );
   printf( "%s returned %d\n", name.c_str(), code );
   if ( code != 0 ) {
     fprintf( stderr, "%s exited with non-zero status\n", name.c_str() );

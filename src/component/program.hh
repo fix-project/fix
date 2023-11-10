@@ -76,7 +76,7 @@ public:
 
   size_t get_instance_and_context_size() const { return instance_context_size_; }
 
-  __m256i execute( Handle encode_name )
+  __m256i execute( Handle encode_name ) const
   {
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );

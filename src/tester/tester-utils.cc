@@ -2,7 +2,7 @@
 
 #include "tester-utils.hh"
 
-#include "base64.hh"
+#include "base16.hh"
 
 using namespace std;
 
@@ -12,6 +12,23 @@ template<std::integral T>
 T to_int( const std::string_view str );
 template<std::integral T>
 T from_int( const std::string_view str );
+
+Handle make_blob( std::string_view s )
+{
+  auto& rt = Runtime::get_instance();
+  if ( s.size() < 31 ) {
+    return Handle( s );
+  } else {
+    return rt.storage().add_blob( OwnedBlob::copy( s ) );
+  }
+}
+
+template<typename T>
+Handle make_blob( T t ) requires std::is_integral_v<T>
+{
+  std::string_view s { (const char*)&t, sizeof( t ) };
+  return Handle( s );
+}
 
 /**
  * Adds the args to RuntimeStorage, loading files and creating objects as necessary.
@@ -28,24 +45,24 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
   const string_view str { args[0] };
 
   if ( str.starts_with( "file:" ) ) {
-    open_files.emplace_back( string( str.substr( 5 ) ) );
+    std::filesystem::path file( string( str.substr( 5 ) ) );
     args.remove_prefix( 1 );
-    return runtime.add_blob( static_cast<string_view>( open_files.back() ) );
+    return runtime.add_blob( OwnedBlob::from_file( file ) );
   }
 
   if ( str.starts_with( "compile:" ) ) {
-    open_files.emplace_back( string( str.substr( 8 ) ) );
+    std::filesystem::path file( string( str.substr( 8 ) ) );
     args.remove_prefix( 1 );
     if ( !deserialized ) {
       runtime.deserialize();
       deserialized = true;
     }
-    Tree compile_tree { 3 };
+    OwnedMutTree compile_tree = OwnedMutTree::allocate( 3 );
     compile_tree.at( 0 ) = Handle( "unused" );
     compile_tree.at( 1 ) = COMPILE_ENCODE;
-    Handle blob = runtime.add_blob( static_cast<string_view>( open_files.back() ) );
+    Handle blob = runtime.add_blob( OwnedBlob::from_file( file ) );
     compile_tree.at( 2 ) = blob;
-    return runtime.add_thunk( Thunk( runtime.add_tree( std::move( compile_tree ) ) ) );
+    return runtime.add_tree( std::move( compile_tree ) ).as_thunk();
   }
 
   if ( str.starts_with( "ref:" ) ) {
@@ -68,32 +85,32 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
       deserialized = true;
     }
     args.remove_prefix( 1 );
-    return base64::decode( str.substr( 5 ) );
+    return base16::decode( str.substr( 5 ) );
   }
 
   if ( str.starts_with( "string:" ) ) {
     args.remove_prefix( 1 );
-    return runtime.add_blob( str.substr( 7 ) );
+    return make_blob( str.substr( 7 ) );
   }
 
   if ( str.starts_with( "uint8:" ) ) {
     args.remove_prefix( 1 );
-    return runtime.add_blob( make_blob( to_int<uint8_t>( str.substr( 6 ) ) ) );
+    return make_blob( to_int<uint8_t>( str.substr( 6 ) ) );
   }
 
   if ( str.starts_with( "uint16:" ) ) {
     args.remove_prefix( 1 );
-    return runtime.add_blob( make_blob( to_int<uint16_t>( str.substr( 7 ) ) ) );
+    return make_blob( to_int<uint16_t>( str.substr( 7 ) ) );
   }
 
   if ( str.starts_with( "uint32:" ) ) {
     args.remove_prefix( 1 );
-    return runtime.add_blob( make_blob( to_int<uint32_t>( str.substr( 7 ) ) ) );
+    return make_blob( to_int<uint32_t>( str.substr( 7 ) ) );
   }
 
   if ( str.starts_with( "uint64:" ) ) {
     args.remove_prefix( 1 );
-    return runtime.add_blob( make_blob( to_int<uint64_t>( str.substr( 7 ) ) ) );
+    return make_blob( to_int<uint64_t>( str.substr( 7 ) ) );
   }
 
   if ( str.starts_with( "tree:" ) ) {
@@ -103,9 +120,9 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
       throw runtime_error( "not enough args to make Tree of length " + to_string( tree_size ) );
     }
 
-    Tree the_tree { tree_size };
+    OwnedMutTree the_tree = OwnedMutTree::allocate( tree_size );
     for ( uint32_t i = 0; i < tree_size; ++i ) {
-      the_tree.at( i ) = parse_args( args, open_files );
+      the_tree[i] = parse_args( args, open_files );
     }
     return runtime.add_tree( std::move( the_tree ) );
   }
@@ -118,8 +135,7 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
     }
 
     Handle tree_name = parse_args( args, open_files );
-    Thunk the_thunk( tree_name );
-    return runtime.add_thunk( the_thunk );
+    return tree_name.as_thunk();
   }
 
   throw runtime_error( "unknown object syntax: \"" + string( str ) + "\"" );
@@ -141,7 +157,7 @@ T to_int( const string_view str )
 }
 
 template<integral T>
-T from_int( const string_view str )
+T from_int( const std::span<const char> str )
 {
   T ret;
   if ( sizeof( T ) != str.size() ) {
@@ -159,10 +175,10 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
   const bool terminal
     = ( &stream == &cout and isatty( STDOUT_FILENO ) ) or ( &stream == &cerr and isatty( STDERR_FILENO ) );
   if ( pp.name.is_blob() ) {
-    const auto view = runtime.user_get_blob( pp.name );
+    const auto view = runtime.get_blob( pp.name );
     stream << ( terminal ? "\033[1;34mBlob\033[m" : "Blob" ) << " (" << dec << view.size() << " byte"
            << ( view.size() != 1 ? "s" : "" ) << "): \"";
-    for ( const unsigned char ch : view.substr( 0, 32 ) ) {
+    for ( const unsigned char ch : view.size() < 32 ? view : view.subspan( 0, 32 ) ) {
       if ( ch == '\\' ) {
         stream << "\\\\";
       } else if ( isprint( ch ) ) {
@@ -200,10 +216,10 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
       for ( unsigned int j = 0; j < pp.level + 1; ++j ) {
         stream << "  ";
       }
-      stream << to_string( i ) << ". " << pretty_print( view.at( i ), pp.level + 1 );
+      stream << to_string( i ) << ". " << pretty_print( view[i], pp.level + 1 );
     }
   } else if ( pp.name.is_thunk() ) {
-    Handle encode_name = runtime.get_thunk_encode_name( pp.name );
+    Handle encode_name = pp.name.as_tree();
     stream << ( terminal ? "\033[1;36mThunk\033[m" : "Thunk" ) << ":\n";
     for ( unsigned int i = 0; i < pp.level + 1; ++i ) {
       stream << "  ";
@@ -217,7 +233,7 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
       for ( unsigned int j = 0; j < pp.level + 1; ++j ) {
         stream << "  ";
       }
-      stream << to_string( i ) << ". " << pretty_print( view.at( i ), pp.level + 1 );
+      stream << to_string( i ) << ". " << pretty_print( view[i], pp.level + 1 );
     }
   } else {
     throw runtime_error( "can't pretty-print object" );

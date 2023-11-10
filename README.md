@@ -90,15 +90,9 @@ The `.fix` directory has the following structure (similar to `.git`):
 ```
 .fix
 ├─ objects
-|  ├─ <base64-encoded name>: contains a list of base64-encoded handles
+|  ├─ <base16-encoded name>: contains data of object
 |  └─ [...]
 ├─ refs
-|  ├─ <human-readable name>: contains single base64-encoded handle
+|  ├─ <human-readable name>: contains single base16-encoded handle
 |  └─ [...]
 ```
-
-The `refs` directory is, strictly speaking, optional; it's possible (and
-arguably better) to specify everything using content-addressed Fix names.
-However, it's pragmatically useful when debugging a Fix computation to be able
-to match specific Fix names with a semantically-meaningful string (and even
-just to know what Fix objects are semantically meaningful to the user).

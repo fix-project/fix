@@ -4,12 +4,9 @@
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-static std::vector<ReadOnlyFile> files {};
-
 static Handle thunk( Handle tree )
 {
-  auto& rt = Runtime::get_instance();
-  return rt.storage().add_thunk( Thunk( tree ) );
+  return tree.as_thunk();
 };
 
 static Handle compile( Handle wasm )
@@ -21,7 +18,7 @@ static Handle compile( Handle wasm )
     exit( 1 );
   }
 
-  Tree tree { 3 };
+  auto tree = OwnedMutTree::allocate( 3 );
   tree.at( 0 ) = Handle( "unused" );
   tree.at( 1 ) = *compiler;
   tree.at( 2 ) = wasm;
@@ -31,7 +28,7 @@ static Handle compile( Handle wasm )
 static Handle tree( std::initializer_list<Handle> elements )
 {
   auto& rt = Runtime::get_instance();
-  Tree t { static_cast<uint32_t>( elements.size() ) };
+  auto t = OwnedMutTree::allocate( static_cast<uint32_t>( elements.size() ) );
   size_t i = 0;
   for ( Handle element : elements ) {
     t.at( i++ ) = element;
@@ -42,12 +39,14 @@ static Handle tree( std::initializer_list<Handle> elements )
 static Handle blob( std::string_view contents )
 {
   auto& rt = Runtime::get_instance();
-  return rt.storage().add_blob( contents );
+  auto blob = OwnedMutBlob::allocate( contents.size() );
+  memcpy( blob.data(), contents.data(), contents.size() );
+  return rt.storage().add_blob( std::move( blob ) );
 }
 
 static Handle file( std::filesystem::path path )
 {
   auto& rt = Runtime::get_instance();
-  files.emplace_back( path );
-  return rt.storage().add_blob( std::string_view( files.back() ) );
+  OwnedBlob blob = OwnedBlob::from_file( path );
+  return rt.storage().add_blob( std::move( blob ) );
 }

@@ -1,101 +1,117 @@
 #pragma once
 
-#include <algorithm>
-#include <cstdlib>
-#include <limits>
-#include <memory>
-#include <stdexcept>
-#include <string_view>
-#include <variant>
+#include <filesystem>
+#include <span>
 
-#include "exception.hh"
 #include "handle.hh"
-#include "spans.hh"
-#include "thunk.hh"
 
 template<typename T>
-struct OptionalFree
-{
-  bool own { true };
+constexpr inline bool is_span = false;
 
-  void operator()( T* ptr ) const
-  {
-    if ( own ) {
-      free( ptr );
-    };
-  }
-};
+template<typename T>
+constexpr inline bool is_span<std::span<T>> = true;
 
-template<typename T, typename View>
-class Value
-{
-public:
-  using ptr_type = std::unique_ptr<T, OptionalFree<T>>;
-  using view = View;
+template<typename T>
+concept any_span = is_span<T>;
 
-  Value( ptr_type&& data, const uint32_t size )
-    : data_( std::move( data ) )
-    , size_( size )
-  {}
-
-  Value( View str )
-    : data_( const_cast<T*>( str.data() ) )
-    , size_( str.size() )
-  {
-    data_.get_deleter().own = false;
-    if ( str.size() > std::numeric_limits<uint32_t>::max() ) {
-      throw std::out_of_range( "Value size too big" );
-    }
-  }
-
-  Value( const uint32_t size )
-    : data_( notnull( "aligned_alloc", static_cast<T*>( aligned_alloc( alignof( T ), size * sizeof( T ) ) ) ) )
-    , size_( size )
-  {
-    /* XXX should probably not leave uninitialized */
-  }
-
-  Value( const Value& ) = delete;
-  Value& operator=( const Value& ) = delete;
-
-  Value( Value&& other ) = default;
-  Value& operator=( Value&& other ) = default;
-
-  operator View() const { return { data_.get(), size_ }; }
-  const T* data() const { return data_.get(); }
-  uint32_t size() const { return size_; }
-
-  T& at( const uint32_t N )
-  {
-    if ( N >= size() ) {
-      throw std::out_of_range( "Value::at: " + std::to_string( N ) + " >= " + std::to_string( size() ) );
-    }
-    return *( data_.get() + N );
-  }
-
-  T& operator[]( const size_t N ) const { return *( data() + N ); }
-
-private:
-  ptr_type data_;
-  uint32_t size_;
-};
-
-static_assert( sizeof( __m256i ) == sizeof( Handle ) );
-
-using Blob = Value<char, std::string_view>;
-using Tree = Value<Handle, span_view<Handle>>;
+using Blob = std::span<const char>;
+using Tree = std::span<const Handle>;
 using Object = std::variant<Blob, Tree>;
 
-using Blob_ptr = Blob::ptr_type;
-using Tree_ptr = Tree::ptr_type;
+template<typename T>
+constexpr inline bool is_object = false;
+
+template<>
+constexpr inline bool is_object<Blob> = true;
+
+template<>
+constexpr inline bool is_object<Tree> = true;
 
 template<typename T>
-Blob make_blob( const T& t )
+concept object = is_object<T>;
+
+using MutBlob = std::span<char>;
+using MutTree = std::span<Handle>;
+using MutObject = std::variant<MutBlob, MutTree>;
+
+template<typename T>
+constexpr inline bool is_mutable_object = false;
+
+template<>
+constexpr inline bool is_mutable_object<MutBlob> = true;
+
+template<>
+constexpr inline bool is_mutable_object<MutTree> = true;
+
+template<typename T>
+concept mutable_object = is_mutable_object<T>;
+
+enum class AllocationType
 {
-  Blob_ptr t_storage { static_cast<char*>( malloc( sizeof( T ) ) ) };
-  if ( not t_storage ) {
-    throw std::bad_alloc();
-  }
-  memcpy( t_storage.get(), &t, sizeof( T ) );
-  return { std::move( t_storage ), sizeof( T ) };
-}
+  Static,
+  Allocated,
+  Mapped,
+};
+
+template<any_span S>
+class Owned
+{
+  S span_;
+  AllocationType allocation_type_;
+
+  Owned( S span, AllocationType allocation_type );
+
+public:
+  using span_type = S;
+  using element_type = S::element_type;
+  using value_type = S::value_type;
+  using pointer = element_type*;
+  using reference = element_type&;
+  using const_pointer = const element_type*;
+  using const_reference = const element_type&;
+
+  using mutable_span = std::span<value_type>;
+  using const_span = std::span<const element_type>;
+
+  Owned( Owned&& other );
+
+  Owned( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>;
+
+  static Owned allocate( size_t size ) requires( not std::is_const_v<element_type> );
+  static Owned map( size_t size ) requires( not std::is_const_v<element_type> );
+
+  static Owned claim_static( S span );
+  static Owned claim_allocated( S span );
+  static Owned claim_mapped( S span );
+
+  static Owned from_file( const std::filesystem::path path ) requires std::is_const_v<element_type>;
+  void to_file( const std::filesystem::path path ) requires std::is_const_v<element_type>;
+  static Owned copy( std::span<element_type> data );
+
+  void leak();
+
+  span_type span() const { return span_; }
+  AllocationType allocation_type() const { return allocation_type_; }
+
+  pointer data() const { return span_.data(); };
+  size_t size() const { return span_.size(); };
+
+  operator span_type() const { return span(); }
+  operator const_span() const requires( not std::is_const_v<element_type> ) { return span(); }
+
+  Owned& operator=( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>;
+  Owned& operator=( Owned&& other );
+
+  element_type& operator[]( size_t index );
+  element_type& at( size_t index ) { return ( *this )[index]; }
+
+  ~Owned();
+};
+
+using OwnedMutBlob = Owned<MutBlob>;
+using OwnedMutTree = Owned<MutTree>;
+using OwnedMutObject = std::variant<OwnedMutBlob, OwnedMutTree>;
+
+using OwnedBlob = Owned<Blob>;
+using OwnedTree = Owned<Tree>;
+using OwnedObject = std::variant<OwnedBlob, OwnedTree>;

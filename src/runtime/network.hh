@@ -7,7 +7,6 @@
 #include <unordered_map>
 #include <utility>
 
-#include "base64.hh"
 #include "channel.hh"
 #include "eventloop.hh"
 #include "fixcache.hh"
@@ -41,8 +40,10 @@ class Runtime;
 class Remote : public ITaskRunner
 {
   EventLoop& events_;
-  EventCategories categories_;
   TCPSocket socket_;
+
+  MessageQueue& msg_q_;
+  Runtime& runtime_;
 
   RingBuffer rx_data_ { 8192 };
   RingBuffer tx_data_ { 8192 };
@@ -57,7 +58,6 @@ class Remote : public ITaskRunner
   std::vector<EventLoop::RuleHandle> installed_rules_ {};
 
   size_t index_ {};
-  MessageQueue& msg_q_;
 
   std::optional<ITaskRunner::Info> info_ {};
 
@@ -65,8 +65,6 @@ class Remote : public ITaskRunner
   std::shared_mutex& mutex_;
 
   bool dead_ { false };
-
-  Runtime& runtime_;
 
 public:
   Remote( EventLoop& events,
@@ -100,9 +98,8 @@ private:
   void install_rule( EventLoop::RuleHandle rule ) { installed_rules_.push_back( rule ); }
   void process_incoming_message( IncomingMessage&& msg );
 
-  void send_blob( std::string_view blob );
-  void send_tree( span_view<Handle> tree );
-  void send_tag( span_view<Handle> tag );
+  void send_blob( Blob blob );
+  void send_tree( Tree tree );
 
   void clean_up();
 };

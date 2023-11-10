@@ -12,7 +12,7 @@ uint32_t fix_add( char a, char b, Handle add_elf )
   (void)a, (void)b;
   Handle result = rt.eval( add );
   Tree tree = rt.storage().get_tree( result );
-  Handle sum = tree.at( 0 );
+  Handle sum = tree[0];
   uint32_t x = -1;
   memcpy( &x, sum.literal_blob().data(), sizeof( uint32_t ) );
   return x;
