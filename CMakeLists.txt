@@ -1,21 +1,18 @@
-cmake_minimum_required(VERSION 2.8.12)
-cmake_policy(SET CMP0048 NEW)
-cmake_policy(SET CMP0115 NEW)
-
+cmake_minimum_required(VERSION 3.16)
 project(fixpoint)
+set (CMAKE_CXX_STANDARD 20)
+set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(PkgConfig)
 find_package(Boost 1.74.0 REQUIRED COMPONENTS headers)
 pkg_search_module(GLOG REQUIRED libglog IMPORTED_TARGET glog)
 
-include(FetchContent)
-FetchContent_Declare(
-  absl
-  GIT_REPOSITORY https://github.com/abseil/abseil-cpp
-  GIT_TAG        20230802.1
-  )
+include(etc/sanitizers.cmake)
+add_compile_options(-march=znver2) # for AVX2
+
 set(ABSL_PROPAGATE_CXX_STD on)
-FetchContent_MakeAvailable(absl)
+add_subdirectory(${PROJECT_SOURCE_DIR}/third-party/abseil-cpp)
+include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/third-party/abseil-cpp")
 
 include(ExternalProject)
 ExternalProject_Add(applications
@@ -25,12 +22,11 @@ ExternalProject_Add(applications
   )
 
 include(etc/build_type.cmake)
-include(etc/cflags.cmake)
+add_compile_options(-Wall -Wpedantic -Werror -Wextra)
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Weffc++>)
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-unqualified-std-cast-call>)
 include(etc/clang_format.cmake)
 include(etc/tests.cmake)
-
-include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-src")
-include_directories(SYSTEM "${CMAKE_BINARY_DIR}/_deps/absl-build")
 
 include_directories("${PROJECT_SOURCE_DIR}/src/util")
 include_directories("${PROJECT_SOURCE_DIR}/src/http")

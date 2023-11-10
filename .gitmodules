@@ -7,3 +7,6 @@
 [submodule "third-party/concurrentqueue"]
 	path = third-party/concurrentqueue
 	url = https://github.com/cameron314/concurrentqueue
+[submodule "third-party/abseil-cpp"]
+	path = third-party/abseil-cpp
+	url = https://github.com/abseil/abseil-cpp

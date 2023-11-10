@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 2.8.12)
 cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0115 NEW)
 
-include(FetchContent)
-
 # defines functions link_libc, link_storage, link_wasi_stubs
 include(../util/cmake_helper_functions.cmake)
 
