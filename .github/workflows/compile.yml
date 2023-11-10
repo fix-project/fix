@@ -11,83 +11,54 @@ jobs:
         run: sudo apt update && sudo apt install clang-format
       - name: run clang-format
         run: ./etc/clang-format-diff.sh
-  build-ubuntu:
+  ci:
       runs-on: ubuntu-latest
       container: ghcr.io/fix-project/wasm_toolchain_docker:latest
+      strategy:
+        matrix:
+          sanitizer: [normal, asan, ubsan, tsan]
+          type: [debug, release]
       steps:
       - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
       - name: install deps
-        run: sudo apt update && sudo apt-get install libboost-all-dev libgoogle-glog-dev -y
+        run: sudo apt update && sudo apt-get install libboost-all-dev libgoogle-glog-dev software-properties-common -y
+      - name: install g++ 13
+        run: sudo add-apt-repository 'ppa:ubuntu-toolchain-r/test' && sudo apt update && sudo apt-get install gcc-13 g++-13 -y
       - name: install gh
         run: sudo apt install gh unzip -y
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
-      - name: Download release asset
-        run: gh release download v0.4.1 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Unzip
-        run: unzip bootstrap.zip
-      - name: Print directory structure
-        run: ls -R -a
+      - if: matrix.sanitizer == 'asan'
+        name: enable address sanitizer
+        run: echo "sanitize_flags=-DUSE_ASAN=ON" >> "$GITHUB_ENV"
+      - if: matrix.sanitizer == 'ubsan'
+        name: enable undefined-behavior sanitizer
+        run: echo "sanitize_flags=-DUSE_UBSAN=ON" >> "$GITHUB_ENV"
+      - if: matrix.sanitizer == 'tsan'
+        name: enable thread sanitizer
+        run: echo "sanitize_flags=-DUSE_TSAN=ON" >> "$GITHUB_ENV"
+      - if: matrix.type == 'debug'
+        name: configure debug build
+        run: echo "configure_flags=-DCMAKE_BUILD_TYPE=Debug" >> "$GITHUB_ENV"
+      - if: matrix.type == 'release'
+        name: configure release build
+        run: echo "configure_flags=-DCMAKE_BUILD_TYPE=Release" >> "$GITHUB_ENV"
       - name: cmake
-        run: cmake -S . -B out
+        run: cmake -S . -B out ${configure_flags} ${sanitize_flags} -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13
       - name: compile
         run: cmake --build out --parallel 8
+      - name: download bootstrap seed
+        run: gh release download v0.4.1 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: unzip bootstrap seed
+        run: unzip bootstrap.zip
+      - name: print directory structure
+        run: ls -R -a
       - name: test
         run: cmake --build out --target fixpoint-check
-  sanitize-ASan:
-      runs-on: ubuntu-latest
-      container: ghcr.io/fix-project/wasm_toolchain_docker:latest
-      steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-      - name: install deps
-        run: sudo apt update && sudo apt-get install libboost-all-dev libgoogle-glog-dev -y
-      - name: install gh
-        run: sudo apt install gh unzip -y
-      - shell: bash
-        run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
-      - name: Download release asset
-        run: gh release download v0.4.1 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Unzip
-        run: unzip bootstrap.zip
-      - name: cmake
-        run: cmake -S . -B out-sanitize -DCMAKE_BUILD_TYPE=Debug -DUSE_ASAN=ON -DUSE_UBSAN=ON
-      - name: compile
-        run: cmake --build out-sanitize --parallel 8
-      - name: test
-        run: cmake --build out-sanitize --target fixpoint-check
-  sanitize-TSan:
-      runs-on: ubuntu-latest
-      container: ghcr.io/fix-project/wasm_toolchain_docker:latest
-      steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-      - name: install deps
-        run: sudo apt update && sudo apt-get install libboost-all-dev libgoogle-glog-dev -y
-      - name: install gh
-        run: sudo apt install gh unzip -y
-      - shell: bash
-        run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
-      - name: Download release asset
-        run: gh release download v0.4.1 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Unzip
-        run: unzip bootstrap.zip
-      - name: cmake
-        run: cmake -S . -B out-sanitize -DUSE_TSAN=ON
-      - name: compile
-        run: cmake --build out-sanitize --parallel 8
-      - name: test
-        run: cmake --build out-sanitize --target fixpoint-check
   typecheck-spec:
     runs-on: ubuntu-latest
     steps:
@@ -95,4 +66,3 @@ jobs:
     - uses: haskell-actions/setup@v2
     - name: Compile
       run: ghc docs/fix.hs
-
