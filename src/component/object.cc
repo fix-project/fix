@@ -186,6 +186,7 @@ template<any_span S>
 Owned<S>& Owned<S>::operator=( Owned&& other )
 {
   this->span_ = other.span_;
+  this->allocation_type_ = other.allocation_type_;
   other.leak();
   return *this;
 }
