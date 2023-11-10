@@ -19,7 +19,7 @@ externref map( externref resource_limits, externref main_blob, uint32_t arr[], u
   }
 
   externref arg_blob = create_blob_i32( arg_1 );
-  for ( int i = 0; i < arr_size; i++ ) {
+  for ( uint32_t i = 0; i < arr_size; i++ ) {
     old_size = grow_rw_table_0( 4, resource_limits );
     if ( old_size == -1 ) {
       return resource_limits;

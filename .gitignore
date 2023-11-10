@@ -2,3 +2,5 @@
 /.ccls-cache
 .fix/
 /.cache
+/boot
+cmake-build-debug

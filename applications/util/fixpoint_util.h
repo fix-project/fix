@@ -10,6 +10,8 @@ extern externref create_blob_i32( int32_t number )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_blob_i32" ) ) );
 extern externref create_thunk( externref pointer )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_thunk" ) ) );
+extern externref create_tag( externref object, externref blob )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_tag" ) ) );
 extern void fixpoint_unsafe_io( const char* s, int32_t size )
   __attribute__( ( import_module( "fixpoint" ), import_name( "unsafe_io" ) ) );
 

@@ -4,6 +4,7 @@ cmake_policy(SET CMP0115 NEW)
 
 project(applications)
 add_subdirectory(util)
+add_subdirectory(curry)
 add_subdirectory(map)
 add_subdirectory(flatware)
 add_subdirectory(scheduler)
