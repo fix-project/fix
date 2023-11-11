@@ -103,12 +103,14 @@ public:
                  RuntimeStorage& storage,
                  Channel<Task>& runq )
     : runq_( runq )
-    , thread_( std::bind( &RuntimeWorker::work, this ) )
+    , thread_()
     , thread_id_( thread_id )
     , runtime_( runtime )
     , graph_( graph )
     , storage_( storage )
   {}
+
+  void start() { thread_ = std::thread( std::bind( &RuntimeWorker::work, this ) ); }
 
   ~RuntimeWorker()
   {
