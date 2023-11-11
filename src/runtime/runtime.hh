@@ -26,12 +26,14 @@ public:
   Runtime()
     : cache_()
     , storage_()
-    , workers_( std::make_shared<WorkerPool>( RUNTIME_THREADS, *this, graph_, storage_ ) )
+    , workers_( std::make_shared<WorkerPool>( RUNTIME_THREADS ) )
     , scheduler_( workers_ )
     , graph_( cache_, scheduler_ )
     , network_( *this )
   {
     graph_.add_result_cache( network_ );
+    network_.start();
+    workers_->start( *this, graph_, storage_ );
   }
 
   static Runtime& get_instance()
@@ -69,4 +71,10 @@ public:
   Address start_server( const Address& address ) { return network_.start_server( address ); }
 
   void connect( const Address& address ) { network_.connect( address ); }
+
+  ~Runtime()
+  {
+    workers_->stop();
+    network_.stop();
+  }
 };

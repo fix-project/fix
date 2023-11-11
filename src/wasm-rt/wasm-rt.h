@@ -56,6 +56,8 @@ extern "C" {
 #define WASM_RT_THREAD_LOCAL __declspec( thread )
 #elif defined( __STDC_VERSION__ ) && ( __STDC_VERSION__ >= 201112L )
 #define WASM_RT_THREAD_LOCAL _Thread_local
+#elif defined( __cplusplus )
+#define WASM_RT_THREAD_LOCAL thread_local
 #else
 #define WASM_RT_THREAD_LOCAL
 #endif

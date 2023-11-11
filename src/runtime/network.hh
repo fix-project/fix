@@ -110,7 +110,7 @@ private:
   EventCategories categories_ {};
 
   EventLoop events_ {};
-  std::thread network_thread_;
+  std::thread network_thread_ {};
   std::atomic<bool> should_exit_ = false;
 
   Channel<TCPSocket> listening_sockets_ {};
@@ -131,14 +131,17 @@ private:
 
 public:
   NetworkWorker( Runtime& runtime )
-    : network_thread_( std::bind( &NetworkWorker::run_loop, this ) )
-    , runtime_( runtime ) {};
+    : runtime_( runtime ) {};
 
-  ~NetworkWorker()
+  void start() { network_thread_ = std::thread( std::bind( &NetworkWorker::run_loop, this ) ); }
+
+  void stop()
   {
     should_exit_ = true;
     network_thread_.join();
   }
+
+  ~NetworkWorker() {}
 
   Address start_server( const Address& address )
   {
