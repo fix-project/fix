@@ -9,6 +9,7 @@ add_test(NAME t_add WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/te
 add_test(NAME t_fib WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib)
 add_test(NAME t_trap WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh)
 add_test(NAME t_map WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-map)
+add_test(NAME t_distributed WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-distributed)
 
 add_test(NAME t_add_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add-flatware)
 add_test(NAME t_open_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-open-flatware)

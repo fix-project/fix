@@ -207,6 +207,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::INFO: {
+      std::unique_lock lock( info_mutex_ );
       info_ = parse<InfoPayload>( std::get<string>( msg.payload() ) );
       break;
     }

@@ -6,6 +6,8 @@
 class Scheduler : public ITaskRunner
 {
   Channel<Task> to_be_scheduled_ {};
+
+  std::shared_mutex runners_mutex_ {};
   std::list<std::weak_ptr<ITaskRunner>> runners_;
   std::thread scheduler_thread_;
 
@@ -17,7 +19,11 @@ public:
     , scheduler_thread_( std::bind( &Scheduler::schedule, this ) )
   {}
 
-  void add_task_runner( std::weak_ptr<ITaskRunner> runner ) { runners_.emplace_back( runner ); }
+  void add_task_runner( std::weak_ptr<ITaskRunner> runner )
+  {
+    std::unique_lock lock( runners_mutex_ );
+    runners_.emplace_back( runner );
+  }
 
   std::optional<Handle> start( Task&& task ) override
   {
