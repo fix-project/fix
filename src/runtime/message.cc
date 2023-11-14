@@ -6,9 +6,9 @@
 
 using namespace std;
 
-IncomingMessage::IncomingMessage( const Message::Opcode opcode, std::string_view payload )
+IncomingMessage::IncomingMessage( const Message::Opcode opcode, string&& payload )
   : Message( opcode )
-  , payload_( payload )
+  , payload_( std::move( payload ) )
 {}
 
 IncomingMessage::IncomingMessage( const Message::Opcode opcode, OwnedMutBlob&& payload )
@@ -27,6 +27,11 @@ OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, Blob payload )
 {}
 
 OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, Tree payload )
+  : Message( opcode )
+  , payload_( payload )
+{}
+
+OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, string&& payload )
   : Message( opcode )
   , payload_( payload )
 {}
