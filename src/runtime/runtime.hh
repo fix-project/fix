@@ -7,10 +7,6 @@
 #include "scheduler.hh"
 #include "worker_pool.hh"
 
-#ifndef RUNTIME_THREADS
-#define RUNTIME_THREADS std::thread::hardware_concurrency()
-#endif
-
 class Runtime : IRuntime
 {
   FixCache cache_;
@@ -23,10 +19,10 @@ class Runtime : IRuntime
   static inline thread_local Handle current_procedure_;
 
 public:
-  Runtime()
+  Runtime( size_t runtime_threads )
     : cache_()
     , storage_()
-    , workers_( std::make_shared<WorkerPool>( RUNTIME_THREADS ) )
+    , workers_( std::make_shared<WorkerPool>( runtime_threads ) )
     , scheduler_( workers_ )
     , graph_( cache_, scheduler_ )
     , network_( *this )
@@ -36,9 +32,9 @@ public:
     workers_->start( *this, graph_, storage_ );
   }
 
-  static Runtime& get_instance()
+  static Runtime& get_instance( size_t runtime_threads = std::thread::hardware_concurrency() )
   {
-    static Runtime runtime;
+    static Runtime runtime( runtime_threads );
     return runtime;
   }
 

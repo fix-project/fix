@@ -19,7 +19,7 @@ void program_body( span_view<char*> args )
 
   args.remove_prefix( 1 ); // ignore argv[ 0 ]
 
-  auto& runtime = Runtime::get_instance();
+  auto& runtime = Runtime::get_instance( RUNTIME_THREADS );
 
   while ( not args.empty() and args[0][0] == '+' ) {
     string addr( &args[0][1] );

@@ -17,6 +17,8 @@ void Scheduler::schedule()
 
       size_t i = 0;
       size_t selected = 0;
+
+      std::unique_lock lock( runners_mutex_ );
       for ( auto it = runners_.begin(); it != runners_.end(); ) {
         if ( auto p = it->lock() ) {
           uint32_t cores = p->get_info().value_or( ITaskRunner::Info { .parallelism = 0 } ).parallelism;

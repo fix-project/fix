@@ -3,6 +3,7 @@
 #include <concurrentqueue/concurrentqueue.h>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -59,6 +60,7 @@ class Remote : public ITaskRunner
 
   size_t index_ {};
 
+  std::shared_mutex info_mutex_ {};
   std::optional<ITaskRunner::Info> info_ {};
 
   absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to_;
@@ -77,7 +79,11 @@ public:
           std::shared_mutex& mutex );
 
   std::optional<Handle> start( Task&& task ) override;
-  std::optional<ITaskRunner::Info> get_info() override { return info_; }
+  std::optional<ITaskRunner::Info> get_info() override
+  {
+    std::shared_lock lock( info_mutex_ );
+    return info_;
+  }
 
   void push_message( OutgoingMessage&& msg );
 
