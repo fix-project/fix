@@ -167,7 +167,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
   VLOG( 1 ) << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
   switch ( msg.opcode() ) {
     case Opcode::RUN: {
-      auto payload = parse<RunPayload>( std::get<string_view>( msg.payload() ) );
+      auto payload = parse<RunPayload>( std::get<string>( msg.payload() ) );
       auto task = payload.task;
       {
         std::unique_lock lock( mutex_ );
@@ -194,7 +194,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::RESULT: {
-      auto payload = parse<ResultPayload>( std::get<string_view>( msg.payload() ) );
+      auto payload = parse<ResultPayload>( std::get<string>( msg.payload() ) );
       pending_result_.erase( payload.task );
       runtime_.finish( std::move( payload.task ), payload.result );
       break;
@@ -207,7 +207,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::INFO: {
-      info_ = parse<InfoPayload>( std::get<string_view>( msg.payload() ) );
+      info_ = parse<InfoPayload>( std::get<string>( msg.payload() ) );
       break;
     }
 
@@ -224,7 +224,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::PROPOSE_TRANSFER: {
-      auto [todo, result, handles] = parse<ProposeTransferPayload>( std::get<string_view>( msg.payload() ) );
+      auto [todo, result, handles] = parse<ProposeTransferPayload>( std::get<string>( msg.payload() ) );
 
       size_t original = handles.size();
       for ( auto it = handles.begin(); it != handles.end(); ) {
@@ -243,7 +243,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::ACCEPT_TRANSFER: {
-      auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string_view>( msg.payload() ) );
+      auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string>( msg.payload() ) );
 
       VLOG( 2 ) << "Sending " << handles.size() << " objects.";
       for ( const auto& h : handles ) {

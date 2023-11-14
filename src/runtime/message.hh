@@ -103,10 +103,10 @@ using MessagePayload
 
 class IncomingMessage : public Message
 {
-  std::variant<std::string_view, OwnedMutBlob, OwnedMutTree> payload_;
+  std::variant<std::string, OwnedMutBlob, OwnedMutTree> payload_;
 
 public:
-  IncomingMessage( const Message::Opcode opcode, std::string_view payload );
+  IncomingMessage( const Message::Opcode opcode, std::string&& payload );
   IncomingMessage( const Message::Opcode opcode, OwnedMutBlob&& payload );
   IncomingMessage( const Message::Opcode opcode, OwnedMutTree&& payload );
 
@@ -128,11 +128,12 @@ public:
 
 class OutgoingMessage : public Message
 {
-  Object payload_;
+  std::variant<Blob, Tree, std::string> payload_ {};
 
 public:
   OutgoingMessage( const Message::Opcode opcode, Blob payload );
   OutgoingMessage( const Message::Opcode opcode, Tree payload );
+  OutgoingMessage( const Message::Opcode opcode, std::string&& payload );
 
   static OutgoingMessage to_message( MessagePayload&& payload );
   std::string_view payload();
