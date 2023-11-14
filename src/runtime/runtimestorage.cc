@@ -398,9 +398,10 @@ bool RuntimeStorage::contains( Handle handle )
 
   shared_lock lock( storage_mutex_ );
 
-  if ( handle.is_thunk() ) {
+  if ( handle.is_thunk() || handle.is_tag() ) {
     return RuntimeStorage::contains( handle.as_tree() );
   }
+
   switch ( handle.get_laziness() ) {
     case Laziness::Lazy:
       return true;
@@ -484,7 +485,6 @@ void RuntimeStorage::visit( Handle handle, function<void( Handle )> visitor )
   } else {
     switch ( handle.get_content_type() ) {
       case ContentType::Tree:
-      case ContentType::Tag:
         if ( contains( handle ) ) {
           for ( const auto& element : get_tree( handle ) ) {
             visit( handle.is_shallow() ? element.as_lazy() : element, visitor );
@@ -496,6 +496,7 @@ void RuntimeStorage::visit( Handle handle, function<void( Handle )> visitor )
         visitor( handle );
         break;
       case ContentType::Thunk:
+      case ContentType::Tag:
         visit( handle.as_tree(), visitor );
         visitor( handle );
         break;
