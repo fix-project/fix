@@ -56,7 +56,7 @@ private:
   void schedule( Task task );
 
   std::filesystem::path get_fix_repo();
-  void serialize_objects( Handle name, const std::filesystem::path& dir );
+  void serialize_object( Handle name, const std::filesystem::path& dir );
   void deserialize_objects( const std::filesystem::path& dir );
 
   Handle canonicalize( Handle handle, std::unique_lock<std::shared_mutex>& lock );
@@ -88,6 +88,8 @@ public:
 
   void serialize( Handle handle );
   void deserialize();
+
+  void serialize( Relation relation );
 
   // Tests if the Handle (with the specified accessibility) is valid with the current contents.
   bool contains( Handle handle );

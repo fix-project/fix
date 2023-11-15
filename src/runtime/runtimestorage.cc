@@ -179,7 +179,17 @@ Handle RuntimeStorage::canonicalize( Handle handle, unique_lock<shared_mutex>& l
 
   if ( holds_alternative<Handle>( local_storage_.at( name.get_local_id() ) ) ) {
     VLOG( 2 ) << "using gravestone";
-    return std::get<Handle>( local_storage_.at( name.get_local_id() ) ).with_laziness( laziness );
+    switch ( handle.get_content_type() ) {
+      case ContentType::Blob:
+      case ContentType::Tree:
+        return std::get<Handle>( local_storage_.at( name.get_local_id() ) ).with_laziness( laziness );
+
+      case ContentType::Tag:
+        return std::get<Handle>( local_storage_.at( name.get_local_id() ) ).with_laziness( laziness ).as_tag();
+
+      case ContentType::Thunk:
+        return std::get<Handle>( local_storage_.at( name.get_local_id() ) ).with_laziness( laziness ).as_thunk();
+    }
   }
 
   switch ( name.get_content_type() ) {
@@ -277,48 +287,86 @@ void RuntimeStorage::serialize( Handle name )
     ofstream output_file { fix_dir / "refs" / ref, std::ios::trunc };
     output_file << base16::encode( storage );
   }
-  serialize_objects( name, fix_dir / "objects" );
+  visit( name, std::bind( &RuntimeStorage::serialize_object, this, placeholders::_1, fix_dir / "objects" ) );
 }
 
-void RuntimeStorage::serialize_objects( Handle name, const filesystem::path& dir )
+void RuntimeStorage::serialize_object( Handle name, const filesystem::path& dir )
 {
   VLOG( 1 ) << "Serializing " << name;
   Handle new_name = canonicalize( name );
   if ( new_name.is_literal_blob() )
     return;
   string file_name = base16::encode( new_name );
-  if ( new_name.is_literal_blob() ) {
-    return;
-  }
 
   switch ( new_name.get_content_type() ) {
-    case ContentType::Blob: {
-      shared_lock lock( storage_mutex_ );
-      if ( not std::filesystem::exists( dir / file_name ) )
-        std::get<OwnedBlob>( canonical_storage_.at( new_name ) ).to_file( dir / file_name );
-      return;
-    }
-
+    case ContentType::Blob:
     case ContentType::Tree: {
-      shared_lock lock( storage_mutex_ );
-      Tree tree = get_tree( new_name );
-      for ( const Handle& h : tree ) {
-        serialize_objects( h, dir );
-      }
       if ( not std::filesystem::exists( dir / file_name ) )
-        std::get<OwnedTree>( canonical_storage_.at( new_name ) ).to_file( dir / file_name );
+        std::visit( [&]( auto& arg ) -> void { arg.to_file( dir / file_name ); },
+                    canonical_storage_.at( new_name ) );
       return;
     }
 
     case ContentType::Tag:
     case ContentType::Thunk: {
-      Handle tree = name.as_tree();
-      serialize_objects( tree, dir );
       return;
     }
 
     default:
       throw runtime_error( "Unknown content type." );
+  }
+}
+
+void RuntimeStorage::serialize( Relation relation )
+{
+  VLOG( 1 ) << "Serializing " << relation << endl;
+  switch ( relation.task().operation() ) {
+    case Operation::Fill:
+      return;
+
+    case Operation::Eval: {
+      const auto fix_dir = get_fix_repo();
+      switch ( relation.task().handle().get_content_type() ) {
+        case ContentType::Blob:
+          return;
+
+        default:
+          Handle canonical_handle = canonicalize( relation.task().handle() );
+          Handle canonical_result = canonicalize( relation.handle() );
+          VLOG(1) << "Serializing eval " << canonical_handle << " --> " << canonical_result << endl;
+          string file_name = base16::encode( canonical_handle );
+          if ( not std::filesystem::exists( fix_dir / "relations" ) ) {
+            std::filesystem::create_directory( fix_dir / "relations" );
+          }
+          if ( not std::filesystem::exists( fix_dir / "relations" / "eval" ) ) {
+            std::filesystem::create_directory( fix_dir / "relations" / "eval" );
+          }
+          if ( not std::filesystem::exists( fix_dir / "relations" / "eval" / file_name ) ) {
+             ofstream output_file( fix_dir / "relations" / "eval" / file_name );
+             output_file << base16::encode( canonical_result );
+          }
+          return;
+       }
+    }
+
+    case Operation::Apply: {
+      const auto fix_dir = get_fix_repo();
+      Handle tree_name = Handle::name_only( canonicalize( relation.task().handle() ) );
+      Handle result_handle = canonicalize( relation.handle() );
+      VLOG(1) << "Serializing apply " << tree_name << " --> " << result_handle << endl;
+      string file_name = base16::encode( tree_name);
+      if ( not std::filesystem::exists( fix_dir / "relations" ) ) {
+        std::filesystem::create_directory( fix_dir / "relations" );
+      }
+      if ( not std::filesystem::exists( fix_dir / "relations" / "apply" ) ) {
+        std::filesystem::create_directory( fix_dir / "relations" / "apply" );
+      }
+      if ( not std::filesystem::exists( fix_dir / "relations" / "apply" / file_name ) ) {
+        ofstream output_file( fix_dir / "relations" / "apply" / file_name );
+        output_file << base16::encode( result_handle );
+      }
+      return;
+                           }
   }
 }
 
@@ -368,21 +416,22 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
 
     switch ( name.get_content_type() ) {
       case ContentType::Blob: {
-        add_blob( OwnedBlob::from_file( file ), name );
-        break;
-      }
+                                add_blob( OwnedBlob::from_file( file ), name );
+                                break;
+                              }
 
       case ContentType::Tree: {
-        add_tree( OwnedTree::from_file( file ), name );
-      }
+                                add_tree( OwnedTree::from_file( file ), name );
+                                break;
+                              }
 
       case ContentType::Thunk:
       case ContentType::Tag: {
-        break;
-      }
+                               break;
+                             }
 
       default:
-        break;
+                             break;
     }
   }
 }
@@ -520,27 +569,9 @@ bool RuntimeStorage::compare_handles( Handle x, Handle y )
 
 bool RuntimeStorage::complete( Handle handle )
 {
-  if ( not contains( handle ) ) {
-    return false;
-  }
-  if ( handle.is_lazy() ) {
-    return true;
-  }
-  switch ( handle.get_content_type() ) {
-    case ContentType::Blob:
-      return contains( handle );
-    case ContentType::Thunk:
-      return complete( handle.as_tree() );
-    case ContentType::Tree:
-    case ContentType::Tag: {
-      bool full = true;
-      for ( const auto& element : get_tree( handle ) ) {
-        full |= handle.is_shallow() ? contains( element ) : complete( element );
-      }
-      return full;
-    }
-  }
-  __builtin_unreachable();
+  bool res {};
+  visit( handle, [&]( Handle h ) { res |= contains( h ); } );
+  return res;
 }
 
 std::vector<Handle> RuntimeStorage::minrepo( Handle handle )

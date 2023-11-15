@@ -3,6 +3,7 @@
 #include "dependency_graph.hh"
 #include "interface.hh"
 #include "network.hh"
+#include "relation.hh"
 #include "runtimestorage.hh"
 #include "scheduler.hh"
 #include "worker_pool.hh"
@@ -17,6 +18,8 @@ class Runtime : IRuntime
   NetworkWorker network_;
 
   static inline thread_local Handle current_procedure_;
+
+  void visit( Relation root, std::function<void( Relation )> visitor );
 
 public:
   Runtime( size_t runtime_threads )
@@ -58,6 +61,8 @@ public:
 
   Handle eval( Handle target ) { return graph_.run( Task::Eval( target ) ); }
 
+  std::optional<Relation> get_relation( Task task ) { return cache_.get_relation( task ); }
+
   void set_current_procedure( Handle handle ) { current_procedure_ = handle; }
 
   Handle get_current_procedure() { return current_procedure_; }
@@ -73,4 +78,6 @@ public:
     workers_->stop();
     network_.stop();
   }
+
+  void serialize( Task task );
 };

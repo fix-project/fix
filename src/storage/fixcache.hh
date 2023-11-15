@@ -11,6 +11,9 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/hash/hash.h"
+#include "handle.hh"
+#include "operation.hh"
+#include "relation.hh"
 #include "task.hh"
 
 #include "interface.hh"
@@ -63,6 +66,19 @@ public:
     std::shared_lock lock( mutex_ );
     if ( cache_.contains( task ) )
       return cache_.at( task );
+    return {};
+  }
+
+  std::optional<Relation> get_relation( Task task )
+  {
+    std::shared_lock lock( mutex_ );
+    if ( cache_.contains( task ) )
+      return Relation( task, cache_.at( task ) );
+
+    if ( task.operation() == Operation::Eval && task.handle().is_blob() ) {
+      return Relation( task, task.handle() );
+    }
+
     return {};
   }
 

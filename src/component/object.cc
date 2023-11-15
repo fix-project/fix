@@ -101,7 +101,7 @@ void Owned<S>::to_file( const std::filesystem::path path ) requires std::is_cons
   VLOG( 1 ) << "writing " << path << " to disk";
   size_t bytes = span_.size_bytes();
   CHECK( not std::filesystem::exists( path ) );
-  int fd = open( path.c_str(), O_RDWR | O_CREAT | O_TRUNC, O_RDWR );
+  int fd = open( path.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
   CHECK( fd >= 0 );
   int status = ftruncate( fd, bytes );
   CHECK( status == 0 );
