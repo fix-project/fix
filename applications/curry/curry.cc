@@ -12,6 +12,13 @@ enum VALUE_TYPE
   Tag
 };
 
+/**
+ * @brief Runs a curried function 
+ * 
+ * @param resource_limits - current resource_limits
+ * @param joined_encode - tree containing (in order) initial resource_limits, current program, program to run, number of required arguments, and arguments
+ * @return externref - result of running the program, or resource_limits if the program was aborted
+ */
 externref run( externref resource_limits, externref joined_encode )
 {
 
@@ -36,6 +43,12 @@ externref run( externref resource_limits, externref joined_encode )
   return create_thunk( create_tree_rw_table_0( num_args + 2 ) );
 }
 
+/**
+ * @brief Applies the provided arguments to a curried function
+ * 
+ * @param encode - the program being run, with a sub_encode as the second argument
+ * @return externref - the curried function if a partial apply, the result of running the program if a full apply, or resource_limits if the program was aborted
+ */
 externref apply( externref encode )
 {
 
@@ -72,6 +85,12 @@ externref apply( externref encode )
   return joined_encode;
 }
 
+/**
+ * @brief Converts a function into a curried function, or applies the arguments to a curried function
+ * @details Passes the function to curry or the curried function as the 1st argument. 
+ *  If creating a curried function, passes the number of arguments as the 2nd argument. If applying arguments, passes the arguments as all subsequent arguments.
+ * @return externref - a callable curried function, resource_limits if the program was aborted, or the
+ */
 __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply( externref encode )
 {
   attach_tree_ro_table_0( encode );
