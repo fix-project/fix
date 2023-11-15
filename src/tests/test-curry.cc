@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-#include "../tester/tester-utils.cc"
 #include "test.hh"
 
 using namespace std;
