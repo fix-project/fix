@@ -59,14 +59,19 @@ public:
    */
   std::optional<Handle> get( Task task );
 
-#ifdef ENABLE_TRACING
   /**
    * Returns a copy of the forward dependency graph, from tasks to tasks which depend on them.
+   * Returns an empty map if ENABLE_TRACING is not defined.
    *
    * @return   A map from tasks to a set of tasks which depend on the key.
    */
-  absl::flat_hash_map<Task, absl::flat_hash_set<Task>> get_graph() { return retained_dependencies_; }
+  absl::flat_hash_map<Task, absl::flat_hash_set<Task>> get_graph()
+  {
+#ifdef ENABLE_TRACING
+    std::shared_lock lock( mutex_ );
+    return retained_dependencies_;
 #endif
+  }
 
   /**
    * Starts @p task if its result is not already known.
