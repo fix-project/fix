@@ -1,8 +1,21 @@
 # Fix Viewer
 
-[![Build Status](https://github.com/tweoss/fix-viewer/workflows/CI/badge.svg)](https://github.com/tweoss/fix-viewer/actions?workflow=CI)
+## Running
 
-## Testing locally
+If the `BUILD_VISUALIZER` cmake cache variable is set, e.g. with `-DBUILD_VISUALIZER` when configure the build directory,
+`cmake` will attempt to build the viewer to a website. Then, running the `http-tester`, for example with
+`http-tester 9090 ~/fix/build/src/tester/http-client/` will serve the viewer on the given port.
+
+If developing on a remote machine, such as stagecast, and viewing from a local machine, like a laptop, ssh port forwarding
+must be setup to access the http-tester's server. This can be accomplished with `ssh -L 9090:127.0.0.1:9090 stagecast.org`.
+
+Visiting `127.0.0.1` on your local machine should then show the viewer.
+
+## Building Locally
+
+You can also build and run the viewer instead of through `cmake` as a native application. 
+
+### Native
 
 Make sure you are using the latest version of stable rust by running `rustup update`.
 
@@ -16,9 +29,12 @@ On Fedora Rawhide you need to run:
 
 `dnf install clang clang-devel clang-tools-extra libxkbcommon-devel pkg-config openssl-devel libxcb-devel gtk3-devel atk fontconfig-devel`
 
-## Web Locally
+### Web
 
-You can compile your app to [WASM](https://en.wikipedia.org/wiki/WebAssembly) and publish it as a web page.
+There are CORS restrictions that prevent making queries to Fixpoint's API from a page hosted on a different port number.
+Therefore, serving the viewer on a local machine as opposed to from the `http-tester` prevents making requests to the API.
+
+You can still build and preview the viewer, however, wih the steps below.
 
 We use [Trunk](https://trunkrs.dev/) to build for web target.
 1. Install Trunk with `cargo install --locked trunk`.
