@@ -367,9 +367,6 @@ void program_body( span_view<char*> args )
   args.remove_prefix( 3 );
   kick_off( args, open_files );
 
-  // TCPSocket connection = server_socket.accept();
-  // cerr << "Connection received from " << connection.peer_address().to_string() << "\n";
-
   EventLoop events;
   EventLoopCategories event_categories { events };
 
@@ -400,26 +397,3 @@ void usage_message( const char* argv0 )
   cerr << "            | compile:<filename>\n";
   cerr << "            | ref:<ref>\n";
 }
-
-// int main( int argc, char* argv[] )
-// {
-//   if ( argc <= 0 ) {
-//     abort();
-//   }
-
-//   try {
-//     if ( argc <= 2 ) {
-//       usage_message( argv[0] );
-//       return EXIT_FAILURE;
-//     }
-
-//     span_view<char*> args = { argv, static_cast<size_t>( argc ) };
-//     program_body( args );
-//   } catch ( const exception& e ) {
-//     cerr << argv[0] << ": " << e.what() << "\n\n";
-//     usage_message( argv[0] );
-//     return EXIT_FAILURE;
-//   }
-
-//   return EXIT_SUCCESS;
-// }
