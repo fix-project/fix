@@ -15,12 +15,12 @@ target_link_libraries(compiler-tester runtime)
 add_executable(fixpoint-server "fixpoint-server.cc" "main.cc" "tester-utils.cc")
 target_link_libraries(fixpoint-server runtime)
 
-find_program(TRUNK_EXECUTABLE, trunk)
-find_program(CARGO_EXECUTABLE, cargo)
+add_executable(http-tester "http-tester.cc" "main.cc" "tester-utils.cc")
+target_link_libraries(http-tester runtime http)
 
-if ((NOT TRUNK_EXECUTABLE STREQUAL "TRUNK_EXECUTABLE,-NOTFOUND") AND (NOT CARGO_EXECUTABLE STREQUAL "CARGO_EXECUTABLE,-NOTFOUND") )
-  add_executable(http-tester "http-tester.cc" "main.cc" "tester-utils.cc")
-  target_link_libraries(http-tester runtime http)
+if (BUILD_VISUALIZER)
+  find_program(TRUNK_EXECUTABLE, trunk)
+  find_program(CARGO_EXECUTABLE, cargo)
 
   execute_process(
     COMMAND trunk build --dist "${CMAKE_BINARY_DIR}/src/tester/http-client"
