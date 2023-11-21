@@ -117,7 +117,6 @@ impl Element {
         (center, zoom): (PlotPoint, f64),
         shapes: &mut Vec<Shape>,
     ) {
-        let transform = transform;
         let scale_transform = |pos: Pos2| -> Pos2 {
             Pos2::new(
                 (pos.x as f64 * transform.dpos_dvalue_x() * zoom) as f32,

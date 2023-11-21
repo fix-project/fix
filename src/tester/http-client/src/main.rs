@@ -4,14 +4,20 @@
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    use tokio::runtime::Runtime;
+
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
+    // Initialize a tokio runtime.
+    let rt = Runtime::new().unwrap();
     let native_options = eframe::NativeOptions::default();
-    eframe::run_native(
-        "Fix Viewer",
-        native_options,
-        Box::new(|cc| Box::new(fix_viewer::App::new(cc))),
-    )
+    rt.block_on(async move {
+        eframe::run_native(
+            "Fix Viewer",
+            native_options,
+            Box::new(|cc| Box::new(fix_viewer::App::new(cc))),
+        )
+    })
 }
 
 // When compiling to web using trunk:
