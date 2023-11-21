@@ -4,24 +4,24 @@ extern "C" {
 #include <cstdint>
 #include <string>
 
-enum VALUE_TYPE
+typedef enum VALUE_TYPE
 {
   Tree,
   Thunk,
   Blob,
   Tag
-};
+} VALUE_TYPE;
 
 /**
- * @brief Runs a curried function 
- * 
+ * @brief Runs a curried function
+ *
  * @param resource_limits - current resource_limits
- * @param joined_encode - tree containing (in order) initial resource_limits, current program, program to run, number of required arguments, and arguments
+ * @param joined_encode - tree containing (in order) initial resource_limits, current program, program to run,
+ * number of required arguments, and arguments
  * @return externref - result of running the program, or resource_limits if the program was aborted
  */
 externref run( externref resource_limits, externref joined_encode )
 {
-
   attach_tree_ro_table_0( joined_encode );
   externref curried_resource_limits = get_ro_table_0( 0 );
   externref program = get_ro_table_0( 2 );
@@ -45,13 +45,13 @@ externref run( externref resource_limits, externref joined_encode )
 
 /**
  * @brief Applies the provided arguments to a curried function
- * 
+ *
  * @param encode - the program being run, with a sub_encode as the second argument
- * @return externref - the curried function if a partial apply, the result of running the program if a full apply, or resource_limits if the program was aborted
+ * @return externref - the curried function if a partial apply, the result of running the program if a full apply,
+ * or resource_limits if the program was aborted
  */
 externref apply( externref encode )
 {
-
   attach_tree_ro_table_0( encode );
 
   externref resource_limits = get_ro_table_0( 0 );
@@ -87,16 +87,19 @@ externref apply( externref encode )
 
 /**
  * @brief Converts a function into a curried function, or applies the arguments to a curried function
- * @details Passes the function to curry or the curried function as the 1st argument. 
- *  If creating a curried function, passes the number of arguments as the 2nd argument. If applying arguments, passes the arguments as all subsequent arguments.
- * @return externref - a callable curried function, resource_limits if the program was aborted, or the
+ * @details Passes the function to curry or the curried function as the 1st argument.
+ *  If creating a curried function, passes the number of arguments as the 2nd argument. If applying arguments,
+ * passes the arguments as all subsequent arguments.
+ * @return externref - a callable curried function, resource_limits if the program was aborted, or a full apply if
+ * enough arguments are provided
  */
 __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply( externref encode )
 {
   attach_tree_ro_table_0( encode );
-  if ( get_value_type( get_ro_table_0( 1 ) ) == Tag ) { // Un-curried function
+
+  if ( get_value_type( get_ro_table_0( 1 ) ) == VALUE_TYPE::Tag ) { // Initial (unwrapped) call
     return encode;
   }
-  
+
   return apply( encode );
 }
