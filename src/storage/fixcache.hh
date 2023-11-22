@@ -133,8 +133,9 @@ public:
   /**
    * Returns a copy of the whole cache.
    */
-  absl::flat_hash_map<Task, Handle, absl::Hash<Task>> get_results() { 
+  absl::flat_hash_map<Task, Handle, absl::Hash<Task>> get_results()
+  {
     std::shared_lock lock( mutex_ );
-    return cache_; 
+    return cache_;
   };
 };
