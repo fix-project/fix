@@ -62,10 +62,9 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
   cout << "Combination:\n" << pretty_print( encode_name ) << "\n";
 
   auto& runtime = Runtime::get_instance();
-  auto& runtime_storage = runtime.storage();
 
   // make a Thunk that points to the combination
-  Handle thunk_name = runtime_storage.add_thunk( Thunk { encode_name } );
+  Handle thunk_name = encode_name.as_thunk();
 
   Handle result = runtime.eval( thunk_name );
 
