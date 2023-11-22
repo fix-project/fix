@@ -87,7 +87,7 @@ pub(crate) fn get_parents(
         handle.clone(),
         format!("http://{url_base}/parents?handle={}", handle.to_hex()),
         |json: JsonResponse| {
-            let Some(json_parents )= json.parents else {
+            let Some(json_parents) = json.parents else {
                 return Ok(Response::Parents(None));
             };
             Ok(Response::Parents(Some(

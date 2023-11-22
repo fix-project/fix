@@ -138,7 +138,6 @@ impl GraphsContainer {
     }
 
     pub fn merge_dependees(&mut self, ui: &Ui, index: usize, dependees: Vec<Task>) {
-        log::error!("{:?}", dependees);
         self.progress.merge_dependees(ui, index, dependees);
     }
 

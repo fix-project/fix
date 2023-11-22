@@ -31,7 +31,10 @@ impl Default for Storage {
     fn default() -> Self {
         Self {
             url: String::new(),
-            target: Handle::from_hex("0-0-0-2400000000000000").unwrap(),
+            target: Handle::from_hex(
+                "1000000000000000000000000000000000000000000000000000000000000024",
+            )
+            .unwrap(),
             operation: Operation::Eval,
         }
     }
@@ -190,18 +193,19 @@ impl eframe::App for App {
                 match http_result.2 {
                     Ok(Response::Parents(tasks)) => {
                         if let Some(tasks) = tasks {
-                            log::info!("Received tasks {:?}", tasks);
+                            log::info!("Received parents {:?}", tasks);
                             graph.as_mut().unwrap().set_parents(ui, handle, tasks);
                         }
                     }
                     Ok(Response::Child(child)) => {
                         if let Some(child) = child {
+                            log::info!("Received child {:?}", child);
                             graph.as_mut().unwrap().set_child(ui, index, child);
                         }
                     }
                     Ok(Response::Dependees(tasks)) => {
-                        log::error!("received response tasks, {:?}", tasks);
                         if let Some(tasks) = tasks {
+                            log::info!("Received dependees {:?}", tasks);
                             graph.as_mut().unwrap().merge_dependees(ui, index, tasks);
                         }
                     }

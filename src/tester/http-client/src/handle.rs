@@ -1,4 +1,7 @@
-use std::{convert::TryFrom, fmt::Display};
+use std::{
+    convert::TryFrom,
+    fmt::{Display, Write},
+};
 
 use anyhow::{bail, ensure, Context, Result};
 
@@ -62,26 +65,15 @@ pub(crate) enum Object {
 }
 
 impl Handle {
-    /// Parses a handle in format [unsigned 64 bit number as hex]-[u64 as hex]-[u64 as hex]-[u64 as hex].
-    /// For example, d9-0-4-0 or 10-0-0-2400000000000000.
-    /// Also takes d9|0|4|0 for compatibility with fixpoint handle formatting.
-    pub(crate) fn from_hex(input: &str) -> Result<Self> {
-        let handle_content = input
-            .split(|c| c == '-' || c == '|')
-            .map(|i| u64::from_str_radix(i, 16))
-            .collect::<Result<Vec<_>, _>>()
-            .context("Failed to parse handle from hex")?;
-        ensure!(
-            handle_content.len() == 4,
-            "Expected handle with exactly 4 parts when parsing from hex"
-        );
-        let handle_content: [u64; 4] = handle_content.try_into().unwrap();
-        let handle_content: [u8; HANDLE_LENGTH] = handle_content
-            .into_iter()
-            .flat_map(|i| i.to_le_bytes().into_iter())
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+    /// Parses a handle in format 64 character hex string
+    pub(crate) fn from_hex(mut input: &str) -> Result<Self> {
+        ensure!(input.len() == 64, "handle must be 64 hex characters");
+        let mut handle_content = [0_u8; HANDLE_LENGTH];
+        for byte in &mut handle_content {
+            let (value, remaining) = input.split_at(2);
+            input = remaining;
+            *byte = u8::from_str_radix(value, 16).context("handle contains non-hex characters")?;
+        }
         // metadata is
         // if handle is literal:
         //     | strict/shallow/lazy (2 bits) | 1 (1 bit) | size of blob (5 bits)
@@ -140,11 +132,11 @@ impl Handle {
 
     /// Reconstructs the hex string version of a Handle
     pub(crate) fn to_hex(&self) -> String {
-        self.to_buffer()
-            .chunks_exact(UINT64_LENGTH)
-            .map(|s: &[u8]| format!("{:x}", u64::from_le_bytes(s.try_into().unwrap())))
-            .collect::<Vec<_>>()
-            .join("-")
+        self.to_buffer().iter().fold(String::new(), |mut s, i| {
+            log::info!("{}", *i);
+            write!(&mut s, "{:02x}", *i).expect("Failed to write to string");
+            s
+        })
     }
 
     fn to_buffer(&self) -> [u8; HANDLE_LENGTH] {
@@ -254,10 +246,10 @@ impl Display for Handle {
                     // 8 hex digits of hash
                     format!(
                         "canonical id 0x{:0>8}",
-                        hash.iter()
-                            .take(4)
-                            .map(|byte| format!("{:x}", byte))
-                            .collect::<String>()
+                        hash.iter().take(4).fold(String::new(), |mut s, i| {
+                            write!(&mut s, "{:02x}", *i).expect("Failed to write to string");
+                            s
+                        })
                     )
                 }
                 Nonliteral::Local(id) => format!("local id 0x{:x}", id),
@@ -274,13 +266,13 @@ impl Display for Handle {
                         format!("\"{}\"", string)
                     } else {
                         // Otherwise, return a hex string.
-                        format!(
-                            "0x{}",
-                            valid_content
-                                .iter()
-                                .map(|byte| format!("{:0>2x}", byte))
-                                .collect::<String>()
-                        )
+                        valid_content
+                            .iter()
+                            .take(4)
+                            .fold("0x".to_owned(), |mut s, i| {
+                                write!(&mut s, "{:02x}", *i).expect("Failed to write to string");
+                                s
+                            })
                     }
                 );
 
@@ -380,7 +372,7 @@ mod tests {
         // &strict Blob(10|0|0|2400000000000000)
         let mut content = [0; LITERAL_CONTENT_LENGTH];
         content[0] = 16;
-        let handle_string = "10-0-0-2400000000000000";
+        let handle_string = "1000000000000000000000000000000000000000000000000000000000000024";
         let handle = Handle {
             // created as a u32
             size: 4,
@@ -394,7 +386,7 @@ mod tests {
     #[test]
     fn thunk() {
         // &strict Thunk(d9|0|4|100000000000000)
-        let handle_string = "d9-0-4-100000000000000";
+        let handle_string = "d900000000000000000000000000000004000000000000000000000000000001";
         let handle = Handle {
             // 4 entries
             size: 4,
@@ -410,25 +402,25 @@ mod tests {
 
     #[test]
     fn tag() {
-        // &strict Tag(862fcba5ecaade2c|4b24159ac7c28a29|3|715eb1e41f37d42)
-        let handle_string = "862fcba5ecaade2c-4b24159ac7c28a29-3-715eb1e41f37d42";
+        // &strict Tag(a522ff3a4afacca8|1008242ffe05abc6|3|8f31b177a03ff407)
+        let handle_string = "a522ff3a4afacca81008242ffe05abc603000000000000008f31b177a03ff407";
         let mut content = [0; CANONICAL_HASH_LENGTH];
         content[..UINT64_LENGTH].copy_from_slice(
-            &u64::from_str_radix("862fcba5ecaade2c", 16)
+            &u64::from_str_radix("a522ff3a4afacca8", 16)
                 .unwrap()
-                .to_le_bytes(),
+                .to_be_bytes(),
         );
         content[UINT64_LENGTH..UINT64_LENGTH * 2].copy_from_slice(
-            &u64::from_str_radix("4b24159ac7c28a29", 16)
+            &u64::from_str_radix("1008242ffe05abc6", 16)
                 .unwrap()
-                .to_le_bytes(),
+                .to_be_bytes(),
         );
         // zero out the last byte because that is metadata
         // and is not part of the content hash
         content[UINT64_LENGTH * 2..].copy_from_slice(
-            &u64::from_str_radix("0015eb1e41f37d42", 16)
+            &u64::from_str_radix("8f31b177a03ff400", 16)
                 .unwrap()
-                .to_le_bytes()[0..UINT64_LENGTH - 1],
+                .to_be_bytes()[0..UINT64_LENGTH - 1],
         );
         let handle = Handle {
             // all tags have 3 entries

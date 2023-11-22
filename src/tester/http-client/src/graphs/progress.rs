@@ -259,7 +259,6 @@ impl ProgressGraph {
             }
         }
         self.ordering.append(&mut new_stacks);
-        log::error!("{:?}", self.ordering.len());
     }
 
     fn get_from_stack(&self, stack: &DependeeStack) -> &Progress {

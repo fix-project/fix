@@ -7,7 +7,9 @@
 #include <stdexcept>
 #include <unistd.h>
 
+#include "base16.hh"
 #include "eventloop.hh"
+#include "handle.hh"
 #include "http_server.hh"
 #include "mmap.hh"
 #include "operation.hh"
@@ -22,32 +24,7 @@ using namespace boost::property_tree;
 static constexpr size_t mebi = 1024 * 1024;
 
 // Web server to expose computation graph through HTTP API for a viewer.
-// Client at https://github.com/Tweoss/fix-viewer.
-
-string hex_encode( Handle handle )
-{
-  stringstream os;
-  __m256i content = handle;
-  os << std::hex << content[0] << "-" << content[1] << "-" << content[2] << "-" << content[3];
-  return os.str();
-}
-
-Handle hex_decode( string input )
-{
-  size_t index;
-  index = input.find( "-" );
-  uint64_t a = std::stoull( input.substr( 0, index ), nullptr, 16 );
-  input = input.substr( index + 1 );
-  index = input.find( "-" );
-  uint64_t b = std::stoull( input.substr( 0, index ), nullptr, 16 );
-  input = input.substr( index + 1 );
-  index = input.find( "-" );
-  uint64_t c = std::stoull( input.substr( 0, index ), nullptr, 16 );
-  input = input.substr( index + 1 );
-  uint64_t d = std::stoull( input, nullptr, 16 );
-
-  return Handle( a, b, c, d );
-}
+// Example client at fix/src/tester/http-client.
 
 void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 {
@@ -68,8 +45,13 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 
   Handle result = runtime.eval( thunk_name );
 
-  cout << "Thunk name: " << hex_encode( thunk_name ) << endl;
-  cout << "Result name: " << hex_encode( result ) << endl << flush;
+  cout << "Thunk name: " << base16::encode( thunk_name ) << endl;
+  cout << "Result name: " << base16::encode( result ) << endl << flush;
+
+  Handle compile_encode = Runtime::get_instance().storage().get_tree( encode_name )[1].as_tree();
+  Handle tag_name = Runtime::get_instance().storage().get_tree( compile_encode )[1];
+  cout << "Tag name: " << tag_name << endl;
+  cout << "Tag name: " << base16::encode( tag_name ) << endl;
 }
 
 ptree list_dependees( Handle handle, Operation op )
@@ -81,7 +63,7 @@ ptree list_dependees( Handle handle, Operation op )
   }
   for ( auto& dependee : graph.at( Task( handle, op ) ) ) {
     ptree dependee_tree;
-    dependee_tree.push_back( ptree::value_type( "handle", hex_encode( dependee.handle() ) ) );
+    dependee_tree.push_back( ptree::value_type( "handle", base16::encode( dependee.handle() ) ) );
     dependee_tree.put( "operation", uint8_t( dependee.operation() ) );
     pt.push_back( ptree::value_type( "", dependee_tree ) );
   }
@@ -98,7 +80,7 @@ ptree get_child( Handle handle, Operation operation )
   auto results = Runtime::get_instance().get_results();
   ptree data;
   if ( results.contains( Task( handle, operation ) ) ) {
-    data.push_back( ptree::value_type( "handle", hex_encode( results.at( Task( handle, operation ) ) ) ) );
+    data.push_back( ptree::value_type( "handle", base16::encode( results.at( Task( handle, operation ) ) ) ) );
   }
 
   return data;
@@ -117,7 +99,7 @@ ptree get_parents( Handle handle )
   ptree data;
   for ( auto& parent : result ) {
     ptree entry;
-    entry.push_back( ptree::value_type( "handle", hex_encode( parent.handle() ) ) );
+    entry.push_back( ptree::value_type( "handle", base16::encode( parent.handle() ) ) );
     entry.put( "operation", uint8_t( parent.operation() ) );
     data.push_back( ptree::value_type( "", entry ) );
   }
@@ -220,15 +202,16 @@ optional<tuple<string, string>> try_get_response( string target, string source_d
   auto map = decode_url_params( target );
   if ( target.starts_with( "dependees" ) ) {
     stringstream ptree;
-    write_json( ptree, list_dependees( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
+    write_json( ptree,
+                list_dependees( base16::decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
   } else if ( target.starts_with( "child" ) ) {
     stringstream ptree;
-    write_json( ptree, get_child( hex_decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
+    write_json( ptree, get_child( base16::decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
   } else if ( target.starts_with( "parents" ) ) {
     stringstream ptree;
-    write_json( ptree, get_parents( hex_decode( map.at( "handle" ) ) ) );
+    write_json( ptree, get_parents( base16::decode( map.at( "handle" ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
   }
   return {};
