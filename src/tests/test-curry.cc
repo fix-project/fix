@@ -4,9 +4,8 @@
 
 using namespace std;
 
-static const Handle curry_compiled
-  = compile( file( "applications-prefix/src/applications-build/curry/curry.wasm" ) );
-static const Handle add_simple_compiled = compile( file( "testing/wasm-examples/add-simple.wasm" ) );
+static Handle curry_compiled;
+static Handle add_simple_compiled;
 
 Handle curry( Runtime& rt, Handle program, Handle num_args )
 {
@@ -108,6 +107,9 @@ void test( void )
 {
   auto& rt = Runtime::get_instance();
   rt.storage().deserialize();
+
+  curry_compiled = compile( file( "applications-prefix/src/applications-build/curry/curry.wasm" ) );
+  add_simple_compiled = compile( file( "testing/wasm-examples/add-simple.wasm" ) );
 
   test_add_simple( rt );
   test_add_as_encode( rt );
