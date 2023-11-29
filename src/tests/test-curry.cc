@@ -4,11 +4,15 @@
 
 using namespace std;
 
+static const Handle curry_compiled
+  = compile( file( "applications-prefix/src/applications-build/curry/curry.wasm" ) );
+static const Handle add_simple_compiled = compile( file( "testing/wasm-examples/add-simple.wasm" ) );
+
 Handle curry( Runtime& rt, Handle program, Handle num_args )
 {
   return rt.eval( thunk( tree( {
     blob( "unused" ),
-    compile( file( "applications-prefix/src/applications-build/curry/curry.wasm" ) ),
+    curry_compiled,
     program,
     num_args,
   } ) ) );
@@ -46,15 +50,17 @@ optional<uint32_t> unwrap_tag( Runtime& rt, const Handle& tag )
 
 void test_add_simple( Runtime& rt )
 {
-  Handle curried = curry( rt, compile( file( "testing/wasm-examples/add-simple.wasm" ) ), Handle( 2 ) );
+  Handle curried = curry( rt, add_simple_compiled, Handle( 2 ) );
 
   Handle curried_result = apply_args( rt, curried, { Handle( 1 ), Handle( 3 ) } );
 
   auto optional_result = unwrap_tag( rt, curried_result );
   if ( not optional_result ) {
     printf( "test_add_simple: Result was not successful\n" );
+    exit( 1 );
   } else if ( optional_result.value() != 4 ) {
     printf( "test_add_simple: Result did not match: %d != 4\n", optional_result.value() );
+    exit( 1 );
   }
 }
 
@@ -63,7 +69,7 @@ void test_add_as_encode( Runtime& rt )
   Handle curried = curry( rt,
                           tree( {
                             blob( "unused" ),
-                            compile( file( "testing/wasm-examples/add-simple.wasm" ) ),
+                            add_simple_compiled,
                           } ),
                           Handle( 2 ) );
 
@@ -72,18 +78,18 @@ void test_add_as_encode( Runtime& rt )
   auto optional_result = unwrap_tag( rt, curried_result );
   if ( not optional_result ) {
     printf( "test_add_as_encode: Result was not successful\n" );
+    exit( 1 );
   } else if ( optional_result.value() != 4 ) {
     printf( "test_add_as_encode: Result did not match: %d != 4\n", optional_result.value() );
+    exit( 1 );
   }
 }
 
 void test_curry_self( Runtime& rt )
 {
-  Handle curried
-    = curry( rt, compile( file( "applications-prefix/src/applications-build/curry/curry.wasm" ) ), Handle( 2 ) );
+  Handle curried = curry( rt, curry_compiled, Handle( 2 ) );
 
-  Handle curried_curry_result
-    = apply_args( rt, curried, { compile( file( "testing/wasm-examples/add-simple.wasm" ) ), Handle( 2 ) } );
+  Handle curried_curry_result = apply_args( rt, curried, { add_simple_compiled, Handle( 2 ) } );
 
   Handle unwrapped_curried_curry_result = rt.storage().get_tree( curried_curry_result )[0];
   Handle curried_add_result = apply_args( rt, unwrapped_curried_curry_result, { Handle( 1 ), Handle( 3 ) } );
@@ -91,8 +97,10 @@ void test_curry_self( Runtime& rt )
   auto optional_result = unwrap_tag( rt, curried_add_result );
   if ( not optional_result ) {
     printf( "test_curry_self: Result was not successful\n" );
+    exit( 1 );
   } else if ( optional_result.value() != 4 ) {
     printf( "test_curry_self: Result did not match: %d != 4\n", optional_result.value() );
+    exit( 1 );
   }
 }
 
@@ -104,4 +112,5 @@ void test( void )
   test_add_simple( rt );
   test_add_as_encode( rt );
   test_curry_self( rt );
+  exit( 0 );
 }
