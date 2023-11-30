@@ -1,4 +1,5 @@
 #include <charconv>
+#include <stdexcept>
 
 #include "tester-utils.hh"
 
@@ -28,6 +29,39 @@ Handle make_blob( T t ) requires std::is_integral_v<T>
 {
   std::string_view s { (const char*)&t, sizeof( t ) };
   return Handle( s );
+}
+
+Handle get_full_name( string_view short_name )
+{
+  char prefix = short_name[0];
+  short_name.remove_prefix( 1 );
+
+  auto fix_dir = Runtime::get_instance().storage().get_fix_repo();
+  for ( const auto& file : filesystem::directory_iterator( fix_dir / "objects" ) ) {
+    if ( file.path().filename().string().starts_with( short_name ) ) {
+      Handle full = base16::decode( file.path().filename().string() );
+
+      if ( prefix == 'G' and !full.is_tag() ) {
+        continue;
+      }
+
+      if ( prefix == 'B' and !full.is_blob() ) {
+        throw std::runtime_error( "Object exists but it is not a Blob." );
+      }
+
+      if ( ( prefix == 'T' or prefix == 'K' ) and !full.is_tree() ) {
+        throw std::runtime_error( "Object exists but it is not a Tree/Thunk." );
+      }
+
+      if ( prefix == 'K' ) {
+        full = full.as_thunk();
+      }
+
+      return full;
+    }
+  }
+
+  throw std::runtime_error( "Short name does not exist." );
 }
 
 /**
@@ -92,6 +126,15 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files, boo
     }
     args.remove_prefix( 1 );
     return base16::decode( str.substr( 5 ) );
+  }
+
+  if ( str.starts_with( "short-name:" ) ) {
+    if ( !deserialized ) {
+      rt.deserialize();
+      deserialized = true;
+    }
+    args.remove_prefix( 1 );
+    return get_full_name( str.substr( 11 ) );
   }
 
   if ( str.starts_with( "string:" ) ) {

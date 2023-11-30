@@ -308,7 +308,14 @@ void RuntimeStorage::serialize_object( Handle name, const filesystem::path& dir 
       return;
     }
 
-    case ContentType::Tag:
+    case ContentType::Tag: {
+      if ( not std::filesystem::exists( dir / file_name ) ) {
+        string tree_file_name = base16::encode( new_name.as_tree() );
+        filesystem::create_symlink( dir / tree_file_name, dir / file_name );
+      }
+      return;
+    }
+
     case ContentType::Thunk: {
       return;
     }

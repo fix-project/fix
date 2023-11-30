@@ -6,6 +6,8 @@ add_custom_command(
           ${CMAKE_CURRENT_SOURCE_DIR}/addblob.wat
           -o addblob.wasm)
 
+add_custom_target(addblob-wasm ALL DEPENDS addblob.wasm)
+
 add_custom_command(
   OUTPUT "addblob-trace.wasm"
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/addblob-trace.wat
