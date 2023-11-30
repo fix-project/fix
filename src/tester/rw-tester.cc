@@ -25,7 +25,7 @@ void program_body( span_view<char*> args )
   }
 
   // add the combination to the store, and print it
-  cout << "Combination:\n" << pretty_print( encode_name ) << "\n";
+  cout << "Combination:\n" << deep_pretty_print( encode_name ) << "\n";
 
   auto& runtime = Runtime::get_instance();
 
@@ -36,11 +36,9 @@ void program_body( span_view<char*> args )
   Handle result = runtime.eval( thunk_name );
 
   // print the result
-  cout << "Result:\n" << pretty_print( result );
+  cout << "Result:\n" << deep_pretty_print( result );
 
   runtime.serialize( Task::Eval( thunk_name ) );
-  runtime.storage().serialize( thunk_name );
-  runtime.storage().serialize( result );
 
   Handle canonical_thunk_name = runtime.storage().canonicalize( thunk_name );
   Handle canonical_result_name = runtime.storage().canonicalize( result );

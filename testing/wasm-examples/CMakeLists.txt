@@ -6,7 +6,15 @@ add_custom_command(
           ${CMAKE_CURRENT_SOURCE_DIR}/addblob.wat
           -o addblob.wasm)
 
-add_custom_target(addblob_wasm ALL DEPENDS addblob.wasm)
+add_custom_command(
+  OUTPUT "addblob-trace.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/addblob-trace.wat
+  COMMAND $ENV{HOME}/wasm-toolchain/wabt/build/wat2wasm
+          --enable-multi-memory
+          ${CMAKE_CURRENT_SOURCE_DIR}/addblob-trace.wat
+          -o addblob-trace.wasm)
+
+add_custom_target(addblob-trace-wasm ALL DEPENDS addblob-trace.wasm)
 
 add_custom_command(
   OUTPUT "add-simple.wasm"

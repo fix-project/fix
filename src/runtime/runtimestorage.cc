@@ -12,10 +12,12 @@
 #include "handle.hh"
 #include "object.hh"
 #include "operation.hh"
+#include "relation.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
 #include "spans.hh"
 #include "task.hh"
+#include "util.hh"
 #include "wasm-rt-content.h"
 
 using namespace std;
@@ -65,6 +67,9 @@ T RuntimeStorage::get( Handle name )
 Handle RuntimeStorage::add_blob( OwnedMutBlob&& blob )
 {
   unique_lock lock( storage_mutex_ );
+  if ( blob.size() < 32 ) {
+    return Handle( { blob.data(), blob.size() } );
+  }
   size_t local_id = local_storage_.size();
   size_t size = blob.size();
   local_storage_.push_back( std::move( blob ) );
@@ -279,21 +284,16 @@ filesystem::path RuntimeStorage::get_fix_repo()
   return current_directory / ".fix";
 }
 
-void RuntimeStorage::serialize( Handle name )
-{
-  const auto fix_dir = get_fix_repo();
-  Handle storage = canonicalize( name );
-  for ( const auto& ref : get_friendly_names( name ) ) {
-    ofstream output_file { fix_dir / "refs" / ref, std::ios::trunc };
-    output_file << base16::encode( storage );
-  }
-  visit( name, std::bind( &RuntimeStorage::serialize_object, this, placeholders::_1, fix_dir / "objects" ) );
-}
-
 void RuntimeStorage::serialize_object( Handle name, const filesystem::path& dir )
 {
   VLOG( 1 ) << "Serializing " << name;
   Handle new_name = canonicalize( name );
+
+  for ( const auto& ref : get_friendly_names( new_name ) ) {
+    ofstream output_file { get_fix_repo() / "refs" / ref, std::ios::trunc };
+    output_file << base16::encode( new_name );
+  }
+
   if ( new_name.is_literal_blob() )
     return;
   string file_name = base16::encode( new_name );
@@ -304,6 +304,7 @@ void RuntimeStorage::serialize_object( Handle name, const filesystem::path& dir 
       if ( not std::filesystem::exists( dir / file_name ) )
         std::visit( [&]( auto& arg ) -> void { arg.to_file( dir / file_name ); },
                     canonical_storage_.at( new_name ) );
+
       return;
     }
 
@@ -317,56 +318,32 @@ void RuntimeStorage::serialize_object( Handle name, const filesystem::path& dir 
   }
 }
 
-void RuntimeStorage::serialize( Relation relation )
+void RuntimeStorage::serialize_relation( Relation relation )
 {
   VLOG( 1 ) << "Serializing " << relation << endl;
-  switch ( relation.task().operation() ) {
-    case Operation::Fill:
-      return;
+  if ( relation.type() == RelationType::Eval and relation.lhs().get_content_type() == ContentType::Blob )
+    return;
 
-    case Operation::Eval: {
-      const auto fix_dir = get_fix_repo();
-      switch ( relation.task().handle().get_content_type() ) {
-        case ContentType::Blob:
-          return;
+  const auto fix_dir = get_fix_repo();
+  Handle lhs_handle = canonicalize( relation.lhs() );
+  Handle rhs_handle = canonicalize( relation.rhs() );
 
-        default:
-          Handle canonical_handle = canonicalize( relation.task().handle() );
-          Handle canonical_result = canonicalize( relation.handle() );
-          VLOG(1) << "Serializing eval " << canonical_handle << " --> " << canonical_result << endl;
-          string file_name = base16::encode( canonical_handle );
-          if ( not std::filesystem::exists( fix_dir / "relations" ) ) {
-            std::filesystem::create_directory( fix_dir / "relations" );
-          }
-          if ( not std::filesystem::exists( fix_dir / "relations" / "eval" ) ) {
-            std::filesystem::create_directory( fix_dir / "relations" / "eval" );
-          }
-          if ( not std::filesystem::exists( fix_dir / "relations" / "eval" / file_name ) ) {
-             ofstream output_file( fix_dir / "relations" / "eval" / file_name );
-             output_file << base16::encode( canonical_result );
-          }
-          return;
-       }
-    }
+  string file_name = base16::encode( lhs_handle );
 
-    case Operation::Apply: {
-      const auto fix_dir = get_fix_repo();
-      Handle tree_name = Handle::name_only( canonicalize( relation.task().handle() ) );
-      Handle result_handle = canonicalize( relation.handle() );
-      VLOG(1) << "Serializing apply " << tree_name << " --> " << result_handle << endl;
-      string file_name = base16::encode( tree_name);
-      if ( not std::filesystem::exists( fix_dir / "relations" ) ) {
-        std::filesystem::create_directory( fix_dir / "relations" );
-      }
-      if ( not std::filesystem::exists( fix_dir / "relations" / "apply" ) ) {
-        std::filesystem::create_directory( fix_dir / "relations" / "apply" );
-      }
-      if ( not std::filesystem::exists( fix_dir / "relations" / "apply" / file_name ) ) {
-        ofstream output_file( fix_dir / "relations" / "apply" / file_name );
-        output_file << base16::encode( result_handle );
-      }
-      return;
-                           }
+  filesystem::path path = fix_dir / "relations";
+  if ( not std::filesystem::exists( path ) ) {
+    std::filesystem::create_directory( path );
+  }
+
+  path = path / RELATIONTYPE_NAMES[to_underlying( relation.type() )];
+  if ( not std::filesystem::exists( path ) ) {
+    std::filesystem::create_directory( path );
+  }
+
+  path = path / file_name;
+  if ( not std::filesystem::exists( path ) ) {
+    ofstream output_file( path );
+    output_file << string_view { reinterpret_cast<char*>( &rhs_handle ), sizeof( Handle ) };
   }
 }
 
@@ -498,17 +475,21 @@ string RuntimeStorage::get_short_name( Handle handle )
 
 string RuntimeStorage::get_display_name( Handle handle )
 {
-  string fullname = get_short_name( handle );
   vector<string> friendly_names = get_friendly_names( handle );
   if ( not friendly_names.empty() ) {
+    string fullname = get_short_name( handle );
     fullname += " (";
     for ( const auto& name : friendly_names ) {
       fullname += name + ", ";
     }
     fullname = fullname.substr( 0, fullname.size() - 2 );
     fullname += ")";
+    return fullname;
+  } else {
+    stringstream ss;
+    ss << handle;
+    return ss.str();
   }
-  return fullname;
 }
 
 optional<Handle> RuntimeStorage::get_ref( string_view ref )

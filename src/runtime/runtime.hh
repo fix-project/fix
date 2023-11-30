@@ -19,7 +19,7 @@ class Runtime : IRuntime
 
   static inline thread_local Handle current_procedure_;
 
-  void visit( Relation root, std::function<void( Relation )> visitor );
+  void deserialize_relations();
 
 public:
   Runtime( size_t runtime_threads )
@@ -62,6 +62,7 @@ public:
   Handle eval( Handle target ) { return graph_.run( Task::Eval( target ) ); }
 
   std::optional<Relation> get_relation( Task task ) { return cache_.get_relation( task ); }
+  std::list<Relation> get_relation( Handle handle ) { return cache_.get_relation( handle ); }
 
   void set_current_procedure( Handle handle ) { current_procedure_ = handle; }
 
@@ -79,5 +80,17 @@ public:
     network_.stop();
   }
 
+  void visit( Relation root, std::function<void( Relation )> visitor );
+  void shallow_visit( Relation root, std::function<void( Relation )> visitor );
+
   void serialize( Task task );
+  void serialize( Handle name );
+
+  void deserialize()
+  {
+    storage_.deserialize();
+    deserialize_relations();
+  };
+
+  void trace( Handle obj, Handle trc ) { cache_.trace( obj, trc ); }
 };

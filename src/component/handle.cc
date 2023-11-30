@@ -68,7 +68,7 @@ ostream& operator<<( ostream& s, const Handle handle )
     s << "Local=" << handle.get_local_id();
     s << ", ";
   } else {
-    s << "Canonical=" << base16::encode( handle );
+    s << "Canonical=" << base16::encode( handle ).substr( 0, 7 );
     s << ", ";
   }
   s << "Length=" << handle.get_length();

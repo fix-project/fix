@@ -55,14 +55,15 @@ private:
 
   void schedule( Task task );
 
-  std::filesystem::path get_fix_repo();
-  void serialize_object( Handle name, const std::filesystem::path& dir );
   void deserialize_objects( const std::filesystem::path& dir );
+  void deserialize_relations( const std::filesystem::path& dir );
 
   Handle canonicalize( Handle handle, std::unique_lock<std::shared_mutex>& lock );
 
 public:
   RuntimeStorage() { canonical_storage_.reserve( 1024 ); }
+
+  std::filesystem::path get_fix_repo();
 
   // Take ownership of a mutable Blob
   Handle add_blob( OwnedMutBlob&& blob );
@@ -86,10 +87,10 @@ public:
 
   Task canonicalize( Task task );
 
-  void serialize( Handle handle );
   void deserialize();
 
-  void serialize( Relation relation );
+  void serialize_object( Handle name, const std::filesystem::path& dir );
+  void serialize_relation( Relation relation );
 
   // Tests if the Handle (with the specified accessibility) is valid with the current contents.
   bool contains( Handle handle );

@@ -8,16 +8,25 @@
 
 #define COMPILE_ENCODE *Runtime::get_instance().storage().get_ref( "compile-encode" )
 
-struct pretty_print
+struct deep_pretty_print
 {
   Handle name;
   unsigned int level;
-  pretty_print( Handle name, unsigned int level = 0 )
+  deep_pretty_print( Handle name, unsigned int level = 0 )
     : name( name )
     , level( level )
   {}
 };
 
+struct pretty_print
+{
+  Handle name;
+  pretty_print( Handle name )
+    : name( name )
+  {}
+};
+
+std::ostream& operator<<( std::ostream& stream, const deep_pretty_print& pp );
 std::ostream& operator<<( std::ostream& stream, const pretty_print& pp );
 
-Handle parse_args( span_view<char*>& args, std::vector<ReadOnlyFile>& open_files );
+Handle parse_args( span_view<char*>& args, std::vector<ReadOnlyFile>& open_files, bool deserialize = false );

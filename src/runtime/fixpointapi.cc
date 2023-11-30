@@ -111,6 +111,12 @@ uint32_t equality( __m256i lhs, __m256i rhs )
   return Runtime::get_instance().storage().compare_handles( left, right );
 }
 
+uint32_t trace( __m256i obj, __m256i trc )
+{
+  Runtime::get_instance().trace( Handle( obj ), Handle( trc ) );
+  return 0;
+}
+
 void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
 {
   if ( index + length > (int64_t)mem->size ) {

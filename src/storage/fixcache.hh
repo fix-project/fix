@@ -31,6 +31,7 @@ class FixCache : IResultCache
   std::shared_mutex mutex_ {};
   std::condition_variable_any cv_ {};
   absl::flat_hash_map<Task, Handle, absl::Hash<Task>> cache_ {};
+  absl::flat_hash_map<Handle, std::unordered_set<Handle>, absl::Hash<Handle>> trace_cache_ {};
   std::unordered_set<Task> finished_ {};
 
 public:
@@ -82,6 +83,18 @@ public:
     return {};
   }
 
+  std::list<Relation> get_relation( Handle handle )
+  {
+    std::shared_lock lock( mutex_ );
+
+    std::list<Relation> result;
+    for ( const auto& trc : trace_cache_[handle] ) {
+      result.push_back( Relation( handle, trc ) );
+    }
+
+    return result;
+  }
+
   /**
    * Tests if FixCache has already seen the result of running a task.  Semantically equivalent to
    * `get(task).has_value()`.
@@ -103,5 +116,11 @@ public:
     std::shared_lock lock( mutex_ );
     cv_.wait( lock, [&] { return cache_.contains( task ); } );
     return cache_.at( task );
+  }
+
+  void trace( Handle obj, Handle trc )
+  {
+    std::unique_lock lock( mutex_ );
+    trace_cache_[obj].insert( trc );
   }
 };

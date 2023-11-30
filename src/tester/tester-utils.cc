@@ -34,9 +34,15 @@ Handle make_blob( T t ) requires std::is_integral_v<T>
  * Adds the args to RuntimeStorage, loading files and creating objects as necessary.
  * The contents of @p open_files must outlive this RuntimeStorage instance.
  */
-Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
+Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files, bool deserialize )
 {
-  auto& runtime = Runtime::get_instance().storage();
+  auto& rt = Runtime::get_instance();
+  auto& storage = Runtime::get_instance().storage();
+
+  if ( deserialize ) {
+    rt.deserialize();
+    deserialized = true;
+  }
 
   if ( args.empty() ) {
     throw runtime_error( "not enough args" );
@@ -47,31 +53,31 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
   if ( str.starts_with( "file:" ) ) {
     std::filesystem::path file( string( str.substr( 5 ) ) );
     args.remove_prefix( 1 );
-    return runtime.add_blob( OwnedBlob::from_file( file ) );
+    return storage.add_blob( OwnedBlob::from_file( file ) );
   }
 
   if ( str.starts_with( "compile:" ) ) {
     std::filesystem::path file( string( str.substr( 8 ) ) );
     args.remove_prefix( 1 );
     if ( !deserialized ) {
-      runtime.deserialize();
+      rt.deserialize();
       deserialized = true;
     }
     OwnedMutTree compile_tree = OwnedMutTree::allocate( 3 );
     compile_tree.at( 0 ) = Handle( "unused" );
     compile_tree.at( 1 ) = COMPILE_ENCODE;
-    Handle blob = runtime.add_blob( OwnedBlob::from_file( file ) );
+    Handle blob = storage.add_blob( OwnedBlob::from_file( file ) );
     compile_tree.at( 2 ) = blob;
-    return runtime.add_tree( std::move( compile_tree ) ).as_thunk();
+    return storage.add_tree( std::move( compile_tree ) ).as_thunk();
   }
 
   if ( str.starts_with( "ref:" ) ) {
     if ( !deserialized ) {
-      runtime.deserialize();
+      rt.deserialize();
       deserialized = true;
     }
     args.remove_prefix( 1 );
-    auto ref = runtime.get_ref( str.substr( 4 ) );
+    auto ref = storage.get_ref( str.substr( 4 ) );
     if ( ref ) {
       return *ref;
     } else {
@@ -81,7 +87,7 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
 
   if ( str.starts_with( "name:" ) ) {
     if ( !deserialized ) {
-      runtime.deserialize();
+      rt.deserialize();
       deserialized = true;
     }
     args.remove_prefix( 1 );
@@ -124,7 +130,7 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files )
     for ( uint32_t i = 0; i < tree_size; ++i ) {
       the_tree[i] = parse_args( args, open_files );
     }
-    return runtime.add_tree( std::move( the_tree ) );
+    return storage.add_tree( std::move( the_tree ) );
   }
 
   if ( str.starts_with( "thunk:" ) ) {
@@ -169,7 +175,7 @@ T from_int( const std::span<const char> str )
   return ret;
 }
 
-ostream& operator<<( ostream& stream, const pretty_print& pp )
+ostream& operator<<( ostream& stream, const deep_pretty_print& pp )
 {
   auto& runtime = Runtime::get_instance().storage();
   const bool terminal
@@ -216,7 +222,7 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
       for ( unsigned int j = 0; j < pp.level + 1; ++j ) {
         stream << "  ";
       }
-      stream << to_string( i ) << ". " << pretty_print( view[i], pp.level + 1 );
+      stream << to_string( i ) << ". " << deep_pretty_print( view[i], pp.level + 1 );
     }
   } else if ( pp.name.is_thunk() ) {
     Handle encode_name = pp.name.as_tree();
@@ -224,7 +230,7 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
     for ( unsigned int i = 0; i < pp.level + 1; ++i ) {
       stream << "  ";
     }
-    stream << pretty_print( encode_name, pp.level + 1 );
+    stream << deep_pretty_print( encode_name, pp.level + 1 );
   } else if ( pp.name.is_tag() ) {
     const auto view = runtime.get_tree( pp.name );
     stream << ( terminal ? "\033[1;32mTag\033[m" : "Tag" ) << " (" << dec << view.size() << " entr"
@@ -233,7 +239,70 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
       for ( unsigned int j = 0; j < pp.level + 1; ++j ) {
         stream << "  ";
       }
-      stream << to_string( i ) << ". " << pretty_print( view[i], pp.level + 1 );
+      stream << to_string( i ) << ". " << deep_pretty_print( view[i], pp.level + 1 );
+    }
+  } else {
+    throw runtime_error( "can't pretty-print object" );
+  }
+  return stream;
+}
+
+ostream& operator<<( ostream& stream, const pretty_print& pp )
+{
+  auto& runtime = Runtime::get_instance().storage();
+  const bool terminal
+    = ( &stream == &cout and isatty( STDOUT_FILENO ) ) or ( &stream == &cerr and isatty( STDERR_FILENO ) );
+  if ( pp.name.is_blob() ) {
+    const auto view = runtime.get_blob( pp.name );
+    stream << ( terminal ? "\033[1;34mBlob\033[m" : "Blob" ) << " (" << dec << view.size() << " byte"
+           << ( view.size() != 1 ? "s" : "" ) << "): \"";
+    for ( const unsigned char ch : view.size() < 32 ? view : view.subspan( 0, 32 ) ) {
+      if ( ch == '\\' ) {
+        stream << "\\\\";
+      } else if ( isprint( ch ) ) {
+        stream << ch;
+      } else {
+        stream << "\\x" << hex << setw( 2 ) << setfill( '0' ) << static_cast<unsigned int>( ch );
+      }
+    }
+    if ( view.size() > 32 ) {
+      stream << ( terminal ? "\033[2;3m[\xe2\x80\xa6]\033[m" : "[...]" );
+    }
+    stream << "\"";
+
+    switch ( view.size() ) {
+      case sizeof( uint8_t ):
+        stream << " (uint8:" << dec << setw( 0 ) << static_cast<unsigned int>( from_int<uint8_t>( view ) ) << ")";
+        break;
+      case sizeof( uint16_t ):
+        stream << " (uint16:" << dec << setw( 0 ) << from_int<uint16_t>( view ) << ")";
+        break;
+      case sizeof( uint32_t ):
+        stream << " (uint32:" << dec << setw( 0 ) << from_int<uint32_t>( view ) << ")";
+        break;
+      case sizeof( uint64_t ):
+        stream << " (uint64:" << dec << setw( 0 ) << from_int<uint64_t>( view ) << ")";
+        break;
+    }
+
+    stream << "\n";
+  } else if ( pp.name.is_tree() ) {
+    const auto view = runtime.get_tree( pp.name );
+    stream << ( terminal ? "\033[1;32mTree\033[m" : "Tree" ) << " (" << dec << view.size() << " entr"
+           << ( view.size() != 1 ? "ies" : "y" ) << "):\n";
+    for ( unsigned int i = 0; i < view.size(); ++i ) {
+      stream << "  " << to_string( i ) << ". " << runtime.get_display_name( view[i] ) << endl;
+    }
+  } else if ( pp.name.is_thunk() ) {
+    Handle encode_name = pp.name.as_tree();
+    stream << ( terminal ? "\033[1;36mThunk\033[m" : "Thunk" ) << ":\n";
+    stream << runtime.get_display_name( encode_name );
+  } else if ( pp.name.is_tag() ) {
+    const auto view = runtime.get_tree( pp.name );
+    stream << ( terminal ? "\033[1;32mTag\033[m" : "Tag" ) << " (" << dec << view.size() << " entr"
+           << ( view.size() != 1 ? "ies" : "y" ) << "):\n";
+    for ( unsigned int i = 0; i < view.size(); ++i ) {
+      stream << "  " << to_string( i ) << ". " << runtime.get_display_name( view[i] ) << endl;
     }
   } else {
     throw runtime_error( "can't pretty-print object" );
