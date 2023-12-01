@@ -400,22 +400,22 @@ void RuntimeStorage::deserialize_objects( const filesystem::path& dir )
 
     switch ( name.get_content_type() ) {
       case ContentType::Blob: {
-                                add_blob( OwnedBlob::from_file( file ), name );
-                                break;
-                              }
+        add_blob( OwnedBlob::from_file( file ), name );
+        break;
+      }
 
       case ContentType::Tree: {
-                                add_tree( OwnedTree::from_file( file ), name );
-                                break;
-                              }
+        add_tree( OwnedTree::from_file( file ), name );
+        break;
+      }
 
       case ContentType::Thunk:
       case ContentType::Tag: {
-                               break;
-                             }
+        break;
+      }
 
       default:
-                             break;
+        break;
     }
   }
 }

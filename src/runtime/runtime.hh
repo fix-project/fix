@@ -63,6 +63,7 @@ public:
 
   std::optional<Relation> get_relation( Task task ) { return cache_.get_relation( task ); }
   std::list<Relation> get_relation( Handle handle ) { return cache_.get_relation( handle ); }
+  std::list<Relation> get_parents( Handle handle ) { return cache_.get_parents( handle ); }
 
   void set_current_procedure( Handle handle ) { current_procedure_ = handle; }
 

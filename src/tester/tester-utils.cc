@@ -49,7 +49,7 @@ Handle get_full_name( string_view short_name )
         throw std::runtime_error( "Object exists but it is not a Blob." );
       }
 
-      if ( ( prefix == 'T' or prefix == 'K' ) and !full.is_tree() ) {
+      if ( ( prefix == 'E' or prefix == 'K' ) and !full.is_tree() ) {
         throw std::runtime_error( "Object exists but it is not a Tree/Thunk." );
       }
 

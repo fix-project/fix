@@ -15,10 +15,10 @@ void usage_message( const char* argv0 )
   cerr << "Usage: " << argv0 << " commands...\n";
   cerr << "   command (followed by entry) :=   what:\n";
   cerr << "                                    -- print the handle to the object\n";
-  cerr << "                                  | deep-content:\n";
-  cerr << "                                    -- print content of the object\n";
   cerr << "                                  | content:\n";
-  cerr << "                                    -- same as content but does not print tree content recursively\n";
+  cerr << "                                    -- print content of the object\n";
+  cerr << "                                  | deep-content:\n";
+  cerr << "                                    -- same as content but prints tree content recursively\n";
   cerr << "                                  | result-<operation>: (with <operation> = apply | eval)\n";
   cerr << "                                    -- print the result of eval/apply(object) if known\n";
   cerr << "                                  | steps-eval:\n";
@@ -27,11 +27,13 @@ void usage_message( const char* argv0 )
   cerr << "                                    -- print the immediate dependencies of an eval-relation\n";
   cerr << "                                  | trace:\n";
   cerr << "                                    -- print all trace entries for the object\n";
+  cerr << "                                  | from-where:\n";
+  cerr << "                                    -- print all eval/apply-relations that leads to the object\n";
   cerr << "   entry :=   file:<filename>\n";
   cerr << "            | string:<string>\n";
   cerr << "            | name:<base16-encoded name>\n";
-  cerr << "            | short-name:<prefix><first 7 bytes of a base16-encoded name> (with <prefix> = (B)lob | "
-          "(T)ree | Thun(K) | Ta(G)\n";
+  cerr << "            | short-name:<prefix><first 7 bytes of a base16-encoded name> (with <prefix> = Blo(B) | "
+          "Tre(E) | Thun(K) | Ta(G)\n";
   cerr << "            | uint<n>:<integer> (with <n> = 8 | 16 | 32 | 64)\n";
   cerr << "            | tree:<n> (followed by <n> entries)\n";
   cerr << "            | thunk: (followed by tree:<n>)\n";
@@ -126,6 +128,19 @@ void parse_args( span_view<char*> args )
     auto relations = rt.get_relation( handle );
     for ( const auto& relation : relations ) {
       cout << deep_pretty_print( relation.rhs() );
+    }
+    return;
+  }
+
+  if ( str.starts_with( "from-where:" ) ) {
+    auto relations = rt.get_parents( handle );
+    if ( relations.empty() ) {
+      cout << "Relation does not exist\n";
+      return;
+    }
+
+    for ( const auto& relation : relations ) {
+      cout << relation << endl;
     }
     return;
   }

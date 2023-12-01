@@ -95,6 +95,19 @@ public:
     return result;
   }
 
+  std::list<Relation> get_parents( Handle handle )
+  {
+    std::shared_lock lock( mutex_ );
+
+    std::list<Relation> result;
+    for ( const auto& [task, res] : cache_ ) {
+      if ( res == handle ) {
+        result.push_back( Relation( task, res ) );
+      }
+    }
+    return result;
+  }
+
   /**
    * Tests if FixCache has already seen the result of running a task.  Semantically equivalent to
    * `get(task).has_value()`.
