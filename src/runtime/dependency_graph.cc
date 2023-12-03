@@ -45,7 +45,7 @@ std::optional<Handle> DependencyGraph::start_after( Task& target, Task& blocked 
   VLOG( 1 ) << blocked << " is blocked on " << target;
   CHECK( blocked != target );
   auto cached = cache_.get( target );
-#ifdef ENABLE_TRACING
+#if ENABLE_TRACING == 1
   retained_dependencies_[blocked].insert( target );
 #endif
   if ( cached ) {
@@ -68,7 +68,7 @@ bool DependencyGraph::start_after( Tree targets, Task& blocked )
     if ( not cache_.contains( target ) ) {
       VLOG( 1 ) << blocked << " is blocked on " << target;
       CHECK( blocked != target );
-#ifdef ENABLE_TRACING
+#if ENABLE_TRACING == 1
       retained_dependencies_[blocked].insert( target );
 #endif
       forward_dependencies_[target].insert( blocked );

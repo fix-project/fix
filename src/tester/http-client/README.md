@@ -6,10 +6,31 @@ If the `BUILD_VISUALIZER` cmake cache variable is set, e.g. with `-DBUILD_VISUAL
 `cmake` will attempt to build the viewer to a website. Then, running the `http-tester`, for example with
 `http-tester 9090 ~/fix/build/src/tester/http-client/` will serve the viewer on the given port.
 
+To see the dependency information, tracing needs to be enabled in the runtime. `ENABLE_TRACING`
+must be defined to be `1` in `src/runtime/dependency_graph.hh`.
+```
+#ifndef ENABLE_TRACING
+#define ENABLE_TRACING 1
+#endif
+```
+
 If developing on a remote machine, such as stagecast, and viewing from a local machine, like a laptop, ssh port forwarding
 must be setup to access the http-tester's server. This can be accomplished with `ssh -L 9090:127.0.0.1:9090 stagecast.org`.
 
-Visiting `127.0.0.1` on your local machine should then show the viewer.
+Visiting `127.0.0.1:9090` on your local machine should then show the viewer.
+
+## Usage
+
+The target handle indicates which object is under inspection. The progress tree shows the result of
+an operation on the target handle. The handles in the middle of the operation arrow are "dependees"
+of the targeted operation. That is, in order for the targeted operation to complete, it  required 
+these intermediate calculations to complete first. The handle at the end of the operation arrow
+is the "child" of running the targeted operation.
+
+In the ancestry tree, parent handles point to handles below themselves. This is the dual of the 
+"child" concept, as running some operation on these parent handles produced this child. Any child
+can have multiple parents, all of which will show up in the ancestry tree. Each parent (with a specific
+operation) only has one child because handles are content addressed and operations are deterministic.
 
 ## Building Locally
 
@@ -43,3 +64,8 @@ We use [Trunk](https://trunkrs.dev/) to build for web target.
 
 > `assets/sw.js` script will try to cache our app, and loads the cached version when it cannot connect to server allowing your app to work offline (like PWA).
 > appending `#dev` to `index.html` will skip this caching, allowing us to load the latest builds during development.
+
+# Credit
+
+The template used to create this viewer is at https://github.com/emilk/eframe_template. 
+The unmodified portions of the template are primarily the README build instructions and the base html webpage.

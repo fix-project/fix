@@ -47,11 +47,6 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 
   cout << "Thunk name: " << base16::encode( thunk_name ) << endl;
   cout << "Result name: " << base16::encode( result ) << endl << flush;
-
-  Handle compile_encode = Runtime::get_instance().storage().get_tree( encode_name )[1].as_tree();
-  Handle tag_name = Runtime::get_instance().storage().get_tree( compile_encode )[1];
-  cout << "Tag name: " << tag_name << endl;
-  cout << "Tag name: " << base16::encode( tag_name ) << endl;
 }
 
 ptree list_dependees( Handle handle, Operation op )
@@ -75,6 +70,7 @@ ptree list_dependees( Handle handle, Operation op )
   return data;
 }
 
+// Obtains the result of the specified operation on this handle.
 ptree get_child( Handle handle, Operation operation )
 {
   auto results = Runtime::get_instance().get_results();
@@ -86,6 +82,7 @@ ptree get_child( Handle handle, Operation operation )
   return data;
 }
 
+// Obtains tasks which produced this handle.
 ptree get_parents( Handle handle )
 {
   ptree pt;
@@ -331,6 +328,11 @@ int max_args = -1;
 void program_body( span_view<char*> args )
 {
   ios::sync_with_stdio( false );
+
+#if ENABLE_TRACING != 1
+  cerr << "ERROR: ENABLE_TRACING must be set to 1 for http-tester" << endl; 
+  return;
+#endif
 
   // Start listening on the specified port.
   TCPSocket server_socket {};

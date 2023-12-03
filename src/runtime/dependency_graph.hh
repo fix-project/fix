@@ -9,7 +9,9 @@
 #include "object.hh"
 #include "scheduler.hh"
 
-#define ENABLE_TRACING
+#ifndef ENABLE_TRACING
+#define ENABLE_TRACING 0
+#endif
 
 /**
  * Serves the purpose of a "blocked queue" in a conventional OS; since we know computations are deterministic, we
@@ -27,7 +29,7 @@ class DependencyGraph
   absl::flat_hash_set<Task> running_ {};
   absl::flat_hash_map<Task, absl::flat_hash_set<Task>> forward_dependencies_ {};
   absl::flat_hash_map<Task, absl::flat_hash_set<Task>> backward_dependencies_ {};
-#ifdef ENABLE_TRACING
+#if ENABLE_TRACING == 1
   absl::flat_hash_map<Task, absl::flat_hash_set<Task>> retained_dependencies_ {};
 #endif
 
@@ -61,15 +63,17 @@ public:
 
   /**
    * Returns a copy of the forward dependency graph, from tasks to tasks which depend on them.
-   * Returns an empty map if ENABLE_TRACING is not defined.
+   * Returns an empty map if ENABLE_TRACING is 0.
    *
    * @return   A map from tasks to a set of tasks which depend on the key.
    */
   absl::flat_hash_map<Task, absl::flat_hash_set<Task>> get_graph()
   {
-#ifdef ENABLE_TRACING
+#if ENABLE_TRACING == 1
     std::shared_lock lock( mutex_ );
     return retained_dependencies_;
+#else
+    return {};
 #endif
   }
 
