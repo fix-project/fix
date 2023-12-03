@@ -330,7 +330,7 @@ void program_body( span_view<char*> args )
   ios::sync_with_stdio( false );
 
 #if ENABLE_TRACING != 1
-  cerr << "ERROR: ENABLE_TRACING must be set to 1 for http-tester" << endl; 
+  cerr << "ERROR: ENABLE_TRACING must be set to 1 for http-tester" << endl;
   return;
 #endif
 
