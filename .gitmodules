@@ -10,3 +10,6 @@
 [submodule "third-party/abseil-cpp"]
 	path = third-party/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp
+[submodule "third-party/BLAKE3"]
+	path = third-party/BLAKE3
+	url = https://github.com/BLAKE3-team/BLAKE3
