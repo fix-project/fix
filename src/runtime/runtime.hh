@@ -57,13 +57,25 @@ public:
   std::optional<Info> get_info() override { return workers_->get_info(); }
 
   void add_task_runner( std::weak_ptr<ITaskRunner> runner ) override { scheduler_.add_task_runner( runner ); }
+
   void add_result_cache( IResultCache& cache ) override { graph_.add_result_cache( cache ); }
 
   Handle eval( Handle target ) { return graph_.run( Task::Eval( target ) ); }
 
-  std::optional<Relation> get_relation( Task task ) { return cache_.get_relation( task ); }
-  std::list<Relation> get_relation( Handle handle ) { return cache_.get_relation( handle ); }
-  std::list<Relation> get_parents( Handle handle ) { return cache_.get_parents( handle ); }
+  std::optional<Relation> get_task_relation( Task task ) { return cache_.get_task_relation( task ); }
+
+  std::pair<std::list<Relation>, std::unordered_set<Handle>> get_explanations( Handle handle )
+  {
+    auto res = storage_.get_pinned_handles( handle );
+    res.merge( storage_.get_tags( handle ) );
+    return { cache_.get_source_relations( handle ), res };
+  }
+
+  bool has_explanation( Handle handle )
+  {
+    auto explanations = get_explanations( handle );
+    return ( !explanations.first.empty() or !explanations.second.empty() );
+  }
 
   void set_current_procedure( Handle handle ) { current_procedure_ = handle; }
 
@@ -83,6 +95,7 @@ public:
 
   void visit( Relation root, std::function<void( Relation )> visitor );
   void shallow_visit( Relation root, std::function<void( Relation )> visitor );
+  bool has_explanation( Relation root );
 
   void serialize( Task task );
   void serialize( Handle name );
@@ -93,5 +106,5 @@ public:
     deserialize_relations();
   };
 
-  void trace( Handle obj, Handle trc ) { cache_.trace( obj, trc ); }
+  void pin( Handle obj, Handle trc ) { storage_.pin( obj, trc ); }
 };

@@ -6,7 +6,7 @@
   (import "fixpoint" "create_blob_rw_mem_1" (func $create_blob_rw_mem_1 (param i32) (result externref)))
   (import "fixpoint" "create_tree_rw_table_0" (func $create_tree_rw_table_0 (param i32) (result externref)))
   (import "fixpoint" "create_tag" (func $create_tag (param externref externref) (result externref)))
-  (import "fixpoint" "trace" (func $trace (param externref externref) (result i32)))
+  (import "fixpoint" "pin" (func $pin (param externref externref) (result i32)))
   (memory $ro_mem_0 (export "ro_mem_0") 0)
   (memory $ro_mem_1 (export "ro_mem_1") 0)
   (memory $rw_mem_0 (export "rw_mem_0") 1)
@@ -34,7 +34,7 @@
 
     (local.get $result)
     (call $create_tag (local.get $result) (local.get $infotree))
-    call $trace
+    call $pin
     drop
 
     (local.get $result)

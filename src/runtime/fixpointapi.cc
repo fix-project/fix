@@ -111,9 +111,9 @@ uint32_t equality( __m256i lhs, __m256i rhs )
   return Runtime::get_instance().storage().compare_handles( left, right );
 }
 
-uint32_t trace( __m256i obj, __m256i trc )
+uint32_t pin( __m256i src, __m256i dst )
 {
-  Runtime::get_instance().trace( Handle( obj ), Handle( trc ) );
+  Runtime::get_instance().pin( Handle( src ), Handle( dst ) );
   return 0;
 }
 

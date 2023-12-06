@@ -51,8 +51,7 @@ void usage_message( const char* argv0 )
   cerr << "   entry :=   file:<filename>\n";
   cerr << "            | string:<string>\n";
   cerr << "            | name:<base16-encoded name>\n";
-  cerr << "            | short-name:<prefix><first 7 bytes of a base16-encoded name> (with <prefix> = Blo(B) | "
-          "Tre(E) | Thun(K) | Ta(G)\n";
+  cerr << "            | short-name:<7 bytes shortened base16-encoded name>\n";
   cerr << "            | uint<n>:<integer> (with <n> = 8 | 16 | 32 | 64)\n";
   cerr << "            | tree:<n> (followed by <n> entries)\n";
   cerr << "            | thunk: (followed by tree:<n>)\n";

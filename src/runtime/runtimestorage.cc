@@ -354,6 +354,35 @@ void RuntimeStorage::serialize_relation( Relation relation )
   }
 }
 
+void RuntimeStorage::serialize_pin_relations( Handle src, const unordered_set<Handle>& dsts )
+{
+  if ( dsts.empty() )
+    return;
+
+  const auto fix_dir = get_fix_repo();
+  Handle lhs_handle = canonicalize( src );
+  string file_name = base16::encode( lhs_handle );
+
+  filesystem::path path = fix_dir / "relations";
+  if ( not std::filesystem::exists( path ) ) {
+    std::filesystem::create_directory( path );
+  }
+
+  path = path / "Pin";
+  if ( not std::filesystem::exists( path ) ) {
+    std::filesystem::create_directory( path );
+  }
+
+  path = path / file_name;
+  if ( not std::filesystem::exists( path ) ) {
+    ofstream output_file( path );
+    for ( const auto& dst : dsts ) {
+      auto canonical_dst = canonicalize( dst );
+      output_file << string_view { reinterpret_cast<const char*>( &canonical_dst ), sizeof( Handle ) };
+    }
+  }
+}
+
 Handle read_handle( filesystem::path file )
 {
   ifstream input_file( file );
@@ -474,29 +503,47 @@ string RuntimeStorage::get_encoded_name( Handle handle )
 
 string RuntimeStorage::get_short_name( Handle handle )
 {
-  if ( handle.is_canonical() )
-    return get_encoded_name( handle ).substr( 0, 7 );
-  else
+  if ( handle.is_canonical() ) {
+    auto encoded = get_encoded_name( handle );
+    return encoded.substr( 0, 6 ) + encoded[63];
+  } else
     return "local[" + to_string( handle.get_local_id() ) + "]";
+}
+
+Handle RuntimeStorage::get_full_name( string short_name )
+{
+  assert( short_name.length() == 7 );
+  string prefix = short_name.substr( 0, 6 );
+
+  auto fix_dir = get_fix_repo();
+  for ( const auto& file : filesystem::directory_iterator( fix_dir / "objects" ) ) {
+    auto file_name = file.path().filename().string();
+    if ( file_name.starts_with( prefix ) ) {
+      Handle full = base16::decode( file_name );
+      if ( file_name.ends_with( short_name[6] ) ) {
+        return full;
+      } else if ( base16::encode( full.as_thunk() ).ends_with( short_name[6] ) ) {
+        return full.as_thunk();
+      }
+    }
+  }
+
+  throw runtime_error( "Full name does not exist." );
 }
 
 string RuntimeStorage::get_display_name( Handle handle )
 {
   vector<string> friendly_names = get_friendly_names( handle );
+  string fullname = get_short_name( handle );
   if ( not friendly_names.empty() ) {
-    string fullname = get_short_name( handle );
     fullname += " (";
     for ( const auto& name : friendly_names ) {
       fullname += name + ", ";
     }
     fullname = fullname.substr( 0, fullname.size() - 2 );
     fullname += ")";
-    return fullname;
-  } else {
-    stringstream ss;
-    ss << handle;
-    return ss.str();
   }
+  return fullname;
 }
 
 optional<Handle> RuntimeStorage::get_ref( string_view ref )
@@ -516,7 +563,6 @@ void RuntimeStorage::set_ref( string_view ref, Handle handle )
 
 void RuntimeStorage::visit( Handle handle, function<void( Handle )> visitor )
 {
-  handle = canonicalize( handle );
   if ( handle.is_lazy() ) {
     visitor( handle );
   } else {
@@ -539,6 +585,43 @@ void RuntimeStorage::visit( Handle handle, function<void( Handle )> visitor )
         break;
     }
   }
+}
+
+void RuntimeStorage::visit_full( Handle handle,
+                                 function<void( Handle )> visitor,
+                                 function<void( Handle, unordered_set<Handle> )> pin_visitor,
+                                 unordered_set<Handle> visited )
+{
+  if ( visited.contains( handle ) ) {
+    return;
+  }
+  visited.insert( handle );
+
+  switch ( handle.get_content_type() ) {
+    case ContentType::Tree:
+      if ( contains( handle ) ) {
+        for ( const auto& element : get_tree( handle ) ) {
+          visit_full( element, visitor, pin_visitor, visited );
+        }
+      }
+      visitor( handle );
+      break;
+    case ContentType::Blob:
+      visitor( handle );
+      break;
+    case ContentType::Thunk:
+    case ContentType::Tag:
+      visit_full( handle.as_tree(), visitor, pin_visitor, visited );
+      visitor( handle );
+      break;
+  }
+
+  auto pinned = get_pinned_handles( handle );
+  for ( const auto& dst : pinned ) {
+    visit_full( dst, visitor, pin_visitor, visited );
+    visitor( dst );
+  }
+  pin_visitor( handle, pinned );
 }
 
 bool RuntimeStorage::compare_handles( Handle x, Handle y )
@@ -579,4 +662,34 @@ const Program& RuntimeStorage::link( Handle handle )
   Program program = link_program( get<Blob>( handle ) );
   linked_programs_.insert( { handle, std::move( program ) } );
   return linked_programs_.at( handle );
+}
+
+unordered_set<Handle> RuntimeStorage::get_pinned_handles( Handle handle )
+{
+  shared_lock lock( storage_mutex_ );
+  return pins_[handle];
+}
+
+void RuntimeStorage::pin( Handle src, Handle dst )
+{
+  unique_lock lock( storage_mutex_ );
+  pins_[src].insert( dst );
+}
+
+unordered_set<Handle> RuntimeStorage::get_tags( Handle handle )
+{
+  auto fix_dir = get_fix_repo();
+  unordered_set<Handle> result;
+
+  for ( const auto& file : filesystem::directory_iterator( fix_dir / "objects" ) ) {
+    Handle name( base16::decode( file.path().filename().string() ) );
+    if ( name.is_tag() ) {
+      auto tree = get_tree( name );
+      if ( compare_handles( tree[0], handle ) ) {
+        result.insert( name );
+      }
+    }
+  }
+
+  return result;
 }

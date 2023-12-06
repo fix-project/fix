@@ -25,15 +25,12 @@ void usage_message( const char* argv0 )
   cerr << "                                    -- print all dependencies of an eval-relation\n";
   cerr << "                                  | step-eval:\n";
   cerr << "                                    -- print the immediate dependencies of an eval-relation\n";
-  cerr << "                                  | trace:\n";
-  cerr << "                                    -- print all trace entries for the object\n";
-  cerr << "                                  | from-where:\n";
-  cerr << "                                    -- print all eval/apply-relations that leads to the object\n";
+  cerr << "                                  | explain:\n";
+  cerr << "                                    -- print explanations for an object\n";
   cerr << "   entry :=   file:<filename>\n";
   cerr << "            | string:<string>\n";
   cerr << "            | name:<base16-encoded name>\n";
-  cerr << "            | short-name:<prefix><first 7 bytes of a base16-encoded name> (with <prefix> = Blo(B) | "
-          "Tre(E) | Thun(K) | Ta(G)\n";
+  cerr << "            | short-name:<7 bytes shortened base16-encoded name>\n";
   cerr << "            | uint<n>:<integer> (with <n> = 8 | 16 | 32 | 64)\n";
   cerr << "            | tree:<n> (followed by <n> entries)\n";
   cerr << "            | thunk: (followed by tree:<n>)\n";
@@ -58,7 +55,7 @@ void parse_args( span_view<char*> args )
   Handle handle = parse_args( args, open_files, true );
 
   if ( str.starts_with( "what:" ) ) {
-    cout << rt.storage().get_display_name( handle ) << endl;
+    cout << pretty_print_handle( handle ) << endl;
     return;
   }
 
@@ -85,14 +82,13 @@ void parse_args( span_view<char*> args )
 
     optional<Relation> relation;
     if ( str.starts_with( "apply:" ) ) {
-      relation = rt.get_relation( Task::Apply( handle ) );
+      relation = rt.get_task_relation( Task::Apply( handle ) );
     } else if ( str.starts_with( "eval:" ) ) {
-      relation = rt.get_relation( Task::Eval( handle ) );
+      relation = rt.get_task_relation( Task::Eval( handle ) );
     } else {
       cerr << "Cannot parse command\n";
       return;
     }
-
     if ( not relation.has_value() ) {
       cerr << "Relation does not exist\n";
       return;
@@ -103,44 +99,51 @@ void parse_args( span_view<char*> args )
   }
 
   if ( str.starts_with( "step-eval:" ) ) {
-    auto relation = rt.get_relation( Task::Eval( handle ) );
+    auto relation = rt.get_task_relation( Task::Eval( handle ) );
 
     if ( not relation.has_value() ) {
       cerr << "Relation does not exist\n";
       return;
     }
-    rt.shallow_visit( relation.value(), []( Relation relation ) { cout << relation << endl; } );
+    rt.shallow_visit( relation.value(),
+                      []( Relation relation ) { cout << pretty_print_relation( relation ) << endl; } );
     return;
   }
 
   if ( str.starts_with( "steps-eval:" ) ) {
-    auto relation = rt.get_relation( Task::Eval( handle ) );
+    auto relation = rt.get_task_relation( Task::Eval( handle ) );
 
     if ( not relation.has_value() ) {
       cerr << "Relation does not exist\n";
       return;
     }
-    rt.visit( relation.value(), []( Relation relation ) { cout << relation << endl; } );
+    rt.visit( relation.value(), []( Relation relation ) { cout << pretty_print_relation( relation ) << endl; } );
     return;
   }
 
-  if ( str.starts_with( "trace:" ) ) {
-    auto relations = rt.get_relation( handle );
+  if ( str.starts_with( "explain:" ) ) {
+    auto [relations, names] = rt.get_explanations( handle );
+
+    cout << "Relations that point to the handle:\n";
     for ( const auto& relation : relations ) {
-      cout << deep_pretty_print( relation.rhs() );
+      cout << pretty_print_relation( relation ) << endl;
     }
-    return;
-  }
 
-  if ( str.starts_with( "from-where:" ) ) {
-    auto relations = rt.get_parents( handle );
-    if ( relations.empty() ) {
-      cout << "Relation does not exist\n";
+    if ( names.empty() )
       return;
-    }
-
-    for ( const auto& relation : relations ) {
-      cout << relation << endl;
+    cout << "\n";
+    cout << "We also have some extra info:\n";
+    for ( const auto& name : names ) {
+      if ( name.is_tag() ) {
+        auto view = rt.storage().get_tree( name );
+        if ( rt.storage().compare_handles( view[0], handle ) ) {
+          cout << "In " << pretty_print_handle( name ) << ", ";
+          cout << pretty_print_handle( view[1] ) << " tags it by\n";
+          cout << deep_pretty_print( view[2] ) << endl;
+          continue;
+        }
+      }
+      cout << deep_pretty_print( name ) << endl;
     }
     return;
   }

@@ -41,6 +41,9 @@ private:
   // Keeping track of canonical and local task handle translation
   absl::flat_hash_map<Handle, std::list<Handle>, AbslHash> canonical_to_local_cache_for_tasks_ {};
 
+  // Keepying track of what objects are pinned by an object
+  absl::flat_hash_map<Handle, std::unordered_set<Handle>, absl::Hash<Handle>> pins_ {};
+
   // Maps a Wasm function Handle to corresponding compiled Program
   std::unordered_map<Handle, Program> linked_programs_ {};
 
@@ -91,6 +94,7 @@ public:
 
   void serialize_object( Handle name, const std::filesystem::path& dir );
   void serialize_relation( Relation relation );
+  void serialize_pin_relations( Handle src, const std::unordered_set<Handle>& dsts );
 
   // Tests if the Handle (with the specified accessibility) is valid with the current contents.
   bool contains( Handle handle );
@@ -101,8 +105,11 @@ public:
   // Gets the base16 encoded name of the handle.
   std::string get_encoded_name( Handle handle );
 
-  // Gets the shortened bbase16 encoded name of the handle.
+  // Gets the shortened base16 encoded name of the handle.
   std::string get_short_name( Handle handle );
+
+  // Gets the handle given shortened base16 encoded name.
+  Handle get_full_name( std::string short_name );
 
   // Gets the best name for this Handle to display to users.
   std::string get_display_name( Handle handle );
@@ -123,6 +130,20 @@ public:
    * @param visitor         A function to call on every dependency.
    */
   void visit( Handle root, std::function<void( Handle )> visitor );
+
+  /**
+   * Call @p visitor for every Handle in the "fully accessible repo" of @p root, i.e., the set of Handles needed for
+   * @p root to be valid as input to a Fix program.
+   *
+   * The iteration order is such that every child will be visited before its parents.
+   *
+   * @param root            The Handle from which to start traversing inputs.
+   * @param visitor         A function to call on every dependency.
+   */
+  void visit_full( Handle root,
+                   std::function<void( Handle )> visitor,
+                   std::function<void( Handle, std::unordered_set<Handle> )> pin_visitor,
+                   std::unordered_set<Handle> visited = {} );
 
   /**
    * Determines if two Handles should be treated as equal.  This might canonicalize the Handles if necessary.
@@ -157,4 +178,19 @@ public:
    * Links an ELF file and returns a runnable Program.
    */
   const Program& link( Handle handle );
+
+  /**
+   * Add a suggestory pin to @p dst from @p src.
+   */
+  void pin( Handle src, Handle dst );
+
+  /**
+   * Return handles pinned by @p handle.
+   */
+  std::unordered_set<Handle> get_pinned_handles( Handle handle );
+
+  /**
+   * Return handles of tags that tag @p handle.
+   */
+  std::unordered_set<Handle> get_tags( Handle handle );
 };

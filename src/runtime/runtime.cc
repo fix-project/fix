@@ -15,7 +15,6 @@ void Runtime::visit( Relation root, std::function<void( Relation )> visitor )
       VLOG( 1 ) << "Visiting apply";
       break;
 
-    case RelationType::TracedBy:
     case RelationType::COUNT:
       throw std::runtime_error( "Visiting not-visitable relation" );
       break;
@@ -31,7 +30,7 @@ void Runtime::visit( Relation root, std::function<void( Relation )> visitor )
         case ContentType::Tree:
         case ContentType::Tag: {
           for ( const auto entry : storage_.get_tree( name.as_tree() ) ) {
-            if ( auto relation = get_relation( Task::Eval( entry ) ); relation.has_value() ) {
+            if ( auto relation = get_task_relation( Task::Eval( entry ) ); relation.has_value() ) {
               visit( relation.value(), visitor );
             }
           }
@@ -41,17 +40,17 @@ void Runtime::visit( Relation root, std::function<void( Relation )> visitor )
         case ContentType::Thunk: {
           Handle encode = name.as_tree();
 
-          auto relation = get_relation( Task::Eval( encode ) );
+          auto relation = get_task_relation( Task::Eval( encode ) );
           if ( !relation.has_value() )
             return;
           visit( relation.value(), visitor );
 
-          relation = get_relation( Task::Apply( relation->rhs() ) );
+          relation = get_task_relation( Task::Apply( relation->rhs() ) );
           if ( !relation.has_value() )
             return;
           visit( relation.value(), visitor );
 
-          relation = get_relation(
+          relation = get_task_relation(
             Task::Eval( name.is_shallow() ? Handle::make_shallow( relation->rhs() ) : relation->rhs() ) );
           if ( !relation.has_value() )
             return;
@@ -72,7 +71,6 @@ void Runtime::shallow_visit( Relation root, std::function<void( Relation )> visi
       VLOG( 1 ) << "Visiting apply";
       break;
 
-    case RelationType::TracedBy:
     case RelationType::COUNT:
       throw std::runtime_error( "Visiting not-visitable relation" );
       break;
@@ -88,7 +86,7 @@ void Runtime::shallow_visit( Relation root, std::function<void( Relation )> visi
         case ContentType::Tree:
         case ContentType::Tag: {
           for ( const auto entry : storage_.get_tree( name.as_tree() ) ) {
-            if ( auto relation = get_relation( Task::Eval( entry ) ); relation.has_value() ) {
+            if ( auto relation = get_task_relation( Task::Eval( entry ) ); relation.has_value() ) {
               visitor( relation.value() );
             }
           }
@@ -98,17 +96,17 @@ void Runtime::shallow_visit( Relation root, std::function<void( Relation )> visi
         case ContentType::Thunk: {
           Handle encode = name.as_tree();
 
-          auto relation = get_relation( Task::Eval( encode ) );
+          auto relation = get_task_relation( Task::Eval( encode ) );
           if ( !relation.has_value() )
             return;
           visitor( relation.value() );
 
-          relation = get_relation( Task::Apply( relation->rhs() ) );
+          relation = get_task_relation( Task::Apply( relation->rhs() ) );
           if ( !relation.has_value() )
             return;
           visitor( relation.value() );
 
-          relation = get_relation(
+          relation = get_task_relation(
             Task::Eval( name.is_shallow() ? Handle::make_shallow( relation->rhs() ) : relation->rhs() ) );
           if ( !relation.has_value() )
             return;
@@ -120,9 +118,14 @@ void Runtime::shallow_visit( Relation root, std::function<void( Relation )> visi
   }
 }
 
+bool Runtime::has_explanation( Relation relation )
+{
+  return ( relation.type() == RelationType::Eval and !relation.lhs().is_blob() );
+}
+
 void Runtime::serialize( Task task )
 {
-  if ( auto relation = cache_.get_relation( task ); relation.has_value() ) {
+  if ( auto relation = cache_.get_task_relation( task ); relation.has_value() ) {
     VLOG( 1 ) << "Visiting relations" << endl;
     visit( relation.value(), [this]( Relation relation ) {
       this->storage().serialize_relation( relation );
@@ -134,16 +137,14 @@ void Runtime::serialize( Task task )
 
 void Runtime::serialize( Handle name )
 {
-  storage_.visit( name, [this]( Handle handle ) {
-    this->storage().serialize_object( handle, this->storage().get_fix_repo() / "objects" );
-    auto trace_relations = cache_.get_relation( handle );
-    for ( const auto& relation : trace_relations ) {
-      this->storage().serialize_relation( relation );
-      storage_.visit( relation.rhs(), [this]( Handle handle ) {
-        this->storage().serialize_object( handle, this->storage().get_fix_repo() / "objects" );
-      } );
-    }
-  } );
+  storage_.visit_full(
+    name,
+    [this]( Handle handle ) {
+      this->storage().serialize_object( handle, this->storage().get_fix_repo() / "objects" );
+    },
+    [this]( Handle handle, unordered_set<Handle> dsts ) {
+      this->storage().serialize_pin_relations( handle, dsts );
+    } );
 }
 
 void Runtime::deserialize_relations()
@@ -169,13 +170,12 @@ void Runtime::deserialize_relations()
     cache_.finish( Task::Eval( name ), tmp.at( 0 ) );
   }
 
-  for ( const auto& file :
-        filesystem::directory_iterator( dir / RELATIONTYPE_NAMES[to_underlying( RelationType::TracedBy )] ) ) {
+  for ( const auto& file : filesystem::directory_iterator( dir / "Pin" ) ) {
     Handle name( base16::decode( file.path().filename().string() ) );
 
     auto tmp = OwnedTree::from_file( file );
     for ( const auto& entry : tmp.span() ) {
-      cache_.trace( name, entry );
+      storage_.pin( name, entry );
     }
   }
 

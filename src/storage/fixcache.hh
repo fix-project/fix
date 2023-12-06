@@ -31,7 +31,6 @@ class FixCache : IResultCache
   std::shared_mutex mutex_ {};
   std::condition_variable_any cv_ {};
   absl::flat_hash_map<Task, Handle, absl::Hash<Task>> cache_ {};
-  absl::flat_hash_map<Handle, std::unordered_set<Handle>, absl::Hash<Handle>> trace_cache_ {};
   std::unordered_set<Task> finished_ {};
 
 public:
@@ -70,11 +69,17 @@ public:
     return {};
   }
 
-  std::optional<Relation> get_relation( Task task )
+  /**
+   * Try to get the relation corresponding to a Task.  Does not perform any work if the relation is unknown.
+   *
+   * @param task  The task for which to get a relation.
+   * @return      The relation, if known, otherwise `std::nullopt`.
+   */
+  std::optional<Relation> get_task_relation( Task task )
   {
-    std::shared_lock lock( mutex_ );
-    if ( cache_.contains( task ) )
-      return Relation( task, cache_.at( task ) );
+    if ( auto result = this->get( task ); result.has_value() ) {
+      return Relation( task, result.value() );
+    }
 
     if ( task.operation() == Operation::Eval && task.handle().is_blob() ) {
       return Relation( task, task.handle() );
@@ -83,19 +88,13 @@ public:
     return {};
   }
 
-  std::list<Relation> get_relation( Handle handle )
-  {
-    std::shared_lock lock( mutex_ );
-
-    std::list<Relation> result;
-    for ( const auto& trc : trace_cache_[handle] ) {
-      result.push_back( Relation( handle, trc ) );
-    }
-
-    return result;
-  }
-
-  std::list<Relation> get_parents( Handle handle )
+  /**
+   * Get any relation that points to a Handle.
+   *
+   * @param handle  The handle for which to look for relations.
+   * @return        The list of relations.
+   */
+  std::list<Relation> get_source_relations( Handle handle )
   {
     std::shared_lock lock( mutex_ );
 
@@ -129,11 +128,5 @@ public:
     std::shared_lock lock( mutex_ );
     cv_.wait( lock, [&] { return cache_.contains( task ); } );
     return cache_.at( task );
-  }
-
-  void trace( Handle obj, Handle trc )
-  {
-    std::unique_lock lock( mutex_ );
-    trace_cache_[obj].insert( trc );
   }
 };

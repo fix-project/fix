@@ -7,12 +7,10 @@ enum class RelationType : uint8_t
 {
   Apply,
   Eval,
-  TracedBy,
   COUNT
 };
 
-static constexpr const char* RELATIONTYPE_NAMES[static_cast<uint8_t>( RelationType::COUNT )]
-  = { "Apply", "Eval", "TracedBy" };
+static constexpr const char* RELATIONTYPE_NAMES[static_cast<uint8_t>( RelationType::COUNT )] = { "Apply", "Eval" };
 
 class Relation
 {
@@ -36,12 +34,6 @@ public:
     }() )
     , lhs_( task.handle() )
     , rhs_( handle )
-  {}
-
-  constexpr Relation( Handle obj, Handle trc )
-    : type_( RelationType::TracedBy )
-    , lhs_( obj )
-    , rhs_( trc )
   {}
 
   constexpr RelationType type() const { return type_; }

@@ -1,6 +1,7 @@
 #include <charconv>
 #include <stdexcept>
 
+#include "relation.hh"
 #include "tester-utils.hh"
 
 #include "base16.hh"
@@ -29,39 +30,6 @@ Handle make_blob( T t ) requires std::is_integral_v<T>
 {
   std::string_view s { (const char*)&t, sizeof( t ) };
   return Handle( s );
-}
-
-Handle get_full_name( string_view short_name )
-{
-  char prefix = short_name[0];
-  short_name.remove_prefix( 1 );
-
-  auto fix_dir = Runtime::get_instance().storage().get_fix_repo();
-  for ( const auto& file : filesystem::directory_iterator( fix_dir / "objects" ) ) {
-    if ( file.path().filename().string().starts_with( short_name ) ) {
-      Handle full = base16::decode( file.path().filename().string() );
-
-      if ( prefix == 'G' and !full.is_tag() ) {
-        continue;
-      }
-
-      if ( prefix == 'B' and !full.is_blob() ) {
-        throw std::runtime_error( "Object exists but it is not a Blob." );
-      }
-
-      if ( ( prefix == 'E' or prefix == 'K' ) and !full.is_tree() ) {
-        throw std::runtime_error( "Object exists but it is not a Tree/Thunk." );
-      }
-
-      if ( prefix == 'K' ) {
-        full = full.as_thunk();
-      }
-
-      return full;
-    }
-  }
-
-  throw std::runtime_error( "Short name does not exist." );
 }
 
 /**
@@ -134,7 +102,7 @@ Handle parse_args( span_view<char*>& args, vector<ReadOnlyFile>& open_files, boo
       deserialized = true;
     }
     args.remove_prefix( 1 );
-    return get_full_name( str.substr( 11 ) );
+    return rt.storage().get_full_name( string( str.substr( 11 ) ) );
   }
 
   if ( str.starts_with( "string:" ) ) {
@@ -276,8 +244,7 @@ ostream& operator<<( ostream& stream, const deep_pretty_print& pp )
     stream << deep_pretty_print( encode_name, pp.level + 1 );
   } else if ( pp.name.is_tag() ) {
     const auto view = runtime.get_tree( pp.name );
-    stream << ( terminal ? "\033[1;32mTag\033[m" : "Tag" ) << " (" << dec << view.size() << " entr"
-           << ( view.size() != 1 ? "ies" : "y" ) << "):\n";
+    stream << ( terminal ? "\033[1;32mTag\033[m" : "Tag" ) << ":\n";
     for ( unsigned int i = 0; i < view.size(); ++i ) {
       for ( unsigned int j = 0; j < pp.level + 1; ++j ) {
         stream << "  ";
@@ -287,6 +254,65 @@ ostream& operator<<( ostream& stream, const deep_pretty_print& pp )
   } else {
     throw runtime_error( "can't pretty-print object" );
   }
+  return stream;
+}
+
+ostream& operator<<( ostream& stream, const pretty_print_handle& pp )
+{
+  Handle handle = pp.handle;
+  const bool terminal
+    = ( &stream == &cout and isatty( STDOUT_FILENO ) ) or ( &stream == &cerr and isatty( STDERR_FILENO ) );
+  if ( handle.is_blob() ) {
+    stream << ( terminal ? "\033[1;34mBlob\033[m" : "Blob" ) << " (" << dec << handle.get_length() << " byte"
+           << ( handle.get_length() != 1 ? "s" : "" ) << "):";
+  } else if ( handle.is_tree() ) {
+    stream << ( terminal ? "\033[1;32mTree\033[m" : "Tree" ) << " (" << dec << handle.get_length() << " entr"
+           << ( handle.get_length() != 1 ? "ies" : "y" ) << "):";
+  } else if ( handle.is_thunk() ) {
+    stream << ( terminal ? "\033[1;36mThunk\033[m" : "Thunk" ) << ":";
+  } else if ( handle.is_tag() ) {
+    stream << ( terminal ? "\033[1;32mTag\033[m" : "Tag" ) << ":";
+  }
+
+  auto& runtime = Runtime::get_instance();
+
+  if ( handle.is_literal_blob() ) {
+    auto view = handle.literal_blob();
+    stream << " \"";
+    for ( const unsigned char ch : view ) {
+      if ( ch == '\\' ) {
+        stream << "\\\\";
+      } else if ( isprint( ch ) ) {
+        stream << ch;
+      } else {
+        stream << "\\x" << hex << setw( 2 ) << setfill( '0' ) << static_cast<unsigned int>( ch );
+      }
+    }
+    stream << "\"";
+
+    switch ( view.size() ) {
+      case sizeof( uint8_t ):
+        stream << " (uint8:" << dec << setw( 0 ) << static_cast<unsigned int>( from_int<uint8_t>( view ) ) << ")";
+        break;
+      case sizeof( uint16_t ):
+        stream << " (uint16:" << dec << setw( 0 ) << from_int<uint16_t>( view ) << ")";
+        break;
+      case sizeof( uint32_t ):
+        stream << " (uint32:" << dec << setw( 0 ) << from_int<uint32_t>( view ) << ")";
+        break;
+      case sizeof( uint64_t ):
+        stream << " (uint64:" << dec << setw( 0 ) << from_int<uint64_t>( view ) << ")";
+        break;
+    }
+  } else {
+    auto display_name = runtime.storage().get_display_name( handle );
+    stream << " " << display_name;
+  }
+
+  if ( runtime.has_explanation( handle ) ) {
+    stream << "\U0001F4AC";
+  }
+
   return stream;
 }
 
@@ -334,21 +360,52 @@ ostream& operator<<( ostream& stream, const pretty_print& pp )
     stream << ( terminal ? "\033[1;32mTree\033[m" : "Tree" ) << " (" << dec << view.size() << " entr"
            << ( view.size() != 1 ? "ies" : "y" ) << "):\n";
     for ( unsigned int i = 0; i < view.size(); ++i ) {
-      stream << "  " << to_string( i ) << ". " << runtime.get_display_name( view[i] ) << endl;
+      stream << "  " << to_string( i ) << ". " << pretty_print_handle( view[i] ) << endl;
     }
   } else if ( pp.name.is_thunk() ) {
     Handle encode_name = pp.name.as_tree();
     stream << ( terminal ? "\033[1;36mThunk\033[m" : "Thunk" ) << ":\n";
-    stream << runtime.get_display_name( encode_name );
+    stream << pretty_print_handle( encode_name ) << endl;
   } else if ( pp.name.is_tag() ) {
     const auto view = runtime.get_tree( pp.name );
-    stream << ( terminal ? "\033[1;32mTag\033[m" : "Tag" ) << " (" << dec << view.size() << " entr"
-           << ( view.size() != 1 ? "ies" : "y" ) << "):\n";
+    stream << ( terminal ? "\033[1;32mTag\033[m" : "Tag" ) << ":\n";
     for ( unsigned int i = 0; i < view.size(); ++i ) {
-      stream << "  " << to_string( i ) << ". " << runtime.get_display_name( view[i] ) << endl;
+      stream << "  " << to_string( i ) << ". " << pretty_print_handle( view[i] ) << endl;
     }
   } else {
     throw runtime_error( "can't pretty-print object" );
   }
+  return stream;
+}
+
+ostream& operator<<( ostream& stream, const pretty_print_relation& pp )
+{
+  const bool terminal
+    = ( &stream == &cout and isatty( STDOUT_FILENO ) ) or ( &stream == &cerr and isatty( STDERR_FILENO ) );
+
+  auto& relation = pp.relation;
+
+  stream << pretty_print_handle( relation.lhs() ) << " ";
+  switch ( pp.relation.type() ) {
+    case RelationType::Eval:
+      stream << "--" << ( terminal ? "\033[3;35mEval\033[m" : "Eval" ) << "-->";
+      break;
+
+    case RelationType::Apply:
+      stream << "--" << ( terminal ? "\033[3;35mApply\033[m" : "Apply" ) << "-->";
+      break;
+
+    default:
+      throw runtime_error( "can't pretty-print relation" );
+  }
+
+  auto& runtime = Runtime::get_instance();
+  if ( runtime.has_explanation( relation ) ) {
+    stream << "\U0001F4AC";
+  }
+  stream << " ";
+
+  stream << pretty_print_handle( relation.rhs() );
+
   return stream;
 }
