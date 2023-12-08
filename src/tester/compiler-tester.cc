@@ -63,7 +63,7 @@ void program_body( span_view<char*> args )
     storage.set_ref( *ref_name, result );
   }
   Handle canonical = storage.canonicalize( result );
-  storage.serialize( result );
+  rt.serialize( result );
   // print the result
   cout << "Result serialized to: " << base16::encode( canonical ) << "\n";
   if ( ref_name ) {

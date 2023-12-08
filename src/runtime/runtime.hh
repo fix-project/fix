@@ -3,6 +3,7 @@
 #include "dependency_graph.hh"
 #include "interface.hh"
 #include "network.hh"
+#include "relation.hh"
 #include "runtimestorage.hh"
 #include "scheduler.hh"
 #include "worker_pool.hh"
@@ -17,6 +18,8 @@ class Runtime : IRuntime
   NetworkWorker network_;
 
   static inline thread_local Handle current_procedure_;
+
+  void deserialize_relations();
 
 public:
   Runtime( size_t runtime_threads )
@@ -54,9 +57,25 @@ public:
   std::optional<Info> get_info() override { return workers_->get_info(); }
 
   void add_task_runner( std::weak_ptr<ITaskRunner> runner ) override { scheduler_.add_task_runner( runner ); }
+
   void add_result_cache( IResultCache& cache ) override { graph_.add_result_cache( cache ); }
 
   Handle eval( Handle target ) { return graph_.run( Task::Eval( target ) ); }
+
+  std::optional<Relation> get_task_relation( Task task ) { return cache_.get_task_relation( task ); }
+
+  std::pair<std::list<Relation>, std::unordered_set<Handle>> get_explanations( Handle handle )
+  {
+    auto res = storage_.get_pinned_handles( handle );
+    res.merge( storage_.get_tags( handle ) );
+    return { cache_.get_source_relations( handle ), res };
+  }
+
+  bool has_explanation( Handle handle )
+  {
+    auto explanations = get_explanations( handle );
+    return ( !explanations.first.empty() or !explanations.second.empty() );
+  }
 
   void set_current_procedure( Handle handle ) { current_procedure_ = handle; }
 
@@ -73,4 +92,19 @@ public:
     workers_->stop();
     network_.stop();
   }
+
+  void visit( Relation root, std::function<void( Relation )> visitor );
+  void shallow_visit( Relation root, std::function<void( Relation )> visitor );
+  bool has_explanation( Relation root );
+
+  void serialize( Task task );
+  void serialize( Handle name );
+
+  void deserialize()
+  {
+    storage_.deserialize();
+    deserialize_relations();
+  };
+
+  void pin( Handle obj, Handle trc ) { storage_.pin( obj, trc ); }
 };

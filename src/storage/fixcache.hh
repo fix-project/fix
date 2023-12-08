@@ -11,6 +11,9 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/hash/hash.h"
+#include "handle.hh"
+#include "operation.hh"
+#include "relation.hh"
 #include "task.hh"
 
 #include "interface.hh"
@@ -64,6 +67,44 @@ public:
     if ( cache_.contains( task ) )
       return cache_.at( task );
     return {};
+  }
+
+  /**
+   * Try to get the relation corresponding to a Task.  Does not perform any work if the relation is unknown.
+   *
+   * @param task  The task for which to get a relation.
+   * @return      The relation, if known, otherwise `std::nullopt`.
+   */
+  std::optional<Relation> get_task_relation( Task task )
+  {
+    if ( auto result = this->get( task ); result.has_value() ) {
+      return Relation( task, result.value() );
+    }
+
+    if ( task.operation() == Operation::Eval && task.handle().is_blob() ) {
+      return Relation( task, task.handle() );
+    }
+
+    return {};
+  }
+
+  /**
+   * Get any relation that points to a Handle.
+   *
+   * @param handle  The handle for which to look for relations.
+   * @return        The list of relations.
+   */
+  std::list<Relation> get_source_relations( Handle handle )
+  {
+    std::shared_lock lock( mutex_ );
+
+    std::list<Relation> result;
+    for ( const auto& [task, res] : cache_ ) {
+      if ( res == handle ) {
+        result.push_back( Relation( task, res ) );
+      }
+    }
+    return result;
   }
 
   /**

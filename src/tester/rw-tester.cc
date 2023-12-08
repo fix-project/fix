@@ -37,6 +37,12 @@ void program_body( span_view<char*> args )
 
   // print the result
   cout << "Result:\n" << deep_pretty_print( result );
+
+  runtime.serialize( Task::Eval( thunk_name ) );
+
+  Handle canonical_thunk_name = runtime.storage().canonicalize( thunk_name );
+  Handle canonical_result_name = runtime.storage().canonicalize( result );
+  cout << "Eval: " << canonical_thunk_name << " --> " << canonical_result_name << endl;
 }
 
 void usage_message( const char* argv0 )

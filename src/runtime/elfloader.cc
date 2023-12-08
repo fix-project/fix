@@ -59,6 +59,7 @@ const static map<string, uint64_t> library_func_map
       // { "fixpoint_debug_try_inspect", (uint64_t)fixpoint_debug::try_inspect },
       // { "fixpoint_debug_try_evaluate", (uint64_t)fixpoint_debug::try_evaluate },
       { "fixpoint_lower", (uint64_t)fixpoint::lower },
+      { "fixpoint_pin", (uint64_t)fixpoint::pin },
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
       { "memset", (uint64_t)memset },

@@ -26,6 +26,8 @@ void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem );
 
 uint32_t equality( __m256i lhs, __m256i rhs );
 
+uint32_t pin( __m256i src, __m256i dst );
+
 // Length in elements (Tree-like) or bytes (Blobs)
 uint32_t get_length( __m256i handle );
 
