@@ -6,14 +6,6 @@ If the `BUILD_VISUALIZER` cmake cache variable is set, e.g. with `-DBUILD_VISUAL
 `cmake` will attempt to build the viewer to a website. Then, running the `http-tester`, for example with
 `http-tester 9090 ~/fix/build/src/tester/http-client/` will serve the viewer on the given port.
 
-To see the dependency information, tracing needs to be enabled in the runtime. `ENABLE_TRACING`
-must be defined to be `1` in `src/runtime/dependency_graph.hh`.
-```
-#ifndef ENABLE_TRACING
-#define ENABLE_TRACING 1
-#endif
-```
-
 If developing on a remote machine, such as stagecast, and viewing from a local machine, like a laptop, ssh port forwarding
 must be setup to access the http-tester's server. This can be accomplished with `ssh -L 9090:127.0.0.1:9090 stagecast.org`.
 

@@ -1,5 +1,6 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ptree_fwd.hpp>
 #include <charconv>
 #include <cstdlib>
 #include <iostream>
@@ -13,6 +14,7 @@
 #include "http_server.hh"
 #include "mmap.hh"
 #include "operation.hh"
+#include "relation.hh"
 #include "runtime.hh"
 #include "runtimestorage.hh"
 #include "socket.hh"
@@ -49,60 +51,49 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
   cout << "Result name: " << base16::encode( result ) << endl << flush;
 }
 
-ptree list_dependees( Handle handle, Operation op )
+ptree serialize_relation( Relation relation )
 {
   ptree pt;
-  auto graph = Runtime::get_instance().get_graph();
-  if ( not graph.contains( Task( handle, op ) ) ) {
-    return pt;
-  }
-  for ( auto& dependee : graph.at( Task( handle, op ) ) ) {
-    ptree dependee_tree;
-    dependee_tree.push_back( ptree::value_type( "handle", base16::encode( dependee.handle() ) ) );
-    dependee_tree.put( "operation", uint8_t( dependee.operation() ) );
-    pt.push_back( ptree::value_type( "", dependee_tree ) );
+
+  if ( relation.type() == RelationType::Apply ) {
+    pt.put( "relation", "Apply" );
+  } else if ( relation.type() == RelationType::Eval ) {
+    pt.put( "relation", "Eval" );
   }
 
-  ptree data;
-  if ( pt.size() != 0 ) {
-    data.push_back( ptree::value_type( "dependees", pt ) );
-  }
-  return data;
+  pt.put( "lhs", base16::encode( relation.lhs() ) );
+  pt.put( "rhs", base16::encode( relation.rhs() ) );
+
+  return pt;
 }
 
-// Obtains the result of the specified operation on this handle.
-ptree get_child( Handle handle, Operation operation )
-{
-  auto results = Runtime::get_instance().get_results();
-  ptree data;
-  if ( results.contains( Task( handle, operation ) ) ) {
-    data.push_back( ptree::value_type( "handle", base16::encode( results.at( Task( handle, operation ) ) ) ) );
-  }
-
-  return data;
-}
-
-// Obtains tasks which produced this handle.
-ptree get_parents( Handle handle )
+ptree get_explanations( Handle handle )
 {
   ptree pt;
-  auto results = Runtime::get_instance().get_results();
-  vector<Task> result;
-  for ( auto& pair : results ) {
-    if ( pair.second == handle ) {
-      result.push_back( pair.first );
-    }
-  }
-  ptree data;
-  for ( auto& parent : result ) {
-    ptree entry;
-    entry.push_back( ptree::value_type( "handle", base16::encode( parent.handle() ) ) );
-    entry.put( "operation", uint8_t( parent.operation() ) );
-    data.push_back( ptree::value_type( "", entry ) );
-  }
+  auto [relations, handles] = Runtime::get_instance().get_explanations( handle );
 
-  if ( data.size() != 0 ) {
-    pt.push_back( ptree::value_type( "parents", data ) );
+  ptree relation_tree;
+  for ( auto& relation : relations ) {
+    relation_tree.push_back( ptree::value_type( "", serialize_relation( relation ) ) );
+  }
+  pt.push_back( ptree::value_type( "relations", relation_tree ) );
+
+  ptree pins_and_tags_tree;
+  for ( auto& handle : handles ) {
+    pins_and_tags_tree.push_back( ptree::value_type( "", base16::encode( handle ) ) );
+  }
+  pt.push_back( ptree::value_type( "handles", relation_tree ) );
+
+  return pt;
+}
+
+ptree get_task_relation( Task task )
+{
+  ptree pt;
+
+  auto relation = Runtime::get_instance().get_task_relation( task );
+  if ( relation.has_value() ) {
+    pt.push_back( ptree::value_type( "relation", serialize_relation( relation.value() ) ) );
   }
 
   return pt;
@@ -197,20 +188,18 @@ optional<tuple<string, string>> try_get_response( string target, string source_d
 
   // Handle API calls.
   auto map = decode_url_params( target );
-  if ( target.starts_with( "dependees" ) ) {
+  if ( target.starts_with( "explanations" ) ) {
     stringstream ptree;
-    write_json( ptree,
-                list_dependees( base16::decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
+    write_json( ptree, get_explanations( base16::decode( map.at( "handle" ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
-  } else if ( target.starts_with( "child" ) ) {
+  } else if ( target.starts_with( "relation" ) ) {
     stringstream ptree;
-    write_json( ptree, get_child( base16::decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) );
-    return make_tuple( ptree.str(), "text/json" );
-  } else if ( target.starts_with( "parents" ) ) {
-    stringstream ptree;
-    write_json( ptree, get_parents( base16::decode( map.at( "handle" ) ) ) );
+    write_json(
+      ptree,
+      get_task_relation( Task( base16::decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
   }
+
   return {};
 }
 
@@ -328,11 +317,6 @@ int max_args = -1;
 void program_body( span_view<char*> args )
 {
   ios::sync_with_stdio( false );
-
-#if ENABLE_TRACING != 1
-  cerr << "ERROR: ENABLE_TRACING must be set to 1 for http-tester" << endl;
-  return;
-#endif
 
   // Start listening on the specified port.
   TCPSocket server_socket {};
