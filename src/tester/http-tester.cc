@@ -72,6 +72,8 @@ ptree get_explanations( Handle handle )
   ptree pt;
   auto [relations, handles] = Runtime::get_instance().get_explanations( handle );
 
+  pt.push_back(ptree::value_type("target", base16::encode(handle)));
+
   ptree relation_tree;
   for ( auto& relation : relations ) {
     relation_tree.push_back( ptree::value_type( "", serialize_relation( relation ) ) );
