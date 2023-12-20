@@ -1,16 +1,18 @@
-use std::sync::{
-    mpsc::{channel, Receiver, Sender},
-    Arc,
+use std::{
+    collections::HashMap,
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc,
+    },
 };
 
 use anyhow::Result;
-use egui::{TextEdit, Visuals};
+use egui::Visuals;
 use reqwest::Client;
 
 use crate::{
-    graphs::GraphsContainer,
-    handle::{Handle, Operation},
-    http::{self, Response},
+    graphs::{add_main_node, add_node, get_connection, Graph, Ports},
+    handle::Handle,
 };
 
 pub struct App {
@@ -22,47 +24,79 @@ pub struct App {
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 struct Storage {
-    url: String,
     target: Handle,
-    operation: Operation,
 }
 
 impl Default for Storage {
     fn default() -> Self {
         Self {
-            url: String::new(),
             target: Handle::from_hex(
                 "1000000000000000000000000000000000000000000000000000000000000024",
             )
             .unwrap(),
-            operation: Operation::Eval,
         }
     }
 }
 
 struct State {
     target_input: String,
-    response: String,
-    error: String,
+    error: Error,
     first_render: bool,
     client: Arc<Client>,
-    response_tx: Sender<(usize, Handle, Result<http::Response>)>,
-    response_rx: Receiver<(usize, Handle, Result<http::Response>)>,
-    graph: Option<GraphsContainer>,
+    response_tx: Sender<Result<Vec<Relation>>>,
+    response_rx: Receiver<Result<Vec<Relation>>>,
+    connections: Graph,
+}
+
+#[derive(Hash, PartialEq, Eq, Clone)]
+pub(crate) struct Relation {
+    pub(crate) lhs: Handle,
+    pub(crate) rhs: Handle,
+    pub(crate) relation_type: RelationType,
+}
+
+// For now. Should add content, tag.
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+pub(crate) enum RelationType {
+    Eval,
+    Apply,
+    Fill,
+}
+
+#[derive(Default)]
+struct Error {
+    content: String,
+    dirty: bool,
+}
+
+impl Error {
+    fn write(&mut self, content: String) {
+        self.dirty = true;
+        self.content = content;
+    }
+
+    fn read_and_update(&mut self) -> &str {
+        if self.dirty {
+            self.dirty = false;
+            &self.content
+        } else {
+            ""
+        }
+    }
 }
 
 impl Default for State {
     fn default() -> Self {
         let (tx, rx) = channel();
         Self {
-            target_input: String::new(),
-            response: String::new(),
-            error: String::new(),
+            target_input: "1000000000000000000000000000000000000000000000000000000000000024"
+                .to_owned(),
+            error: Error::default(),
             first_render: true,
             client: Arc::new(Client::new()),
             response_tx: tx,
             response_rx: rx,
-            graph: None,
+            connections: Graph::default(),
         }
     }
 }
@@ -100,150 +134,74 @@ impl eframe::App for App {
         let storage = &mut self.storage;
         let State {
             target_input,
-            response,
             error,
             first_render,
             client,
             response_tx: tx,
             response_rx: rx,
-            graph,
+            connections,
         } = &mut self.state;
 
-        #[cfg(not(target_arch = "wasm32"))] // no File->Quit on web pages!
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Quit").clicked() {
-                        _frame.close();
-                    }
-                });
-            });
-        });
-
-        egui::SidePanel::left("controls").show(ctx, |ui| {
-            ui.heading("Controls");
-
-            ui.separator();
-
-            ui.horizontal(|ui| {
-                ui.label("URL: ");
-                TextEdit::singleline(&mut storage.url)
-                    .hint_text("127.0.0.1:9090")
-                    .desired_width(f32::INFINITY)
-                    .show(ui);
-            });
-
-            if *first_render {
-                *target_input = storage.target.to_hex();
-            }
-            ui.horizontal(|ui| {
-                if *first_render {
-                    *graph = Some(GraphsContainer::new(
-                        ui,
-                        storage.target.clone(),
-                        storage.operation,
-                    ));
-                }
-                ui.label("Target: ");
-                if TextEdit::singleline(target_input)
-                    .desired_width(f32::INFINITY)
-                    .show(ui)
-                    .response
-                    .changed()
-                    || *first_render
-                {
-                    match Handle::from_hex(target_input) {
-                        Ok(handle) => {
-                            error.clear();
-                            storage.target = handle.clone();
-                            *graph = Some(GraphsContainer::new(ui, handle, storage.operation));
-                        }
-                        Err(e) => *error = format!("{:#}", e),
+        if let Ok(new_connections) = rx.try_recv() {
+            match new_connections {
+                Ok(new_connections) => {
+                    for c in new_connections {
+                        connections.insert(c);
                     }
                 }
-            });
-
-            let operation = storage.operation;
-            ui.selectable_value(
-                &mut storage.operation,
-                Operation::Eval,
-                Operation::Eval.to_string(),
-            );
-            ui.selectable_value(
-                &mut storage.operation,
-                Operation::Apply,
-                Operation::Apply.to_string(),
-            );
-            ui.selectable_value(
-                &mut storage.operation,
-                Operation::Fill,
-                Operation::Fill.to_string(),
-            );
-            if operation != storage.operation {
-                graph.as_mut().unwrap().set_operation(
-                    ui,
-                    storage.operation,
-                    storage.target.clone(),
-                );
+                Err(e) => error.write(format!("{:#}", e)),
             }
-
-            if let Ok(http_result) = rx.try_recv() {
-                let index = http_result.0;
-                let handle = http_result.1;
-                match http_result.2 {
-                    Ok(Response::Parents(tasks)) => {
-                        if let Some(tasks) = tasks {
-                            log::info!("Received parents {:?}", tasks);
-                            graph.as_mut().unwrap().set_parents(ui, handle, tasks);
-                        }
-                    }
-                    Ok(Response::Child(child)) => {
-                        if let Some(child) = child {
-                            log::info!("Received child {:?}", child);
-                            graph.as_mut().unwrap().set_child(ui, index, child);
-                        }
-                    }
-                    Ok(Response::Dependees(tasks)) => {
-                        if let Some(tasks) = tasks {
-                            log::info!("Received dependees {:?}", tasks);
-                            graph.as_mut().unwrap().merge_dependees(ui, index, tasks);
-                        }
-                    }
-                    Err(e) => *error = format!("Failed http request: {}.", e.root_cause()),
-                }
-            }
-
-            ui.separator();
-            ui.colored_label(Operation::Apply.get_color(), Operation::Apply.to_string());
-            ui.colored_label(Operation::Eval.get_color(), Operation::Eval.to_string());
-            ui.colored_label(Operation::Fill.get_color(), Operation::Fill.to_string());
-            ui.separator();
-            ui.label(response.as_str());
-            ui.label(error.as_str());
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("powered by ");
-                    ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-                    ui.label(" and ");
-                    ui.hyperlink_to(
-                        "eframe",
-                        "https://github.com/emilk/egui/tree/master/crates/eframe",
-                    );
-                    ui.label(".");
-                });
-            });
-        });
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Windows");
+            ui.heading("Objects");
             ui.separator();
+
+            let mut handle_to_ports: HashMap<Handle, Ports> = HashMap::new();
+            let painter = ui.painter();
+
+            let main_handle = match Handle::from_hex(target_input) {
+                Ok(h) => {
+                    storage.target = h.clone();
+                    h
+                }
+                Err(e) => {
+                    error.write(format!("{:#}", e));
+                    storage.target.clone()
+                }
+            };
+
+            handle_to_ports.insert(
+                main_handle.clone(),
+                add_main_node(
+                    client,
+                    ctx,
+                    tx.clone(),
+                    main_handle.clone(),
+                    target_input,
+                    error.read_and_update(),
+                ),
+            );
+
+            connections.visit_bfs(main_handle.clone(), |connection| {
+                let out_port = handle_to_ports
+                    .entry(connection.lhs.clone())
+                    .or_insert_with(|| add_node(client, ctx, tx.clone(), connection.lhs.clone()))
+                    .output;
+                let in_port = handle_to_ports
+                    .entry(connection.rhs.clone())
+                    .or_insert_with(|| add_node(client, ctx, tx.clone(), connection.rhs.clone()))
+                    .input;
+
+                painter.add(get_connection(
+                    out_port,
+                    in_port,
+                    connection.relation_type,
+                    connection.lhs == connection.rhs,
+                ));
+            });
         });
-        graph
-            .as_mut()
-            .unwrap()
-            .view(ctx, client.clone(), &storage.url, tx.clone());
+
         *first_render = false;
     }
 }

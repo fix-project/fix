@@ -1,25 +1,17 @@
 use std::sync::{mpsc::Sender, Arc};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 
-use crate::handle::{Handle, Operation, Task};
-
-pub(crate) enum Response {
-    Parents(Option<Vec<Task>>),
-    Child(Option<Handle>),
-    Dependees(Option<Vec<Task>>),
-}
+use crate::{app::Relation, handle::Handle};
 
 pub(crate) fn get<T, S, F>(
     client: Arc<Client>,
     ctx: egui::Context,
-    index: usize,
-    handle: Handle,
     url: String,
     map: F,
-    tx: Sender<(usize, Handle, Result<S>)>,
+    tx: Sender<Result<S>>,
 ) where
     T: DeserializeOwned + Send,
     S: Send + 'static,
@@ -30,26 +22,22 @@ pub(crate) fn get<T, S, F>(
         match result {
             Ok(ok) => {
                 let json = ok.json::<T>().await;
-                let _ = tx.send((index, handle, json.context("parsing json").and_then(map)));
+                let _ = tx.send(json.context("parsing json").and_then(map));
             }
             Err(e) => {
-                let _ = tx.send((
-                    index,
-                    handle,
-                    Err(anyhow::anyhow!(format!(
-                        "request failed: {} error",
-                        match () {
-                            () if e.is_builder() => "building url",
-                            () if e.is_request() => "request",
-                            () if e.is_redirect() => "redirect",
-                            () if e.is_status() => "status code",
-                            () if e.is_body() => "body",
-                            () if e.is_decode() => "decode",
-                            () if e.is_timeout() => "timeout",
-                            () => "unknown",
-                        }
-                    ))),
-                ));
+                let _ = tx.send(Err(anyhow::anyhow!(format!(
+                    "request failed: {} error",
+                    match () {
+                        () if e.is_builder() => "building url",
+                        () if e.is_request() => "request",
+                        () if e.is_redirect() => "redirect",
+                        () if e.is_status() => "status code",
+                        () if e.is_body() => "body",
+                        () if e.is_decode() => "decode",
+                        () if e.is_timeout() => "timeout",
+                        () => "unknown",
+                    }
+                ))));
             }
         }
         ctx.request_repaint();
@@ -62,134 +50,64 @@ pub(crate) fn get<T, S, F>(
 }
 
 #[derive(serde::Deserialize)]
-struct JsonTask {
-    handle: String,
-    operation: String,
+struct JsonRelation {
+    relation: String,
+    lhs: String,
+    rhs: String,
 }
 
-pub(crate) fn get_parents(
+pub(crate) fn get_explanations(
     client: Arc<Client>,
     ctx: egui::Context,
-    index: usize,
     handle: &Handle,
-    tx: Sender<(usize, Handle, Result<Response>)>,
+    tx: Sender<Result<Vec<Relation>>>,
     url_base: &str,
 ) {
     #[derive(serde::Deserialize)]
     struct JsonResponse {
-        parents: Option<Vec<JsonTask>>,
+        target: String,
+        relations: EmptyStringOrVec<JsonRelation>,
+        handles: EmptyStringOrVec<Handle>,
+    }
+
+    // The specific Boost for C++ being used only support property trees
+    // which serialize empty arrays as the empty string.
+    // Therefore, we catch the different type with this enum.
+    #[derive(serde::Deserialize)]
+    #[serde(untagged)]
+    enum EmptyStringOrVec<T> {
+        String(String),
+        Vec(Vec<T>),
     }
 
     get(
         client,
         ctx,
-        index,
-        handle.clone(),
-        format!("http://{url_base}/parents?handle={}", handle.to_hex()),
+        format!("http://{url_base}/explanations?handle={}", handle.to_hex()),
         |json: JsonResponse| {
-            let Some(json_parents) = json.parents else {
-                return Ok(Response::Parents(None));
-            };
-            Ok(Response::Parents(Some(
-                json_parents
-                    .iter()
-                    .map(|json_task| {
-                        Ok::<Task, anyhow::Error>(Task {
-                            handle: Handle::from_hex(&json_task.handle)
-                                .context("parsing handle")?,
-                            operation: json_task
-                                .operation
-                                .parse::<u8>()
-                                .context("parsing operation as u8")?
-                                .try_into()
-                                .context("casting u8 to operation")?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>>>()?,
-            )))
-        },
-        tx,
-    );
-}
+            let mut results = vec![];
+            if let EmptyStringOrVec::Vec(_handles) = json.handles {
+                todo!();
+            }
+            if let EmptyStringOrVec::Vec(relations) = json.relations {
+                for relation in relations {
+                    let result = Relation {
+                        lhs: Handle::from_hex(&relation.lhs)
+                            .with_context(|| format!("parsing {}", relation.lhs))?,
+                        rhs: Handle::from_hex(&relation.rhs)
+                            .with_context(|| format!("parsing {}", relation.rhs))?,
+                        relation_type: match relation.relation.as_str() {
+                            "Apply" => crate::app::RelationType::Apply,
+                            "Eval" => crate::app::RelationType::Eval,
+                            "Fill" => crate::app::RelationType::Fill,
+                            _ => return Err(anyhow!("invalid relation {}", relation.relation)),
+                        },
+                    };
+                    results.push(result)
+                }
+            }
 
-pub(crate) fn get_dependees(
-    client: Arc<Client>,
-    ctx: egui::Context,
-    index: usize,
-    handle: Handle,
-    operation: Operation,
-    tx: Sender<(usize, Handle, Result<Response>)>,
-    url_base: &str,
-) {
-    #[derive(serde::Deserialize)]
-    struct JsonResponse {
-        dependees: Option<Vec<JsonTask>>,
-    }
-
-    get(
-        client,
-        ctx,
-        index,
-        handle.clone(),
-        format!(
-            "http://{url_base}/dependees?handle={}&op={}",
-            handle.to_hex(),
-            operation as u8
-        ),
-        |json: JsonResponse| {
-            let Some(dependees) = json.dependees else {
-                return Ok(Response::Dependees(None));
-            };
-            Ok(Response::Dependees(Some(
-                dependees
-                    .iter()
-                    .map(|json_task| {
-                        Ok::<Task, anyhow::Error>(Task {
-                            handle: Handle::from_hex(&json_task.handle)
-                                .context("parsing handle")?,
-                            operation: json_task
-                                .operation
-                                .parse::<u8>()
-                                .context("parsing operation as u8")?
-                                .try_into()
-                                .context("casting u8 to operation")?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>>>()?,
-            )))
-        },
-        tx,
-    );
-}
-
-pub(crate) fn get_child(
-    client: Arc<Client>,
-    ctx: egui::Context,
-    index: usize,
-    handle: Handle,
-    operation: Operation,
-    tx: Sender<(usize, Handle, Result<Response>)>,
-    url_base: &str,
-) {
-    #[derive(serde::Deserialize)]
-    struct JsonResponse {
-        handle: Option<String>,
-    }
-
-    get(
-        client,
-        ctx,
-        index,
-        handle.clone(),
-        format!(
-            "http://{url_base}/child?handle={}&op={}",
-            handle.to_hex(),
-            operation as u8
-        ),
-        |json: JsonResponse| {
-            Ok(Response::Child(json.handle.and_then(|handle| {
-                Handle::from_hex(&handle).context("parsing handle").ok()
-            })))
+            Ok(results)
         },
         tx,
     );

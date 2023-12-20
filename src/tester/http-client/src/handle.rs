@@ -133,7 +133,6 @@ impl Handle {
     /// Reconstructs the hex string version of a Handle
     pub(crate) fn to_hex(&self) -> String {
         self.to_buffer().iter().fold(String::new(), |mut s, i| {
-            log::info!("{}", *i);
             write!(&mut s, "{:02x}", *i).expect("Failed to write to string");
             s
         })
