@@ -7,10 +7,11 @@ enum class RelationType : uint8_t
 {
   Apply,
   Eval,
+  Fill,
   COUNT
 };
 
-static constexpr const char* RELATIONTYPE_NAMES[static_cast<uint8_t>( RelationType::COUNT )] = { "Apply", "Eval" };
+static constexpr const char* RELATIONTYPE_NAMES[static_cast<uint8_t>( RelationType::COUNT )] = { "Apply", "Eval", "Fill" };
 
 class Relation
 {
@@ -27,6 +28,9 @@ public:
 
         case Operation::Eval:
           return RelationType::Eval;
+
+        case Operation::Fill:
+          return RelationType::Fill;
 
         default:
           throw std::runtime_error( "Invalid task for relation" );
