@@ -55,7 +55,7 @@ ptree serialize_relation( Relation relation )
 {
   ptree pt;
 
-  switch (relation.type()) {
+  switch ( relation.type() ) {
     case RelationType::Apply: {
       pt.put( "relation", "Apply" );
       break;
@@ -84,7 +84,7 @@ ptree get_explanations( Handle handle )
   ptree pt;
   auto [relations, handles] = Runtime::get_instance().get_explanations( handle );
 
-  pt.push_back(ptree::value_type("target", base16::encode(handle)));
+  pt.push_back( ptree::value_type( "target", base16::encode( handle ) ) );
 
   ptree relation_tree;
   for ( auto& relation : relations ) {

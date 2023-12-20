@@ -36,7 +36,8 @@ void usage_message( const char* argv0 )
   cerr << "            | thunk: (followed by tree:<n>)\n";
   cerr << "            | compile:<filename>\n";
   cerr << "            | ref:<ref>\n";
-  cerr << "\U0001F4AC means there are more explanations. If it follows a Handle, use \"explain:\". If it follows a Relation, use \"step-eval:\"\n";
+  cerr << "\U0001F4AC means there are more explanations. If it follows a Handle, use \"explain:\". If it follows a "
+          "Relation, use \"step-eval:\"\n";
 }
 
 int min_args = 2;
