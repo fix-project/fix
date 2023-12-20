@@ -55,10 +55,22 @@ ptree serialize_relation( Relation relation )
 {
   ptree pt;
 
-  if ( relation.type() == RelationType::Apply ) {
-    pt.put( "relation", "Apply" );
-  } else if ( relation.type() == RelationType::Eval ) {
-    pt.put( "relation", "Eval" );
+  switch (relation.type()) {
+    case RelationType::Apply: {
+      pt.put( "relation", "Apply" );
+      break;
+    }
+    case RelationType::COUNT: {
+      break;
+    }
+    case RelationType::Eval: {
+      pt.put( "relation", "Eval" );
+      break;
+    }
+    case RelationType::Fill: {
+      pt.put( "relation", "Fill" );
+      break;
+    }
   }
 
   pt.put( "lhs", base16::encode( relation.lhs() ) );
@@ -84,7 +96,7 @@ ptree get_explanations( Handle handle )
   for ( auto& handle : handles ) {
     pins_and_tags_tree.push_back( ptree::value_type( "", base16::encode( handle ) ) );
   }
-  pt.push_back( ptree::value_type( "handles", relation_tree ) );
+  pt.push_back( ptree::value_type( "handles", pins_and_tags_tree ) );
 
   return pt;
 }
