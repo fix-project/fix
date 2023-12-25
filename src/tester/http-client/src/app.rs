@@ -48,7 +48,7 @@ struct State {
     connections: Graph,
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Relation {
     pub(crate) lhs: Handle,
     pub(crate) rhs: Handle,
@@ -56,7 +56,7 @@ pub(crate) struct Relation {
 }
 
 // For now. Should add content, tag.
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub(crate) enum RelationType {
     Eval,
     Apply,
@@ -75,13 +75,16 @@ impl Error {
         self.content = content;
     }
 
-    fn read_and_update(&mut self) -> &str {
+    fn read(&self) -> &str {
         if self.dirty {
-            self.dirty = false;
             &self.content
         } else {
             ""
         }
+    }
+
+    fn clear(&mut self) {
+        self.dirty = false;
     }
 }
 
@@ -145,6 +148,7 @@ impl eframe::App for App {
         if let Ok(new_connections) = rx.try_recv() {
             match new_connections {
                 Ok(new_connections) => {
+                    error.clear();
                     for c in new_connections {
                         connections.insert(c);
                     }
@@ -179,7 +183,7 @@ impl eframe::App for App {
                     tx.clone(),
                     main_handle.clone(),
                     target_input,
-                    error.read_and_update(),
+                    error.read(),
                 ),
             );
 
