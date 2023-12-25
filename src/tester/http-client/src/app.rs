@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Display,
     sync::{
         mpsc::{channel, Receiver, Sender},
         Arc,
@@ -56,11 +57,23 @@ pub(crate) struct Relation {
 }
 
 // For now. Should add content, tag.
-#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
+/// The order of these fields dictates the order in which they show up in the
+/// visualization windows.
+#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug, PartialOrd, Ord)]
 pub(crate) enum RelationType {
     Eval,
     Apply,
     Fill,
+}
+
+impl Display for RelationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Eval => "Eval",
+            Self::Apply => "Apply",
+            Self::Fill => "Fill",
+        })
+    }
 }
 
 #[derive(Default)]
@@ -182,19 +195,26 @@ impl eframe::App for App {
                     ctx,
                     tx.clone(),
                     main_handle.clone(),
+                    connections,
                     target_input,
                     error.read(),
                 ),
             );
 
             connections.visit_bfs(main_handle.clone(), |connection| {
-                let out_port = handle_to_ports
+                let out_port = *handle_to_ports
                     .entry(connection.lhs.clone())
-                    .or_insert_with(|| add_node(client, ctx, tx.clone(), connection.lhs.clone()))
-                    .output;
+                    .or_insert_with(|| {
+                        add_node(client, ctx, tx.clone(), connection.lhs.clone(), connections)
+                    })
+                    .outputs
+                    .get(&connection.relation_type)
+                    .expect("Connection withouth port");
                 let in_port = handle_to_ports
                     .entry(connection.rhs.clone())
-                    .or_insert_with(|| add_node(client, ctx, tx.clone(), connection.rhs.clone()))
+                    .or_insert_with(|| {
+                        add_node(client, ctx, tx.clone(), connection.rhs.clone(), connections)
+                    })
                     .input;
 
                 painter.add(get_connection(

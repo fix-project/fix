@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     sync::{mpsc::Sender, Arc},
 };
 
@@ -17,8 +17,8 @@ use crate::{
 
 #[derive(Default)]
 pub(crate) struct Graph {
-    forward: HashMap<Handle, HashSet<Relation>>,
-    backward: HashMap<Handle, HashSet<Relation>>,
+    forward: HashMap<Handle, BTreeMap<RelationType, HashSet<Relation>>>,
+    backward: HashMap<Handle, BTreeMap<RelationType, HashSet<Relation>>>,
 }
 
 impl Graph {
@@ -26,11 +26,15 @@ impl Graph {
         self.forward
             .entry(relation.lhs.clone())
             .or_default()
+            .entry(relation.relation_type)
+            .or_default()
             .insert(relation.clone());
         self.backward
             .entry(relation.rhs.clone())
             .or_default()
-            .insert(relation.clone());
+            .entry(relation.relation_type)
+            .or_default()
+            .insert(relation);
     }
 
     pub(crate) fn visit_bfs(&self, root: Handle, mut handle: impl FnMut(&Relation)) {
@@ -54,10 +58,18 @@ impl Graph {
         let mut to_visit: VecDeque<_> = vec![root].into();
         while let Some(next) = to_visit.pop_front() {
             if let Some(relations) = self.forward.get(&next) {
-                handle_relations(relations, &mut to_visit, &mut seen, &mut handle, |r| &r.rhs);
+                for relation_set in relations.values() {
+                    handle_relations(relation_set, &mut to_visit, &mut seen, &mut handle, |r| {
+                        &r.rhs
+                    });
+                }
             }
             if let Some(relations) = self.backward.get(&next) {
-                handle_relations(relations, &mut to_visit, &mut seen, &mut handle, |r| &r.lhs);
+                for relation_set in relations.values() {
+                    handle_relations(relation_set, &mut to_visit, &mut seen, &mut handle, |r| {
+                        &r.lhs
+                    });
+                }
             }
         }
     }
@@ -65,7 +77,7 @@ impl Graph {
 
 pub(crate) struct Ports {
     pub input: Pos2,
-    pub output: Pos2,
+    pub outputs: HashMap<RelationType, Pos2>,
 }
 
 fn add_object(
@@ -73,6 +85,7 @@ fn add_object(
     id: impl std::hash::Hash,
     handle: Handle,
     start_pos: Pos2,
+    forward_relations: Option<&BTreeMap<RelationType, HashSet<Relation>>>,
     add_contents: impl FnOnce(&mut Ui) -> f32,
 ) -> Ports {
     fn add_dot(ui: &mut Ui, center: Pos2) {
@@ -95,23 +108,54 @@ fn add_object(
                     .stroke(ctx.style().visuals.window_stroke)
                     .fill(ui.style().visuals.panel_fill)
                     .show(ui, |ui| {
-                        ui.set_max_size(Vec2::new(200.0, f32::INFINITY));
-                        ui.add(Label::new(
-                            // TODO use nice print of id
-                            RichText::new(handle.to_string())
-                                .text_style(TextStyle::Button)
-                                .color(ui.style().visuals.strong_text_color()),
-                        ));
-                        add_contents(ui)
+                        egui::containers::Resize::default()
+                            .id((handle.to_hex() + " resizable window").into())
+                            .with_stroke(false)
+                            .show(ui, |ui| {
+                                ui.add(Label::new(
+                                    // TODO use nice print of id
+                                    RichText::new(handle.to_string())
+                                        .text_style(TextStyle::Button)
+                                        .color(ui.style().visuals.strong_text_color()),
+                                ));
+                                add_contents(ui);
+                                ui.separator();
+                                let mut ports = HashMap::new();
+                                egui::Grid::new(handle.to_hex() + " relation-table")
+                                    .num_columns(1)
+                                    .show(ui, |ui| {
+                                        if let Some(relations) = forward_relations {
+                                            for relation_type in relations.keys() {
+                                                // Sorted by relation type.
+                                                let start_height = ui.min_rect().bottom();
+                                                ui.label(relation_type.to_string());
+                                                let end_height = ui.min_rect().bottom();
+                                                ui.end_row();
+                                                ports.insert(
+                                                    relation_type,
+                                                    (start_height + end_height) / 2.0,
+                                                );
+                                            }
+                                        }
+                                    });
+                                ports
+                            })
                     });
                 let title_center = response.rect.center().y;
                 let dot_center = Pos2::new(ui.min_rect().left(), title_center);
                 add_dot(ui, dot_center);
-                let out_dot_center = Pos2::new(ui.min_rect().right(), inner);
-                add_dot(ui, out_dot_center);
+
+                let outputs: HashMap<_, _> = inner
+                    .into_iter()
+                    .map(|(r_type, height)| (*r_type, Pos2::new(ui.min_rect().right(), height)))
+                    .collect();
+                for pos in outputs.values() {
+                    add_dot(ui, *pos);
+                }
+
                 Ports {
                     input: dot_center,
-                    output: out_dot_center,
+                    outputs,
                 }
             })
             .inner
@@ -124,6 +168,7 @@ pub(crate) fn add_main_node(
     ctx: &egui::Context,
     tx: Sender<std::result::Result<Vec<Relation>, anyhow::Error>>,
     handle: Handle,
+    graph: &Graph,
     target_input: &mut String,
     error: &str,
 ) -> Ports {
@@ -132,6 +177,7 @@ pub(crate) fn add_main_node(
         "main object",
         handle.clone(),
         Pos2::new(20.0, 20.0),
+        graph.forward.get(&handle),
         |ui| {
             Grid::new(handle.to_hex() + " properties")
                 .num_columns(2)
@@ -139,8 +185,6 @@ pub(crate) fn add_main_node(
                     let start_y = ui.min_rect().bottom();
                     ui.label("Handle:");
                     ui.text_edit_singleline(target_input);
-                    // ui.add(Label::new(handle.to_hex()).truncate(true))
-                    //     .on_hover_cursor(egui::CursorIcon::Copy);
                     ui.end_row();
                     let handle_middle_height = (ui.min_rect().bottom() + start_y) / 2.0;
                     if ui.button("load").clicked() {
@@ -171,12 +215,14 @@ pub(crate) fn add_node(
     ctx: &egui::Context,
     tx: Sender<std::result::Result<Vec<Relation>, anyhow::Error>>,
     handle: Handle,
+    graph: &Graph,
 ) -> Ports {
     add_object(
         ctx,
         handle.clone(),
         handle.clone(),
         Pos2::new(20.0, 20.0),
+        graph.forward.get(&handle),
         |ui| {
             Grid::new(handle.to_hex() + " properties")
                 .num_columns(2)
