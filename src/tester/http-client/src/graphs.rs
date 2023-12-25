@@ -82,7 +82,7 @@ pub(crate) struct Ports {
 
 fn add_object(
     ctx: &egui::Context,
-    id: impl std::hash::Hash,
+    window_id: impl std::hash::Hash,
     handle: Handle,
     start_pos: Pos2,
     forward_relations: Option<&BTreeMap<RelationType, HashSet<Relation>>>,
@@ -96,7 +96,42 @@ fn add_object(
         ui.painter()
             .circle(center, 4.0, Color32::WHITE, Stroke::NONE);
     }
-    egui::containers::Area::new(Id::new(id))
+
+    fn main_body<'a>(
+        ui: &mut Ui,
+        handle: Handle,
+        add_contents: impl FnOnce(&mut Ui) -> f32,
+        forward_relations: Option<&'a BTreeMap<RelationType, HashSet<Relation>>>,
+    ) -> HashMap<&'a RelationType, f32> {
+        ui.add(Label::new(
+            RichText::new(format!(
+                "{}, {}",
+                handle.get_content_type(),
+                handle.get_identifier()
+            ))
+            .text_style(TextStyle::Button)
+            .color(ui.style().visuals.strong_text_color()),
+        ));
+        add_contents(ui);
+        ui.separator();
+        let mut ports = HashMap::new();
+        if let Some(relations) = forward_relations {
+            for relation_type in relations.keys() {
+                // Sorted by relation type.
+                let start_height = ui.min_rect().bottom();
+                ui.label(relation_type.to_string());
+                let end_height = ui.min_rect().bottom();
+                ui.end_row();
+                ports.insert(relation_type, (start_height + end_height) / 2.0);
+            }
+        }
+        ports
+    }
+
+    // Note that the window_id should not be derived from the handle.
+    // This allows the "main" window with an editable handle to not
+    // jump around while the user types into it.
+    egui::containers::Area::new(Id::new(window_id))
         .default_pos(start_pos)
         .movable(true)
         .show(ctx, |ui| {
@@ -112,33 +147,7 @@ fn add_object(
                             .id((handle.to_hex() + " resizable window").into())
                             .with_stroke(false)
                             .show(ui, |ui| {
-                                ui.add(Label::new(
-                                    // TODO use nice print of id
-                                    RichText::new(handle.to_string())
-                                        .text_style(TextStyle::Button)
-                                        .color(ui.style().visuals.strong_text_color()),
-                                ));
-                                add_contents(ui);
-                                ui.separator();
-                                let mut ports = HashMap::new();
-                                egui::Grid::new(handle.to_hex() + " relation-table")
-                                    .num_columns(1)
-                                    .show(ui, |ui| {
-                                        if let Some(relations) = forward_relations {
-                                            for relation_type in relations.keys() {
-                                                // Sorted by relation type.
-                                                let start_height = ui.min_rect().bottom();
-                                                ui.label(relation_type.to_string());
-                                                let end_height = ui.min_rect().bottom();
-                                                ui.end_row();
-                                                ports.insert(
-                                                    relation_type,
-                                                    (start_height + end_height) / 2.0,
-                                                );
-                                            }
-                                        }
-                                    });
-                                ports
+                                main_body(ui, handle, add_contents, forward_relations)
                             })
                     });
                 let title_center = response.rect.center().y;
@@ -207,8 +216,6 @@ pub(crate) fn add_main_node(
         },
     )
 }
-// TODO For now, just add every node from every relation.
-// Just connect the first out port and first in port.
 
 pub(crate) fn add_node(
     client: &mut Arc<Client>,

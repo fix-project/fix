@@ -172,74 +172,16 @@ impl Handle {
 
         out_content
     }
-}
 
-impl TryFrom<u8> for Operation {
-    type Error = anyhow::Error;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        Ok(match value {
-            0 => Self::Apply,
-            1 => Self::Eval,
-            2 => Self::Fill,
-            _ => bail!("Invalid number for Operation"),
-        })
-    }
-}
-
-impl From<Operation> for u8 {
-    fn from(val: Operation) -> Self {
-        match val {
-            Operation::Apply => 0,
-            Operation::Eval => 1,
-            Operation::Fill => 2,
-        }
-    }
-}
-
-impl Display for Operation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Operation::Apply => "Apply",
-            Operation::Eval => "Eval",
-            Operation::Fill => "Fill",
-        })
-    }
-}
-
-impl Operation {
-    pub fn get_color(&self) -> egui::Color32 {
-        match self {
-            Operation::Apply => egui::Color32::GREEN,
-            Operation::Eval => egui::Color32::from_rgb(20, 20, 255),
-            Operation::Fill => egui::Color32::RED,
-        }
-    }
-}
-
-impl Display for Handle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // strict Tree, 3 entries, local id d9
-        // shallow Thunk, 8 entries, canonical id 0x0123456
-        // strict Blob, 8 bytes, content "unused"
-        // strict Blob, 2 bytes, content 0x91ABCD
-        // strict Blob, 2 bytes, local id ab
-        let accessibility = match self.accessibility {
-            Accessibility::Strict => "strict",
-            Accessibility::Shallow => "shallow",
-            Accessibility::Lazy => "lazy",
-        };
-        let content_type = match self.content {
+    pub(crate) fn get_content_type(&self) -> Object {
+        match self.content {
             Content::Other { object_type, .. } => object_type,
             Content::Literal(_) => Object::Blob,
-        };
-        let size = self.size;
-        let size_desc = match content_type {
-            Object::Blob => "bytes",
-            _ => "entries",
-        };
+        }
+    }
 
-        let identifier = match &self.content {
+    pub(crate) fn get_identifier(&self) -> String {
+        match &self.content {
             Content::Other { data, .. } => match data {
                 Nonliteral::Canonical(hash) => {
                     // 8 hex digits of hash
@@ -296,7 +238,63 @@ impl Display for Handle {
 
                 base
             }
+        }
+    }
+}
+
+impl TryFrom<u8> for Operation {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::Apply,
+            1 => Self::Eval,
+            2 => Self::Fill,
+            _ => bail!("Invalid number for Operation"),
+        })
+    }
+}
+
+impl From<Operation> for u8 {
+    fn from(val: Operation) -> Self {
+        match val {
+            Operation::Apply => 0,
+            Operation::Eval => 1,
+            Operation::Fill => 2,
+        }
+    }
+}
+
+impl Display for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Operation::Apply => "Apply",
+            Operation::Eval => "Eval",
+            Operation::Fill => "Fill",
+        })
+    }
+}
+
+impl Display for Handle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // strict Tree, 3 entries, local id d9
+        // shallow Thunk, 8 entries, canonical id 0x0123456
+        // strict Blob, 8 bytes, content "unused"
+        // strict Blob, 2 bytes, content 0x91ABCD
+        // strict Blob, 2 bytes, local id ab
+        let accessibility = match self.accessibility {
+            Accessibility::Strict => "strict",
+            Accessibility::Shallow => "shallow",
+            Accessibility::Lazy => "lazy",
         };
+        let size = self.size;
+        let content_type = self.get_content_type();
+        let size_desc = match content_type {
+            Object::Blob => "bytes",
+            _ => "entries",
+        };
+        let identifier = self.get_identifier();
+
         f.write_fmt(format_args!(
             "{accessibility} {content_type}, {size} {size_desc}, {identifier}"
         ))
