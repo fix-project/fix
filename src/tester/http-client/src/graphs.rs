@@ -1,18 +1,17 @@
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
-    sync::{mpsc::Sender, Arc},
+    fmt::Display,
 };
 
 use egui::{
     epaint::CubicBezierShape, Color32, Grid, Id, InnerResponse, Label, Layout, Margin, Pos2, Rect,
     RichText, Sense, Stroke, TextStyle, Ui, Vec2,
 };
-use reqwest::Client;
 
 use crate::{
-    app::{Relation, RelationType},
-    handle::Handle,
-    http,
+    handle::{Handle, Object},
+    http::{self, HttpContext},
 };
 
 #[derive(Default)]
@@ -72,6 +71,54 @@ impl Graph {
                 }
             }
         }
+    }
+}
+
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
+pub(crate) struct Relation {
+    pub(crate) lhs: Handle,
+    pub(crate) rhs: Handle,
+    pub(crate) relation_type: RelationType,
+}
+
+impl Relation {
+    pub(crate) fn new(lhs: Handle, rhs: Handle, relation_type: RelationType) -> Self {
+        Self {
+            lhs,
+            rhs,
+            relation_type,
+        }
+    }
+}
+
+// For now. Should add content, tag.
+/// The order of these fields dictates the order in which they show up in the
+/// visualization windows.
+#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug, PartialOrd, Ord)]
+pub(crate) enum RelationType {
+    Eval,
+    Apply,
+    Fill,
+    Pin,
+    TagAuthor,
+    TagTarget,
+    TagLabel,
+    TreeEntry(usize),
+}
+
+impl Display for RelationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Self::Eval => Cow::Borrowed("evaluates into"),
+            Self::Apply => Cow::Borrowed("applies into"),
+            Self::Fill => Cow::Borrowed("fills into"),
+            Self::Pin => Cow::Borrowed("pins"),
+            Self::TagAuthor => Cow::Borrowed("this object"),
+            Self::TagTarget => Cow::Borrowed("tags this object"),
+            Self::TagLabel => Cow::Borrowed("with this label"),
+            Self::TreeEntry(i) => Cow::Owned(format!("has entry at index [{}]", i)),
+        };
+        f.write_fmt(format_args!("{}", name))
     }
 }
 
@@ -136,7 +183,7 @@ fn add_object(
         .movable(true)
         .show(ctx, |ui| {
             ui.with_layout(Layout::default().with_main_wrap(false), |ui| {
-                ui.style_mut().wrap = Some(false);
+                // ui.style_mut().wrap = Some(false);
                 let InnerResponse { inner, response } = egui::Frame::default()
                     .rounding(egui::Rounding::same(4.0))
                     .inner_margin(Margin::same(8.0))
@@ -150,8 +197,8 @@ fn add_object(
                                 main_body(ui, handle, add_contents, forward_relations)
                             })
                     });
-                let title_center = response.rect.center().y;
-                let dot_center = Pos2::new(ui.min_rect().left(), title_center);
+                let window_center = response.rect.center().y;
+                let dot_center = Pos2::new(ui.min_rect().left(), window_center);
                 add_dot(ui, dot_center);
 
                 let outputs: HashMap<_, _> = inner
@@ -172,17 +219,32 @@ fn add_object(
         .inner
 }
 
+fn add_fetch_buttons(ui: &mut Ui, ctx: HttpContext, handle: &Handle) {
+    if ui.button("get explanations").clicked() {
+        http::get_explanations(ctx.clone(), handle);
+
+        if handle.get_content_type() == Object::Tree {}
+    }
+    if ui.button("get contents").clicked() {
+        match handle.get_content_type() {
+            Object::Blob => todo!(),
+            Object::Tree => http::get_tree_contents(ctx.clone(), handle),
+            Object::Thunk => todo!(),
+            Object::Tag => http::get_tag_contents(ctx.clone(), handle, None),
+        }
+    }
+    ui.end_row();
+}
+
 pub(crate) fn add_main_node(
-    client: &mut Arc<Client>,
-    ctx: &egui::Context,
-    tx: Sender<std::result::Result<Vec<Relation>, anyhow::Error>>,
+    ctx: HttpContext,
     handle: Handle,
     graph: &Graph,
     target_input: &mut String,
     error: &str,
 ) -> Ports {
     add_object(
-        ctx,
+        &ctx.egui_ctx,
         "main object",
         handle.clone(),
         Pos2::new(20.0, 20.0),
@@ -195,37 +257,21 @@ pub(crate) fn add_main_node(
                     ui.label("Handle:");
                     ui.text_edit_singleline(target_input);
                     ui.end_row();
-                    let handle_middle_height = (ui.min_rect().bottom() + start_y) / 2.0;
-                    if ui.button("load").clicked() {
-                        http::get_explanations(
-                            client.clone(),
-                            ctx.clone(),
-                            &handle,
-                            tx,
-                            "127.0.0.1:9090",
-                        )
-                    }
-                    ui.end_row();
+                    add_fetch_buttons(ui, ctx.clone(), &handle);
                     ui.label("Error: ");
                     ui.label(error);
                     ui.end_row();
 
-                    handle_middle_height
+                    (ui.min_rect().bottom() + start_y) / 2.0
                 })
                 .inner
         },
     )
 }
 
-pub(crate) fn add_node(
-    client: &mut Arc<Client>,
-    ctx: &egui::Context,
-    tx: Sender<std::result::Result<Vec<Relation>, anyhow::Error>>,
-    handle: Handle,
-    graph: &Graph,
-) -> Ports {
+pub(crate) fn add_node(ctx: HttpContext, handle: Handle, graph: &Graph) -> Ports {
     add_object(
-        ctx,
+        &ctx.egui_ctx,
         handle.clone(),
         handle.clone(),
         Pos2::new(20.0, 20.0),
@@ -248,19 +294,10 @@ pub(crate) fn add_node(
                         ui.output_mut(|o| o.copied_text = handle.to_hex())
                     };
                     ui.end_row();
-                    let handle_middle_height = (ui.min_rect().bottom() + start_y) / 2.0;
 
-                    if ui.button("load").clicked() {
-                        http::get_explanations(
-                            client.clone(),
-                            ctx.clone(),
-                            &handle,
-                            tx,
-                            "127.0.0.1:9090",
-                        )
-                    }
+                    add_fetch_buttons(ui, ctx.clone(), &handle);
 
-                    handle_middle_height
+                    (ui.min_rect().bottom() + start_y) / 2.0
                 })
                 .inner
         },
@@ -303,6 +340,11 @@ pub(crate) fn get_connection(
         RelationType::Eval => Color32::BLUE,
         RelationType::Apply => Color32::GREEN,
         RelationType::Fill => Color32::RED,
+        RelationType::Pin => Color32::GRAY,
+        RelationType::TagTarget => Color32::LIGHT_BLUE,
+        RelationType::TagAuthor => Color32::LIGHT_GREEN,
+        RelationType::TagLabel => Color32::LIGHT_RED,
+        RelationType::TreeEntry(_) => Color32::GRAY,
     };
     get_bezier(src, src_dir, dst, dst_dir, color)
 }

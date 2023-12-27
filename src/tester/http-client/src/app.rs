@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    fmt::Display,
     sync::{
         mpsc::{channel, Receiver, Sender},
         Arc,
@@ -12,8 +11,9 @@ use egui::Visuals;
 use reqwest::Client;
 
 use crate::{
-    graphs::{add_main_node, add_node, get_connection, Graph, Ports},
+    graphs::{add_main_node, add_node, get_connection, Graph, Ports, Relation},
     handle::Handle,
+    http::HttpContext,
 };
 
 pub struct App {
@@ -47,33 +47,6 @@ struct State {
     response_tx: Sender<Result<Vec<Relation>>>,
     response_rx: Receiver<Result<Vec<Relation>>>,
     connections: Graph,
-}
-
-#[derive(Hash, PartialEq, Eq, Clone, Debug)]
-pub(crate) struct Relation {
-    pub(crate) lhs: Handle,
-    pub(crate) rhs: Handle,
-    pub(crate) relation_type: RelationType,
-}
-
-// For now. Should add content, tag.
-/// The order of these fields dictates the order in which they show up in the
-/// visualization windows.
-#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug, PartialOrd, Ord)]
-pub(crate) enum RelationType {
-    Eval,
-    Apply,
-    Fill,
-}
-
-impl Display for RelationType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Eval => "Eval",
-            Self::Apply => "Apply",
-            Self::Fill => "Fill",
-        })
-    }
 }
 
 #[derive(Default)]
@@ -158,6 +131,13 @@ impl eframe::App for App {
             connections,
         } = &mut self.state;
 
+        let http_ctx = HttpContext {
+            client: client.clone(),
+            egui_ctx: ctx.clone(),
+            url_base: "127.0.0.1:9090".to_owned(),
+            tx: tx.clone(),
+        };
+
         if let Ok(new_connections) = rx.try_recv() {
             match new_connections {
                 Ok(new_connections) => {
@@ -191,9 +171,7 @@ impl eframe::App for App {
             handle_to_ports.insert(
                 main_handle.clone(),
                 add_main_node(
-                    client,
-                    ctx,
-                    tx.clone(),
+                    http_ctx.clone(),
                     main_handle.clone(),
                     connections,
                     target_input,
@@ -205,15 +183,15 @@ impl eframe::App for App {
                 let out_port = *handle_to_ports
                     .entry(connection.lhs.clone())
                     .or_insert_with(|| {
-                        add_node(client, ctx, tx.clone(), connection.lhs.clone(), connections)
+                        add_node(http_ctx.clone(), connection.lhs.clone(), connections)
                     })
                     .outputs
                     .get(&connection.relation_type)
-                    .expect("Connection withouth port");
+                    .expect("Connection without port");
                 let in_port = handle_to_ports
                     .entry(connection.rhs.clone())
                     .or_insert_with(|| {
-                        add_node(client, ctx, tx.clone(), connection.rhs.clone(), connections)
+                        add_node(http_ctx.clone(), connection.rhs.clone(), connections)
                     })
                     .input;
 

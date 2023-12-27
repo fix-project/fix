@@ -113,6 +113,19 @@ ptree get_task_relation( Task task )
   return pt;
 }
 
+ptree get_tree_contents( Handle handle )
+{
+  ptree pt;
+
+  ptree handles;
+  for ( const auto& entry : Runtime::get_instance().storage().get_tree( handle ) ) {
+    handles.push_back( ptree::value_type( "", base16::encode( entry ) ) );
+  }
+  pt.push_back( ptree::value_type( "handles", handles ) );
+
+  return pt;
+}
+
 // gets one definition if it exists. expects a=b&c=d or a=b
 optional<pair<string, string>> find_definition( string& url,
                                                 const char query_separator,
@@ -211,6 +224,10 @@ optional<tuple<string, string>> try_get_response( string target, string source_d
     write_json(
       ptree,
       get_task_relation( Task( base16::decode( map.at( "handle" ) ), Operation( stoul( map.at( "op" ) ) ) ) ) );
+    return make_tuple( ptree.str(), "text/json" );
+  } else if ( target.starts_with( "tree_contents" ) ) {
+    stringstream ptree;
+    write_json( ptree, get_tree_contents( ( base16::decode( map.at( "handle" ) ) ) ) );
     return make_tuple( ptree.str(), "text/json" );
   }
 
