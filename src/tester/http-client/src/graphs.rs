@@ -122,6 +122,21 @@ impl Display for RelationType {
     }
 }
 
+impl RelationType {
+    fn get_color(&self) -> Color32 {
+        match self {
+            RelationType::Eval => Color32::BLUE,
+            RelationType::Apply => Color32::GREEN,
+            RelationType::Fill => Color32::RED,
+            RelationType::Pin => Color32::GRAY,
+            RelationType::TagTarget => Color32::LIGHT_BLUE,
+            RelationType::TagAuthor => Color32::LIGHT_GREEN,
+            RelationType::TagLabel => Color32::LIGHT_RED,
+            RelationType::TreeEntry(_) => Color32::GRAY,
+        }
+    }
+}
+
 pub(crate) struct Ports {
     pub input: Pos2,
     pub outputs: HashMap<RelationType, Pos2>,
@@ -225,12 +240,15 @@ fn add_fetch_buttons(ui: &mut Ui, ctx: HttpContext, handle: &Handle) {
 
         if handle.get_content_type() == Object::Tree {}
     }
-    if ui.button("get contents").clicked() {
+
+    // TODO: add blob, and maybe thunk pointing to tree.
+    if matches!(handle.get_content_type(), Object::Tree | Object::Tag)
+        && ui.button("get contents").clicked()
+    {
         match handle.get_content_type() {
-            Object::Blob => todo!(),
             Object::Tree => http::get_tree_contents(ctx.clone(), handle),
-            Object::Thunk => todo!(),
             Object::Tag => http::get_tag_contents(ctx.clone(), handle, None),
+            _ => unreachable!(),
         }
     }
     ui.end_row();
@@ -250,21 +268,24 @@ pub(crate) fn add_main_node(
         Pos2::new(20.0, 20.0),
         graph.forward.get(&handle),
         |ui| {
-            Grid::new(handle.to_hex() + " properties")
+            let middle_height = Grid::new(handle.to_hex() + " properties")
                 .num_columns(2)
                 .show(ui, |ui| {
                     let start_y = ui.min_rect().bottom();
                     ui.label("Handle:");
                     ui.text_edit_singleline(target_input);
                     ui.end_row();
-                    add_fetch_buttons(ui, ctx.clone(), &handle);
                     ui.label("Error: ");
                     ui.label(error);
                     ui.end_row();
 
                     (ui.min_rect().bottom() + start_y) / 2.0
                 })
-                .inner
+                .inner;
+
+            add_fetch_buttons(ui, ctx.clone(), &handle);
+
+            middle_height
         },
     )
 }
@@ -277,17 +298,17 @@ pub(crate) fn add_node(ctx: HttpContext, handle: Handle, graph: &Graph) -> Ports
         Pos2::new(20.0, 20.0),
         graph.forward.get(&handle),
         |ui| {
-            Grid::new(handle.to_hex() + " properties")
+            let middle_height = Grid::new(handle.to_hex() + " properties")
                 .num_columns(2)
                 .show(ui, |ui| {
                     let start_y = ui.min_rect().bottom();
                     ui.label("Handle:");
+
+                    let label = Label::new(handle.to_hex())
+                        .truncate(true)
+                        .sense(Sense::click());
                     if ui
-                        .add(
-                            Label::new(handle.to_hex())
-                                .truncate(true)
-                                .sense(Sense::click()),
-                        )
+                        .add(label)
                         .on_hover_cursor(egui::CursorIcon::Copy)
                         .clicked()
                     {
@@ -295,11 +316,13 @@ pub(crate) fn add_node(ctx: HttpContext, handle: Handle, graph: &Graph) -> Ports
                     };
                     ui.end_row();
 
-                    add_fetch_buttons(ui, ctx.clone(), &handle);
-
                     (ui.min_rect().bottom() + start_y) / 2.0
                 })
-                .inner
+                .inner;
+
+            add_fetch_buttons(ui, ctx.clone(), &handle);
+
+            middle_height
         },
     )
 }
@@ -336,15 +359,5 @@ pub(crate) fn get_connection(
     } else {
         (Vec2::X, -Vec2::X)
     };
-    let color = match relation_type {
-        RelationType::Eval => Color32::BLUE,
-        RelationType::Apply => Color32::GREEN,
-        RelationType::Fill => Color32::RED,
-        RelationType::Pin => Color32::GRAY,
-        RelationType::TagTarget => Color32::LIGHT_BLUE,
-        RelationType::TagAuthor => Color32::LIGHT_GREEN,
-        RelationType::TagLabel => Color32::LIGHT_RED,
-        RelationType::TreeEntry(_) => Color32::GRAY,
-    };
-    get_bezier(src, src_dir, dst, dst_dir, color)
+    get_bezier(src, src_dir, dst, dst_dir, relation_type.get_color())
 }
