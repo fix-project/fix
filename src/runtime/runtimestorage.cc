@@ -685,7 +685,7 @@ unordered_set<Handle> RuntimeStorage::get_tags( Handle handle )
     Handle name( base16::decode( file.path().filename().string() ) );
     if ( name.is_tag() ) {
       auto tree = get_tree( name );
-      if ( compare_handles( tree[0], handle ) ) {
+      if ( compare_handles( tree[1], handle ) ) {
         result.insert( name );
       }
     }
