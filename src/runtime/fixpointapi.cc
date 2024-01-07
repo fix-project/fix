@@ -85,8 +85,8 @@ __m256i create_tag( __m256i handle, __m256i type )
 
   auto tree = OwnedMutTree::allocate( 3 );
 
-  tree[0] = handle;
-  tree[1] = Runtime::get_instance().get_current_procedure();
+  tree[0] = Runtime::get_instance().get_current_procedure();
+  tree[1] = handle;
   tree[2] = type;
 
   return Runtime::get_instance().storage().add_tree( std::move( tree ) ).as_tag();
