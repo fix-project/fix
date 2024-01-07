@@ -106,7 +106,7 @@ be in Encode format, but this property is not checked by fixpoint.
 fn create_tag(target: &any Object, tag_data: &Blob) -> &Tag;
 ```
 Given the `target` object to be tagged and the custom `tag_data`, returns the
-Handle of a Tag `{x, current_procedure, y}`. Used to unforgeably mark Objects.
+Handle of a Tag `{current_procedure, x, y}`. Used to unforgeably mark Objects.
 
 Currently, `tag_data` is not being checked to be a `Blob` and the strict
 requirement is not known to be necessary.

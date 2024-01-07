@@ -56,8 +56,8 @@ equivalent and indistinguishable.
   ├─ tree:4
   |  ├─ string:unused
   |  ├─ tag
-  |  |  ├─ blob:EXECUTABLE
   |  |  ├─ handle to TRUSTED_COMPILE
+  |  |  ├─ blob:EXECUTABLE
   |  |  ├─ literal blob "Runnable"
   |  ├─ ARGUMENT_2_1
   |  ├─ ARGUMENT_2_2

@@ -138,9 +138,9 @@ void parse_args( span_view<char*> args )
     for ( const auto& name : names ) {
       if ( name.is_tag() ) {
         auto view = rt.storage().get_tree( name );
-        if ( rt.storage().compare_handles( view[0], handle ) ) {
+        if ( rt.storage().compare_handles( view[1], handle ) ) {
           cout << "In " << pretty_print_handle( name ) << ", ";
-          cout << pretty_print_handle( view[1] ) << " tags it by\n";
+          cout << pretty_print_handle( view[0] ) << " tags it by\n";
           cout << deep_pretty_print( view[2] ) << endl;
           continue;
         }
