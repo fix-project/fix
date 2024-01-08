@@ -96,14 +96,6 @@ private:
    */
   std::optional<Handle> progress( Task task );
 
-  /**
-   * Gets the runnable tag from a handle.
-   * 
-   * @param handle                  The handle to get the runnable tag from.
-   * @return std::optional<Handle>  The runnable tag, if it exists.
-   */
-  std::optional<Handle> get_runnable( Handle handle );
-
 public:
   RuntimeWorker( size_t thread_id,
                  Runtime& runtime,
