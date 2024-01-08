@@ -22,8 +22,7 @@ typedef enum VALUE_TYPE
 externref tagged_output( externref value, bool succeeded )
 {
   grow_rw_mem_0_pages( 4 );
-  set_i32_rw_mem_0( 0, succeeded );
-  return create_tag( value, create_blob_rw_mem_0( 4 ) );
+  return create_tag( value, create_blob_i32( succeeded ) );
 }
 
 /**
