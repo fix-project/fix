@@ -89,8 +89,8 @@ Handle RuntimeWorker::do_apply( Task task )
   CHECK( not function_tag.is_blob() );
 
   while ( !storage_.get_tree( function_tag )[1].is_blob() ) {
-    if ( not storage_.get_tree( function_tag )[1].is_tag() ) {
-      throw std::runtime_error( "Procedure is not a tag." );
+    if ( storage_.get_tree( function_tag )[1].is_blob() ) {
+      throw std::runtime_error( "Procedure is not tag or tree." );
     }
     function_tag = storage_.get_tree( function_tag )[1];
   }

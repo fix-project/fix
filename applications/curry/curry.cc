@@ -71,7 +71,7 @@ externref apply( externref encode )
   externref resource_limits = get_ro_table_0( 0 );
 
   attach_tree_ro_table_1( get_ro_table_0( 1 ) );
-  externref sub_encode = get_ro_table_1( 0 );
+  externref sub_encode = get_ro_table_1( 1 );
 
   int32_t tree_length = get_length( sub_encode ) + get_length( encode ) - 2;
 
@@ -112,9 +112,9 @@ externref apply( externref encode )
 __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply( externref encode )
 {
   attach_tree_ro_table_0( encode );
-  attach_tree_ro_table_1( get_ro_table_0( 1 ) ); // Attach tag
+  attach_tree_ro_table_1( get_ro_table_0( 1 ) ); // Attach current program tag
 
-  if ( get_value_type( get_ro_table_1( 0 ) ) == VALUE_TYPE::Blob ) { // Initial (unwrapped) call
+  if ( get_value_type( get_ro_table_1( 1 ) ) == VALUE_TYPE::Blob ) { // Initial (unwrapped) call
     return tagged_output( encode, true );
   }
 

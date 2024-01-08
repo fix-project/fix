@@ -41,7 +41,7 @@ optional<uint32_t> unwrap_tag( Runtime& rt, const Handle& tag )
     return {};
   }
 
-  auto& tag_contents = rt.storage().get_tree( tag )[0];
+  auto& tag_contents = rt.storage().get_tree( tag )[1];
   uint32_t blob_result = -1;
   memcpy( &blob_result, rt.storage().get_blob( tag_contents ).data(), sizeof( uint32_t ) );
   return blob_result;
@@ -90,7 +90,7 @@ void test_curry_self( Runtime& rt )
 
   Handle curried_curry_result = apply_args( rt, curried, { add_simple_compiled, Handle( 2 ) } );
 
-  Handle unwrapped_curried_curry_result = rt.storage().get_tree( curried_curry_result )[0];
+  Handle unwrapped_curried_curry_result = rt.storage().get_tree( curried_curry_result )[1];
   Handle curried_add_result = apply_args( rt, unwrapped_curried_curry_result, { Handle( 1 ), Handle( 3 ) } );
 
   auto optional_result = unwrap_tag( rt, curried_add_result );
