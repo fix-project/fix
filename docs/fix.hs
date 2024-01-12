@@ -33,16 +33,16 @@ type ValueTree = Tree Value
 
 -- | An Expression is a computation which may be further evaluated.  When evaluated, it will produce a Value.
 data Expression = Value Value | Encode Encode | ExpressionTree ExpressionTree | ExpressionTreeStub (Stub ExpressionTree)
--- | An Encode is an instruction expressing that a Thunk be replaced by the result of the function it represents.  A Strict Encode requests the complete expansion of the result, while a Shallow Encode requests partial (i.e., lazy) expansion.
+-- | An Encode is an instruction requesting that a Thunk be replaced by the result of the function it represents.  A Strict Encode requests the complete expansion of the result, while a Shallow Encode requests partial (i.e., lazy) expansion.
 data Encode = Strict Thunk | Shallow Thunk
 -- | A Tree of Expressions.
 type ExpressionTree = Tree Expression
 
--- | Fix represents any Fix type.  This may be an Expression or a Relation, or a sequence of Expressions and Relations.
+-- | Fix represents any Fix type, including both Expressions and Relations.
 data Fix = Expression Expression | Relation Relation | FixTree FixTree
 -- | A Relation represents either the application of a Thunk or the evaluation of an Expression.
 data Relation = Apply Thunk | Eval Expression
--- | A Tree of Fix types.
+-- | A Tree of Expressions and Relations.
 type FixTree = Tree Fix
 
 -- * Functions
@@ -63,18 +63,40 @@ load = undefined
 name :: a -> Name a
 name = undefined
 
--- | Apply a function described by a combination.  The function may in theory produce any Expression; however, any Encodes or Stubs within it will be overridden by the Encode triggering this application.
-applyCombination :: Value -> Expression
-applyCombination = undefined
+-- | Apply a function described by a combination.  Even though a Fixpoint procedure can attempt to return a non-Value Expression, doing so is considered a type error.
+applyCombination :: Value -> Value
+applyCombination _ = case (undefined :: Expression) of
+                      Value x -> x
+                      _ -> error "Result must be a Value."
 
 -- ** Evaluation Rules
 
--- | Convert a "full" object into a "stub" object, removing its data from the reachable set.
-lower :: Object -> Object
-lower (Blob x) = BlobStub $ name x
-lower (BlobStub x) = BlobStub x
-lower (ObjectTree x) = ObjectTreeStub $ name $ treeMap (Value . Object) x
-lower (ObjectTreeStub x) = ObjectTreeStub x
+-- | Apply a Thunk.  In most cases this will apply a combination; however, as an optimization, a thunk describing an application of the identity function may be represented inline.
+apply :: Thunk -> Value
+apply (Identity x) = Object x
+apply (Combination x) = applyCombination $ eval $ ExpressionTree $ load x
+
+-- | Converts an Expression into a Value by executing any Encodes contained within the Expression.
+eval :: Expression -> Value
+eval (Value x) = x
+eval (Encode (Strict x)) = eval $ encodeStrict $ apply x
+eval (Encode (Shallow x)) = eval $ encodeShallow $ apply x
+eval (ExpressionTree x) = ValueTree $ treeMap eval x
+eval (ExpressionTreeStub x) = ValueTreeStub x
+
+-- | Turns an arbitrary Value into an Expression which, when evaluated, will produce the full contents of that Value (containing neither Stubs nor Thunks).
+encodeStrict :: Value -> Expression
+encodeStrict (Thunk x) = Encode $ Strict x
+encodeStrict (ValueTree x) = ExpressionTree $ treeMap encodeStrict x
+encodeStrict (ValueTreeStub x) = ExpressionTree $ treeMap (encodeStrict . eval) $ load x
+encodeStrict (Object x) = Value $ Object $ lift x
+
+-- | Turns an arbitrary Value into an Expression which, when evaluated, will produce a Stub corresponding to the value.
+encodeShallow :: Value -> Expression
+encodeShallow (Thunk x) = Encode $ Shallow x
+encodeShallow (ValueTree x) = Value $ ValueTreeStub $ name $ treeMap Value x
+encodeShallow (ValueTreeStub x) = Value $ ValueTreeStub x
+encodeShallow (Object x) = Value $ Object $ lower x
 
 -- | Convert a "stub" object into a "full" object, adding its data to the reachable set.  This may require doing additional computation if a stub was produced by lazy evaluation.
 lift :: Object -> Object
@@ -83,51 +105,23 @@ lift (BlobStub x) = Blob $ load x
 lift (ObjectTree x) = ObjectTree x
 lift (ObjectTreeStub x) = ObjectTree $ treeMap (force . eval) $ load x
 
--- | Apply a Thunk.  In most cases this will apply a combination; however, as an optimization, a thunk describing an application of the identity function may be represented inline.
-apply :: Thunk -> Expression
-apply (Identity x) = Value $ Object x
-apply (Combination x) = applyCombination $ eval $ ExpressionTree $ load x
+-- | Convert a "full" object into a "stub" object, removing its data from the reachable set.
+lower :: Object -> Object
+lower (Blob x) = BlobStub $ name x
+lower (BlobStub x) = BlobStub x
+lower (ObjectTree x) = ObjectTreeStub $ name $ treeMap (Value . Object) x
+lower (ObjectTreeStub x) = ObjectTreeStub x
 
--- | Converts an Expression into a Value by replacing any Encodes with the result of applying the Thunk to which they refer.  Encodes may additionally specify whether the replacement should be strict or shallow.
-eval :: Expression -> Value
-eval (Value x) = x
-eval (Encode (Strict x)) = eval $ makeStrict $ apply x
-eval (Encode (Shallow x)) = eval $ makeShallow $ apply x
-eval (ExpressionTree x) = ValueTree $ treeMap eval x
-eval (ExpressionTreeStub x) = ValueTreeStub x
-
--- | Turns an arbitrary Expression into a Strict version of that Expression; the result, when evaluated, will contain no Stubs nor Thunks.  This overrides Encodes already present within the Expression.
-makeStrict :: Expression -> Expression
-makeStrict (Encode (Strict x)) = Encode $ Strict x
-makeStrict (Encode (Shallow x)) = Encode $ Strict x
-makeStrict (ExpressionTree x) = ExpressionTree $ treeMap makeStrict x
-makeStrict (ExpressionTreeStub x) = ExpressionTree $ treeMap makeStrict $ load x
-makeStrict (Value (Thunk x)) = Encode $ Strict x
-makeStrict (Value (ValueTree x)) = ExpressionTree $ treeMap (makeStrict . Value) x
-makeStrict (Value (ValueTreeStub x)) = ExpressionTree $ treeMap makeStrict $ load x
-makeStrict (Value (Object x)) = Value $ Object $ lift x
-
--- | Turns an arbitrary Expression into a Shallow version of that Expression; the result, when evaluated, will always be a Stub.  If the expression is itself an Encode, this overrides it.
-makeShallow :: Expression -> Expression
-makeShallow (Encode (Strict x)) = Encode $ Shallow x
-makeShallow (Encode (Shallow x)) = Encode $ Shallow x
-makeShallow (ExpressionTree x) = ExpressionTreeStub $ name x
-makeShallow (ExpressionTreeStub x) = ExpressionTreeStub x
-makeShallow (Value (Thunk x)) = Encode $ Shallow x
-makeShallow (Value (ValueTree x)) = Value $ ValueTreeStub $ name $ treeMap Value x
-makeShallow (Value (ValueTreeStub x)) = Value $ ValueTreeStub x
-makeShallow (Value (Object x)) = Value $ Object $ lower x
-
--- | Turns a Value into an Object by repeatedly repacing Thunks with their results.
+-- | Turns a Value into an Object by repeatedly replacing Thunks with their results.
 force :: Value -> Object
 force (Object x) = x
 force (ValueTree x) = ObjectTree $ treeMap force x
 force (ValueTreeStub x) = ObjectTree $ treeMap (force . eval) $ load x
-force (Thunk x) = force $ eval $ apply x
+force (Thunk x) = force $ apply x
 
 -- | Produces the Expression corresponding to any Fix type, including a Relation.
 reduce :: Fix -> Expression
-reduce (Relation (Apply x)) = apply x
+reduce (Relation (Apply x)) = Value $ apply x
 reduce (Relation (Eval x)) = Value $ eval x
 reduce (FixTree x) = ExpressionTree $ treeMap reduce x
 reduce (Expression x) = x
