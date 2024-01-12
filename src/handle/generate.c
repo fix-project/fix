@@ -267,16 +267,15 @@ int main( int argc, char** argv )
   const Type* etree = make_terminal( "ExpressionTree", 240 + 1 + 1 ); // hash + tag + is_local
   const Type* ftree = make_terminal( "FixTree", 240 + 1 + 1 );        // hash + tag + is_local
 
-  const Type* ostub = make_wrapper( "ObjectTreeStub", etree );
-  const Type* vstub = make_wrapper( "ValueTreeStub", etree );
-  const Type* estub = make_wrapper( "ExpressionTreeStub", etree );
+  const Type* ostub = make_wrapper( "ObjectTreeStub", otree );
+  const Type* vstub = make_wrapper( "ValueTreeStub", vtree );
 
   const Type* named = make_terminal( "Named", 240 + 1 );     // hash + is_local
   const Type* literal = make_terminal( "Literal", 240 + 5 ); // hash + size
   const Type* blob = make_sum( "Blob", 2, named, literal );
-  const Type* blob_stub = make_wrapper( "BlobStub", blob );
+  const Type* bstub = make_wrapper( "BlobStub", blob );
 
-  const Type* object = make_sum( "Object", 4, otree, ostub, blob, blob_stub );
+  const Type* object = make_sum( "Object", 4, otree, ostub, blob, bstub );
 
   const Type* combination = make_wrapper( "Combination", etree );
   const Type* identity = make_wrapper( "Identity", object );
@@ -287,13 +286,14 @@ int main( int argc, char** argv )
   const Type* shallow = make_wrapper( "Shallow", thunk );
   const Type* step = make_wrapper( "Step", thunk );
   const Type* encode = make_sum( "Encode", 3, strict, shallow, step );
-  const Type* expression = make_sum( "Expression", 4, value, encode, etree, estub );
+  const Type* expression = make_sum( "Expression", 3, value, encode, etree );
 
   const Type* apply = make_wrapper( "Apply", expression );
   const Type* eval = make_wrapper( "Eval", expression );
   const Type* relation = make_sum( "Relation", 2, apply, eval );
   const Type* fix = make_sum( "Fix", 3, expression, relation, ftree );
 
+  fprintf( stderr, "Fix Handles currently need %lu bits.\n", fix->bits );
   assert( fix->bits <= 256 );
 
   printf( "#pragma once\n"

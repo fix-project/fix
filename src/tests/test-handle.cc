@@ -41,11 +41,7 @@ void test_stub( void )
   const u8x32 zero { 0 };
   const auto nil = Handle<Fix>::forge( zero );
   const auto tree = nil.unwrap<Expression>().unwrap<Value>().unwrap<Object>().unwrap<ObjectTree>();
-  const auto stub = Handle<ObjectTreeStub>( Handle<ExpressionTree>( tree ) )
-                      .into<Object>()
-                      .into<Value>()
-                      .into<Expression>()
-                      .into<Fix>();
+  const auto stub = tree.into<ObjectTreeStub>().into<Object>().into<Value>().into<Expression>().into<Fix>();
   CHECK_NE( stub, nil );
   CHECK_EQ( tree.size(), 0 );
   CHECK( not tree.is_local() );

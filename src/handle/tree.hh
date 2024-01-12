@@ -73,4 +73,10 @@ public:
   {
     return Handle<FixTree>::forge( content );
   }
+
+  template<typename S>
+  inline Handle<S> into() const requires std::constructible_from<Handle<S>, Handle<Tree<T>>>
+  {
+    return Handle<S>( *this );
+  }
 };

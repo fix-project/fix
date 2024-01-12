@@ -42,6 +42,12 @@ public:
   inline bool is_local() const { return ( content[30] >> 7 ) & 1; }
 
   static inline Handle<Named> forge( u8x32 content ) { return { content }; }
+
+  template<typename S>
+  inline Handle<S> into() const requires std::constructible_from<Handle<S>, Handle<Named>>
+  {
+    return Handle<S>( *this );
+  }
 };
 
 template<>
@@ -97,5 +103,11 @@ public:
   {
     assert( sizeof( T ) == size() );
     return *( (T*)&content );
+  }
+
+  template<typename S>
+  inline Handle<S> into() const requires std::constructible_from<Handle<S>, Handle<Literal>>
+  {
+    return Handle<S>( *this );
   }
 };
