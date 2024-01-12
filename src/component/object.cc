@@ -6,13 +6,13 @@
 
 #include <glog/logging.h>
 
-template<any_span S>
+template<typename S>
 Owned<S>::Owned( S span, AllocationType allocation_type )
   : span_( span )
   , allocation_type_( allocation_type )
 {}
 
-template<any_span S>
+template<typename S>
 Owned<S> Owned<S>::allocate( size_t size ) requires( not std::is_const_v<element_type> )
 {
   void* p = aligned_alloc( std::alignment_of<element_type>(), size * sizeof( element_type ) );
@@ -29,7 +29,7 @@ Owned<S> Owned<S>::allocate( size_t size ) requires( not std::is_const_v<element
   };
 }
 
-template<any_span S>
+template<typename S>
 Owned<S> Owned<S>::map( size_t size ) requires( not std::is_const_v<element_type> )
 {
   void* p = mmap( 0, size * sizeof( element_type ), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 );
@@ -50,7 +50,7 @@ Owned<S> Owned<S>::map( size_t size ) requires( not std::is_const_v<element_type
   };
 }
 
-template<any_span S>
+template<typename S>
 Owned<S> Owned<S>::claim_static( S span )
 {
   VLOG( 1 ) << "claimed " << span.size_bytes() << " static bytes at "
@@ -58,7 +58,7 @@ Owned<S> Owned<S>::claim_static( S span )
   return Owned { span, AllocationType::Static };
 }
 
-template<any_span S>
+template<typename S>
 Owned<S> Owned<S>::claim_allocated( S span )
 {
   VLOG( 1 ) << "claimed " << span.size_bytes() << " allocated bytes at "
@@ -66,7 +66,7 @@ Owned<S> Owned<S>::claim_allocated( S span )
   return Owned { span, AllocationType::Allocated };
 }
 
-template<any_span S>
+template<typename S>
 Owned<S> Owned<S>::claim_mapped( S span )
 {
   VLOG( 1 ) << "claimed " << span.size_bytes() << " mapped bytes at "
@@ -74,7 +74,7 @@ Owned<S> Owned<S>::claim_mapped( S span )
   return Owned { span, AllocationType::Mapped };
 }
 
-template<any_span S>
+template<typename S>
 Owned<S> Owned<S>::from_file( const std::filesystem::path path ) requires std::is_const_v<element_type>
 {
   VLOG( 1 ) << "mapping " << path << " as read-only";
@@ -87,7 +87,7 @@ Owned<S> Owned<S>::from_file( const std::filesystem::path path ) requires std::i
   return claim_mapped( { reinterpret_cast<pointer>( p ), size / sizeof( element_type ) } );
 }
 
-template<any_span S>
+template<typename S>
 Owned<S> Owned<S>::copy( std::span<element_type> data )
 {
   element_type* a = (element_type*)malloc( data.size_bytes() );
@@ -95,7 +95,7 @@ Owned<S> Owned<S>::copy( std::span<element_type> data )
   return claim_allocated( { a, data.size() } );
 }
 
-template<any_span S>
+template<typename S>
 void Owned<S>::to_file( const std::filesystem::path path ) requires std::is_const_v<element_type>
 {
   VLOG( 1 ) << "writing " << path << " to disk";
@@ -128,7 +128,7 @@ void Owned<S>::to_file( const std::filesystem::path path ) requires std::is_cons
   allocation_type_ = AllocationType::Mapped;
 }
 
-template<any_span S>
+template<typename S>
 Owned<S>::Owned( Owned<S>&& other )
   : span_( other.span_ )
   , allocation_type_( other.allocation_type_ )
@@ -136,7 +136,7 @@ Owned<S>::Owned( Owned<S>&& other )
   other.leak();
 }
 
-template<any_span S>
+template<typename S>
 Owned<S>::Owned( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>
   : span_( original.span() )
   , allocation_type_( original.allocation_type() )
@@ -155,7 +155,7 @@ Owned<S>::Owned( Owned<std::span<value_type>>&& original ) requires std::is_cons
   }
 };
 
-template<any_span S>
+template<typename S>
 Owned<S>& Owned<S>::operator=( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>
 {
   span_ = original.span();
@@ -175,14 +175,14 @@ Owned<S>& Owned<S>::operator=( Owned<std::span<value_type>>&& original ) require
   return *this;
 }
 
-template<any_span S>
+template<typename S>
 void Owned<S>::leak()
 {
   span_ = { reinterpret_cast<S::value_type*>( 0 ), 0 };
   allocation_type_ = AllocationType::Static;
 }
 
-template<any_span S>
+template<typename S>
 Owned<S>& Owned<S>::operator=( Owned&& other )
 {
   this->span_ = other.span_;
@@ -191,14 +191,14 @@ Owned<S>& Owned<S>::operator=( Owned&& other )
   return *this;
 }
 
-template<any_span S>
+template<typename S>
 auto Owned<S>::operator[]( size_t index ) -> element_type&
 {
   CHECK( index < span_.size() );
   return span_[index];
 }
 
-template<any_span S>
+template<typename S>
 Owned<S>::~Owned()
 {
   switch ( allocation_type_ ) {
@@ -216,7 +216,6 @@ Owned<S>::~Owned()
   leak();
 }
 
-template class Owned<MutBlob>;
-template class Owned<MutTree>;
 template class Owned<Blob>;
-template class Owned<Tree>;
+template class Owned<Tree<Object>>;
+template class Owned<Tree<Expression>>;
