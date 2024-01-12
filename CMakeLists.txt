@@ -10,9 +10,9 @@ pkg_search_module(GLOG REQUIRED libglog IMPORTED_TARGET glog)
 include(etc/sanitizers.cmake)
 add_compile_options(-march=znver2) # for AVX2
 
-set(ABSL_PROPAGATE_CXX_STD on)
+set(ABSL_PROPAGATE_CXX_STD ON)
+set(ABSL_USE_SYSTEM_INCLUDES ON)
 add_subdirectory(${PROJECT_SOURCE_DIR}/third-party/abseil-cpp)
-include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/third-party/abseil-cpp")
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/third-party/BLAKE3/c)
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/third-party/BLAKE3/c")
@@ -31,27 +31,8 @@ add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-unqualified-std-cast-call>)
 include(etc/clang_format.cmake)
 include(etc/tests.cmake)
 
-include_directories("${PROJECT_SOURCE_DIR}/src/util")
-include_directories("${PROJECT_SOURCE_DIR}/src/http")
-include_directories("${PROJECT_SOURCE_DIR}/src/runtime")
-include_directories("${PROJECT_SOURCE_DIR}/src/component")
-include_directories("${PROJECT_SOURCE_DIR}/src/wasm-rt")
-include_directories("${PROJECT_SOURCE_DIR}/src/storage")
-include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/third-party")
-
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/util")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/http")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/runtime")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/component")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/wasm-rt")
-
-#add_subdirectory("${PROJECT_SOURCE_DIR}/src/storage") # only headers
-
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/tester")
-add_subdirectory("${PROJECT_SOURCE_DIR}/src/tests")
-
-add_subdirectory("${PROJECT_SOURCE_DIR}/testing/wasm-examples")
-add_subdirectory("${PROJECT_SOURCE_DIR}/testing/benchmark")
+add_subdirectory(src)
+add_subdirectory(testing)
 
 # Doxygen documentation generation
 add_subdirectory(docs)

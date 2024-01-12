@@ -8,7 +8,6 @@ add_custom_command(
           -o wasm-rt-content.h
 )
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
 add_library (runtime STATIC ${LIB_SOURCES} wasm-rt-content.h)
-target_link_libraries(runtime PUBLIC component util glog PRIVATE wasmrt absl::flat_hash_map)
+target_include_directories (runtime PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(runtime PUBLIC storage component util glog absl::flat_hash_map PRIVATE wasmrt)
