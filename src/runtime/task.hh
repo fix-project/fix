@@ -10,12 +10,12 @@
  */
 class Task
 {
-  Handle handle_;
+  Handle<Expression> handle_;
   Operation operation_;
 
 public:
-  constexpr Task()
-    : handle_()
+  Task()
+    : handle_( Handle<ObjectTree>::nil().into<Object>().into<Value>().into<Expression>() )
     , operation_()
   {}
 
@@ -24,12 +24,12 @@ public:
     , operation_( other.operation_ )
   {}
 
-  constexpr Task( Handle handle, Operation operation )
+  Task( Handle<Expression> handle, Operation operation )
     : handle_( handle )
     , operation_( operation )
   {}
 
-  constexpr Handle handle() const { return handle_; }
+  Handle<Expression> handle() const { return handle_; }
   constexpr Operation operation() const { return operation_; }
 
   bool operator==( const Task other ) const
@@ -60,9 +60,15 @@ public:
     return H::combine( std::move( h ), task.handle_, task.operation_ );
   }
 
-  static Task Eval( Handle handle ) { return Task( handle, Operation::Eval ); }
-  static Task Apply( Handle handle ) { return Task( handle, Operation::Apply ); }
-  static Task Fill( Handle handle ) { return Task( handle, Operation::Fill ); }
+  static Task Eval( Handle<Expression> handle ) { return Task( handle, Operation::Eval ); }
+  static Task Apply( Handle<Thunk> handle )
+  {
+    return Task( handle.into<Value>().into<Expression>(), Operation::Apply );
+  }
+  static Task Fill( Handle<ValueTree> handle )
+  {
+    return Task( handle.into<Value>().into<Expression>(), Operation::Fill );
+  }
 
   Task& operator=( const Task& other )
   {
@@ -78,7 +84,7 @@ struct hash<Task>
 {
   size_t operator()( const Task& x ) const
   {
-    return hash<Handle>()( x.handle() ) ^ hash<Operation>()( x.operation() );
+    return hash<Handle<Expression>>()( x.handle() ) ^ hash<Operation>()( x.operation() );
   }
 };
 }

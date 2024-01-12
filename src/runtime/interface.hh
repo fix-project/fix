@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+
+#include "handle.hh"
 #include "task.hh"
 
 /**
@@ -25,7 +28,7 @@ public:
    * @param task  The Task to execute.
    * @return      The result of the Task, if it's already known.
    */
-  virtual std::optional<Handle> start( Task&& task ) = 0;
+  virtual std::optional<Handle<Value>> start( Task&& task ) = 0;
 
   /**
    * Gets metadata about this ITaskRunner.
@@ -48,7 +51,7 @@ public:
    * @param task    The Task which was completed.
    * @param result  The Handle of the Task's result.
    */
-  virtual void finish( Task&& task, Handle result ) = 0;
+  virtual void finish( Task&& task, Handle<Value> result ) = 0;
   virtual ~IResultCache() {};
 };
 

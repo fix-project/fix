@@ -1,9 +1,6 @@
 #pragma once
 
-#include <cassert>
 #include <cstdint>
-#include <initializer_list>
-#include <utility>
 
 /**
  * A basic operation, which can be applied to an ::Object (via a Handle) by constructing and scheduling a Task.
