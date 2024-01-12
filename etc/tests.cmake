@@ -22,3 +22,5 @@ add_test(NAME t_helloworld_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BI
 add_test(NAME t_storage WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-storage)
 
 add_test(NAME t_self_host WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-self-host)
+
+add_test(NAME t_handle COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-handle)

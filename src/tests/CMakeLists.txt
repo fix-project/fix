@@ -1,3 +1,8 @@
+link_libraries(glog)
+
+add_executable(test-handle test-handle.cc main.cc)
+target_link_libraries(test-handle handle)
+
 add_executable(test-add test-add.cc main.cc)
 target_link_libraries(test-add runtime)
 

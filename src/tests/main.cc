@@ -1,7 +1,5 @@
 #include <glog/logging.h>
 
-#include "spans.hh"
-
 void test( void );
 
 int main( int argc, char* argv[] )
