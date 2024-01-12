@@ -9,7 +9,14 @@ void test_nil( void )
 {
   const u8x32 zero {};
   const auto nil = Handle<Fix>::forge( zero );
-  const auto name = nil.unwrap<Expression>().unwrap<Value>().unwrap<Object>().unwrap<ObjectTree>();
+  const auto name = nil.try_into<Expression>()
+                      .value()
+                      .try_into<Value>()
+                      .value()
+                      .try_into<Object>()
+                      .value()
+                      .try_into<ObjectTree>()
+                      .value();
   CHECK_EQ( name.size(), 0 );
   CHECK( not name.is_local() );
 }
@@ -18,7 +25,16 @@ void test_string_literal( void )
 {
   const auto literal = "hello"_literal;
   const auto fix = Handle<Blob>( literal ).into<Object>().into<Value>().into<Expression>().into<Fix>();
-  const auto extracted = fix.unwrap<Expression>().unwrap<Value>().unwrap<Object>().unwrap<Blob>().unwrap<Literal>();
+  const auto extracted = fix.try_into<Expression>()
+                           .value()
+                           .try_into<Value>()
+                           .value()
+                           .try_into<Object>()
+                           .value()
+                           .try_into<Blob>()
+                           .value()
+                           .try_into<Literal>()
+                           .value();
 
   CHECK_EQ( extracted, literal );
   CHECK_EQ( extracted.view(), "hello" );
@@ -29,7 +45,16 @@ void test_int_literal( void )
 {
   const auto literal = 0xcafeb0ba_literal32;
   const auto fix = Handle<Blob>( literal ).into<Object>().into<Value>().into<Expression>().into<Fix>();
-  const auto extracted = fix.unwrap<Expression>().unwrap<Value>().unwrap<Object>().unwrap<Blob>().unwrap<Literal>();
+  const auto extracted = fix.try_into<Expression>()
+                           .value()
+                           .try_into<Value>()
+                           .value()
+                           .try_into<Object>()
+                           .value()
+                           .try_into<Blob>()
+                           .value()
+                           .try_into<Literal>()
+                           .value();
   CHECK_EQ( extracted, literal );
   CHECK_EQ( extracted.size(), sizeof( uint32_t ) );
   CHECK_EQ( uint32_t( extracted ), 0xcafeb0ba );
@@ -40,7 +65,14 @@ void test_stub( void )
 {
   const u8x32 zero { 0 };
   const auto nil = Handle<Fix>::forge( zero );
-  const auto tree = nil.unwrap<Expression>().unwrap<Value>().unwrap<Object>().unwrap<ObjectTree>();
+  const auto tree = nil.try_into<Expression>()
+                      .value()
+                      .try_into<Value>()
+                      .value()
+                      .try_into<Object>()
+                      .value()
+                      .try_into<ObjectTree>()
+                      .value();
   const auto stub = tree.into<ObjectTreeStub>().into<Object>().into<Value>().into<Expression>().into<Fix>();
   CHECK_NE( stub, nil );
   CHECK_EQ( tree.size(), 0 );
@@ -51,10 +83,24 @@ void test_tag( void )
 {
   const u8x32 zero { 0 };
   const auto nil = Handle<Fix>::forge( zero );
-  const auto tree = nil.unwrap<Expression>().unwrap<Value>().unwrap<Object>().unwrap<ObjectTree>();
+  const auto tree = nil.try_into<Expression>()
+                      .value()
+                      .try_into<Value>()
+                      .value()
+                      .try_into<Object>()
+                      .value()
+                      .try_into<ObjectTree>()
+                      .value();
   const auto tag = Handle<Object>( tree.tag() ).into<Value>().into<Expression>().into<Fix>();
   CHECK_NE( tag, nil );
-  const auto inner = tag.unwrap<Expression>().unwrap<Value>().unwrap<Object>().unwrap<ObjectTree>();
+  const auto inner = tag.try_into<Expression>()
+                       .value()
+                       .try_into<Value>()
+                       .value()
+                       .try_into<Object>()
+                       .value()
+                       .try_into<ObjectTree>()
+                       .value();
   CHECK( inner.is_tag() );
   CHECK( not inner.untag().is_tag() );
 }
@@ -66,9 +112,9 @@ void test_thunks( void )
   const auto combination = Handle<Combination>( Handle<ExpressionTree>( tree ) );
   const auto id = Handle<Identity>( obj );
 
-  CHECK_EQ( id.unwrap<Object>(), obj );
-  CHECK_EQ( id.unwrap<Object>().unwrap<ObjectTree>(), tree );
-  CHECK_EQ( combination.unwrap<ExpressionTree>(), Handle<ExpressionTree>( tree ) );
+  CHECK_EQ( id.try_into<Object>().value(), obj );
+  CHECK_EQ( id.try_into<Object>().value().try_into<ObjectTree>().value(), tree );
+  CHECK_EQ( combination.try_into<ExpressionTree>().value(), Handle<ExpressionTree>( tree ) );
 }
 
 void test_trees( void )
