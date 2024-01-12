@@ -19,12 +19,13 @@ private:
   {}
 
 public:
-  inline Handle( u8x32 hash, uint64_t size )
+  inline Handle( const u8x32 hash, uint64_t size, bool local )
     : content( hash )
   {
     assert( ( size & 0xffff000000000000 ) == 0 );
     assert( size > Handle<Literal>::MAXIMUM_LENGTH );
     ( *(u64x4*)&content )[3] = size;
+    content[30] |= ( local << 7 );
   }
 
   inline u8x32 hash() const
@@ -34,10 +35,7 @@ public:
     return (u8x32)hash;
   }
 
-  inline size_t size() const
-  {
-    return ( (unsigned long long __attribute__( ( vector_size( 32 ) ) ))content )[3] & 0xffffffffffff;
-  }
+  inline size_t size() const { return ( (u64x4)content )[3] & 0xffffffffffff; }
   inline bool empty() const { return size() == 0; }
   inline bool is_local() const { return ( content[30] >> 7 ) & 1; }
 
@@ -56,7 +54,7 @@ struct Handle<Literal>
   u8x32 content;
 
 private:
-  inline Handle( const unsigned char __attribute__( ( vector_size( 32 ) ) ) content )
+  inline Handle( u8x32 content )
     : content( content )
   {}
 

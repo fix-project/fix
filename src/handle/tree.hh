@@ -12,16 +12,17 @@ struct Handle<Tree<T>>
   u8x32 content;
 
 private:
-  Handle( const unsigned char __attribute__( ( vector_size( 32 ) ) ) content )
+  Handle( const u8x32 content )
     : content( content )
   {}
 
 public:
-  inline Handle( u8x32 hash, uint64_t size )
+  inline Handle( const u8x32 hash, uint64_t size, bool local )
     : content( hash )
   {
     assert( ( size & 0xffff000000000000 ) == 0 );
     ( *(u64x4*)&content )[3] = size;
+    content[30] |= ( local << 7 );
   }
 
   inline static Handle nil()
