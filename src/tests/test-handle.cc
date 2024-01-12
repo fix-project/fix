@@ -41,7 +41,11 @@ void test_stub( void )
   const u8x32 zero { 0 };
   const auto nil = Handle<Fix>::forge( zero );
   const auto tree = nil.unwrap<Expression>().unwrap<Value>().unwrap<Object>().unwrap<ObjectTree>();
-  const auto stub = Handle<ObjectTreeStub>( tree ).into<Object>().into<Value>().into<Expression>().into<Fix>();
+  const auto stub = Handle<ObjectTreeStub>( Handle<ExpressionTree>( tree ) )
+                      .into<Object>()
+                      .into<Value>()
+                      .into<Expression>()
+                      .into<Fix>();
   CHECK_NE( stub, nil );
   CHECK_EQ( tree.size(), 0 );
   CHECK( not tree.is_local() );
@@ -63,7 +67,7 @@ void test_thunks( void )
 {
   const auto tree = Handle<ObjectTree>::nil();
   const auto obj = Handle<Object>( tree );
-  const auto combination = Handle<Combination>( tree );
+  const auto combination = Handle<Combination>( Handle<ExpressionTree>( tree ) );
   const auto id = Handle<Identity>( obj );
 
   CHECK_EQ( id.unwrap<Object>(), obj );
@@ -71,7 +75,27 @@ void test_thunks( void )
   CHECK_EQ( combination.unwrap<ExpressionTree>(), Handle<ExpressionTree>( tree ) );
 }
 
-void test()
+void test_trees( void )
+{
+  const auto o = Handle<ObjectTree>::nil();
+  const auto v = Handle<ValueTree>::nil();
+  const auto e = Handle<ExpressionTree>::nil();
+  const auto f = Handle<FixTree>::nil();
+
+  const auto fo = Handle<Object>( o ).into<Value>().into<Expression>().into<Fix>();
+  const auto fv = Handle<Value>( v ).into<Expression>().into<Fix>();
+  const auto fe = Handle<Expression>( e ).into<Fix>();
+  const auto ff = Handle<Fix>( f );
+
+  CHECK_NE( fo, fv );
+  CHECK_NE( fo, fe );
+  CHECK_NE( fo, ff );
+  CHECK_NE( fv, fe );
+  CHECK_NE( fv, ff );
+  CHECK_NE( fe, ff );
+}
+
+void test( void )
 {
   test_nil();
   test_string_literal();
@@ -79,4 +103,5 @@ void test()
   test_stub();
   test_tag();
   test_thunks();
+  test_trees();
 }

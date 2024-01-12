@@ -30,6 +30,13 @@ public:
     return forge( zero );
   }
 
+  inline u8x32 hash() const
+  {
+    u64x4 hash = (u64x4)content;
+    hash[3] = 0;
+    return (u8x32)hash;
+  }
+
   inline size_t size() const { return ( (u64x4)content )[3] & 0xffffffffffff; }
   inline bool empty() const { return size() == 0; }
   inline bool is_local() const { return ( content[30] >> 7 ) & 1; }
@@ -51,17 +58,17 @@ public:
 
   static inline Handle<Tree<T>> forge( u8x32 content ) { return { content }; }
 
-  inline operator Handle<ValueTree>() const requires std::same_as<T, Object>
+  explicit inline operator Handle<ValueTree>() const requires std::same_as<T, Object>
   {
     return Handle<ValueTree>::forge( content );
   }
 
-  inline operator Handle<ExpressionTree>() const requires std::same_as<T, Value> or std::same_as<T, Object>
+  explicit inline operator Handle<ExpressionTree>() const requires std::same_as<T, Value> or std::same_as<T, Object>
   {
     return Handle<ExpressionTree>::forge( content );
   }
 
-  inline operator Handle<FixTree>() const
+  explicit inline operator Handle<FixTree>() const
     requires std::same_as<T, Value> or std::same_as<T, Object> or std::same_as<T, Expression>
   {
     return Handle<FixTree>::forge( content );

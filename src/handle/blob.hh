@@ -27,6 +27,13 @@ public:
     ( *(u64x4*)&content )[3] = size;
   }
 
+  inline u8x32 hash() const
+  {
+    u64x4 hash = (u64x4)content;
+    hash[3] = 0;
+    return (u8x32)hash;
+  }
+
   inline size_t size() const
   {
     return ( (unsigned long long __attribute__( ( vector_size( 32 ) ) ))content )[3] & 0xffffffffffff;
@@ -50,7 +57,7 @@ private:
 public:
   static constexpr size_t MAXIMUM_LENGTH = 30;
 
-  inline Handle( const std::string_view str )
+  explicit inline Handle( const std::string_view str )
     : content {}
   {
     assert( str.size() <= 30 );
@@ -60,7 +67,7 @@ public:
 
   template<typename T>
   requires std::integral<T> or std::floating_point<T>
-  inline Handle( const T x )
+  explicit inline Handle( const T x )
     : content {}
   {
     static_assert( sizeof( T ) <= MAXIMUM_LENGTH );
@@ -82,11 +89,11 @@ public:
 
   static inline Handle<Literal> forge( u8x32 content ) { return { content }; }
 
-  inline operator std::string() const { return std::string( view() ); }
+  explicit inline operator std::string() const { return std::string( view() ); }
 
   template<typename T>
   requires std::integral<T> or std::floating_point<T>
-  inline operator T() const
+  explicit inline operator T() const
   {
     assert( sizeof( T ) == size() );
     return *( (T*)&content );
