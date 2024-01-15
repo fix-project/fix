@@ -1,3 +1,4 @@
+#if 0
 #include "message.hh"
 #include "base64.hh"
 #include "object.hh"
@@ -281,3 +282,4 @@ template TxP<PROPOSE> TxP<PROPOSE>::parse( Parser& parser );
 template void TxP<PROPOSE>::serialize( Serializer& serializer ) const;
 template TxP<ACCEPT> TxP<ACCEPT>::parse( Parser& parser );
 template void TxP<ACCEPT>::serialize( Serializer& serializer ) const;
+#endif

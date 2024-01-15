@@ -110,6 +110,7 @@ void serialize_enum( const Type* type, unsigned offset, unsigned tag_bits )
 
 void serialize_constructors( const Type* type, const unsigned offset )
 {
+  printf( "\tinline Handle<%s>() : content() {}\n", type->name );
   printf( "private:\n" );
   printf( "\tinline Handle<%s>(const u8x32 &content) : content(content) {}\n", type->name );
   printf( "public:\n" );
@@ -119,21 +120,33 @@ void serialize_constructors( const Type* type, const unsigned offset )
 
   if ( type->num_options == 1 ) {
     const Type* option = type->options[0];
-    printf( "\texplicit inline Handle<%s>(const Handle<%s> &base) : "
+    printf( "\tinline Handle<%s>(const Handle<%s> &base) : "
             "content(base.content) {}\n\n",
             type->name,
             option->name );
   } else {
     for ( unsigned i = 0; i < type->num_options; i++ ) {
       const Type* option = type->options[i];
-      printf( "\texplicit inline Handle<%s>(const Handle<%s> &base) : content(base.content){\n",
-              type->name,
-              option->name );
+      printf( "\tinline Handle<%s>(const Handle<%s> &base) : content(base.content){\n", type->name, option->name );
       printf( "\t\tu64x4 words = (u64x4)content;\n" );
       unsigned long long mask = i << offset;
       printf( "\t\twords[3] |= 0x%016lx;\n", __builtin_bswap64( mask ) );
       printf( "\t\tcontent = (u8x32)words;\n" );
       printf( "\t}\n\n" );
+    }
+  }
+
+  for ( unsigned i = 0; i < type->num_options; i++ ) {
+    const Type* option = type->options[i];
+    // wrapper types cause ambiguous implicit conversions, so we don't allow it
+    if ( option->num_options != 1 ) {
+      printf( "\ttemplate<FixType T>\n" );
+      printf( "\tinline Handle<%s>(const Handle<T> &base) requires std::convertible_to<Handle<T>, "
+              "Handle<%s>>: "
+              "Handle(Handle<%s>(base)) {}\n\n",
+              type->name,
+              option->name,
+              option->name );
     }
   }
 }
@@ -153,8 +166,7 @@ void serialize_unwrap( const Type* type )
     }
     printf( "\t\t}" );
   }
-  printf( " else {\n\t\t\tstatic_assert(false, \"this unwrap will always "
-          "fail\");\n\t\t\t__builtin_unreachable();\n\t\t}\n" );
+  printf( " else {\n\t\t\tassert(false);\n\t\t}\n" );
   printf( "\t}\n\n" );
 }
 
@@ -164,7 +176,7 @@ void serialize_try_into( const Type* type )
   printf( "\tinline std::optional<Handle<T>> try_into() const {\n" );
   for ( unsigned char i = 0; i < type->num_options; i++ ) {
     const Type* option = type->options[i];
-    printf( "%sif constexpr (std::is_same<T, %s>::value) {\n", i == 0 ? "\t\t" : " else ", option->name );
+    printf( "%sif constexpr (std::same_as<T, %s>) {\n", i == 0 ? "\t\t" : " else ", option->name );
     if ( type->num_options == 1 ) {
       printf( "\t\t\treturn unwrap<T>();\n" );
     } else {
@@ -173,8 +185,21 @@ void serialize_try_into( const Type* type )
     }
     printf( "\t\t}" );
   }
-  printf( " else {\n\t\t\tstatic_assert(false, \"this unwrap will always "
-          "fail\");\n\t\t}\n" );
+  printf( " else {\n\t\t\treturn {};\n\t\t}\n" );
+  printf( "\t}\n\n" );
+
+  printf( "\ttemplate<FixType A, FixType... As>\n" );
+  printf( "\tinline auto contains() const {\n" );
+  printf( "\t\tauto x = try_into<A>();\n" );
+  printf( "\t\tif (!x) return false;\n" );
+  printf( "\t\tif constexpr(sizeof...(As) == 0) {\n" );
+  printf( "\t\t\treturn true;\n" );
+  printf( "\t\t}\n" );
+  printf( "\t\treturn std::visit([&](const auto y) -> bool {\n" );
+  printf( "\t\t\tif constexpr(decltype(y)::is_fix_sum_type) {\n" );
+  printf( "\t\t\t\treturn y.template contains<A, As...>();\n" );
+  printf( "\t\t\t} else return false;\n" );
+  printf( "\t\t}, x->get());\n" );
   printf( "\t}\n\n" );
 }
 
@@ -187,13 +212,18 @@ void serialize_get( const Type* type )
     printf( "Handle<%s>", type->options[i]->name );
   }
   printf( "> get() const {\n" );
-  printf( "\t\tswitch (option()) {\n" );
-  for ( unsigned i = 0; i < type->num_options; i++ ) {
-    const Type* option = type->options[i];
-    printf( "\t\tcase Option::%s:\n", type->options[i]->name );
-    printf( "\t\t\treturn unwrap<%s>();\n", option->name );
+  if ( type->num_options == 1 ) {
+    printf( "\t\treturn unwrap<%s>();\n", type->options[0]->name );
+  } else {
+    printf( "\t\tswitch (option()) {\n" );
+    for ( unsigned i = 0; i < type->num_options; i++ ) {
+      const Type* option = type->options[i];
+      printf( "\t\tcase Option::%s:\n", option->name );
+      printf( "\t\t\treturn unwrap<%s>();\n", option->name );
+    }
+    printf( "\t\t}\n" );
+    printf( "\t\t__builtin_unreachable();\n" );
   }
-  printf( "\t\t}\n" );
   printf( "\t}\n" );
 }
 
@@ -228,6 +258,9 @@ body:
   printf( "struct %s;\n\n", type->name );
   printf( "template<>\n" );
   printf( "struct Handle<%s> {\n", type->name );
+  printf( "\tconstexpr static bool is_fix_data_type = true;\n" );
+  printf( "\tconstexpr static bool is_fix_sum_type = true;\n" );
+  printf( "\tconstexpr static bool is_fix_wrapper = %s;\n", wrapper ? "true" : "false" );
   if ( !wrapper ) {
     serialize_mask( offset, tag_bits );
   }
@@ -240,18 +273,38 @@ body:
   serialize_unwrap( type );
   serialize_try_into( type );
 
-  if ( !wrapper ) {
-    serialize_get( type );
-  }
+  serialize_get( type );
 
-  printf( "\ttemplate<FixType T>\n" );
-  printf( "\tinline Handle<T> into() const requires "
-          "std::constructible_from<Handle<T>, Handle<%s>> {\n",
+  printf( "\ttemplate<FixType A>\n" );
+  printf( "\tinline Handle<A> into() const requires "
+          "std::constructible_from<Handle<A>, Handle<%s>> {\n",
           type->name );
-  printf( "\t\treturn Handle<T>(*this);\n" );
+  printf( "\t\treturn Handle<A>(*this);\n" );
   printf( "\t}\n" );
 
   printf( "};\n\n" );
+
+  printf( "static inline std::ostream& operator<<(std::ostream& os, const Handle<%s>& h) {\n", type->name );
+  printf( "\tos << \"%s (\";\n", type->name );
+  printf( "\tstd::visit([&](auto x) {os << x;}, h.get());\n" );
+  printf( "\tos << \")\";\n" );
+  printf( "\treturn os;\n" );
+  printf( "}\n\n" );
+
+  if ( !wrapper ) {
+    printf( "template<typename T>\n" );
+    printf( "concept Fix%sType = ", type->name );
+    for ( unsigned i = 0; i < type->num_options; i++ ) {
+      const Type* option = type->options[i];
+      if ( i )
+        printf( " or " );
+      printf( "std::same_as<T, %s>", option->name );
+      if ( option->num_options > 1 ) {
+        printf( " or Fix%sType<T>", option->name );
+      }
+    }
+    printf( ";\n\n" );
+  }
 
 assert_fix:
   printf( "static_assert(FixType<%s>);\n\n", type->name );
@@ -307,7 +360,9 @@ int main( int argc, char** argv )
           "#include \"handle_extra.hh\"\n"
           "\n"
           "template <typename T>\n"
-          "concept FixType = requires(u8x32 bytes) { Handle<T>::forge(bytes); };\n"
+          "concept FixType = Handle<T>::is_fix_data_type;\n"
+          "template <typename T>\n"
+          "concept FixHandle = T::is_fix_data_type;\n"
           "\n" );
 
   serialize( fix );

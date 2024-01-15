@@ -1,3 +1,4 @@
+#if 0
 #include <glog/logging.h>
 
 #include "fixpointapi.hh"
@@ -154,3 +155,4 @@ __m256i lower( __m256i handle )
   __builtin_unreachable();
 }
 }
+#endif

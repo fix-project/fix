@@ -1,11 +1,11 @@
 #include <glog/logging.h>
 
-#include "spans.hh"
+#include <span>
 
 extern int max_args;
 extern int min_args;
 extern void usage_message( const char* argv0 );
-extern void program_body( span_view<char*> args );
+extern void program_body( std::span<char*> args );
 
 int main( int argc, char* argv[] )
 {
@@ -22,7 +22,7 @@ int main( int argc, char* argv[] )
     return EXIT_FAILURE;
   }
 
-  span_view<char*> args = { argv, static_cast<size_t>( argc ) };
+  std::span<char*> args = { argv, static_cast<size_t>( argc ) };
   program_body( args );
 
   return EXIT_SUCCESS;

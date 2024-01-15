@@ -5,16 +5,13 @@
 
 #include "handle.hh"
 
-struct Blob : public std::span<const char>
-{
-  using std::span<const char>::span;
-};
+using BlobSpan = std::span<const char>;
+using TreeSpan = std::span<const Handle<Fix>>;
+using Span = std::variant<BlobSpan, TreeSpan>;
 
-template<typename T>
-struct Tree : public std::span<const Handle<T>>
-{
-  using std::span<const Handle<T>>::span;
-};
+using MutBlobSpan = std::span<char>;
+using MutTreeSpan = std::span<Handle<Fix>>;
+using MutSpan = std::variant<MutBlobSpan, MutTreeSpan>;
 
 enum class AllocationType
 {
@@ -29,25 +26,27 @@ class Owned
   S span_;
   AllocationType allocation_type_;
 
-  Owned( S span, AllocationType allocation_type );
-
 public:
   using span_type = S;
   using element_type = S::element_type;
   using value_type = S::value_type;
   using pointer = element_type*;
   using reference = element_type&;
+
   using const_pointer = const element_type*;
   using const_reference = const element_type&;
-
-  using mutable_span = std::span<value_type>;
   using const_span = std::span<const element_type>;
 
+  using mutable_pointer = value_type*;
+  using mutable_reference = value_type&;
+  using mutable_span = std::span<value_type>;
+
+  Owned( S span, AllocationType allocation_type );
   Owned( Owned&& other );
 
   Owned( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>;
 
-  static Owned allocate( size_t size ) requires( not std::is_const_v<element_type> );
+  static Owned<S> allocate( size_t size ) requires( not std::is_const_v<element_type> );
   static Owned map( size_t size ) requires( not std::is_const_v<element_type> );
 
   static Owned claim_static( S span );
@@ -66,18 +65,18 @@ public:
   pointer data() const { return span_.data(); };
   size_t size() const { return span_.size(); };
 
-  operator span_type() const { return span(); }
-  operator const_span() const requires( not std::is_const_v<element_type> ) { return span(); }
-
   Owned& operator=( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>;
   Owned& operator=( Owned&& other );
 
   element_type& operator[]( size_t index );
-  element_type& at( size_t index ) { return ( *this )[index]; }
 
   ~Owned();
 };
 
-using OwnedBlob = Owned<Blob>;
-template<typename T>
-using OwnedTree = Owned<Tree<T>>;
+using OwnedBlob = Owned<BlobSpan>;
+using OwnedTree = Owned<TreeSpan>;
+using OwnedMutBlob = Owned<MutBlobSpan>;
+using OwnedMutTree = Owned<MutTreeSpan>;
+
+using OwnedSpan = std::variant<OwnedBlob, OwnedTree>;
+using OwnedMutSpan = std::variant<OwnedMutBlob, OwnedMutTree>;

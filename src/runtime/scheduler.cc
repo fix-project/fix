@@ -1,3 +1,4 @@
+#if 0
 #include <glog/logging.h>
 
 using namespace std;
@@ -46,3 +47,4 @@ void Scheduler::schedule()
     return;
   }
 }
+#endif

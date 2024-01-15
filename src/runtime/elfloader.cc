@@ -1,10 +1,7 @@
 #include <iostream>
-#include <math.h>
 
 #include "elfloader.hh"
-#include "runtimestorage.hh"
 #include "spans.hh"
-#include "timer.hh"
 
 using namespace std;
 
@@ -17,6 +14,8 @@ static void throw_assertion_failure( const char* __assertion,
                        + to_string( __line ) + " (" + string( __function ) + ")" );
 }
 
+const static map<string, uint64_t> library_func_map = { { "__assert_fail", (uint64_t)throw_assertion_failure } };
+#if 0
 const static map<string, uint64_t> library_func_map
   = { { "wasm_rt_trap", (uint64_t)wasm_rt_trap },
       { "wasm_rt_allocate_memory", (uint64_t)wasm_rt_allocate_memory },
@@ -69,6 +68,7 @@ const static map<string, uint64_t> library_func_map
       { "floor", ( uint64_t ) static_cast<double ( * )( double )>( floor ) },
       { "nearbyint", ( uint64_t ) static_cast<double ( * )( double )>( nearbyint ) },
       { "__assert_fail", (uint64_t)throw_assertion_failure } };
+#endif
 
 void __stack_chk_fail( void )
 {

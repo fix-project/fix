@@ -1,3 +1,4 @@
+#if 0
 #include "dependency_graph.hh"
 
 #include <glog/logging.h>
@@ -113,3 +114,4 @@ Handle DependencyGraph::run( Task&& task )
   VLOG( 1 ) << "Waiting for " << task;
   return cache_.wait( std::move( task ) );
 }
+#endif

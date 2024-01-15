@@ -137,6 +137,71 @@ void test_trees( void )
   CHECK_NE( fe, ff );
 }
 
+template<FixType To, typename From>
+Handle<To> check_conversion( Handle<From> x )
+{
+  return x;
+}
+
+void test_implicit_conversions( void )
+{
+  // We should be able to implicitly up-convert along any path not including a wrapper.
+  // We can implicitly convert *to* a wrapper type, and we can implicitly convert *from* a wrapper type, but not
+  // across one.
+
+  auto literal = "foo"_literal;
+  auto blob = check_conversion<Blob>( literal );
+  static_assert( std::convertible_to<Handle<Literal>, Handle<Blob>> );
+  check_conversion<Object>( literal );
+  check_conversion<Value>( literal );
+  check_conversion<Expression>( literal );
+  auto fix_literal = check_conversion<Fix>( literal );
+  auto fix_blob = check_conversion<Fix>( blob );
+  auto stub = check_conversion<BlobStub>( literal );
+  auto fix_stub = check_conversion<Fix>( stub );
+
+  CHECK_EQ( fix_literal, fix_blob );
+  CHECK_NE( fix_literal, fix_stub );
+
+  CHECK( fix_kind( literal ) == FixKind::Object );
+  CHECK( fix_kind( blob ) == FixKind::Object );
+  CHECK( fix_kind( stub ) == FixKind::Object );
+  CHECK( fix_kind( fix_literal ) == FixKind::Object );
+  CHECK( fix_kind( fix_blob ) == FixKind::Object );
+  CHECK( fix_kind( fix_stub ) == FixKind::Object );
+}
+
+void test_explicit_conversions( void )
+{
+  // We can explicitly up-convert between Trees.  Doing so, then up-converting to a Fix, should *not* produce the
+  // same Handle as just up-converting to a Fix.
+
+  auto otree = Handle<ObjectTree>::nil();
+  auto vtree = Handle<ValueTree>( otree );
+  auto etree = Handle<ExpressionTree>( otree );
+  auto ftree = Handle<FixTree>( otree );
+  auto fix_ftree = check_conversion<Fix>( ftree );
+  auto fix_etree = check_conversion<Fix>( etree );
+  CHECK_NE( fix_ftree, fix_etree );
+
+  auto value_otree = check_conversion<Value>( otree );
+  auto fix_vtree = check_conversion<Fix>( vtree );
+  auto fix_value_otree = check_conversion<Fix>( value_otree );
+  auto fix_otree = check_conversion<Fix>( otree );
+  CHECK_EQ( fix_value_otree, fix_otree );
+  CHECK_NE( fix_vtree, fix_value_otree );
+
+  CHECK( fix_kind( otree ) == FixKind::Object );
+  CHECK( fix_kind( vtree ) == FixKind::Value );
+  CHECK( fix_kind( etree ) == FixKind::Expression );
+  CHECK( fix_kind( ftree ) == FixKind::Fix );
+
+  CHECK( fix_kind( value_otree ) == FixKind::Object );
+  CHECK( fix_kind( fix_vtree ) == FixKind::Value );
+  CHECK( fix_kind( fix_value_otree ) == FixKind::Object );
+  CHECK( fix_kind( fix_otree ) == FixKind::Object );
+}
+
 void test( void )
 {
   test_nil();
@@ -146,4 +211,6 @@ void test( void )
   test_tag();
   test_thunks();
   test_trees();
+  test_implicit_conversions();
+  test_explicit_conversions();
 }

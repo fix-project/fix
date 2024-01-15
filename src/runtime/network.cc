@@ -1,3 +1,4 @@
+#if 0
 #include <algorithm>
 #include <cstdint>
 #include <functional>
@@ -414,3 +415,4 @@ void NetworkWorker::finish( Task&& task, Handle result )
     msg_q_.enqueue( make_pair( reply_to_.at( task ), move( payload ) ) );
   }
 }
+#endif

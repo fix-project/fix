@@ -1,38 +1,111 @@
 #include <stdio.h>
 
-#include "test.hh"
+#include "handle.hh"
+#include "overload.hh"
+#include "runtimestorage.hh"
+
+#include <glog/logging.h>
 
 using namespace std;
 
-#define TEST( condition )                                                                                          \
-  if ( not( condition ) ) {                                                                                        \
-    fprintf( stderr, "%s:%d - assertion '%s' failed\n", __FILE__, __LINE__, #condition );                          \
-    exit( 1 );                                                                                                     \
-  }
+const std::string aeneid = "Arma virumque canō, Trōiae quī prīmus ab ōrīs\n"
+                           "Ītaliam, fātō profugus, Lāvīniaque vēnit\n"
+                           "lītora, multum ille et terrīs iactātus et altō\n"
+                           "vī superum saevae memorem Iūnōnis ob īram;\n"
+                           "multa quoque et bellō passus, dum conderet urbem\n"
+                           "inferretque deōs Latiō, genus unde Latīnum,\n"
+                           "Albānīque patrēs, atque altae moenia Rōmae.\n"
+                           "\n"
+                           "Mūsa, mihī causās memorā, quō nūmine laesō,\n"
+                           "quidve dolēns, rēgīna deum tot volvere cāsūs\n"
+                           "īnsīgnem pietāte virum, tot adīre labōrēs\n"
+                           "impulerit. Tantaene animīs caelestibus īrae? \n";
+
+const std::string de_bello_gallico
+  = "Gallia est omnis divisa in partes tres, quarum unam incolunt Belgae, aliam Aquitani, tertiam qui ipsorum "
+    "lingua Celtae, nostra Galli appellantur. Hi omnes lingua, institutis, legibus inter se differunt. Gallos ab "
+    "Aquitanis Garumna flumen, a Belgis Matrona et Sequana dividit. Horum omnium fortissimi sunt Belgae, propterea "
+    "quod a cultu atque humanitate provinciae longissime absunt, minimeque ad eos mercatores saepe commeant atque "
+    "ea quae ad effeminandos animos pertinent important, proximique sunt Germanis, qui trans Rhenum incolunt, "
+    "quibuscum continenter bellum gerunt. Qua de causa Helvetii quoque reliquos Gallos virtute praecedunt, quod "
+    "fere cotidianis proeliis cum Germanis contendunt, cum aut suis finibus eos prohibent aut ipsi in eorum "
+    "finibus bellum gerunt. Eorum una pars, quam Gallos obtinere dictum est, initium capit a flumine Rhodano, "
+    "continetur Garumna flumine, Oceano, finibus Belgarum, attingit etiam ab Sequanis et Helvetiis flumen Rhenum, "
+    "vergit ad septentriones. Belgae ab extremis Galliae finibus oriuntur, pertinent ad inferiorem partem fluminis "
+    "Rheni, spectant in septentrionem et orientem solem. Aquitania a Garumna flumine ad Pyrenaeos montes et eam "
+    "partem Oceani quae est ad Hispaniam pertinet; spectat inter occasum solis et septentriones.";
 
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  auto& s = rt.storage();
+  RuntimeStorage storage;
 
-  Handle data = tree( {
-    blob( "visible 1" ),
-    blob( "visible 2" ),
-    tree( { blob( "not visible" ) } ).as_lazy(),
-    blob( "visible 3" ),
-    thunk( tree( {
-             blob( "unused" ),
-             blob( "elf" ),
-           } ) )
-      .as_lazy(),
-  } );
+  Handle virgil = storage.create( aeneid );
+  Handle caesar = storage.create( de_bello_gallico );
 
-  size_t count = 0;
-  s.visit( data, [&]( Handle h ) {
-    count++;
-    TEST( not s.compare_handles( h, blob( "not visible" ) ) );
-    TEST( not s.compare_handles( h, blob( "unused" ) ) );
-    TEST( not s.compare_handles( h, blob( "elf" ) ) );
-  } );
-  TEST( count == 6 );
+  Handle<Combination> combination
+    = storage.construct_tree<ExpressionTree>( "unused"_literal, "elf"_literal, caesar );
+
+  Handle<Identity> hidden = storage.construct_tree<ObjectTree>( "not visible"_literal );
+
+  auto full
+    = storage.construct( "visible 1"_literal, "visible 2"_literal, hidden, virgil, combination, 100_literal32 );
+
+  {
+    size_t count = 0;
+    bool saw_aeneid = false;
+    storage.visit( Handle<Fix>( full ), [&]( Handle<Fix> h ) {
+      count++;
+      std::visit( overload { []( const Handle<Literal> ) { CHECK( false ); },
+                             [&]( const auto other ) {
+                               CHECK( other.is_local() );
+                               CHECK_NE( Handle<Fix>( other ), Handle<Fix>( caesar ) );
+                             } },
+                  fix_data( h ) );
+      if ( h == Handle<Fix>( virgil ) )
+        saw_aeneid = true;
+    } );
+    CHECK_EQ( count, 2 );
+    CHECK( saw_aeneid );
+  }
+  {
+    size_t count = 0;
+    bool saw_aeneid = false;
+    storage.visit( Handle<Fix>( storage.canonicalize( full ) ), [&]( Handle<Fix> h ) {
+      count++;
+      std::visit( overload { []( const Handle<Literal> ) { CHECK( false ); },
+                             [&]( const auto other ) {
+                               CHECK( not other.is_local() );
+                               CHECK_NE( Handle<Fix>( other ), Handle<Fix>( caesar ) );
+                             } },
+                  fix_data( h ) );
+      if ( h == Handle<Fix>( storage.canonicalize( virgil ) ) )
+        saw_aeneid = true;
+    } );
+    CHECK_EQ( count, 2 );
+    CHECK( saw_aeneid );
+  }
+  {
+    size_t count = 0;
+    storage.visit_full( Handle<Fix>( full ), [&]( Handle<Fix> ) { count++; } );
+    CHECK_EQ( count, 5 );
+  }
+  {
+    size_t count = 0;
+    storage.visit_full( Handle<Fix>( storage.canonicalize( full ) ), [&]( Handle<Fix> ) { count++; } );
+    CHECK_EQ( count, 5 );
+  }
+
+  {
+    Handle<Apply> apply( virgil );
+    Handle<Fix> target( caesar );
+    storage.create( apply, target );
+    CHECK( storage.contains( apply ) );
+    CHECK( storage.complete( apply ) );
+    CHECK_EQ( storage.get( apply ), target );
+    auto canonical = storage.canonicalize( apply );
+    CHECK_NE( storage.get( canonical ), target );
+    CHECK_NE( storage.get( apply ), target );
+    CHECK_EQ( storage.get( canonical ), storage.canonicalize( target ) );
+    CHECK_EQ( storage.get( apply ), storage.canonicalize( target ) );
+  }
 }

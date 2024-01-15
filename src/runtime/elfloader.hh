@@ -11,10 +11,8 @@
 #include <string_view>
 #include <vector>
 
-#include "fixpointapi.hh"
 #include "program.hh"
 #include "spans.hh"
-#include "wasm-rt.h"
 
 // Represents one object file
 struct Elf_Info

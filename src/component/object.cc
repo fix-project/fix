@@ -90,7 +90,7 @@ Owned<S> Owned<S>::from_file( const std::filesystem::path path ) requires std::i
 template<typename S>
 Owned<S> Owned<S>::copy( std::span<element_type> data )
 {
-  element_type* a = (element_type*)malloc( data.size_bytes() );
+  element_type* a = (element_type*)aligned_alloc( std::alignment_of<element_type>(), data.size_bytes() );
   memcpy( (void*)a, (void*)data.data(), data.size_bytes() );
   return claim_allocated( { a, data.size() } );
 }
@@ -216,6 +216,7 @@ Owned<S>::~Owned()
   leak();
 }
 
-template class Owned<Blob>;
-template class Owned<Tree<Object>>;
-template class Owned<Tree<Expression>>;
+template class Owned<BlobSpan>;
+template class Owned<TreeSpan>;
+template class Owned<MutBlobSpan>;
+template class Owned<MutTreeSpan>;

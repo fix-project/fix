@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | The Fix language (types and evaluation rules)
 module Fix where
@@ -97,7 +98,7 @@ encodeShallow (ValueTree x) = Value $ ValueTreeStub $ name x
 encodeShallow (ValueTreeStub x) = Value $ ValueTreeStub x
 encodeShallow (Object x) = Value $ Object $ lower x
 
--- | Convert a "stub" object into a "full" object, adding its data to the reachable set.  This may require doing additional computation if a stub was produced by lazy evaluation.
+-- | Convert a "stub" object into a "full" object, adding its data to the reachable set.
 lift :: Object -> Object
 lift (Blob x) = Blob x
 lift (BlobStub x) = Blob $ load x
@@ -111,22 +112,22 @@ lower (BlobStub x) = BlobStub x
 lower (ObjectTree x) = ObjectTreeStub $ name x
 lower (ObjectTreeStub x) = ObjectTreeStub x
 
--- ** Forcing Functions
+-- ** Forcing Functions (names subject to change)
 
--- | Turns a Value into an Object by repeatedly replacing Thunks with their results.
-force :: Value -> Object
-force (Object x) = x
-force (ValueTree x) = ObjectTree $ treeMap force x
-force (ValueTreeStub x) = ObjectTree $ treeMap force $ load x
-force (Thunk x) = force $ apply x
+-- | Produces an Object from a Value by repeatedly replacing Thunks with their results.
+produce :: Value -> Object
+produce = unwrap . eval . encodeStrict
+  where unwrap = \case
+          Object o -> o
+          _ -> error "Impossible"
 
--- | Produces the Expression corresponding to any Fix type, including a Relation.
+-- | Reduces anything in Fix, including a Relation, to an Expression.
 reduce :: Fix -> Expression
 reduce (Relation (Apply x)) = Value $ apply x
 reduce (Relation (Eval x)) = Value $ eval x
 reduce (FixTree x) = ExpressionTree $ treeMap reduce x
 reduce (Expression x) = x
 
--- | Produces the concrete Object corresponding to a Fix type.  This will perform all computation and gather all the data entailed by the relation.
-perform :: Fix -> Object
-perform = lift . force . eval . reduce
+-- | Induces all the computation entailed by something in Fix, resulting in a datum.
+induce :: Fix -> Object
+induce = lift . produce . eval . reduce

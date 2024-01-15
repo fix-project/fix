@@ -1,7 +1,10 @@
 #pragma once
+#include <algorithm>
 #include <cstdint>
+#include <format>
 #include <ostream>
 
+#include "blob.hh"
 #include "types.hh"
 
 #ifdef __AVX__
@@ -19,14 +22,80 @@ inline bool operator==( const Handle<T>& lhs, const Handle<T>& rhs )
 #endif
 }
 
-template<typename T>
-inline std::ostream& operator<<( std::ostream& os, const Handle<T>& h )
+inline std::ostream& operator<<( std::ostream& os, const u8x32& v )
 {
   char buf[65];
   for ( unsigned i = 0; i < 32; i++ ) {
-    snprintf( &buf[2 * i], 3, "%02x", h.content[i] );
+    snprintf( &buf[2 * i], 3, "%02x", v[i] );
   }
   os << std::string( buf );
+  return os;
+}
+
+inline std::ostream& operator<<( std::ostream& os, const Handle<Named>& h )
+{
+  os << "Named size:" << h.size() << " name:";
+  if ( h.is_local() ) {
+    os << "(Local " << h.local_name() << ")";
+  } else {
+    os << "(Canonical " << h.hash() << ")";
+  }
+  return os;
+}
+
+inline std::ostream& operator<<( std::ostream& os, const Handle<Literal>& h )
+{
+  os << "Literal size:" << (size_t)h.size() << " contents:";
+
+  auto s = std::string( h );
+  bool is_printable
+    = (unsigned)std::count_if( s.begin(), s.end(), []( unsigned char c ) { return std::isprint( c ); } )
+      == s.size();
+
+  if ( is_printable ) {
+    os << '"';
+    os << s;
+    os << '"';
+  } else if ( h.size() == 8 ) {
+    os << std::format( "0x{:016x}", uint64_t( h ) );
+  } else if ( h.size() == 4 ) {
+    os << std::format( "0x{:08x}", uint32_t( h ) );
+  } else if ( h.size() == 2 ) {
+    os << std::format( "0x{:04x}", uint16_t( h ) );
+  } else if ( h.size() == 1 ) {
+    os << std::format( "0x{:02x}", uint8_t( h ) );
+  } else {
+    os << "[";
+    for ( int i = 0; i < h.size() - 1; i++ ) {
+      os << std::format( "0x{:02x}, ", h.content[i] );
+    }
+    os << std::format( "0x{:02x}", h.content[h.size() - 1] );
+    os << "]";
+  }
+  return os;
+}
+
+template<typename T>
+inline std::ostream& operator<<( std::ostream& os, const Handle<Tree<T>>& h )
+{
+  os << "Tree<";
+  if constexpr ( std::same_as<T, Object> ) {
+    os << "Object";
+  } else if constexpr ( std::same_as<T, Value> ) {
+    os << "Value";
+  } else if constexpr ( std::same_as<T, Expression> ) {
+    os << "Expression";
+  } else if constexpr ( std::same_as<T, Fix> ) {
+    os << "Fix";
+  } else {
+    assert( false );
+  }
+  os << "> " << h.size() << " ";
+  if ( h.is_local() ) {
+    os << "(Local " << h.local_name() << ")";
+  } else {
+    os << "(Canonical " << h.hash() << ")";
+  }
   return os;
 }
 
