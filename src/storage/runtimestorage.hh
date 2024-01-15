@@ -53,7 +53,7 @@ private:
   // Maps a Handle to its user-facing names
   std::unordered_map<std::string, Handle<Fix>> labels_ {};
 
-  Repository repo_;
+  Repository repo_ {};
 
   void schedule( Task task );
 

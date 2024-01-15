@@ -10,6 +10,7 @@ using namespace std;
 namespace fs = std::filesystem;
 
 Repository::Repository( std::filesystem::path directory )
+  : repo_()
 {
   namespace fs = std::filesystem;
   auto current_directory = directory;
@@ -31,7 +32,7 @@ std::unordered_set<Handle<Fix>> Repository::data() const
       result.insert( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) );
     }
     return result;
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -43,7 +44,7 @@ std::unordered_set<std::string> Repository::labels() const
       result.insert( label.path().filename().string() );
     }
     return result;
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -60,7 +61,7 @@ std::unordered_map<Handle<Fix>, std::unordered_set<Handle<Fix>>> Repository::pin
       result.insert( { Handle<Fix>::forge( base16::decode( src.path().filename().string() ) ), dsts } );
     }
     return result;
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -72,7 +73,7 @@ OwnedBlob Repository::get( Handle<Named> name ) const
     VLOG( 1 ) << "loading " << fix.content << " from disk";
     assert( not fix_is_local( fix ) );
     return OwnedBlob::from_file( repo_ / "data" / base16::encode( fix.content ) );
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw HandleNotFound( name );
   }
 }
@@ -85,7 +86,7 @@ OwnedTree Repository::get( Handle<T> name ) const
     VLOG( 1 ) << "loading " << fix.content << " from disk";
     assert( not fix_is_local( fix ) );
     return OwnedTree::from_file( repo_ / "data" / base16::encode( fix.content ) );
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw HandleNotFound( name );
   }
 }
@@ -103,7 +104,7 @@ Handle<Fix> Repository::get( Handle<Relation> relation ) const
     assert( not fix_is_local( fix ) );
     return Handle<Fix>::forge( base16::decode(
       fs::read_symlink( repo_ / "relations" / base16::encode( fix.content ) ).filename().string() ) );
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw HandleNotFound( relation );
   }
 }
@@ -118,7 +119,7 @@ void Repository::put( Handle<Named> name, OwnedBlob& data )
     if ( fs::exists( path ) )
       return;
     data.to_file( path );
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -133,7 +134,7 @@ void Repository::put( Handle<T> name, OwnedTree& data )
     if ( fs::exists( path ) )
       return;
     data.to_file( path );
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -149,7 +150,7 @@ void Repository::put( Handle<Relation> relation, Handle<Fix> target )
     if ( fs::exists( path ) )
       return;
     fs::create_symlink( path, "../data/" + base16::encode( target.content ) );
-  } catch ( std::filesystem::filesystem_error ) {
+  } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -163,7 +164,7 @@ Handle<Fix> Repository::labeled( const std::string_view label ) const
 {
   try {
     return Handle<Fix>::forge( base16::decode( fs::read_symlink( repo_ / "labels" / label ).filename().string() ) );
-  } catch ( fs::filesystem_error ) {
+  } catch ( fs::filesystem_error& ) {
     throw LabelNotFound( label );
   }
 }
@@ -176,7 +177,7 @@ void Repository::label( const std::string_view label, Handle<Fix> target )
     if ( fs::exists( path ) )
       fs::remove( path );
     fs::create_symlink( "../data/" + base16::encode( target.content ), path );
-  } catch ( fs::filesystem_error ) {
+  } catch ( fs::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -190,7 +191,7 @@ std::unordered_set<Handle<Fix>> Repository::pinned( Handle<Fix> src ) const
       dsts.insert( Handle<Fix>::forge( base16::decode( dst.path().filename().string() ) ) );
     }
     return dsts;
-  } catch ( fs::filesystem_error ) {
+  } catch ( fs::filesystem_error& ) {
     return {};
   }
 }
@@ -208,7 +209,7 @@ void Repository::pin( Handle<Fix> src, const std::unordered_set<Handle<Fix>>& ds
       assert( not fix_is_local( dst ) );
       fs::create_symlink( dir / base16::encode( dst.content ), "../data/" + name );
     }
-  } catch ( fs::filesystem_error ) {
+  } catch ( fs::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -221,7 +222,7 @@ bool Repository::contains( Handle<Fix> handle ) const
     } else {
       return fs::exists( repo_ / "data" / base16::encode( handle.content ) );
     }
-  } catch ( fs::filesystem_error ) {
+  } catch ( fs::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
@@ -230,7 +231,7 @@ bool Repository::contains( const std::string_view label ) const
 {
   try {
     return fs::exists( repo_ / "labels" / label );
-  } catch ( fs::filesystem_error ) {
+  } catch ( fs::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }

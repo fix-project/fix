@@ -531,14 +531,14 @@ Handle<Fix> RuntimeStorage::lookup( const std::string_view ref )
   }
   try {
     return labeled( ref );
-  } catch ( LabelNotFound ) {}
+  } catch ( LabelNotFound& ) {}
   try {
     return get_handle( ref );
-  } catch ( ReferenceNotFound ) {}
+  } catch ( ReferenceNotFound& ) {}
   if ( fs::exists( ref ) ) {
     try {
       return create( OwnedBlob::from_file( ref ) );
-    } catch ( fs::filesystem_error ) {}
+    } catch ( fs::filesystem_error& ) {}
   }
   throw ReferenceNotFound( ref );
 }
