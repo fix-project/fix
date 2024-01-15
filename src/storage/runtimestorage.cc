@@ -7,20 +7,18 @@
 #include <variant>
 
 #include "base16.hh"
-#include "elfloader.hh"
 #include "handle.hh"
 #include "object.hh"
 #include "overload.hh"
 #include "runtimestorage.hh"
 #include "sha256.hh"
-#include "wasm-rt-content.h"
+#include "storage_exception.hh"
 
 using namespace std;
 namespace fs = std::filesystem;
 
 Handle<Blob> RuntimeStorage::create( OwnedBlob&& blob, std::optional<Handle<Fix>> name )
 {
-  unique_lock lock( storage_mutex_ );
   if ( name ) {
     auto handle = fix_extract<Blob>( *name ).value();
     std::visit(
@@ -58,7 +56,6 @@ Handle<Fix> RuntimeStorage::create( OwnedTree&& tree, std::optional<Handle<Fix>>
     auto handle = *name;
     assert( fix_size( *name ) == tree.size() );
     assert( fix_kind( *name ) == kind );
-    unique_lock lock( storage_mutex_ );
     canonical_storage_.insert( { *name, std::move( tree ) } );
     return handle;
   } else {
@@ -90,12 +87,11 @@ Handle<Fix> RuntimeStorage::create( OwnedTree&& tree, std::optional<Handle<Fix>>
 
 void RuntimeStorage::create( Handle<Relation> relation, Handle<Fix> result )
 {
-  unique_lock lock( storage_mutex_ );
   if ( fix_is_local( relation ) ) {
     local_relations_.insert( { relation, result } );
   } else if ( not fix_is_local( result ) ) {
     LOG( WARNING ) << "attempted to relate canonical handle to local handle";
-    canonical_storage_.insert( { relation, canonicalize( result, lock ) } );
+    canonical_storage_.insert( { relation, canonicalize( result ) } );
   }
 }
 
@@ -121,7 +117,7 @@ template Handle<Tree<Value>> RuntimeStorage::create_tree( OwnedTree&&, std::opti
 template Handle<Tree<Expression>> RuntimeStorage::create_tree( OwnedTree&&, std::optional<Handle<Fix>> );
 template Handle<Tree<Fix>> RuntimeStorage::create_tree( OwnedTree&&, std::optional<Handle<Fix>> );
 
-BlobSpan RuntimeStorage::get_unsync( const Handle<Blob>& handle )
+BlobSpan RuntimeStorage::get( const Handle<Blob>& handle )
 {
   std::optional<Handle<Literal>> literal = handle.try_into<Literal>();
   if ( literal ) {
@@ -143,12 +139,19 @@ BlobSpan RuntimeStorage::get_unsync( const Handle<Blob>& handle )
     return blob.span();
   } else {
     VLOG( 2 ) << "get " << handle << ": canonical";
-    return std::get<OwnedBlob>( std::get<OwnedSpan>( canonical_storage_.at( handle ) ) ).span();
+    if ( canonical_storage_.contains( handle ) ) {
+      return std::get<OwnedBlob>( std::get<OwnedSpan>( canonical_storage_.at( handle ) ) ).span();
+    } else {
+      auto blob = repo_.get( handle.unwrap<Named>() );
+      auto span = blob.span();
+      canonical_storage_.insert( { handle, std::move( blob ) } );
+      return span;
+    }
   }
 }
 
 template<FixTreeType T>
-TreeSpan RuntimeStorage::get_unsync( Handle<T> handle )
+TreeSpan RuntimeStorage::get( Handle<T> handle )
 {
   if ( handle.is_local() ) {
     const uint64_t local_name = handle.local_name();
@@ -164,38 +167,32 @@ TreeSpan RuntimeStorage::get_unsync( Handle<T> handle )
     return tree.span();
   } else {
     VLOG( 2 ) << "get " << handle << ": canonical";
-    return std::get<OwnedTree>( std::get<OwnedSpan>( canonical_storage_.at( handle ) ) ).span();
+    if ( canonical_storage_.contains( handle ) ) {
+      return std::get<OwnedTree>( std::get<OwnedSpan>( canonical_storage_.at( handle ) ) ).span();
+    } else {
+      auto tree = repo_.get( handle );
+      auto span = tree.span();
+      canonical_storage_.insert( { handle, std::move( tree ) } );
+      return span;
+    }
   }
 }
 
-Handle<Fix> RuntimeStorage::get_unsync( Handle<Relation> handle )
+Handle<Fix> RuntimeStorage::get( Handle<Relation> handle )
 {
   if ( fix_is_local( handle ) ) {
     VLOG( 2 ) << "get " << handle << ": local";
     return local_relations_.at( handle );
   } else {
     VLOG( 2 ) << "get " << handle << ": canonical";
-    return std::get<Handle<Fix>>( canonical_storage_.at( handle ) );
+    if ( canonical_storage_.contains( handle ) ) {
+      return std::get<Handle<Fix>>( canonical_storage_.at( handle ) );
+    } else {
+      auto result = repo_.get( handle );
+      canonical_storage_.insert( { handle, result } );
+      return result;
+    }
   }
-}
-
-BlobSpan RuntimeStorage::get( const Handle<Blob>& handle )
-{
-  std::shared_lock lock( storage_mutex_ );
-  return get_unsync( handle );
-}
-
-template<FixTreeType T>
-TreeSpan RuntimeStorage::get( Handle<T> handle )
-{
-  std::shared_lock lock( storage_mutex_ );
-  return get_unsync<T>( handle );
-}
-
-Handle<Fix> RuntimeStorage::get( Handle<Relation> handle )
-{
-  std::shared_lock lock( storage_mutex_ );
-  return get_unsync( handle );
 }
 
 template TreeSpan RuntimeStorage::get( Handle<ObjectTree> handle );
@@ -263,12 +260,12 @@ void RuntimeStorage::visit_full(
   }
 
   if ( pin_visitor ) {
-    auto pinned = pins( handle );
-    for ( const auto& dst : pinned ) {
+    std::unordered_set<Handle<Fix>> pins = pinned( handle );
+    for ( const auto& dst : pins ) {
       visit_full( dst, visitor, pin_visitor, visited );
       visitor( dst );
     }
-    ( *pin_visitor )( handle, pinned );
+    ( *pin_visitor )( handle, pins );
   }
 }
 
@@ -279,7 +276,7 @@ template void RuntimeStorage::visit_full(
   std::unordered_set<Handle<Fix>> );
 
 template<FixType T>
-Handle<T> RuntimeStorage::canonicalize( Handle<T> handle, std::unique_lock<std::shared_mutex>& lock )
+Handle<T> RuntimeStorage::canonicalize( Handle<T> handle )
 {
   if ( not fix_is_local( handle ) ) {
     return handle;
@@ -291,12 +288,11 @@ Handle<T> RuntimeStorage::canonicalize( Handle<T> handle, std::unique_lock<std::
 
   if constexpr ( Handle<T>::is_fix_sum_type ) {
     // non-terminal types: recurse until terminal
-    auto canonical
-      = std::visit( [&]( const auto x ) { return Handle<T>( canonicalize( x, lock ) ); }, handle.get() );
+    auto canonical = std::visit( [&]( const auto x ) { return Handle<T>( canonicalize( x ) ); }, handle.get() );
     if constexpr ( std::constructible_from<Handle<Relation>, Handle<T>> ) {
       // relations are special; we canonicalize both sides and rewrite the local relation
-      auto target = get_unsync( handle );
-      auto canonical_target = canonicalize( target, lock );
+      auto target = get( handle );
+      auto canonical_target = canonicalize( target );
 
       local_relations_[handle] = canonical_target;
       canonical_storage_.insert( { canonical, canonical_target } );
@@ -314,7 +310,7 @@ Handle<T> RuntimeStorage::canonicalize( Handle<T> handle, std::unique_lock<std::
         .value();
     }
     // Named Blobs: hash the contents
-    auto span = get_unsync( handle );
+    auto span = get( handle );
 
     std::string hash = sha256::encode_span( span );
     u8x32 data;
@@ -332,10 +328,10 @@ Handle<T> RuntimeStorage::canonicalize( Handle<T> handle, std::unique_lock<std::
 
   } else if constexpr ( FixTreeType<T> ) {
     // Trees: canonicalize the elements and hash the new contents
-    auto old = get_unsync( handle );
+    auto old = get( handle );
     auto tree = OwnedMutTree::allocate( old.size() );
     for ( size_t i = 0; i < old.size(); i++ ) {
-      tree[i] = canonicalize( old[i], lock );
+      tree[i] = canonicalize( old[i] );
     }
     OwnedTree owned( std::move( tree ) );
 
@@ -344,7 +340,6 @@ Handle<T> RuntimeStorage::canonicalize( Handle<T> handle, std::unique_lock<std::
     memcpy( &data, hash.data(), 32 );
     auto canonical = Handle<T>( data, owned.size() );
 
-    // TODO: do we need to maintain a reference count here? another thread might still have a reference to this span
     local_storage_.at( handle.local_name() ) = canonical; // frees the old tree
     canonical_storage_.insert_or_assign( canonical, std::move( owned ) );
     return canonical;
@@ -352,33 +347,33 @@ Handle<T> RuntimeStorage::canonicalize( Handle<T> handle, std::unique_lock<std::
   assert( false );
 }
 
-template Handle<Fix> RuntimeStorage::canonicalize( Handle<Fix>, std::unique_lock<std::shared_mutex>& );
+template Handle<Fix> RuntimeStorage::canonicalize( Handle<Fix> );
 
 void RuntimeStorage::label( Handle<Fix> target, const std::string_view label )
 {
-  std::unique_lock lock( storage_mutex_ );
-  labels_.insert( { target, std::string( label ) } );
+  labels_.insert( { std::string( label ), target } );
 }
 
-std::optional<Handle<Fix>> RuntimeStorage::label( const std::string_view label )
+Handle<Fix> RuntimeStorage::labeled( const std::string_view label )
 {
-  std::shared_lock lock( storage_mutex_ );
-  for ( const auto& [handle, current] : labels_ ) {
-    if ( current == label ) {
-      return handle;
-    }
+  std::string l( label );
+  if ( labels_.contains( l ) ) {
+    return labels_.at( l );
+  } else {
+    auto result = repo_.labeled( l );
+    labels_.insert( { l, result } );
+    return result;
   }
-  return {};
 }
 
-std::unordered_set<std::string> RuntimeStorage::labels( std::optional<Handle<Fix>> handle )
+std::unordered_set<std::string> RuntimeStorage::labels() const
 {
-  std::shared_lock lock( storage_mutex_ );
   std::unordered_set<std::string> result;
-  for ( const auto& [h, l] : labels_ ) {
-    if ( !handle or h == handle ) {
-      result.insert( l );
-    }
+  for ( const auto& [l, h] : labels_ ) {
+    result.insert( l );
+  }
+  for ( const auto& l : repo_.labels() ) {
+    result.insert( l );
   }
   return result;
 }
@@ -404,131 +399,37 @@ Handle<Fix> RuntimeStorage::serialize( Handle<Fix> root, bool pins )
     [&]( Handle<Fix> current ) {
       std::visit( overload {
                     []( const Handle<Literal> ) {},
-                    [&]( const auto x ) {
-                      string file_name = base16::encode( current.content );
-                      auto path = get_fix_repo() / "data" / file_name;
-                      if ( fs::exists( path ) )
+                    [&]( const Handle<Named> name ) {
+                      if ( repo_.contains( name ) )
                         return;
-                      VLOG( 1 ) << "Serializing " << x;
-                      std::visit( [&]( auto& arg ) { arg.to_file( path ); },
-                                  std::get<OwnedSpan>( canonical_storage_.at( x ) ) );
+                      auto& span = std::get<OwnedSpan>( canonical_storage_.at( name ) );
+                      auto& owned = std::get<OwnedBlob>( span );
+                      repo_.put( name, owned );
+                    },
+                    [&]( const auto name ) {
+                      if ( repo_.contains( name ) )
+                        return;
+                      auto& span = std::get<OwnedSpan>( canonical_storage_.at( name ) );
+                      auto& owned = std::get<OwnedTree>( span );
+                      repo_.put( name, owned );
                     },
                   },
                   fix_data( current ) );
     },
     [&]( Handle<Fix> src, const std::unordered_set<Handle<Fix>>& dsts ) {
-      if ( dsts.empty() )
-        return;
-      string dir_name = base16::encode( src.content );
-      fs::create_directory( get_fix_repo() / "pins" / dir_name );
-      for ( const auto& dst : dsts ) {
-        string file_name = base16::encode( src.content );
-        fs::create_symlink( get_fix_repo() / "pins" / dir_name / file_name, "../data/" + dir_name );
-        serialize( dst, pins );
-      }
+      if ( pins )
+        repo_.pin( src, dsts );
     } );
   return canonical;
 }
 
 Handle<Fix> RuntimeStorage::serialize( const std::string_view label, bool pins )
 {
-  for ( auto it = labels_.begin(); it != labels_.end(); ++it ) {
-    auto [h, l] = *it;
-    if ( l == label ) {
-      auto canonical = serialize( h, pins );
-      std::string target = base16::encode( canonical.content );
-      auto path = get_fix_repo() / "labels" / label;
-      if ( fs::exists( path ) ) {
-        fs::remove( path );
-      }
-      fs::create_symlink( "../data/" + target, path );
-      return canonical;
-    }
-  }
-  throw std::runtime_error( "invalid label: " + string( label ) );
+  auto handle = labels_.at( std::string( label ) );
+  auto canonical = serialize( handle, pins );
+  repo_.label( label, canonical );
+  return canonical;
 }
-
-Handle<Fix> read_handle( fs::path file )
-{
-  ifstream input_file( file );
-  if ( !input_file.is_open() ) {
-    throw runtime_error( "File does not exist: " + file.string() );
-  }
-  input_file.seekg( 0, std::ios::end );
-  size_t size = input_file.tellg();
-  if ( size != 64 ) {
-    throw runtime_error( "File was an invalid size: " + file.string() + ": " + to_string( size ) );
-  }
-  input_file.seekg( 0, std::ios::beg );
-  char buf[64];
-  input_file.read( buf, size );
-  auto h = Handle<Fix>::forge( base16::decode( { buf, 64 } ) );
-  VLOG( 1 ) << "decoded " << string_view( buf, 64 ) << " into " << h;
-  return h;
-}
-
-void RuntimeStorage::deserialize()
-{
-  const auto fix = get_fix_repo();
-
-  for ( const auto& label : fs::directory_iterator( fix / "labels" ) ) {
-    auto handle = Handle<Fix>::forge( base16::decode( fs::read_symlink( label ).filename().string() ) );
-    labels_.insert( make_pair( handle, label.path().filename() ) );
-  }
-
-  for ( const auto& datum : fs::directory_iterator( fix / "data" ) ) {
-    VLOG( 2 ) << "deserializing " << datum;
-    auto handle = Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) );
-    std::visit( overload {
-                  []( Handle<Literal> ) {},
-                  [&]( Handle<Named> ) { create( OwnedBlob::from_file( datum ), handle ); },
-                  [&]( auto x ) {
-                    create_tree<Tree<typename decltype( x )::element_type>>( OwnedTree::from_file( datum ),
-                                                                             handle );
-                  },
-                },
-                fix_data( handle ) );
-  }
-}
-
-#if 0
-void RuntimeStorage::deserialize_objects( const fs::path& dir )
-{
-  for ( const auto& file : fs::directory_iterator( dir ) ) {
-    if ( file.is_directory() )
-      continue;
-    Handle name( base16::decode( file.path().filename().string() ) );
-    VLOG( 2 ) << "deserializing " << file << " to " << name;
-
-    if ( name.is_local() ) {
-      throw runtime_error( "Attempted to deserialize a local name." );
-    }
-    if ( name.is_literal_blob() ) {
-      continue;
-    }
-
-    switch ( name.get_content_type() ) {
-      case ContentType::Blob: {
-        add_blob( OwnedBlob::from_file( file ), name );
-        break;
-      }
-
-      case ContentType::Tree: {
-        add_tree( OwnedTree::from_file( file ), name );
-        break;
-      }
-
-      case ContentType::Thunk:
-      case ContentType::Tag: {
-        break;
-      }
-
-      default:
-        break;
-    }
-  }
-}
-#endif
 
 bool RuntimeStorage::contains( Handle<Fix> handle )
 {
@@ -540,8 +441,6 @@ bool RuntimeStorage::contains( Handle<Fix> handle )
     return true;
   }
 
-  shared_lock lock( storage_mutex_ );
-
   if ( fix_is_local( handle ) ) {
     return local_storage_.size() > std::visit( []( const auto x ) { return x.local_name(); }, fix_data( handle ) );
   } else {
@@ -551,17 +450,20 @@ bool RuntimeStorage::contains( Handle<Fix> handle )
                                     []( const auto& tree ) -> Handle<Fix> { return tree.untag(); },
                                   },
                                   fix_data( handle ) );
-    return canonical_storage_.contains( raw );
+    if ( canonical_storage_.contains( raw ) ) {
+      return true;
+    }
+    return repo_.contains( raw );
   }
 }
 
 vector<string> RuntimeStorage::get_friendly_names( Handle<Fix> handle )
 {
   vector<string> names;
-  const auto [begin, end] = labels_.equal_range( handle );
-  for ( auto it = begin; it != end; it++ ) {
-    auto x = *it;
-    names.push_back( x.second );
+  for ( const auto& [l, h] : labels_ ) {
+    if ( h == handle ) {
+      names.push_back( l );
+    }
   }
   return names;
 }
@@ -578,7 +480,7 @@ string RuntimeStorage::get_short_name( Handle<Fix> handle )
   return encoded.substr( 0, 7 );
 }
 
-std::optional<Handle<Fix>> RuntimeStorage::get_handle( const std::string_view short_name )
+Handle<Fix> RuntimeStorage::get_handle( const std::string_view short_name )
 {
   std::optional<Handle<Fix>> candidate;
   for ( const auto& [handle, data] : canonical_storage_ ) {
@@ -586,11 +488,21 @@ std::optional<Handle<Fix>> RuntimeStorage::get_handle( const std::string_view sh
     std::string name = base16::encode( handle.content );
     if ( name.rfind( short_name, 0 ) == 0 ) {
       if ( candidate )
-        return {};
+        throw AmbiguousReference( short_name );
       candidate = handle;
     }
   }
-  return candidate;
+  for ( const auto handle : repo_.data() ) {
+    std::string name = base16::encode( handle.content );
+    if ( name.rfind( short_name, 0 ) == 0 ) {
+      if ( candidate )
+        throw AmbiguousReference( short_name );
+      candidate = handle;
+    }
+  }
+  if ( candidate )
+    return *candidate;
+  throw ReferenceNotFound( short_name );
 }
 
 string RuntimeStorage::get_display_name( Handle<Fix> handle )
@@ -608,26 +520,27 @@ string RuntimeStorage::get_display_name( Handle<Fix> handle )
   return fullname;
 }
 
-std::optional<Handle<Fix>> RuntimeStorage::lookup( const std::string_view ref )
+Handle<Fix> RuntimeStorage::lookup( const std::string_view ref )
 {
-  std::shared_lock lock( storage_mutex_ );
   if ( ref.size() == 64 ) {
     auto handle = Handle<Fix>::forge( base16::decode( ref ) );
     if ( contains( handle ) )
       return handle;
+    if ( repo_.contains( handle ) )
+      return handle;
   }
-  return label( ref ).or_else( [&] { return get_handle( ref ); } ).or_else( [&] -> std::optional<Handle<Fix>> {
-    if ( fs::exists( ref ) ) {
-      lock.unlock();
-      try {
-        return create( OwnedBlob::from_file( ref ) );
-      } catch ( fs::filesystem_error ) {
-        return {};
-      }
-    } else {
-      return {};
-    }
-  } );
+  try {
+    return labeled( ref );
+  } catch ( LabelNotFound ) {}
+  try {
+    return get_handle( ref );
+  } catch ( ReferenceNotFound ) {}
+  if ( fs::exists( ref ) ) {
+    try {
+      return create( OwnedBlob::from_file( ref ) );
+    } catch ( fs::filesystem_error ) {}
+  }
+  throw ReferenceNotFound( ref );
 }
 
 bool RuntimeStorage::compare_handles( Handle<Fix> x, Handle<Fix> y )
@@ -651,32 +564,23 @@ std::vector<Handle<Fix>> RuntimeStorage::minrepo( Handle<Fix> handle )
   return handles;
 }
 
-const Program& RuntimeStorage::link( Handle<Blob> handle )
+unordered_set<Handle<Fix>> RuntimeStorage::pinned( Handle<Fix> handle )
 {
-  unique_lock lock( storage_mutex_ );
-  if ( linked_programs_.contains( handle ) ) {
-    return linked_programs_.at( handle );
+  if ( pins_.contains( handle ) ) {
+    return pins_[handle];
+  } else {
+    pins_.insert( { handle, repo_.pinned( handle ) } );
+    return pins_[handle];
   }
-  Program program = link_program( get( handle ) );
-  linked_programs_.insert( { handle, std::move( program ) } );
-  return linked_programs_.at( handle );
-}
-
-unordered_set<Handle<Fix>> RuntimeStorage::pins( Handle<Fix> handle )
-{
-  shared_lock lock( storage_mutex_ );
-  return pins_[handle];
 }
 
 void RuntimeStorage::pin( Handle<Fix> src, Handle<Fix> dst )
 {
-  unique_lock lock( storage_mutex_ );
   pins_[src].insert( dst );
 }
 
 unordered_set<Handle<Fix>> RuntimeStorage::tags( Handle<Fix> handle )
 {
-  std::shared_lock lock( storage_mutex_ );
   handle = canonicalize( handle );
   unordered_set<Handle<Fix>> result;
   for ( const auto& [name, data] : canonical_storage_ ) {

@@ -7,7 +7,7 @@ add_executable(rw-tester "rw-tester.cc" "main.cc" "tester-utils.cc")
 target_link_libraries(rw-tester runtime)
 
 add_executable(fix "fix.cc")
-target_link_libraries(fix runtime)
+target_link_libraries(fix storage)
 
 add_executable(compiler-tester "compiler-tester.cc" "main.cc" "tester-utils.cc")
 target_link_libraries(compiler-tester runtime)

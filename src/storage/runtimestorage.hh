@@ -12,6 +12,7 @@
 #include "handle.hh"
 #include "object.hh"
 #include "program.hh"
+#include "repository.hh"
 #include "task.hh"
 
 #include "absl/container/flat_hash_map.h"
@@ -37,7 +38,6 @@ class RuntimeStorage
 private:
   friend class RuntimeWorker;
 
-  std::shared_mutex storage_mutex_ {};
   // Storage for Object/Handles with a canonical name
   absl::flat_hash_map<Handle<Fix>, DatumOrName, AbslHash> canonical_storage_ {};
   // Storage for Object/Handles with a local name
@@ -47,24 +47,18 @@ private:
   // Keeping track of canonical and local task handle translation
   absl::flat_hash_map<Handle<Fix>, std::list<Handle<Fix>>, AbslHash> canonical_to_local_cache_for_tasks_ {};
 
-  /* // Keepying track of what objects are pinned by an object */
+  /* // Keeping track of what objects are pinned by an object */
   absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash> pins_ {};
 
-  // Maps a Wasm function Handle to corresponding compiled Program
-  std::unordered_map<Handle<Blob>, Program> linked_programs_ {};
-
   // Maps a Handle to its user-facing names
-  std::unordered_multimap<Handle<Fix>, std::string> labels_ {};
+  std::unordered_map<std::string, Handle<Fix>> labels_ {};
+
+  Repository repo_;
 
   void schedule( Task task );
 
   template<FixType T>
   Handle<T> canonicalize( Handle<T> handle, std::unique_lock<std::shared_mutex>& lock );
-
-  BlobSpan get_unsync( const Handle<Blob>& name );
-  template<FixTreeType T>
-  TreeSpan get_unsync( Handle<T> name );
-  Handle<Fix> get_unsync( Handle<Relation> handle );
 
 public:
   RuntimeStorage() { canonical_storage_.reserve( 1024 ); }
@@ -138,22 +132,13 @@ public:
 
   // Convert a Handle into the canonically-named version of that handle.
   template<FixType T>
-  Handle<T> canonicalize( Handle<T> handle )
-  {
-    std::unique_lock lock( storage_mutex_ );
-    return canonicalize( handle, lock );
-  }
+  Handle<T> canonicalize( Handle<T> handle );
 
   Task canonicalize( Task task );
 
-  // Sets a human-readable label for a Handle.
   void label( Handle<Fix> target, const std::string_view label );
-  // Looks up a Handle based on the human-readable labels.
-  std::optional<Handle<Fix>> label( const std::string_view label );
-  // Looks up all the human-readable labels.
-  std::unordered_set<std::string> labels( std::optional<Handle<Fix>> handle = {} );
-
-  void deserialize();
+  Handle<Fix> labeled( const std::string_view label );
+  std::unordered_set<std::string> labels() const;
 
   Handle<Fix> serialize( Handle<Fix> root, bool pins = true );
   Handle<Fix> serialize( const std::string_view label, bool pins = true );
@@ -171,13 +156,13 @@ public:
   std::string get_short_name( Handle<Fix> handle );
 
   // Gets the handle given shortened base16 encoded name.
-  std::optional<Handle<Fix>> get_handle( const std::string_view short_name );
+  Handle<Fix> get_handle( const std::string_view short_name );
 
   // Gets the best name for this Handle to display to users.
   std::string get_display_name( Handle<Fix> handle );
 
   // Tries to turn the provided string into a Handle using any known method.
-  std::optional<Handle<Fix>> lookup( const std::string_view ref );
+  Handle<Fix> lookup( const std::string_view ref );
 
   /**
    * Call @p visitor for every Handle in the "minimum repo" of @p root, i.e., the set of Handles which are needed
@@ -235,11 +220,6 @@ public:
   std::optional<Handle<Fix>> get_canonical_name( Handle<Fix> name );
 
   /**
-   * Links an ELF file and returns a runnable Program.
-   */
-  const Program& link( Handle<Blob> handle );
-
-  /**
    * Add an advisory pin to @p dst from @p src.
    */
   void pin( Handle<Fix> src, Handle<Fix> dst );
@@ -247,7 +227,7 @@ public:
   /**
    * Return handles pinned by @p handle.
    */
-  std::unordered_set<Handle<Fix>> pins( Handle<Fix> handle );
+  std::unordered_set<Handle<Fix>> pinned( Handle<Fix> handle );
 
   /**
    * Return handles of tags that tag @p handle.

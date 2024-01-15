@@ -14,12 +14,11 @@
 #include "object.hh"
 #include "overload.hh"
 #include "runtimestorage.hh"
+#include "storage_exception.hh"
 
 using namespace std;
 
 extern map<string, pair<function<void( int, char*[] )>, const char*>> commands;
-
-static RuntimeStorage storage;
 
 namespace blob {
 void add( int argc, char* argv[] )
@@ -41,6 +40,8 @@ void add( int argc, char* argv[] )
     cerr << "Error: file \"" << filename << "\" does not exist.\n";
     exit( EXIT_FAILURE );
   }
+
+  RuntimeStorage storage;
 
   try {
     Handle<Fix> handle = storage.create( OwnedBlob::from_file( filename ) );
@@ -75,6 +76,7 @@ void create( int argc, char* argv[] )
     } );
   parser.Parse( argc, argv );
 
+  RuntimeStorage storage;
   if ( !contents ) {
     std::istreambuf_iterator<char> begin( std::cin ), end;
     contents = { begin, end };
@@ -99,14 +101,10 @@ void cat( int argc, char* argv[] )
   parser.Parse( argc, argv );
   if ( !ref )
     exit( EXIT_FAILURE );
-  storage.deserialize();
 
+  RuntimeStorage storage;
   auto handle = storage.lookup( ref );
-  if ( !handle ) {
-    cerr << "Error: Unable to find \"" << ref << "\" in the repository.\n";
-    exit( EXIT_FAILURE );
-  }
-  auto blob = fix_extract<Blob>( *handle );
+  auto blob = fix_extract<Blob>( handle );
   if ( !blob ) {
     cerr << "Error: \"" << ref << "\" does not describe a Blob.\n";
     exit( EXIT_FAILURE );
@@ -122,19 +120,15 @@ void create( int argc, char* argv[] )
   OptionParser parser( "create-tree", commands["create-tree"].second );
   static std::vector<Handle<Fix>> contents;
   std::optional<const char*> label;
-  storage.deserialize();
+  RuntimeStorage storage;
   parser.AddOption(
     'l', "label", "label", "Assign a human-readable name to this Tree.", [&]( const char* argument ) {
       label = argument;
     } );
   parser.AddArgument( "handles", OptionParser::ArgumentCount::ZeroOrMore, [&]( const char* argument ) {
     std::string ref( argument );
-    optional<Handle<Fix>> handle = storage.lookup( ref );
-    if ( !handle ) {
-      cerr << "Error: Unable to find \"" << ref << "\" in the repository.\n";
-      exit( EXIT_FAILURE );
-    }
-    contents.push_back( *handle );
+    auto handle = storage.lookup( ref );
+    contents.push_back( handle );
   } );
   parser.Parse( argc, argv );
 
@@ -142,12 +136,8 @@ void create( int argc, char* argv[] )
     while ( !cin.eof() ) {
       std::string ref;
       std::getline( cin, ref );
-      optional<Handle<Fix>> handle = storage.lookup( ref );
-      if ( !handle ) {
-        cerr << "Error: Unable to find \"" << ref << "\" in the repository.\n";
-        exit( EXIT_FAILURE );
-      }
-      contents.push_back( *handle );
+      auto handle = storage.lookup( ref );
+      contents.push_back( handle );
     }
   }
 
@@ -168,15 +158,11 @@ void cat( int argc, char* argv[] )
   parser.AddArgument(
     "label-or-hash", OptionParser::ArgumentCount::One, [&]( const char* argument ) { ref = argument; } );
   parser.Parse( argc, argv );
-  storage.deserialize();
   if ( !ref )
     exit( EXIT_FAILURE );
 
+  RuntimeStorage storage;
   auto handle = storage.lookup( ref );
-  if ( !handle ) {
-    cerr << "Error: Unable to find \"" << ref << "\" in the repository.\n";
-    exit( EXIT_FAILURE );
-  }
   std::visit( overload {
                 [&]( Handle<Literal> ) {
                   cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
@@ -193,10 +179,11 @@ void cat( int argc, char* argv[] )
                   }
                 },
               },
-              fix_data( *handle ) );
+              fix_data( handle ) );
 }
 
-void print_tree( Handle<Fix> handle,
+void print_tree( RuntimeStorage& storage,
+                 Handle<Fix> handle,
                  bool recursive,
                  bool decode,
                  std::optional<std::string> ref = nullopt,
@@ -222,7 +209,7 @@ void print_tree( Handle<Fix> handle,
                       cout << prefix << i << ". " << span[i] << "\n";
                     else
                       cout << prefix << i << ". " << span[i].content << "\n";
-                    print_tree( span[i], recursive, decode, {}, prefix + "  " );
+                    print_tree( storage, span[i], recursive, decode, {}, prefix + "  " );
                   }
                 },
               },
@@ -242,14 +229,10 @@ void ls( int argc, char* argv[] )
   parser.Parse( argc, argv );
   if ( !ref )
     exit( EXIT_FAILURE );
-  storage.deserialize();
 
+  RuntimeStorage storage;
   auto handle = storage.lookup( ref );
-  if ( !handle ) {
-    cerr << "Error: Unable to find \"" << ref << "\" in the repository.\n";
-    exit( EXIT_FAILURE );
-  }
-  print_tree( *handle, recursive, decode, ref );
+  print_tree( storage, handle, recursive, decode, ref );
 }
 }
 
@@ -264,7 +247,7 @@ void labels( int argc, char* argv[] )
     decode = true;
   } );
   parser.Parse( argc, argv );
-  storage.deserialize();
+  RuntimeStorage storage;
 
   auto unordered_labels = storage.labels();
   set<std::string> labels( unordered_labels.begin(), unordered_labels.end() );
@@ -280,9 +263,9 @@ void labels( int argc, char* argv[] )
     if ( handles ) {
       cout << std::format( "{:{}} -> ", label, length );
       if ( not decode ) {
-        cout << storage.label( label ).value().content << "\n";
+        cout << storage.labeled( label ) << "\n";
       } else {
-        cout << storage.label( label ).value() << "\n";
+        cout << storage.labeled( label ) << "\n";
       }
     } else {
       cout << label << "\n";
@@ -298,12 +281,12 @@ void gc( int argc, char* argv[] )
     dry_run = true;
   } );
   parser.Parse( argc, argv );
-  storage.deserialize();
+  RuntimeStorage storage;
 
   auto labels = storage.labels();
   unordered_set<Handle<Fix>> roots;
   for ( const auto& label : labels ) {
-    roots.insert( storage.label( label ).value() );
+    roots.insert( storage.labeled( label ) );
   }
 
   unordered_set<Handle<Fix>> data;
@@ -358,14 +341,10 @@ void label( int argc, char* argv[] )
   parser.Parse( argc, argv );
   if ( !ref or !new_label )
     exit( EXIT_FAILURE );
-  storage.deserialize();
+  RuntimeStorage storage;
 
-  auto handle = storage.lookup( ref );
-  if ( !handle ) {
-    cerr << "Error: Unable to find \"" << ref << "\" in the repository.\n";
-    exit( EXIT_FAILURE );
-  }
-  storage.label( *handle, new_label );
+  Handle<Fix> handle = storage.lookup( ref );
+  storage.label( handle, new_label );
   storage.serialize( new_label );
 }
 
@@ -382,6 +361,7 @@ void init( int, char*[] )
   }
   std::filesystem::create_directory( ".fix" );
   std::filesystem::create_directory( ".fix/data" );
+  std::filesystem::create_directory( ".fix/relations" );
   std::filesystem::create_directory( ".fix/labels" );
   std::filesystem::create_directory( ".fix/pins" );
   if ( exists ) {
@@ -393,6 +373,26 @@ void init( int, char*[] )
 
 void help( int argc, char* argv[] );
 
+void decode( int argc, char* argv[] )
+{
+  OptionParser parser( "decode", commands["decode"].second );
+  const char* handle = NULL;
+  parser.AddArgument(
+    "handle", OptionParser::ArgumentCount::One, [&]( const char* argument ) { handle = argument; } );
+  parser.Parse( argc, argv );
+  if ( !handle )
+    exit( EXIT_FAILURE );
+
+  try {
+    auto result = base16::decode( handle );
+    auto handle = Handle<Fix>::forge( result );
+    cout << handle << "\n";
+  } catch ( std::runtime_error& e ) {
+    cerr << "Error: " << e.what() << "\n";
+    exit( EXIT_FAILURE );
+  }
+}
+
 map<string, pair<function<void( int, char*[] )>, const char*>> commands = {
   { "add", { blob::add, "Add a file to the Fix repository as a Blob." } },
   { "add-blob", { blob::add, "Add a file to the Fix repository as a Blob." } },
@@ -400,6 +400,7 @@ map<string, pair<function<void( int, char*[] )>, const char*>> commands = {
   { "cat-tree", { tree::cat, "Output the contents of a Tree." } },
   { "create-blob", { blob::create, "Create a new Blob." } },
   { "create-tree", { tree::create, "Construct a new Tree." } },
+  { "decode", { decode, "Decode a Handle." } },
   { "gc", { gc, "Garbage-collect any data not referenced by a label." } },
   { "help", { help, "Print a list of sub-commands." } },
   { "init", { init, "Initialize a Fix repository in the current directory." } },
@@ -443,8 +444,13 @@ int main( int argc, char* argv[] )
 
   for ( const auto& command : commands ) {
     if ( command.first == argv[1] ) {
-      command.second.first( argc - 1, &argv[1] );
-      return EXIT_SUCCESS;
+      try {
+        command.second.first( argc - 1, &argv[1] );
+        return EXIT_SUCCESS;
+      } catch ( const StorageException& e ) {
+        cerr << "Error: " << e.what() << "\n";
+        return EXIT_FAILURE;
+      }
     }
   }
 
