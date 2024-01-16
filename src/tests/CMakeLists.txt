@@ -1,6 +1,9 @@
 add_executable(test-add test-add.cc main.cc)
 target_link_libraries(test-add runtime)
 
+add_executable(test-blake3 test-blake3.cc main.cc)
+target_link_libraries(test-blake3 util glog)
+
 add_executable(test-fib test-fib.cc main.cc)
 target_link_libraries(test-fib runtime)
 
