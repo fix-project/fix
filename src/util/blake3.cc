@@ -5,6 +5,7 @@
 #endif
 #include "blake3.h"
 #include "timer.hh"
+#include <cstring>
 
 using namespace std;
 
@@ -13,11 +14,9 @@ std::string encode( const std::string_view input )
 {
   blake3_hasher hasher;
   blake3_hasher_init( &hasher );
-
   blake3_hasher_update( &hasher, input.data(), input.size() );
-
-  uint8_t hash_buf[BLAKE3_OUT_LEN];
-  blake3_hasher_finalize( &hasher, hash_buf, BLAKE3_OUT_LEN );
-  return std::string( (char*)hash_buf, BLAKE3_OUT_LEN );
+  string digest( BLAKE3_OUT_LEN, '\0' );
+  blake3_hasher_finalize( &hasher, reinterpret_cast<uint8_t*>( digest.data() ), BLAKE3_OUT_LEN );
+  return digest;
 }
 }
