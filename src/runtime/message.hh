@@ -1,14 +1,14 @@
 #pragma once
 
-#include <algorithm>
 #include <queue>
-#include <string_view>
 #include <variant>
+#include <vector>
 
+#include "handle.hh"
 #include "interface.hh"
 #include "object.hh"
 #include "parser.hh"
-#include "task.hh"
+#include "types.hh"
 
 class Message
 {
@@ -19,6 +19,8 @@ public:
     RESULT,
     REQUESTINFO,
     INFO,
+    REQUESTTREE,
+    REQUESTBLOB,
     BLOBDATA,
     TREEDATA,
     PROPOSE_TRANSFER,
@@ -26,8 +28,16 @@ public:
     COUNT,
   };
 
-  static constexpr const char* OPCODE_NAMES[static_cast<uint8_t>( Opcode::COUNT )]
-    = { "RUN", "RESULT", "REQUESTINFO", "INFO", "BLOBDATA", "TREEDATA", "PROPOSE_TRANSFER", "ACCEPT_TRANSFER" };
+  static constexpr const char* OPCODE_NAMES[static_cast<uint8_t>( Opcode::COUNT )] = { "RUN",
+                                                                                       "RESULT",
+                                                                                       "REQUESTINFO",
+                                                                                       "INFO",
+                                                                                       "REQUESTTREE",
+                                                                                       "REQUESTBLOB",
+                                                                                       "BLOBDATA",
+                                                                                       "TREEDATA",
+                                                                                       "PROPOSE_TRANSFER",
+                                                                                       "ACCEPT_TRANSFER" };
 
   constexpr static size_t HEADER_LENGTH = sizeof( size_t ) + sizeof( Opcode );
 
@@ -47,42 +57,64 @@ public:
 
 struct RunPayload
 {
-  Task task {};
+  Handle<Relation> task {};
 
   static RunPayload parse( Parser& parser );
   void serialize( Serializer& serializer ) const;
 
   constexpr static Message::Opcode OPCODE = Message::Opcode::RUN;
-  size_t payload_length() const { return 43 + sizeof( Operation ); }
+  size_t payload_length() const { return sizeof( u8x32 ); }
 };
 
 struct ResultPayload
 {
-  Task task {};
-  Handle result {};
+  Handle<Relation> task {};
+  Handle<Object> result {};
 
   static ResultPayload parse( Parser& parser );
   void serialize( Serializer& serializer ) const;
 
   constexpr static Message::Opcode OPCODE = Message::Opcode::RESULT;
-  size_t payload_length() const { return 43 + 43 + sizeof( Operation ); }
+  size_t payload_length() const { return 2 * sizeof( u8x32 ); }
 };
 
-struct InfoPayload : public ITaskRunner::Info
+struct RequestBlobPayload
+{
+  Handle<Named> handle;
+
+  static RequestBlobPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::REQUESTBLOB;
+  size_t payload_length() const { return sizeof( u8x32 ); }
+};
+
+struct RequestTreePayload
+{
+  Handle<AnyTree> handle {};
+
+  static RequestTreePayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::REQUESTTREE;
+  size_t payload_length() const { return sizeof( u8x32 ); }
+};
+
+struct InfoPayload : public IRuntime::Info
 {
   static InfoPayload parse( Parser& parser );
   void serialize( Serializer& serializer ) const;
 
   constexpr static Message::Opcode OPCODE = Message::Opcode::INFO;
-  size_t payload_length() const { return sizeof( uint32_t ); }
+  size_t payload_length() const { return sizeof( uint32_t ) + sizeof( double ); }
 };
 
 template<Message::Opcode O>
 struct TransferPayload
 {
-  Task todo {};
-  std::optional<Handle> result {};
-  std::vector<Handle> handles {};
+  Handle<Relation> todo {};
+  std::optional<Handle<Object>> result {};
+  std::vector<Handle<Fix>> handles {};
 
   static TransferPayload parse( Parser& parser );
   void serialize( Serializer& serializer ) const;
@@ -90,16 +122,21 @@ struct TransferPayload
   constexpr static Message::Opcode OPCODE = O;
   size_t payload_length() const
   {
-    return 43 + sizeof( Operation ) + sizeof( bool ) + ( result ? 43 : 0 ) + +sizeof( size_t )
-           + handles.size() * 43;
+    return sizeof( u8x32 ) + sizeof( bool ) + ( result ? sizeof( u8x32 ) : 0 ) + sizeof( size_t )
+           + handles.size() * sizeof( u8x32 );
   }
 };
 
 using ProposeTransferPayload = TransferPayload<Message::Opcode::PROPOSE_TRANSFER>;
 using AcceptTransferPayload = TransferPayload<Message::Opcode::ACCEPT_TRANSFER>;
 
-using MessagePayload
-  = std::variant<RunPayload, ResultPayload, InfoPayload, ProposeTransferPayload, AcceptTransferPayload>;
+using MessagePayload = std::variant<RunPayload,
+                                    ResultPayload,
+                                    InfoPayload,
+                                    ProposeTransferPayload,
+                                    AcceptTransferPayload,
+                                    RequestBlobPayload,
+                                    RequestTreePayload>;
 
 class IncomingMessage : public Message
 {
@@ -110,16 +147,16 @@ public:
   IncomingMessage( const Message::Opcode opcode, OwnedMutBlob&& payload );
   IncomingMessage( const Message::Opcode opcode, OwnedMutTree&& payload );
 
-  OwnedMutBlob get_blob()
+  BlobData get_blob()
   {
     assert( holds_alternative<OwnedMutBlob>( payload_ ) );
-    return std::move( get<OwnedMutBlob>( payload_ ) );
+    return make_shared<OwnedBlob>( std::move( get<OwnedMutBlob>( payload_ ) ) );
   }
 
-  OwnedMutTree get_tree()
+  TreeData get_tree()
   {
     assert( holds_alternative<OwnedMutTree>( payload_ ) );
-    return std::move( get<OwnedMutTree>( payload_ ) );
+    return make_shared<OwnedTree>( std::move( get<OwnedMutTree>( payload_ ) ) );
   }
 
   static size_t expected_payload_length( std::string_view header );
@@ -128,11 +165,11 @@ public:
 
 class OutgoingMessage : public Message
 {
-  std::variant<Blob, Tree, std::string> payload_ {};
+  std::variant<BlobData, TreeData, std::string> payload_ {};
 
 public:
-  OutgoingMessage( const Message::Opcode opcode, Blob payload );
-  OutgoingMessage( const Message::Opcode opcode, Tree payload );
+  OutgoingMessage( const Message::Opcode opcode, BlobData payload );
+  OutgoingMessage( const Message::Opcode opcode, TreeData payload );
   OutgoingMessage( const Message::Opcode opcode, std::string&& payload );
 
   static OutgoingMessage to_message( MessagePayload&& payload );

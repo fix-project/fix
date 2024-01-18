@@ -44,6 +44,17 @@ public:
     cv_.notify_one();
   }
 
+  void move_push( T&& item )
+  {
+    std::unique_lock lock( mutex_ );
+    if ( shutdown_ ) {
+      throw ChannelClosed {};
+    }
+    data_.enqueue( std::move( item ) );
+    ++size_;
+    cv_.notify_one();
+  }
+
   void push( T item )
   {
     std::unique_lock lock( mutex_ );

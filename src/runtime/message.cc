@@ -1,9 +1,10 @@
-#if 0
 #include "message.hh"
-#include "base64.hh"
 #include "object.hh"
+#include "overload.hh"
 #include "parser.hh"
-#include "runtime.hh"
+#include "types.hh"
+
+#include <glog/logging.h>
 
 using namespace std;
 
@@ -22,12 +23,12 @@ IncomingMessage::IncomingMessage( const Message::Opcode opcode, OwnedMutTree&& p
   , payload_( std::move( payload ) )
 {}
 
-OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, Blob payload )
+OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, BlobData payload )
   : Message( opcode )
   , payload_( payload )
 {}
 
-OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, Tree payload )
+OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, TreeData payload )
   : Message( opcode )
   , payload_( payload )
 {}
@@ -51,20 +52,22 @@ void OutgoingMessage::serialize_header( string& out )
 
 string_view OutgoingMessage::payload()
 {
-  return std::visit(
-    [&]( auto& arg ) -> string_view {
-      return { reinterpret_cast<const char*>( arg.data() ), payload_length() };
-    },
-    payload_ );
+  return std::visit( overload { []( BlobData& b ) -> string_view {
+                                 return { b->data(), b->size() };
+                               },
+                                []( TreeData& t ) -> string_view {
+                                  return { reinterpret_cast<const char*>( t->data() ), t->span().size_bytes() };
+                                },
+                                []( string& s ) -> string_view { return s; } },
+                     payload_ );
 }
 
 size_t OutgoingMessage::payload_length()
 {
-  if ( std::holds_alternative<Tree>( payload_ ) ) {
-    return get<Tree>( payload_ ).size() * sizeof( Tree::element_type );
-  } else {
-    return std::visit( []( auto& arg ) -> size_t { return arg.size(); }, payload_ );
-  }
+  return std::visit( overload { []( BlobData& b ) { return b->size(); },
+                                []( TreeData& t ) { return t->span().size_bytes(); },
+                                []( string& s ) { return s.size(); } },
+                     payload_ );
 }
 
 Message::Opcode Message::opcode( string_view header )
@@ -129,6 +132,8 @@ size_t MessageParser::parse( string_view buf )
             case Message::Opcode::RUN:
             case Message::Opcode::INFO:
             case Message::Opcode::RESULT:
+            case Message::Opcode::REQUESTTREE:
+            case Message::Opcode::REQUESTBLOB:
             case Message::Opcode::PROPOSE_TRANSFER:
             case Message::Opcode::ACCEPT_TRANSFER: {
               incomplete_payload_ = "";
@@ -142,7 +147,8 @@ size_t MessageParser::parse( string_view buf )
             }
 
             case Message::Opcode::TREEDATA: {
-              incomplete_payload_ = OwnedMutTree::allocate( expected_payload_length_.value() / sizeof( Handle ) );
+              incomplete_payload_
+                = OwnedMutTree::allocate( expected_payload_length_.value() / sizeof( Handle<Fix> ) );
               break;
             }
 
@@ -173,86 +179,104 @@ size_t MessageParser::parse( string_view buf )
   return consumed_bytes;
 }
 
-Handle parse_handle( Parser& parser )
+template<FixType F>
+Handle<F> parse_handle( Parser& parser )
 {
-  string handle;
-  handle.resize( 43 );
-  parser.string( string_span::from_view( handle ) );
+  u8x32 handle;
+  parser.integer( handle );
 
   if ( parser.error() ) {
     throw runtime_error( "Failed to parse handle." );
   }
 
-  return base64::decode( handle );
-}
-
-Operation parse_operation( Parser& parser )
-{
-  uint8_t operation;
-  parser.integer( operation );
-
-  if ( parser.error() ) {
-    throw runtime_error( "Failed to parse opeartion." );
-  }
-
-  return static_cast<Operation>( operation );
+  return Handle<F>::forge( handle );
 }
 
 RunPayload RunPayload::parse( Parser& parser )
 {
-  return { .task { parse_handle( parser ), parse_operation( parser ) } };
+  return { .task { parse_handle<Relation>( parser ) } };
 }
 
 void RunPayload::serialize( Serializer& serializer ) const
 {
-  serializer.string( base64::encode( task.handle() ) );
-  serializer.integer( static_cast<uint8_t>( task.operation() ) );
+  serializer.integer( task.content );
+}
+
+RequestBlobPayload RequestBlobPayload::parse( Parser& parser )
+{
+  return { .handle { parse_handle<Named>( parser ) } };
+}
+
+void RequestBlobPayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
+}
+
+RequestTreePayload RequestTreePayload::parse( Parser& parser )
+{
+  return { .handle { parse_handle<AnyTree>( parser ) } };
+}
+
+void RequestTreePayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
 }
 
 ResultPayload ResultPayload::parse( Parser& parser )
 {
-  return { .task { parse_handle( parser ), parse_operation( parser ) }, .result { parse_handle( parser ) } };
+  ResultPayload res;
+  res.task = parse_handle<Relation>( parser );
+  res.result = parse_handle<Object>( parser );
+  return res;
 }
 
 void ResultPayload::serialize( Serializer& serializer ) const
 {
-  serializer.string( base64::encode( task.handle() ) );
-  serializer.integer( static_cast<uint8_t>( task.operation() ) );
-  serializer.string( base64::encode( result ) );
+  serializer.integer( task.content );
+  serializer.integer( result.content );
 }
 
 InfoPayload InfoPayload::parse( Parser& parser )
 {
-  uint32_t parallelism;
-  parser.integer( parallelism );
+  uint32_t parallelism {};
+  double link_speed {};
 
+  parser.integer( parallelism );
   if ( parser.error() ) {
-    throw runtime_error( "Failed to parse opeartion." );
+    throw runtime_error( "Failed to parse parallelism." );
   }
 
-  return { { .parallelism = parallelism } };
+  parser.integer( link_speed );
+  if ( parser.error() ) {
+    throw runtime_error( "Failed to parse link speed." );
+  }
+
+  return { { .parallelism = parallelism, .link_speed = link_speed } };
 }
 
 void InfoPayload::serialize( Serializer& serializer ) const
 {
   serializer.integer( parallelism );
+  serializer.integer( link_speed );
 }
 
 template<Message::Opcode O>
 TransferPayload<O> TransferPayload<O>::parse( Parser& parser )
 {
-  Handle handle = parse_handle( parser );
-  Operation operation = parse_operation( parser );
-  TransferPayload payload { .todo = Task( handle, operation ) };
+  auto handle = parse_handle<Relation>( parser );
+  TransferPayload payload { .todo = handle };
+
   bool has_result = false;
   parser.integer<bool>( has_result );
+
   if ( has_result )
-    payload.result = parse_handle( parser );
+    payload.result = parse_handle<Object>( parser );
+
   size_t count = 0;
   parser.integer<size_t>( count );
   payload.handles.reserve( count );
   for ( size_t i = 0; i < count; i++ ) {
-    payload.handles.push_back( parse_handle( parser ) );
+    payload.handles.push_back( parse_handle<Fix>( parser ) );
   }
   return payload;
 }
@@ -260,15 +284,14 @@ TransferPayload<O> TransferPayload<O>::parse( Parser& parser )
 template<Message::Opcode O>
 void TransferPayload<O>::serialize( Serializer& serializer ) const
 {
-  serializer.string( base64::encode( todo.handle() ) );
-  serializer.integer<uint8_t>( static_cast<uint8_t>( todo.operation() ) );
+  serializer.integer( todo.content );
   serializer.integer<bool>( result.has_value() );
   if ( result.has_value() ) {
-    serializer.string( base64::encode( *result ) );
+    serializer.integer( result.value().content );
   }
   serializer.integer<size_t>( handles.size() );
   for ( const auto& h : handles ) {
-    serializer.string( base64::encode( h ) );
+    serializer.integer( h.into<Fix>().content );
   }
 }
 
@@ -282,4 +305,3 @@ template TxP<PROPOSE> TxP<PROPOSE>::parse( Parser& parser );
 template void TxP<PROPOSE>::serialize( Serializer& serializer ) const;
 template TxP<ACCEPT> TxP<ACCEPT>::parse( Parser& parser );
 template void TxP<ACCEPT>::serialize( Serializer& serializer ) const;
-#endif

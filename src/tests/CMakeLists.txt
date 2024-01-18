@@ -24,9 +24,6 @@ link_libraries(glog)
 # add_executable(test-map test-map.cc main.cc)
 # target_link_libraries(test-map runtime)
 
-# add_executable(test-distributed test-distributed.cc main.cc)
-# target_link_libraries(test-distributed runtime)
-
 # add_executable(test-self-host test-self-host.cc main.cc)
 # target_link_libraries(test-self-host runtime)
 
@@ -45,3 +42,7 @@ target_link_libraries(test-evaluator runtime)
 
 add_executable(test-executor test-executor.cc main.cc)
 target_link_libraries(test-executor runtime)
+
+add_executable(test-distributed test-distributed.cc main.cc)
+target_link_libraries(test-distributed runtime)
+

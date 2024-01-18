@@ -1,4 +1,4 @@
-file (GLOB LIB_SOURCES evaluator.cc executor.cc)
+file (GLOB LIB_SOURCES evaluator.cc executor.cc message.cc network.cc)
 
 add_custom_command(
   OUTPUT "wasm-rt-content.h"

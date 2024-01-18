@@ -25,3 +25,4 @@ add_test(NAME t_handle COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-handle
 add_test(NAME t_storage COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-storage)
 add_test(NAME t_evaluator COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-evaluator)
 add_test(NAME t_executor COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-executor)
+add_test(NAME t_distributed COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-distributed)
