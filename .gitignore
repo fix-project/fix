@@ -2,3 +2,4 @@
 /.ccls-cache
 .fix/
 /.cache
+cmake-build-debug

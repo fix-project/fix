@@ -10,6 +10,8 @@ extern externref create_blob_i32( int32_t number )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_blob_i32" ) ) );
 extern externref create_thunk( externref pointer )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_thunk" ) ) );
+extern externref create_tag( externref object, externref blob )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_tag" ) ) );
 extern void fixpoint_unsafe_io( const char* s, int32_t size )
   __attribute__( ( import_module( "fixpoint" ), import_name( "unsafe_io" ) ) );
 
@@ -44,6 +46,8 @@ void set_rw_table( int32_t table_id, int32_t index, externref val );
 void set_i32_rw_mem( int32_t mem_id, int32_t index, int32_t val );
 
 int32_t get_i32_rw_mem( int32_t mem_id, int32_t index );
+
+int32_t get_i32_ro_mem( int32_t mem_id, int32_t index );
 
 // Returns the size of mem_id in PAGES (not bytes)
 int32_t byte_size_ro_mem( int32_t mem_id );
