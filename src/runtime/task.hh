@@ -15,7 +15,7 @@ class Task
 
 public:
   Task()
-    : handle_( Handle<ObjectTree>::nil().into<Object>().into<Value>().into<Expression>() )
+    : handle_( Handle<ValueTree>::nil().into<Value>().into<Object>().into<Expression>() )
     , operation_()
   {}
 
@@ -63,11 +63,11 @@ public:
   static Task Eval( Handle<Expression> handle ) { return Task( handle, Operation::Eval ); }
   static Task Apply( Handle<Thunk> handle )
   {
-    return Task( handle.into<Value>().into<Expression>(), Operation::Apply );
+    return Task( handle.into<Object>().into<Expression>(), Operation::Apply );
   }
-  static Task Fill( Handle<ValueTree> handle )
+  static Task Fill( Handle<ObjectTree> handle )
   {
-    return Task( handle.into<Value>().into<Expression>(), Operation::Fill );
+    return Task( handle.into<Object>().into<Expression>(), Operation::Fill );
   }
 
   Task& operator=( const Task& other )

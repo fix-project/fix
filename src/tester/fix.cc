@@ -13,7 +13,7 @@
 #include "base16.hh"
 #include "object.hh"
 #include "overload.hh"
-#include "runtimestorage.hh"
+#include "repository.hh"
 #include "storage_exception.hh"
 
 using namespace std;
@@ -41,16 +41,12 @@ void add( int argc, char* argv[] )
     exit( EXIT_FAILURE );
   }
 
-  RuntimeStorage storage;
+  Repository storage;
 
   try {
-    Handle<Fix> handle = storage.create( OwnedBlob::from_file( filename ) );
-    if ( label ) {
-      storage.label( handle, *label );
-      handle = storage.serialize( *label );
-    } else {
-      handle = storage.serialize( handle );
-    }
+    Handle<Fix> handle = storage.create( std::make_shared<OwnedBlob>( filename ) );
+    if ( label )
+      storage.label( *label, handle );
     cout << handle.content << endl;
   } catch ( std::filesystem::filesystem_error& e ) {
     cerr << "Error: unable to open file " << std::filesystem::path( filename ) << ":\n\t" << e.what() << "\n";
@@ -76,19 +72,16 @@ void create( int argc, char* argv[] )
     } );
   parser.Parse( argc, argv );
 
-  RuntimeStorage storage;
+  Repository storage;
   if ( !contents ) {
     std::istreambuf_iterator<char> begin( std::cin ), end;
     contents = { begin, end };
   }
 
-  Handle<Fix> handle = storage.create( OwnedBlob::claim_static( { contents->data(), contents->size() } ) );
-  if ( label ) {
-    storage.label( handle, *label );
-    handle = storage.serialize( *label );
-  } else {
-    handle = storage.serialize( handle );
-  }
+  Handle<Fix> handle = storage.create(
+    std::make_shared<OwnedBlob>( std::span { contents->data(), contents->size() }, AllocationType::Static ) );
+  if ( label )
+    storage.label( *label, handle );
   cout << handle.content << endl;
 }
 
@@ -102,15 +95,20 @@ void cat( int argc, char* argv[] )
   if ( !ref )
     exit( EXIT_FAILURE );
 
-  RuntimeStorage storage;
+  Repository storage;
   auto handle = storage.lookup( ref );
-  auto blob = fix_extract<Blob>( handle );
+  auto blob = handle::extract<Blob>( handle );
   if ( !blob ) {
     cerr << "Error: \"" << ref << "\" does not describe a Blob.\n";
     exit( EXIT_FAILURE );
   }
-  auto data = storage.get( *blob );
-  cout << std::string( data.begin(), data.end() );
+  blob->visit<void>( overload {
+    []( Handle<Literal> literal ) { cout << literal.view(); },
+    [&]( Handle<Named> named ) {
+      auto data = storage.get( named ).value();
+      cout << std::string( data->span().begin(), data->span().end() );
+    },
+  } );
 }
 }
 
@@ -120,7 +118,7 @@ void create( int argc, char* argv[] )
   OptionParser parser( "create-tree", commands["create-tree"].second );
   static std::vector<Handle<Fix>> contents;
   std::optional<const char*> label;
-  RuntimeStorage storage;
+  Repository storage;
   parser.AddOption(
     'l', "label", "label", "Assign a human-readable name to this Tree.", [&]( const char* argument ) {
       label = argument;
@@ -141,13 +139,12 @@ void create( int argc, char* argv[] )
     }
   }
 
-  Handle<Fix> handle = storage.create( OwnedTree::claim_static( { contents.data(), contents.size() } ) );
-  if ( label ) {
-    storage.label( handle, *label );
-    handle = storage.serialize( *label );
-  } else {
-    handle = storage.serialize( handle );
-  }
+  Handle<Fix> handle = storage
+                         .create( std::make_shared<OwnedTree>( std::span { contents.data(), contents.size() },
+                                                               AllocationType::Static ) )
+                         .visit<Handle<Fix>>( []( const auto x ) { return x; } );
+  if ( label )
+    storage.label( *label, handle );
   cout << handle.content << endl;
 }
 
@@ -161,7 +158,7 @@ void cat( int argc, char* argv[] )
   if ( !ref )
     exit( EXIT_FAILURE );
 
-  RuntimeStorage storage;
+  Repository storage;
   auto handle = storage.lookup( ref );
   std::visit( overload {
                 [&]( Handle<Literal> ) {
@@ -173,16 +170,16 @@ void cat( int argc, char* argv[] )
                   exit( EXIT_FAILURE );
                 },
                 [&]( auto tree ) {
-                  TreeSpan span = storage.get( tree );
-                  for ( size_t i = 0; i < span.size(); i++ ) {
-                    cout << span[i].content << "\n";
+                  auto data = storage.get( tree ).value();
+                  for ( size_t i = 0; i < data->size(); i++ ) {
+                    cout << data->at( i ).content << "\n";
                   }
                 },
               },
-              fix_data( handle ) );
+              handle::data( handle ).get() );
 }
 
-void print_tree( RuntimeStorage& storage,
+void print_tree( Repository& storage,
                  Handle<Fix> handle,
                  bool recursive,
                  bool decode,
@@ -203,17 +200,17 @@ void print_tree( RuntimeStorage& storage,
                   }
                 },
                 [&]( auto tree ) {
-                  TreeSpan span = storage.get( tree );
-                  for ( size_t i = 0; i < span.size(); i++ ) {
+                  auto data = storage.get( tree ).value();
+                  for ( size_t i = 0; i < data->size(); i++ ) {
                     if ( decode )
-                      cout << prefix << i << ". " << span[i] << "\n";
+                      cout << prefix << i << ". " << data->at( i ) << "\n";
                     else
-                      cout << prefix << i << ". " << span[i].content << "\n";
-                    print_tree( storage, span[i], recursive, decode, {}, prefix + "  " );
+                      cout << prefix << i << ". " << data->at( i ).content << "\n";
+                    print_tree( storage, data->at( i ), recursive, decode, {}, prefix + "  " );
                   }
                 },
               },
-              fix_data( handle ) );
+              handle::data( handle ).get() );
 }
 
 void ls( int argc, char* argv[] )
@@ -230,7 +227,7 @@ void ls( int argc, char* argv[] )
   if ( !ref )
     exit( EXIT_FAILURE );
 
-  RuntimeStorage storage;
+  Repository storage;
   auto handle = storage.lookup( ref );
   print_tree( storage, handle, recursive, decode, ref );
 }
@@ -247,7 +244,7 @@ void labels( int argc, char* argv[] )
     decode = true;
   } );
   parser.Parse( argc, argv );
-  RuntimeStorage storage;
+  Repository storage;
 
   auto unordered_labels = storage.labels();
   set<std::string> labels( unordered_labels.begin(), unordered_labels.end() );
@@ -281,7 +278,7 @@ void gc( int argc, char* argv[] )
     dry_run = true;
   } );
   parser.Parse( argc, argv );
-  RuntimeStorage storage;
+  Repository storage;
 
   auto labels = storage.labels();
   unordered_set<Handle<Fix>> roots;
@@ -290,13 +287,23 @@ void gc( int argc, char* argv[] )
   }
 
   unordered_set<Handle<Fix>> data;
-  for ( const auto& datum : std::filesystem::directory_iterator( storage.get_fix_repo() / "data" ) ) {
+  for ( const auto& datum : std::filesystem::directory_iterator( storage.path() / "data" ) ) {
     data.insert( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) );
   }
 
   unordered_set<Handle<Fix>> needed;
   for ( const auto root : roots ) {
-    storage.visit_full( root, [&]( const auto x ) { needed.insert( storage.canonicalize( x ) ); } );
+    if ( root.contains<Relation>() ) {
+      needed.insert(
+        handle::data( storage.get( root.unwrap<Relation>() ).value() ).visit<Handle<Fix>>( []( const auto x ) {
+          return x;
+        } ) );
+    }
+    needed.insert( handle::data( root ).visit<Handle<Fix>>( []( const auto x ) { return x; } ) );
+    auto pins = storage.pinned( root );
+    for ( const auto& p : pins ) {
+      needed.insert( handle::data( p ).visit<Handle<Fix>>( []( const auto x ) { return x; } ) );
+    }
   }
 
   unordered_set<Handle<Fix>> unneeded;
@@ -312,7 +319,7 @@ void gc( int argc, char* argv[] )
                   [&]( const Handle<Named> x ) { total_size += x.size(); },
                   [&]( const auto x ) { total_size += x.size() * sizeof( Handle<Fix> ); },
                 },
-                fix_data( x ) );
+                handle::data( x ).get() );
   }
 
   if ( dry_run ) {
@@ -323,7 +330,7 @@ void gc( int argc, char* argv[] )
   } else {
     for ( const auto x : unneeded ) {
       auto name = x.content;
-      std::filesystem::remove( storage.get_fix_repo() / "data" / base16::encode( name ) );
+      std::filesystem::remove( storage.path() / "data" / base16::encode( name ) );
     }
     cout << "Deleted " << total_size << " bytes.\n";
   }
@@ -341,11 +348,10 @@ void label( int argc, char* argv[] )
   parser.Parse( argc, argv );
   if ( !ref or !new_label )
     exit( EXIT_FAILURE );
-  RuntimeStorage storage;
+  Repository storage;
 
   Handle<Fix> handle = storage.lookup( ref );
-  storage.label( handle, new_label );
-  storage.serialize( new_label );
+  storage.label( new_label, handle );
 }
 
 void init( int, char*[] )

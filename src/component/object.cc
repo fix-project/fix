@@ -13,69 +13,9 @@ Owned<S>::Owned( S span, AllocationType allocation_type )
 {}
 
 template<typename S>
-Owned<S> Owned<S>::allocate( size_t size ) requires( not std::is_const_v<element_type> )
-{
-  void* p = aligned_alloc( std::alignment_of<element_type>(), size * sizeof( element_type ) );
-  CHECK( p );
-  span_type span = {
-    reinterpret_cast<pointer>( p ),
-    size,
-  };
-  VLOG( 1 ) << "allocated " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
-            << reinterpret_cast<void*>( span.data() );
-  return {
-    span,
-    AllocationType::Allocated,
-  };
-}
-
-template<typename S>
-Owned<S> Owned<S>::map( size_t size ) requires( not std::is_const_v<element_type> )
-{
-  void* p = mmap( 0, size * sizeof( element_type ), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 );
-  if ( p == (void*)-1 ) {
-    perror( "mmap" );
-    CHECK( p != (void*)-1 );
-  }
-  CHECK( p );
-  span_type span = {
-    reinterpret_cast<pointer>( p ),
-    size,
-  };
-  VLOG( 1 ) << "mapped " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
-            << reinterpret_cast<void*>( span.data() );
-  return {
-    span,
-    AllocationType::Mapped,
-  };
-}
-
-template<typename S>
-Owned<S> Owned<S>::claim_static( S span )
-{
-  VLOG( 1 ) << "claimed " << span.size_bytes() << " static bytes at "
-            << reinterpret_cast<const void*>( span.data() );
-  return Owned { span, AllocationType::Static };
-}
-
-template<typename S>
-Owned<S> Owned<S>::claim_allocated( S span )
-{
-  VLOG( 1 ) << "claimed " << span.size_bytes() << " allocated bytes at "
-            << reinterpret_cast<const void*>( span.data() );
-  return Owned { span, AllocationType::Allocated };
-}
-
-template<typename S>
-Owned<S> Owned<S>::claim_mapped( S span )
-{
-  VLOG( 1 ) << "claimed " << span.size_bytes() << " mapped bytes at "
-            << reinterpret_cast<const void*>( span.data() );
-  return Owned { span, AllocationType::Mapped };
-}
-
-template<typename S>
-Owned<S> Owned<S>::from_file( const std::filesystem::path path ) requires std::is_const_v<element_type>
+Owned<S>::Owned( std::filesystem::path path ) requires std::is_const_v<element_type>
+  : span_()
+  , allocation_type_( AllocationType::Mapped )
 {
   VLOG( 1 ) << "mapping " << path << " as read-only";
   size_t size = std::filesystem::file_size( path );
@@ -84,15 +24,44 @@ Owned<S> Owned<S>::from_file( const std::filesystem::path path ) requires std::i
   void* p = mmap( NULL, size, PROT_READ, MAP_SHARED, fd, 0 );
   CHECK( p );
   close( fd );
-  return claim_mapped( { reinterpret_cast<pointer>( p ), size / sizeof( element_type ) } );
+  span_ = { reinterpret_cast<pointer>( p ), size / sizeof( element_type ) };
 }
 
 template<typename S>
-Owned<S> Owned<S>::copy( std::span<element_type> data )
+Owned<S>::Owned( size_t size, AllocationType type ) requires( not std::is_const_v<element_type> )
+  : span_()
+  , allocation_type_( type )
 {
-  element_type* a = (element_type*)aligned_alloc( std::alignment_of<element_type>(), data.size_bytes() );
-  memcpy( (void*)a, (void*)data.data(), data.size_bytes() );
-  return claim_allocated( { a, data.size() } );
+  switch ( type ) {
+    case AllocationType::Allocated: {
+      void* p = aligned_alloc( std::alignment_of<element_type>(), size * sizeof( element_type ) );
+      CHECK( p );
+      span_ = {
+        reinterpret_cast<pointer>( p ),
+        size,
+      };
+      VLOG( 1 ) << "allocated " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
+                << reinterpret_cast<void*>( span_.data() );
+      return;
+    }
+    case AllocationType::Mapped: {
+      void* p = mmap( 0, size * sizeof( element_type ), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 );
+      if ( p == (void*)-1 ) {
+        perror( "mmap" );
+        CHECK( p != (void*)-1 );
+      }
+      CHECK( p );
+      span_ = {
+        reinterpret_cast<pointer>( p ),
+        size,
+      };
+      VLOG( 1 ) << "mapped " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
+                << reinterpret_cast<void*>( span_.data() );
+      return;
+    }
+    case AllocationType::Static:
+      CHECK( false );
+  }
 }
 
 template<typename S>

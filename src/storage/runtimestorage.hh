@@ -1,27 +1,20 @@
 #pragma once
 
 #include <absl/container/flat_hash_set.h>
-#include <filesystem>
-#include <mutex>
-#include <shared_mutex>
 #include <stdio.h>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 
 #include "handle.hh"
+#include "mutex.hh"
 #include "object.hh"
-#include "program.hh"
-#include "repository.hh"
-#include "task.hh"
 
 #include "absl/container/flat_hash_map.h"
 
 #ifndef TRUSTED
 #define TRUSTED
 #endif
-
-using DatumOrName = std::variant<OwnedSpan, Handle<Fix>>;
 
 struct AbslHash
 {
@@ -38,59 +31,60 @@ class RuntimeStorage
 private:
   friend class RuntimeWorker;
 
-  // Storage for Object/Handles with a canonical name
-  absl::flat_hash_map<Handle<Fix>, DatumOrName, AbslHash> canonical_storage_ {};
-  // Storage for Object/Handles with a local name
-  std::vector<DatumOrName> local_storage_ {};
-  absl::flat_hash_map<Handle<Relation>, Handle<Fix>, AbslHash> local_relations_ {};
+  struct Data
+  {
+    using LocalEntry = std::variant<BlobData, TreeData, Handle<Fix>>;
+    using CanonicalEntry = std::variant<BlobData, TreeData, Handle<Object>>;
 
-  // Keeping track of canonical and local task handle translation
-  absl::flat_hash_map<Handle<Fix>, std::list<Handle<Fix>>, AbslHash> canonical_to_local_cache_for_tasks_ {};
+    absl::flat_hash_map<Handle<Fix>, CanonicalEntry, AbslHash> canonical_storage_ {};
+    // Storage for Object/Handles with a local name
+    std::vector<LocalEntry> local_storage_ {};
+    absl::flat_hash_map<Handle<Relation>, Handle<Object>, AbslHash> local_relations_ {};
 
-  /* // Keeping track of what objects are pinned by an object */
-  absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash> pins_ {};
+    /* // Keeping track of what objects are pinned by an object */
+    absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash> pins_ {};
 
-  // Maps a Handle to its user-facing names
-  std::unordered_map<std::string, Handle<Fix>> labels_ {};
+    // Maps a Handle to its user-facing names
+    std::unordered_map<std::string, Handle<Fix>> labels_ {};
 
-  Repository repo_ {};
+    Data()
+    {
+      canonical_storage_.reserve( 1024 );
+      local_storage_.reserve( 1024 );
+    }
+  };
 
-  void schedule( Task task );
-
-  template<FixType T>
-  Handle<T> canonicalize( Handle<T> handle, std::unique_lock<std::shared_mutex>& lock );
+  SharedMutex<Data> data_ {};
 
 public:
-  RuntimeStorage() { canonical_storage_.reserve( 1024 ); }
-
-  std::filesystem::path get_fix_repo();
+  RuntimeStorage() {}
 
   // Construct a Blob by taking ownership of a memory region
-  Handle<Blob> create( OwnedBlob&& blob, std::optional<Handle<Fix>> name = {} );
+  Handle<Blob> create( BlobData blob, std::optional<Handle<Blob>> name = {} );
 
   // Construct a Tree by taking ownership of a memory region
-  Handle<Fix> create( OwnedTree&& tree, std::optional<Handle<Fix>> name = {} );
+  Handle<AnyTree> create( TreeData tree, std::optional<Handle<AnyTree>> name = {} );
 
   // Construct a Relation
-  void create( Handle<Relation> relation, Handle<Fix> result );
+  void create( Handle<Relation> relation, Handle<Object> result );
 
   template<FixTreeType T>
-  Handle<T> create_tree( OwnedTree&& tree, std::optional<Handle<Fix>> name = {} );
+  Handle<T> create_tree( TreeData tree, std::optional<Handle<AnyTree>> name = {} );
 
   // Construct a Blob by copying a memory region.
   Handle<Blob> create( const std::string_view string )
   {
     auto blob = OwnedMutBlob::allocate( string.size() );
     memcpy( blob.data(), string.data(), string.size() );
-    return create( std::move( blob ) );
+    return create( std::make_shared<OwnedBlob>( std::move( blob ) ) );
   }
 
   // Construct a Tree by copying a memory region.
-  Handle<Fix> create( const std::span<const Handle<Fix>> span )
+  Handle<AnyTree> create( const std::span<const Handle<Fix>> span )
   {
     auto tree = OwnedMutTree::allocate( span.size() );
     memcpy( tree.data(), span.data(), span.size_bytes() );
-    return create( std::move( tree ) );
+    return create( std::make_shared<OwnedTree>( std::move( tree ) ) );
   }
 
   template<FixTreeType T>
@@ -100,12 +94,12 @@ public:
     for ( size_t i = 0; i < span.size(); i++ ) {
       tree[i] = span[i];
     }
-    return create_tree<T>( std::move( tree ) );
+    return create_tree<T>( std::make_shared<OwnedTree>( std::move( tree ) ) );
   }
 
   // Construct a Tree by copying individual elements.
   template<FixHandle... As>
-  Handle<Fix> construct( As... args )
+  Handle<AnyTree> construct( As... args )
   {
     return ( [&]( std::initializer_list<Handle<Fix>> list ) {
       return create( { std::data( list ), list.size() } );
@@ -120,49 +114,29 @@ public:
     } )( { args... } );
   }
 
-  // Return reference to blob content.  The returned span is only valid for the lifetime of the Handle.
-  BlobSpan get( const Handle<Blob>& name );
-
+  // Return reference to blob content.
+  std::shared_ptr<OwnedBlob> get( Handle<Named> name );
   // Return reference to tree content.
-  template<FixTreeType T>
-  TreeSpan get( Handle<T> name );
-
+  std::shared_ptr<OwnedTree> get( Handle<AnyTree> name );
   // Get the result of a relation.
-  Handle<Fix> get( Handle<Relation> name );
+  Handle<Object> get( Handle<Relation> name );
+
+  Handle<Value> get_relation( Handle<Eval> name ) { return get( name ).unwrap<Value>(); }
+  Handle<Object> get_relation( Handle<Apply> name ) { return get( name ); }
 
   // Convert a Handle into the canonically-named version of that handle.
   template<FixType T>
   Handle<T> canonicalize( Handle<T> handle );
 
-  Task canonicalize( Task task );
-
   void label( Handle<Fix> target, const std::string_view label );
   Handle<Fix> labeled( const std::string_view label );
-  std::unordered_set<std::string> labels() const;
+  std::unordered_set<std::string> labels();
 
   Handle<Fix> serialize( Handle<Fix> root, bool pins = true );
   Handle<Fix> serialize( const std::string_view label, bool pins = true );
 
   // Tests if the data corresponding to the current handle is stored.
   bool contains( Handle<Fix> handle );
-
-  // Gets all the known friendly names for this handle.
-  std::vector<std::string> get_friendly_names( Handle<Fix> handle );
-
-  // Gets the base16 encoded name of the handle.
-  std::string get_encoded_name( Handle<Fix> handle );
-
-  // Gets the shortened base16 encoded name of the handle.
-  std::string get_short_name( Handle<Fix> handle );
-
-  // Gets the handle given shortened base16 encoded name.
-  Handle<Fix> get_handle( const std::string_view short_name );
-
-  // Gets the best name for this Handle to display to users.
-  std::string get_display_name( Handle<Fix> handle );
-
-  // Tries to turn the provided string into a Handle using any known method.
-  Handle<Fix> lookup( const std::string_view ref );
 
   /**
    * Call @p visitor for every Handle in the "minimum repo" of @p root, i.e., the set of Handles which are needed
@@ -213,13 +187,6 @@ public:
   std::vector<Handle<Fix>> minrepo( Handle<Fix> root );
 
   /**
-   * Return the canonical name if the Name @name has been canonicalized. No work is done if it is not canonicalized
-   *
-   * @param name            The name for which to request the canonical name
-   */
-  std::optional<Handle<Fix>> get_canonical_name( Handle<Fix> name );
-
-  /**
    * Add an advisory pin to @p dst from @p src.
    */
   void pin( Handle<Fix> src, Handle<Fix> dst );
@@ -233,4 +200,11 @@ public:
    * Return handles of tags that tag @p handle.
    */
   std::unordered_set<Handle<Fix>> tags( Handle<Fix> handle );
+
+  template<class Predicate>
+  void wait( Predicate c )
+  {
+    auto data = data_.read();
+    data.wait( c );
+  }
 };

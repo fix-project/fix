@@ -2,12 +2,8 @@
 
 #include <concurrentqueue/concurrentqueue.h>
 #include <condition_variable>
-#include <deque>
-#include <iostream>
-#include <memory>
 #include <mutex>
 #include <optional>
-#include <shared_mutex>
 
 class ChannelClosed : public std::exception
 {
@@ -39,6 +35,17 @@ public:
   }
 
   void push( T&& item )
+  {
+    std::unique_lock lock( mutex_ );
+    if ( shutdown_ ) {
+      throw ChannelClosed {};
+    }
+    data_.enqueue( std::move( item ) );
+    ++size_;
+    cv_.notify_one();
+  }
+
+  void push( T item )
   {
     std::unique_lock lock( mutex_ );
     if ( shutdown_ ) {
@@ -82,7 +89,9 @@ public:
   size_t size_approx() { return data_.size_approx(); }
 
   void operator<<( T&& item ) { push( std::move( item ) ); }
+  void operator<<( T item ) { push( item ); }
   void operator>>( std::optional<T>& item ) { item = pop(); }
+  void operator>>( T& item ) { item = pop_or_wait(); }
 
   void close()
   {

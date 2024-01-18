@@ -42,20 +42,23 @@ public:
   using mutable_span = std::span<value_type>;
 
   Owned( S span, AllocationType allocation_type );
+  Owned( Owned& other ) = delete;
   Owned( Owned&& other );
 
   Owned( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>;
+  Owned( std::filesystem::path path ) requires std::is_const_v<element_type>;
+  Owned( size_t size, AllocationType type ) requires( not std::is_const_v<element_type> );
 
-  static Owned<S> allocate( size_t size ) requires( not std::is_const_v<element_type> );
-  static Owned map( size_t size ) requires( not std::is_const_v<element_type> );
+  static Owned allocate( size_t size ) requires( not std::is_const_v<element_type> )
+  {
+    return Owned( size, AllocationType::Allocated );
+  }
+  static Owned map( size_t size ) requires( not std::is_const_v<element_type> )
+  {
+    return Owned( size, AllocationType::Mapped );
+  }
 
-  static Owned claim_static( S span );
-  static Owned claim_allocated( S span );
-  static Owned claim_mapped( S span );
-
-  static Owned from_file( const std::filesystem::path path ) requires std::is_const_v<element_type>;
   void to_file( const std::filesystem::path path ) requires std::is_const_v<element_type>;
-  static Owned copy( std::span<element_type> data );
 
   void leak();
 
@@ -67,8 +70,10 @@ public:
 
   Owned& operator=( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>;
   Owned& operator=( Owned&& other );
+  Owned& operator=( Owned& other ) = delete;
 
   element_type& operator[]( size_t index );
+  element_type& at( size_t index ) { return ( *this )[index]; }
 
   ~Owned();
 };
@@ -80,3 +85,7 @@ using OwnedMutTree = Owned<MutTreeSpan>;
 
 using OwnedSpan = std::variant<OwnedBlob, OwnedTree>;
 using OwnedMutSpan = std::variant<OwnedMutBlob, OwnedMutTree>;
+
+using BlobData = std::shared_ptr<OwnedBlob>;
+using TreeData = std::shared_ptr<OwnedTree>;
+using Data = std::variant<BlobData, TreeData>;

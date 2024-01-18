@@ -73,7 +73,7 @@ public:
 
   size_t get_instance_and_context_size() const { return instance_context_size_; }
 
-  Handle<Value> execute( Handle<ExpressionTree> encode_name ) const
+  Handle<Object> execute( Handle<ExpressionTree> encode_name ) const
   {
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
@@ -100,7 +100,7 @@ public:
     cleanup_func( instance );
     free( instance );
 
-    return Handle<Fix>::forge( result ).try_into<Expression>().value().try_into<Value>().value();
+    return Handle<Fix>::forge( result ).try_into<Expression>().value().try_into<Object>().value();
   }
 
   Program( const Program& ) = delete;

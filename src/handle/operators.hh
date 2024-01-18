@@ -78,19 +78,14 @@ inline std::ostream& operator<<( std::ostream& os, const Handle<Literal>& h )
 template<typename T>
 inline std::ostream& operator<<( std::ostream& os, const Handle<Tree<T>>& h )
 {
-  os << "Tree<";
-  if constexpr ( std::same_as<T, Object> ) {
-    os << "Object";
-  } else if constexpr ( std::same_as<T, Value> ) {
+  if constexpr ( std::same_as<T, Value> ) {
     os << "Value";
+  } else if constexpr ( std::same_as<T, Object> ) {
+    os << "Object";
   } else if constexpr ( std::same_as<T, Expression> ) {
     os << "Expression";
-  } else if constexpr ( std::same_as<T, Fix> ) {
-    os << "Fix";
-  } else {
-    assert( false );
   }
-  os << "> " << h.size() << " ";
+  os << "Tree " << h.size() << " ";
   if ( h.is_local() ) {
     os << "(Local " << h.local_name() << ")";
   } else {

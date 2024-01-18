@@ -1,7 +1,6 @@
 #pragma once
 #include <filesystem>
 #include <format>
-#include <stdexcept>
 
 #include "base16.hh"
 #include "handle.hh"

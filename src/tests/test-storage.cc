@@ -42,13 +42,14 @@ void test( void )
   Handle virgil = storage.create( aeneid );
   Handle caesar = storage.create( de_bello_gallico );
 
-  Handle<Combination> combination
+  Handle<Application> combination
     = storage.construct_tree<ExpressionTree>( "unused"_literal, "elf"_literal, caesar );
 
-  Handle<Identity> hidden = storage.construct_tree<ObjectTree>( "not visible"_literal );
+  Handle<Identification> hidden = storage.construct_tree<ValueTree>( "not visible"_literal );
 
   auto full
-    = storage.construct( "visible 1"_literal, "visible 2"_literal, hidden, virgil, combination, 100_literal32 );
+    = storage.construct( "visible 1"_literal, "visible 2"_literal, hidden, virgil, combination, 100_literal32 )
+        .unwrap<ObjectTree>();
 
   {
     size_t count = 0;
@@ -60,7 +61,7 @@ void test( void )
                                CHECK( other.is_local() );
                                CHECK_NE( Handle<Fix>( other ), Handle<Fix>( caesar ) );
                              } },
-                  fix_data( h ) );
+                  handle::data( h ).get() );
       if ( h == Handle<Fix>( virgil ) )
         saw_aeneid = true;
     } );
@@ -77,7 +78,7 @@ void test( void )
                                CHECK( not other.is_local() );
                                CHECK_NE( Handle<Fix>( other ), Handle<Fix>( caesar ) );
                              } },
-                  fix_data( h ) );
+                  handle::data( h ).get() );
       if ( h == Handle<Fix>( storage.canonicalize( virgil ) ) )
         saw_aeneid = true;
     } );
@@ -96,8 +97,8 @@ void test( void )
   }
 
   {
-    Handle<Apply> apply( virgil );
-    Handle<Fix> target( caesar );
+    Handle<Apply> apply( storage.construct_tree<ObjectTree>( virgil ) );
+    Handle<Object> target( caesar );
     storage.create( apply, target );
     CHECK( storage.contains( apply ) );
     CHECK( storage.complete( apply ) );

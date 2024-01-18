@@ -10,6 +10,7 @@ typedef struct Type
 {
   const char* name;
   size_t bits;
+  bool fix;
   size_t num_options;
   struct Type* options[];
 } Type;
@@ -19,6 +20,7 @@ Type* make_terminal( const char* name, size_t bits )
   Type* value = malloc( sizeof( Type ) );
   *value = ( Type ) {
     .name = name,
+    .fix = true,
     .bits = bits,
     .num_options = 0,
   };
@@ -32,6 +34,7 @@ Type* make_sum( const char* name, size_t n, ... )
   size_t bits = 0;
   *value = ( Type ) {
     .name = name,
+    .fix = true,
     .num_options = n,
   };
   va_list args;
@@ -167,6 +170,7 @@ void serialize_unwrap( const Type* type )
     printf( "\t\t}" );
   }
   printf( " else {\n\t\t\tassert(false);\n\t\t}\n" );
+  printf( "\t\t__builtin_unreachable();\n" );
   printf( "\t}\n\n" );
 }
 
@@ -188,18 +192,37 @@ void serialize_try_into( const Type* type )
   printf( " else {\n\t\t\treturn {};\n\t\t}\n" );
   printf( "\t}\n\n" );
 
+  if ( type->num_options == 1 ) {
+    printf( "\ttemplate<class Visitor>\n" );
+    printf( "\tinline auto visit(Visitor v) {\n" );
+    const Type* option = type->options[0];
+    printf( "\t\treturn v(unwrap<%s>());\n", option->name );
+    printf( "\t}\n\n" );
+  } else {
+    printf( "\ttemplate<typename Result, class Visitor>\n" );
+    printf( "\tinline Result visit(Visitor v) {\n" );
+    for ( unsigned i = 0; i < type->num_options; i++ ) {
+      const Type* option = type->options[i];
+      printf( "\t\tif (option() == Option::%s)\n", option->name );
+      printf( "\t\t\treturn v(unwrap<%s>());\n", option->name );
+    }
+    printf( "\t\t__builtin_unreachable();\n" );
+    printf( "\t}\n\n" );
+  }
+
   printf( "\ttemplate<FixType A, FixType... As>\n" );
   printf( "\tinline auto contains() const {\n" );
   printf( "\t\tauto x = try_into<A>();\n" );
   printf( "\t\tif (!x) return false;\n" );
   printf( "\t\tif constexpr(sizeof...(As) == 0) {\n" );
   printf( "\t\t\treturn true;\n" );
-  printf( "\t\t}\n" );
-  printf( "\t\treturn std::visit([&](const auto y) -> bool {\n" );
-  printf( "\t\t\tif constexpr(decltype(y)::is_fix_sum_type) {\n" );
-  printf( "\t\t\t\treturn y.template contains<A, As...>();\n" );
-  printf( "\t\t\t} else return false;\n" );
-  printf( "\t\t}, x->get());\n" );
+  printf( "\t\t} else {\n" );
+  printf( "\t\t\treturn std::visit([&](const auto y) -> bool {\n" );
+  printf( "\t\t\t\tif constexpr(decltype(y)::is_fix_sum_type) {\n" );
+  printf( "\t\t\t\t\treturn y.template contains<A, As...>();\n" );
+  printf( "\t\t\t\t} else return false;\n" );
+  printf( "\t\t\t}, x->get());\n" );
+  printf( "\t\t}\n\n" );
   printf( "\t}\n\n" );
 }
 
@@ -291,7 +314,7 @@ body:
   printf( "\treturn os;\n" );
   printf( "}\n\n" );
 
-  if ( !wrapper ) {
+  if ( !wrapper && type->fix ) {
     printf( "template<typename T>\n" );
     printf( "concept Fix%sType = ", type->name );
     for ( unsigned i = 0; i < type->num_options; i++ ) {
@@ -307,7 +330,8 @@ body:
   }
 
 assert_fix:
-  printf( "static_assert(FixType<%s>);\n\n", type->name );
+  if ( type->fix )
+    printf( "static_assert(FixType<%s>);\n\n", type->name );
 }
 
 int main( int argc, char** argv )
@@ -315,36 +339,35 @@ int main( int argc, char** argv )
   (void)argc;
   (void)argv;
 
-  const Type* otree = make_terminal( "ObjectTree", 240 + 1 + 1 );     // hash + tag + is_local
   const Type* vtree = make_terminal( "ValueTree", 240 + 1 + 1 );      // hash + tag + is_local
+  const Type* otree = make_terminal( "ObjectTree", 240 + 1 + 1 );     // hash + tag + is_local
   const Type* etree = make_terminal( "ExpressionTree", 240 + 1 + 1 ); // hash + tag + is_local
-  const Type* ftree = make_terminal( "FixTree", 240 + 1 + 1 );        // hash + tag + is_local
 
-  const Type* ostub = make_wrapper( "ObjectTreeStub", otree );
-  const Type* vstub = make_wrapper( "ValueTreeStub", vtree );
+  const Type* vref = make_wrapper( "ValueTreeRef", vtree );
+  const Type* oref = make_wrapper( "ObjectTreeRef", otree );
 
-  const Type* named = make_terminal( "Named", 240 + 1 );     // hash + is_local
   const Type* literal = make_terminal( "Literal", 240 + 5 ); // hash + size
-  const Type* blob = make_sum( "Blob", 2, named, literal );
-  const Type* bstub = make_wrapper( "BlobStub", blob );
+  const Type* named = make_terminal( "Named", 240 + 1 );     // hash + is_local
+  const Type* blob = make_sum( "Blob", 2, literal, named );
+  const Type* bref = make_wrapper( "BlobRef", blob );
 
-  const Type* object = make_sum( "Object", 4, otree, ostub, blob, bstub );
+  const Type* value = make_sum( "Value", 4, blob, bref, vtree, vref );
 
-  const Type* combination = make_wrapper( "Combination", etree );
-  const Type* identity = make_wrapper( "Identity", object );
-  const Type* thunk = make_sum( "Thunk", 2, combination, identity );
-  const Type* value = make_sum( "Value", 4, object, thunk, vtree, vstub );
+  const Type* application = make_wrapper( "Application", etree );
+  const Type* identification = make_wrapper( "Identification", value );
+  const Type* selection = make_wrapper( "Selection", otree );
+  const Type* thunk = make_sum( "Thunk", 3, application, identification, selection );
+  const Type* object = make_sum( "Object", 4, value, thunk, otree, oref );
 
   const Type* strict = make_wrapper( "Strict", thunk );
   const Type* shallow = make_wrapper( "Shallow", thunk );
-  const Type* step = make_wrapper( "Step", thunk );
-  const Type* encode = make_sum( "Encode", 3, strict, shallow, step );
-  const Type* expression = make_sum( "Expression", 3, value, encode, etree );
+  const Type* encode = make_sum( "Encode", 2, strict, shallow );
+  const Type* expression = make_sum( "Expression", 3, object, encode, etree );
 
-  const Type* apply = make_wrapper( "Apply", expression );
-  const Type* eval = make_wrapper( "Eval", expression );
+  const Type* apply = make_wrapper( "Apply", otree );
+  const Type* eval = make_wrapper( "Eval", object );
   const Type* relation = make_sum( "Relation", 2, apply, eval );
-  const Type* fix = make_sum( "Fix", 3, expression, relation, ftree );
+  const Type* fix = make_sum( "Fix", 2, expression, relation );
 
   fprintf( stderr, "Fix Handles currently need %lu bits.\n", fix->bits );
   assert( fix->bits <= 256 );
@@ -357,7 +380,7 @@ int main( int argc, char** argv )
           "#include <type_traits>\n"
           "#include <variant>\n"
           "\n"
-          "#include \"handle_extra.hh\"\n"
+          "#include \"handle_pre.hh\"\n"
           "\n"
           "template <typename T>\n"
           "concept FixType = Handle<T>::is_fix_data_type;\n"
@@ -366,4 +389,11 @@ int main( int argc, char** argv )
           "\n" );
 
   serialize( fix );
+  const Type* anytree = make_sum( "AnyTree", 3, vtree, otree, etree );
+  const Type* anytreeref = make_sum( "AnyTreeRef", 2, vref, oref );
+  const Type* anydatatype = make_sum( "AnyDataType", 5, literal, named, vtree, otree, etree );
+  serialize( anytree );
+  serialize( anytreeref );
+  serialize( anydatatype );
+  printf( "#include \"handle_post.hh\" // IWYU pragma: keep\n\n" );
 }

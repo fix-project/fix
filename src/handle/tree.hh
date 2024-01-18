@@ -74,7 +74,7 @@ public:
 
   static inline Handle<Tree<T>> forge( u8x32 content ) { return { content }; }
 
-  explicit inline operator Handle<ValueTree>() const requires std::same_as<T, Object>
+  explicit inline operator Handle<ObjectTree>() const requires std::same_as<T, Value>
   {
     if ( is_local() ) {
       return { local_name(), size() };
@@ -83,17 +83,7 @@ public:
     }
   }
 
-  explicit inline operator Handle<ExpressionTree>() const requires std::same_as<T, Value> or std::same_as<T, Object>
-  {
-    if ( is_local() ) {
-      return { local_name(), size() };
-    } else {
-      return { hash(), size() };
-    }
-  }
-
-  explicit inline operator Handle<FixTree>() const
-    requires std::same_as<T, Value> or std::same_as<T, Object> or std::same_as<T, Expression>
+  explicit inline operator Handle<ExpressionTree>() const requires std::same_as<T, Object> or std::same_as<T, Value>
   {
     if ( is_local() ) {
       return { local_name(), size() };
@@ -116,4 +106,4 @@ public:
 };
 
 template<typename T>
-concept FixTreeType = requires( Handle<T> a ) { Handle<FixTree>( a ); };
+concept FixTreeType = requires( Handle<T> a ) { Handle<ExpressionTree>( a ); };
