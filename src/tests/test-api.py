@@ -21,6 +21,8 @@ def run_tests(server):
         if "Evaluation completed" in line:
             signal.alarm(0)
             break
+        if server.returncode != None:
+            raise Exception("Server failed to start")
         if time.time() - start_time > total_timeout_seconds:
             raise Exception("Failed to finish within " + str(total_timeout_seconds) + " seconds")
 
