@@ -33,7 +33,9 @@ public:
   std::unordered_set<Handle<Fix>> pinned( Handle<Fix> src ) const;
   void pin( Handle<Fix> src, const std::unordered_set<Handle<Fix>>& dsts );
 
-  virtual bool contains( Handle<Fix> name ) override;
+  virtual bool contains( Handle<Named> name ) override;
+  virtual bool contains( Handle<AnyTree> name ) override;
+  virtual bool contains( Handle<Relation> name ) override;
 
   bool contains( const std::string_view label ) const;
 

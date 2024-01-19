@@ -391,7 +391,7 @@ int main( int argc, char** argv )
   serialize( fix );
   const Type* anytree = make_sum( "AnyTree", 3, vtree, otree, etree );
   const Type* anytreeref = make_sum( "AnyTreeRef", 2, vref, oref );
-  const Type* anydatatype = make_sum( "AnyDataType", 5, literal, named, vtree, otree, etree );
+  const Type* anydatatype = make_sum( "AnyDataType", 6, literal, named, vtree, otree, etree, relation );
   serialize( anytree );
   serialize( anytreeref );
   serialize( anydatatype );

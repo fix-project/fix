@@ -11,7 +11,7 @@ RuntimeStorage storage;
 
 /**
  * A single-threaded Fix Runtime which executes in a stackful manner.  Its evaluation functions are guaranteed to
- * return values, not nullopt.  It aggressively canonicalizes to enable memoization.
+ * return values, not nullopt.
  */
 class FakeRuntime : private FixRuntime
 {
@@ -33,7 +33,6 @@ private:
 
   virtual Result<Object> apply( Handle<ObjectTree> combination )
   {
-    combination = storage.canonicalize( combination );
     Handle<Apply> apply( combination );
     if ( storage.contains( apply ) ) {
       return storage.get_relation( apply );
@@ -54,7 +53,6 @@ private:
 
   virtual Result<Value> evalStrict( Handle<Object> obj )
   {
-    obj = storage.canonicalize( obj );
     Handle<Eval> eval( obj );
     if ( storage.contains( eval ) ) {
       return storage.get_relation( eval );

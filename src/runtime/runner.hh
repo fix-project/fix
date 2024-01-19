@@ -1,6 +1,7 @@
 #pragma once
 #include "handle.hh"
 #include "object.hh"
+#include "runtimestorage.hh"
 
 #include <glog/logging.h>
 
@@ -32,9 +33,11 @@ public:
  */
 class PointerRunner : public Runner
 {
+
 public:
   virtual void init() override {}
   virtual ~PointerRunner() {}
+
   virtual Handle<Object> apply( Handle<ObjectTree> handle, TreeData combination ) override
   {
     auto procedure = combination->at( 0 )

@@ -64,8 +64,7 @@ std::optional<BlobData> Executor::get_or_delegate( Handle<Named> goal )
 
 std::optional<TreeData> Executor::get_or_delegate( Handle<AnyTree> goal )
 {
-  Handle<Fix> fix = goal.visit<Handle<Fix>>( []( auto x ) { return x; } );
-  if ( storage_.contains( fix ) ) {
+  if ( storage_.contains( goal ) ) {
     return storage_.get( goal );
   }
   auto parent = parent_.lock();
@@ -73,7 +72,7 @@ std::optional<TreeData> Executor::get_or_delegate( Handle<AnyTree> goal )
     return parent->get( goal );
   } else {
     // we have no way to get this
-    throw HandleNotFound( fix );
+    throw HandleNotFound( handle::fix( goal ) );
   }
 }
 
@@ -106,10 +105,6 @@ Result<Value> Executor::load( Handle<Value> value )
 
 Result<Object> Executor::apply( Handle<ObjectTree> combination )
 {
-  auto original = combination;
-  {
-    combination = storage_.canonicalize( combination );
-  }
   Handle<Apply> goal( combination );
   TreeData tree;
   {
@@ -121,9 +116,6 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   }
   auto result = runner_->apply( combination, tree );
   storage_.create( goal, result );
-  if ( original != combination ) {
-    storage_.create( Handle<Apply>( original ), result );
-  }
   return result;
 }
 
@@ -238,11 +230,10 @@ std::optional<BlobData> Executor::get( Handle<Named> name )
 
 std::optional<TreeData> Executor::get( Handle<AnyTree> name )
 {
-  auto fix = name.visit<Handle<Fix>>( []( auto x ) { return x; } );
-  if ( storage_.contains( fix ) ) {
+  if ( storage_.contains( name ) ) {
     return storage_.get( name );
   }
-  throw HandleNotFound( fix );
+  throw HandleNotFound( handle::fix( name ) );
 };
 
 std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
@@ -269,7 +260,17 @@ void Executor::put( Handle<Relation> name, Handle<Object> data )
   storage_.create( name, data );
 }
 
-bool Executor::contains( Handle<Fix> handle )
+bool Executor::contains( Handle<Named> handle )
+{
+  return storage_.contains( handle );
+}
+
+bool Executor::contains( Handle<AnyTree> handle )
+{
+  return storage_.contains( handle );
+}
+
+bool Executor::contains( Handle<Relation> handle )
 {
   return storage_.contains( handle );
 }

@@ -160,76 +160,53 @@ void cat( int argc, char* argv[] )
 
   Repository storage;
   auto handle = storage.lookup( ref );
-  std::visit( overload {
-                [&]( Handle<Literal> ) {
-                  cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
-                  exit( EXIT_FAILURE );
-                },
-                [&]( Handle<Named> ) {
-                  cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
-                  exit( EXIT_FAILURE );
-                },
-                [&]( auto tree ) {
-                  auto data = storage.get( tree ).value();
-                  for ( size_t i = 0; i < data->size(); i++ ) {
-                    cout << data->at( i ).content << "\n";
-                  }
-                },
-              },
-              handle::data( handle ).get() );
+  handle::data( handle ).visit<void>( overload {
+    [&]( Handle<AnyTree> tree ) {
+      auto data = storage.get( tree ).value();
+      for ( size_t i = 0; i < data->size(); i++ ) {
+        cout << data->at( i ).content << "\n";
+      }
+    },
+    [&]( auto ) {
+      cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
+      exit( EXIT_FAILURE );
+    },
+  } );
 }
 
-void print_tree( Repository& storage,
-                 Handle<Fix> handle,
-                 bool recursive,
-                 bool decode,
-                 std::optional<std::string> ref = nullopt,
-                 std::string prefix = "" )
+void print_tree( Repository& storage, Handle<AnyTree> handle, bool decode )
 {
-  std::visit( overload {
-                [&]( Handle<Literal> ) {
-                  if ( ref ) {
-                    cerr << "Error: \"" << *ref << "\" does not describe a Tree.\n";
-                    exit( EXIT_FAILURE );
-                  }
-                },
-                [&]( Handle<Named> ) {
-                  if ( ref ) {
-                    cerr << "Error: \"" << *ref << "\" does not describe a Tree.\n";
-                    exit( EXIT_FAILURE );
-                  }
-                },
-                [&]( auto tree ) {
-                  auto data = storage.get( tree ).value();
-                  for ( size_t i = 0; i < data->size(); i++ ) {
-                    if ( decode )
-                      cout << prefix << i << ". " << data->at( i ) << "\n";
-                    else
-                      cout << prefix << i << ". " << data->at( i ).content << "\n";
-                    print_tree( storage, data->at( i ), recursive, decode, {}, prefix + "  " );
-                  }
-                },
-              },
-              handle::data( handle ).get() );
+  auto tree = storage.get( handle ).value();
+  for ( size_t i = 0; i < tree->size(); i++ ) {
+    if ( decode )
+      cout << "  " << i << ". " << tree->at( i ) << "\n";
+    else
+      cout << "  " << i << ". " << tree->at( i ).content << "\n";
+  }
 }
 
 void ls( int argc, char* argv[] )
 {
   OptionParser parser( "ls-tree", commands["ls-tree"].second );
   const char* ref = NULL;
-  bool recursive = false;
   bool decode = false;
   parser.AddArgument(
     "label-or-hash", OptionParser::ArgumentCount::One, [&]( const char* argument ) { ref = argument; } );
-  parser.AddOption( 'r', "recursive", "Recursively print sub-trees.", [&] { recursive = true; } );
   parser.AddOption( 'd', "decode", "Decode Handles within Tree.", [&] { decode = true; } );
   parser.Parse( argc, argv );
   if ( !ref )
     exit( EXIT_FAILURE );
 
   Repository storage;
-  auto handle = storage.lookup( ref );
-  print_tree( storage, handle, recursive, decode, ref );
+  auto handle = handle::data( storage.lookup( ref ) )
+                  .visit<Handle<AnyTree>>( overload {
+                    []( Handle<AnyTree> x ) { return x; },
+                    [&]( auto ) -> Handle<AnyTree> {
+                      cerr << std::format( "Ref {} does not a describe a tree.", ref );
+                      exit( EXIT_FAILURE );
+                    },
+                  } );
+  print_tree( storage, handle, decode );
 }
 }
 
@@ -315,9 +292,8 @@ void gc( int argc, char* argv[] )
   size_t total_size = 0;
   for ( const auto x : unneeded ) {
     std::visit( overload {
-                  [&]( const Handle<Literal> ) {},
-                  [&]( const Handle<Named> x ) { total_size += x.size(); },
-                  [&]( const auto x ) { total_size += x.size() * sizeof( Handle<Fix> ); },
+                  []( const Handle<Relation> ) {},
+                  [&]( const auto x ) { total_size += handle::size( x ) * sizeof( Handle<Fix> ); },
                 },
                 handle::data( x ).get() );
   }

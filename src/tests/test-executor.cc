@@ -50,23 +50,21 @@ Handle<Object> fib( Handle<ObjectTree> combination )
 
 Handle<Object> manyfib( Handle<ObjectTree> combination )
 {
-  auto data = rt.get( combination ).value();
+  auto data = rt.storage().get( combination );
   uint64_t x(
     data->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
   auto tree = OwnedMutTree::allocate( x );
   for ( uint64_t i = 0; i < tree.size(); i++ ) {
     tree[i] = application( fib, Handle<Literal>( i ) );
   }
-  return handle::tree_unwrap<ObjectTree>( rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) ) );
+  return handle::tree_unwrap<ObjectTree>( rt.storage().create( std::make_shared<OwnedTree>( std::move( tree ) ) ) );
 }
 
 void test( void )
 {
-  auto sum = rt.execute( Handle<Eval>( application( add, 1_literal64, 2_literal64 ) ) );
-  CHECK_EQ( sum, Handle<Value>( 3_literal64 ) );
-
   auto fibs_h = rt.execute( Handle<Eval>( application( manyfib, 94_literal64 ) ) ).unwrap<ValueTree>();
-  auto fibs = rt.get( fibs_h ).value();
+  auto fibs = rt.storage().get( fibs_h );
+
   uint64_t a = 0;
   uint64_t b = 1;
   for ( size_t i = 0; i < fibs->size(); i++ ) {

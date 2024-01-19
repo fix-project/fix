@@ -37,9 +37,14 @@ public:
       return storage_.get( x ).unwrap<Value>();
     }
     todo_ << x;
-    storage_.wait( [&] { return storage_.contains( x ); } );
-    return storage_.get( x ).unwrap<Value>();
+    Handle<Object> current = storage_.wait( x );
+    while ( not current.contains<Value>() ) {
+      current = storage_.wait( Handle<Eval>( current ) );
+    }
+    return current.unwrap<Value>();
   }
+
+  RuntimeStorage& storage() { return storage_; }
 
 private:
   void run();
@@ -74,7 +79,9 @@ public:
   virtual void put( Handle<Named> name, BlobData data ) override;
   virtual void put( Handle<AnyTree> name, TreeData data ) override;
   virtual void put( Handle<Relation> name, Handle<Object> data ) override;
-  virtual bool contains( Handle<Fix> handle ) override;
+  virtual bool contains( Handle<Named> handle ) override;
+  virtual bool contains( Handle<AnyTree> handle ) override;
+  virtual bool contains( Handle<Relation> handle ) override;
 
   /* }@ */
 };

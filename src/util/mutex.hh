@@ -22,7 +22,9 @@ class ReadGuard
   {}
 
 public:
-  const T* operator->() { return &data_; }
+  const T* operator->() const { return &data_; }
+
+  const T& get() const { return data_; }
 
   template<class Predicate>
   void wait( Predicate c )
@@ -46,7 +48,9 @@ class WriteGuard
   {}
 
 public:
-  T* operator->() { return &data_; }
+  T* operator->() const { return &data_; }
+
+  T& get() const { return data_; }
 
   template<class Predicate>
   void wait( Predicate c )

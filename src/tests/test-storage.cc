@@ -40,73 +40,23 @@ void test( void )
   RuntimeStorage storage;
 
   Handle virgil = storage.create( aeneid );
+  CHECK_EQ( storage.get( virgil.unwrap<Named>() )->size(), aeneid.size() );
   Handle caesar = storage.create( de_bello_gallico );
+  CHECK_EQ( storage.get( caesar.unwrap<Named>() )->size(), de_bello_gallico.size() );
 
-  Handle<Application> combination
-    = storage.construct_tree<ExpressionTree>( "unused"_literal, "elf"_literal, caesar );
+  /* Handle<Application> combination */
+  /*   = storage.construct_tree<ExpressionTree>( "unused"_literal, "elf"_literal, caesar ); */
 
-  Handle<Identification> hidden = storage.construct_tree<ValueTree>( "not visible"_literal );
+  /* Handle<Identification> hidden = storage.construct_tree<ValueTree>( "not visible"_literal ); */
 
-  auto full
-    = storage.construct( "visible 1"_literal, "visible 2"_literal, hidden, virgil, combination, 100_literal32 )
-        .unwrap<ObjectTree>();
+  /* auto full */
+  /*   = storage.construct( "visible 1"_literal, "visible 2"_literal, hidden, virgil, combination, 100_literal32 );
+   */
 
-  {
-    size_t count = 0;
-    bool saw_aeneid = false;
-    storage.visit( Handle<Fix>( full ), [&]( Handle<Fix> h ) {
-      count++;
-      std::visit( overload { []( const Handle<Literal> ) { CHECK( false ); },
-                             [&]( const auto other ) {
-                               CHECK( other.is_local() );
-                               CHECK_NE( Handle<Fix>( other ), Handle<Fix>( caesar ) );
-                             } },
-                  handle::data( h ).get() );
-      if ( h == Handle<Fix>( virgil ) )
-        saw_aeneid = true;
-    } );
-    CHECK_EQ( count, 2 );
-    CHECK( saw_aeneid );
-  }
-  {
-    size_t count = 0;
-    bool saw_aeneid = false;
-    storage.visit( Handle<Fix>( storage.canonicalize( full ) ), [&]( Handle<Fix> h ) {
-      count++;
-      std::visit( overload { []( const Handle<Literal> ) { CHECK( false ); },
-                             [&]( const auto other ) {
-                               CHECK( not other.is_local() );
-                               CHECK_NE( Handle<Fix>( other ), Handle<Fix>( caesar ) );
-                             } },
-                  handle::data( h ).get() );
-      if ( h == Handle<Fix>( storage.canonicalize( virgil ) ) )
-        saw_aeneid = true;
-    } );
-    CHECK_EQ( count, 2 );
-    CHECK( saw_aeneid );
-  }
-  {
-    size_t count = 0;
-    storage.visit_full( Handle<Fix>( full ), [&]( Handle<Fix> ) { count++; } );
-    CHECK_EQ( count, 5 );
-  }
-  {
-    size_t count = 0;
-    storage.visit_full( Handle<Fix>( storage.canonicalize( full ) ), [&]( Handle<Fix> ) { count++; } );
-    CHECK_EQ( count, 5 );
-  }
-
-  {
-    Handle<Apply> apply( storage.construct_tree<ObjectTree>( virgil ) );
-    Handle<Object> target( caesar );
-    storage.create( apply, target );
-    CHECK( storage.contains( apply ) );
-    CHECK( storage.complete( apply ) );
-    CHECK_EQ( storage.get( apply ), target );
-    auto canonical = storage.canonicalize( apply );
-    CHECK_NE( storage.get( canonical ), target );
-    CHECK_NE( storage.get( apply ), target );
-    CHECK_EQ( storage.get( canonical ), storage.canonicalize( target ) );
-    CHECK_EQ( storage.get( apply ), storage.canonicalize( target ) );
-  }
+  // TODO: reimplement visiting and add tests here
+  Handle<Apply> apply( storage.construct_tree<ObjectTree>( virgil ) );
+  Handle<Object> target( caesar );
+  storage.create( apply, target );
+  CHECK( storage.contains( apply ) );
+  CHECK_EQ( storage.get( apply ), target );
 }

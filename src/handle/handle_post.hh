@@ -28,7 +28,9 @@ inline std::optional<Handle<S>> extract( Handle<T> original )
 template<typename T>
 static inline Handle<AnyDataType> data( Handle<T> handle )
 {
-  if constexpr ( not Handle<T>::is_fix_sum_type ) {
+  if constexpr ( std::same_as<T, Relation> ) {
+    return handle;
+  } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
     return handle;
   } else {
     return std::visit( []( const auto x ) { return data( x ); }, handle.get() );
@@ -50,7 +52,14 @@ static inline size_t local_name( Handle<T> handle )
 template<typename T>
 static inline size_t size( Handle<T> handle )
 {
-  return std::visit( []( const auto x ) -> size_t { return x.size(); }, data( handle ).get() );
+  return std::visit(
+    []( auto x ) -> size_t {
+      if constexpr ( std::same_as<decltype( x ), Handle<Relation>> )
+        return sizeof( Handle<Fix> );
+      else
+        return x.size();
+    },
+    data( handle ).get() );
 }
 
 template<typename T>
@@ -99,6 +108,12 @@ Handle<T> tree_unwrap( Handle<Expression> handle )
       throw std::runtime_error( "tried to create tree with incorrect type" );
     }
   } );
+}
+
+static inline Handle<ExpressionTree> upcast( Handle<AnyTree> tree )
+{
+  return tree.visit<Handle<ExpressionTree>>(
+    []( auto t ) -> Handle<ExpressionTree> { return Handle<ExpressionTree>( t ); } );
 }
 
 }

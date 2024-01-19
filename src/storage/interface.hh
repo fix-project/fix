@@ -85,7 +85,11 @@ public:
    * @param handle  The handle to query.
    * @return        Whether the data is present in this IRuntime.
    */
-  virtual bool contains( Handle<Fix> handle ) = 0;
+  ///@{
+  virtual bool contains( Handle<Named> handle ) = 0;
+  virtual bool contains( Handle<AnyTree> handle ) = 0;
+  virtual bool contains( Handle<Relation> handle ) = 0;
+  ///}@
 
   /**
    * Gets metadata about this IDataLoader.

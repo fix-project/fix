@@ -30,31 +30,17 @@ class RuntimeStorage
 {
 private:
   friend class RuntimeWorker;
+  using BlobMap = absl::flat_hash_map<Handle<Named>, BlobData, AbslHash>;
+  using TreeMap = absl::flat_hash_map<Handle<ExpressionTree>, TreeData, AbslHash>;
+  using RelationMap = absl::flat_hash_map<Handle<Fix>, Handle<Object>, AbslHash>;
+  using PinMap = absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash>;
+  using LabelMap = absl::flat_hash_map<std::string, Handle<Fix>>;
 
-  struct Data
-  {
-    using LocalEntry = std::variant<BlobData, TreeData, Handle<Fix>>;
-    using CanonicalEntry = std::variant<BlobData, TreeData, Handle<Object>>;
-
-    absl::flat_hash_map<Handle<Fix>, CanonicalEntry, AbslHash> canonical_storage_ {};
-    // Storage for Object/Handles with a local name
-    std::vector<LocalEntry> local_storage_ {};
-    absl::flat_hash_map<Handle<Relation>, Handle<Object>, AbslHash> local_relations_ {};
-
-    /* // Keeping track of what objects are pinned by an object */
-    absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash> pins_ {};
-
-    // Maps a Handle to its user-facing names
-    std::unordered_map<std::string, Handle<Fix>> labels_ {};
-
-    Data()
-    {
-      canonical_storage_.reserve( 1024 );
-      local_storage_.reserve( 1024 );
-    }
-  };
-
-  SharedMutex<Data> data_ {};
+  SharedMutex<BlobMap> blobs_ {};
+  SharedMutex<TreeMap> trees_ {};
+  SharedMutex<RelationMap> relations_ {};
+  SharedMutex<PinMap> pins_ {};
+  SharedMutex<LabelMap> labels_ {};
 
 public:
   RuntimeStorage() {}
@@ -136,7 +122,9 @@ public:
   Handle<Fix> serialize( const std::string_view label, bool pins = true );
 
   // Tests if the data corresponding to the current handle is stored.
-  bool contains( Handle<Fix> handle );
+  bool contains( Handle<Named> handle );
+  bool contains( Handle<AnyTree> handle );
+  bool contains( Handle<Relation> handle );
 
   /**
    * Call @p visitor for every Handle in the "minimum repo" of @p root, i.e., the set of Handles which are needed
@@ -201,10 +189,21 @@ public:
    */
   std::unordered_set<Handle<Fix>> tags( Handle<Fix> handle );
 
-  template<class Predicate>
-  void wait( Predicate c )
+  BlobData wait( Handle<Named> handle )
   {
-    auto data = data_.read();
-    data.wait( c );
+    blobs_.read().wait( [&] { return contains( handle ); } );
+    return get( handle );
+  }
+
+  TreeData wait( Handle<AnyTree> handle )
+  {
+    trees_.read().wait( [&] { return contains( handle ); } );
+    return get( handle );
+  }
+
+  Handle<Object> wait( Handle<Relation> handle )
+  {
+    relations_.read().wait( [&] { return contains( handle ); } );
+    return get( handle );
   }
 };

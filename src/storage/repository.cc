@@ -209,6 +209,34 @@ void Repository::pin( Handle<Fix> src, const std::unordered_set<Handle<Fix>>& ds
   }
 }
 
+bool Repository::contains( Handle<Named> handle )
+{
+  try {
+    return fs::exists( repo_ / "data" / base16::encode( Handle<Fix>( handle ).content ) );
+  } catch ( fs::filesystem_error& ) {
+    throw RepositoryCorrupt( repo_ );
+  }
+}
+
+bool Repository::contains( Handle<AnyTree> handle )
+{
+  try {
+    return fs::exists( repo_ / "data" / base16::encode( handle::fix( handle ).content ) );
+  } catch ( fs::filesystem_error& ) {
+    throw RepositoryCorrupt( repo_ );
+  }
+}
+
+bool Repository::contains( Handle<Relation> handle )
+{
+  try {
+    return fs::exists( repo_ / "relations" / base16::encode( handle.content ) );
+  } catch ( fs::filesystem_error& ) {
+    throw RepositoryCorrupt( repo_ );
+  }
+}
+
+#if 0
 bool Repository::contains( Handle<Fix> handle )
 {
   try {
@@ -224,6 +252,7 @@ bool Repository::contains( Handle<Fix> handle )
     throw RepositoryCorrupt( repo_ );
   }
 }
+#endif
 
 bool Repository::contains( const std::string_view label ) const
 {
@@ -292,7 +321,10 @@ Handle<Fix> Repository::lookup( const std::string_view ref )
 {
   if ( ref.size() == 64 ) {
     auto handle = Handle<Fix>::forge( base16::decode( ref ) );
-    if ( contains( handle ) )
+    if ( handle::data( handle ).visit<bool>( overload {
+           [&]( Handle<Literal> ) { return true; },
+           [&]( auto x ) { return contains( x ); },
+         } ) )
       return handle;
   }
   try {

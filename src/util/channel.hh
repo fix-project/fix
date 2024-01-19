@@ -12,9 +12,8 @@ public:
   const char* what() { return "Channel was closed."; }
 };
 
-/** An inter-thread communication data structure, analogous to Go's channels. Semantically, a Channel is a way to
- * transfer ownership of an object from one location to another, so for safety reasons it only
- * accepts rvalue references.
+/**
+ * An inter-thread communication data structure, analogous to Go's channels.
  */
 template<typename T>
 class Channel
@@ -100,4 +99,6 @@ public:
     ++size_;
     cv_.notify_all();
   }
+
+  ~Channel() { close(); }
 };
