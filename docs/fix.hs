@@ -41,7 +41,7 @@ type ExpressionTree = Tree Expression
 -- | Fix represents any Fix type, including both Expressions and Relations.
 data Fix = Expression Expression | Relation Relation
 -- | A Relation represents either the Application of a Tree or the Evaluation of an Object.
-data Relation = Apply ExpressionTree | Eval Object
+data Relation = Apply ObjectTree | Eval Object
 
 -- * Functions
 
@@ -120,7 +120,7 @@ lower (ValueTreeRef x) = ValueTreeRef x
 
 -- | Given a Relation, finds the "result", otherwise passes Expressions through unchanged.
 relate :: Fix -> Object
-relate (Relation (Apply x)) = apply $ treeMap reduce x
+relate (Relation (Apply x)) = apply x
 relate (Relation (Eval x)) = Value $ evalStrict x
 relate (Expression x) = reduce x
 
