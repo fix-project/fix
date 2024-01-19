@@ -8,6 +8,7 @@ add_custom_target (all-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure 
 add_test(NAME t_add WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add)
 add_test(NAME t_fib WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib)
 add_test(NAME t_trap WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh)
+add_test(NAME t_api WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-api.py)
 add_test(NAME t_map WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-map)
 add_test(NAME t_curry WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-curry)
 add_test(NAME t_distributed WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-distributed)

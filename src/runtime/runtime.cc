@@ -58,7 +58,11 @@ void Runtime::visit( Relation root, std::function<void( Relation )> visitor )
           break;
         }
       }
+      break;
     }
+    case RelationType::Fill:
+      VLOG( 1 ) << "Visiting fill";
+      break;
   }
   VLOG( 1 ) << "Calling visitor " << root;
   visitor( root );
@@ -114,7 +118,11 @@ void Runtime::shallow_visit( Relation root, std::function<void( Relation )> visi
           break;
         }
       }
+      break;
     }
+    case RelationType::Fill:
+      VLOG( 1 ) << "Visiting fill";
+      break;
   }
 }
 

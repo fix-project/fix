@@ -5,7 +5,7 @@
 
 using namespace std;
 
-EventCategories::EventCategories( EventLoop& loop )
+EventLoopCategories::EventLoopCategories( EventLoop& loop )
   : read_from_client( loop.add_category( "Read from client" ) )
   , parse_http( loop.add_category( "Parse HTTP request" ) )
   , serialize_http( loop.add_category( "Serialize HTTP response" ) )
@@ -20,7 +20,7 @@ void WebServer::Client::mark_dead()
 
 WebServer::Client::Client( TCPSocket& listening_socket,
                            EventLoop& events,
-                           const EventCategories& categories,
+                           const EventLoopCategories& categories,
                            std::shared_ptr<bool> cull_needed,
                            const Handler& handler )
   : socket_( listening_socket.accept() )

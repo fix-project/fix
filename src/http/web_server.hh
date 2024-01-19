@@ -11,11 +11,11 @@
 #include <memory>
 #include <vector>
 
-struct EventCategories
+struct EventLoopCategories
 {
   size_t read_from_client, parse_http, serialize_http, write_to_client;
 
-  EventCategories( EventLoop& loop );
+  EventLoopCategories( EventLoop& loop );
 };
 
 class WebServer
@@ -45,7 +45,7 @@ private:
   public:
     Client( TCPSocket& listening_socket,
             EventLoop& events,
-            const EventCategories& categories,
+            const EventLoopCategories& categories,
             std::shared_ptr<bool> cull_needed,
             const Handler& handler );
 
@@ -57,7 +57,7 @@ private:
   };
 
   TCPSocket server_socket_ {};
-  EventCategories categories_;
+  EventLoopCategories categories_;
   std::list<Client> clients_ {};
   std::shared_ptr<bool> cull_needed_;
   Handler handler_;
