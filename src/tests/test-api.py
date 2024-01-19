@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-import urllib, urllib.request, subprocess, signal, sys, json
+import urllib, urllib.request, subprocess, signal, sys, json, time
 
 def run_tests(server):
-    # Timeout if the process doesn't print out a line within 2 seconds
+    start_time = time.time()
+    total_timeout_seconds = 60
+    
+    # Timeout if the process doesn't print out a line within some seconds
     timeout_seconds = 10
     def timeout(sig, frm):
         print("no new line after " + str(timeout_seconds) + " seconds")
@@ -18,6 +21,8 @@ def run_tests(server):
         if "Evaluation completed" in line:
             signal.alarm(0)
             break
+        if time.time() - start_time > total_timeout_seconds:
+            raise Exception("Failed to finish within " + str(total_timeout_seconds) + " seconds")
 
     print('Evaluation completed, testing requests')
 
