@@ -25,6 +25,7 @@ def run_tests(server):
             raise Exception("Server failed to start")
         if time.time() - start_time > total_timeout_seconds:
             raise Exception("Failed to finish within " + str(total_timeout_seconds) + " seconds")
+        print(line)
 
     print('Evaluation completed, testing requests')
 
