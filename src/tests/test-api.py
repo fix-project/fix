@@ -13,9 +13,9 @@ def run_tests(server):
         sys.exit(1)
 
     signal.signal(signal.SIGALRM, timeout)
+    signal.alarm(timeout_seconds)
 
     while True:
-        signal.alarm(timeout_seconds)
         line = server.stdout.readline()
         # Only continue when the evaluation is completed
         if "Evaluation completed" in line:
@@ -25,7 +25,9 @@ def run_tests(server):
             raise Exception("Server failed to start")
         if time.time() - start_time > total_timeout_seconds:
             raise Exception("Failed to finish within " + str(total_timeout_seconds) + " seconds")
-        print(line)
+        # Only reset the timer if the line is nonempty
+        if line != "":
+            signal.alarm(timeout_seconds)
 
     print('Evaluation completed, testing requests')
 
