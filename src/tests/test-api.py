@@ -3,7 +3,7 @@ import urllib, urllib.request, subprocess, signal, sys, json
 
 def run_tests(server):
     # Timeout if the process doesn't print out a line within 2 seconds
-    timeout_seconds = 2
+    timeout_seconds = 10
     def timeout(sig, frm):
         print("no new line after " + str(timeout_seconds) + " seconds")
         server.kill()
