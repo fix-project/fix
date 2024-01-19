@@ -47,6 +47,7 @@ void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 
   Handle result = runtime.eval( thunk_name );
 
+  cout << "Evaluation completed" << endl;
   cout << "Thunk name: " << base16::encode( thunk_name ) << endl;
   cout << "Result name: " << base16::encode( result ) << endl << flush;
 }
