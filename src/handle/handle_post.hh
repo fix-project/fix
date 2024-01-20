@@ -40,7 +40,15 @@ static inline Handle<AnyDataType> data( Handle<T> handle )
 template<typename T>
 static inline bool is_local( Handle<T> handle )
 {
-  return std::visit( []( const auto x ) { return x.is_local(); }, data( handle ).get() );
+  return std::visit(
+    []( auto x ) {
+      if constexpr ( std::same_as<decltype( x ), Handle<Relation>> ) {
+        return x.template visit<bool>( []( const auto x ) { return is_local( x ); } );
+      } else {
+        return x.is_local();
+      }
+    },
+    data( handle ).get() );
 }
 
 template<typename T>
@@ -115,5 +123,4 @@ static inline Handle<ExpressionTree> upcast( Handle<AnyTree> tree )
   return tree.visit<Handle<ExpressionTree>>(
     []( auto t ) -> Handle<ExpressionTree> { return Handle<ExpressionTree>( t ); } );
 }
-
 }

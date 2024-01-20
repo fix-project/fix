@@ -62,14 +62,23 @@ Handle<Object> manyfib( Handle<ObjectTree> combination )
 
 void test( void )
 {
-  auto fibs_h = rt.execute( Handle<Eval>( application( manyfib, 94_literal64 ) ) ).unwrap<ValueTree>();
-  auto fibs = rt.storage().get( fibs_h );
+  if ( getenv( "FIB" ) ) {
+    auto fibs_h = rt.execute( Handle<Eval>( application( manyfib, 94_literal64 ) ) ).unwrap<ValueTree>();
+    auto fibs = rt.storage().get( fibs_h );
+    uint64_t a = 0;
+    uint64_t b = 1;
+    for ( size_t i = 0; i < fibs->size(); i++ ) {
+      CHECK_EQ( fibs->at( i ), Handle<Fix>( Handle<Literal>( a ) ) );
+      b = a + b;
+      a = b - a;
+    }
+  } else {
+    for ( size_t i = 0; i < 10000; i++ ) {
+      uint64_t a = rand();
+      uint64_t b = rand();
+      auto sum = rt.execute( Handle<Eval>( application( add, Handle<Literal>( a ), Handle<Literal>( b ) ) ) );
 
-  uint64_t a = 0;
-  uint64_t b = 1;
-  for ( size_t i = 0; i < fibs->size(); i++ ) {
-    CHECK_EQ( fibs->at( i ), Handle<Fix>( Handle<Literal>( a ) ) );
-    b = a + b;
-    a = b - a;
+      CHECK_EQ( sum, Handle<Value>( Handle<Literal>( a + b ) ) );
+    }
   }
 }
