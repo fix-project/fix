@@ -1,38 +1,58 @@
-#if 0
 #include <glog/logging.h>
+#include <stdexcept>
 
 #include "fixpointapi.hh"
-#include "runtime.hh"
+#include "handle.hh"
+#include "handle_post.hh"
+#include "object.hh"
+#include "runtimestorage.hh"
 #include "wasm-rt.h"
 
-namespace fixpoint {
-void attach_tree( __m256i handle, wasm_rt_externref_table_t* target_table )
+using namespace std;
+
+template<typename T>
+void check( optional<T> t )
 {
-  GlobalScopeTimer<Timer::Category::AttachTree> record_timer;
-  Handle tree_handle( handle );
-  CHECK( tree_handle.is_tree() or tree_handle.is_tag() );
-  CHECK( tree_handle.is_strict() );
-  auto tree = Runtime::get_instance().storage().get_tree( tree_handle );
-  target_table->ref = tree_handle;
-  target_table->data = reinterpret_cast<wasm_rt_externref_t*>( const_cast<Handle*>( tree.data() ) );
-  target_table->size = tree.size();
-  target_table->max_size = tree.size();
+  if ( t ) {
+    return;
+  } else {
+    throw std::runtime_error( "Invaid handle" );
+  }
 }
 
-void attach_blob( __m256i handle, wasm_rt_memory_t* target_memory )
+namespace fixpoint {
+void attach_tree( u8x32 handle, wasm_rt_externref_table_t* target_table )
 {
-  GlobalScopeTimer<Timer::Category::AttachBlob> record_timer;
-  Handle blob_handle( handle );
-  CHECK( blob_handle.is_blob() );
-  CHECK( blob_handle.is_strict() );
+  auto fix_handle = Handle<Fix>::forge( handle );
+  optional<Handle<AnyTree>> h
+    = handle::extract<ExpressionTree>( fix_handle )
+        .transform( []( auto h ) -> Handle<AnyTree> { return h; } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ObjectTree>( fix_handle ); } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ValueTree>( fix_handle ); } );
 
-  target_memory->ref = blob_handle;
-  Blob blob;
-  if ( blob_handle.is_literal_blob() ) {
-    blob = { reinterpret_cast<const char*>( &target_memory->ref ), blob_handle.literal_blob_len() };
-  } else {
-    blob = Runtime::get_instance().storage().get_blob( blob_handle );
-  }
+  check( h );
+
+  auto tree = storage->get( *h );
+  target_table->ref = h->content;
+  target_table->data = reinterpret_cast<wasm_rt_externref_t*>( const_cast<Handle<Fix>*>( tree->data() ) );
+  target_table->size = tree->size();
+  target_table->max_size = tree->size();
+}
+
+void attach_blob( u8x32 handle, wasm_rt_memory_t* target_memory )
+{
+  auto h = handle::extract<Blob>( Handle<Fix>::forge( handle ) );
+  check( h );
+
+  target_memory->ref = h->content;
+
+  BlobSpan blob = h->try_into<Named>()
+                    .transform( [&]( auto h ) { return storage->get( h )->span(); } )
+                    .or_else( [&]() -> optional<BlobSpan> {
+                      return span<const char> { reinterpret_cast<const char*>( &target_memory->ref ),
+                                                h->try_into<Literal>()->size() };
+                    } )
+                    .value();
 
   target_memory->data = reinterpret_cast<uint8_t*>( const_cast<char*>( blob.data() ) );
   target_memory->pages = ( blob.size() + WASM_RT_PAGE_SIZE - 1 ) / WASM_RT_PAGE_SIZE; // ceil(blob_size/page_size)
@@ -41,76 +61,233 @@ void attach_blob( __m256i handle, wasm_rt_memory_t* target_memory )
 }
 
 // module_instance points to the WASM instance
-__m256i create_blob( wasm_rt_memory_t* memory, size_t size )
+u8x32 create_blob( wasm_rt_memory_t* memory, size_t size )
 {
-  GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
   if ( size > memory->size ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
-  auto blob = OwnedMutBlob::claim_allocated( {
-    reinterpret_cast<char*>( memory->data ),
-    size,
-  } );
+
+  auto blob = OwnedBlob(
+    {
+      reinterpret_cast<char*>( memory->data ),
+      size,
+    },
+    AllocationType::Allocated );
   memory->data = NULL;
   memory->pages = 0;
   memory->size = 0;
-  return Runtime::get_instance().storage().add_blob( std::move( blob ) );
+  return storage->create( make_shared<OwnedBlob>( move( blob ) ) ).into<Fix>().content;
 }
 
-__m256i create_blob_i32( uint32_t content )
+u8x32 create_blob_i32( uint32_t content )
 {
-  GlobalScopeTimer<Timer::Category::CreateBlob> record_timer;
-  return _mm256_set_epi32( 0x24'00'00'00, 0, 0, 0, 0, 0, 0, content );
+  return Handle<Literal>( content ).into<Fix>().content;
 }
 
-__m256i create_tree( wasm_rt_externref_table_t* table, size_t size )
+u8x32 create_blob_i64( uint64_t content )
 {
-  GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
+  return Handle<Literal>( content ).into<Fix>().content;
+}
 
+u8x32 create_blob_string( uint32_t index, uint32_t length, wasm_rt_memory_t* memory )
+{
+  if ( index + length > (int64_t)memory->size ) {
+    wasm_rt_trap( WASM_RT_TRAP_OOB );
+  }
+
+  return storage->create( { reinterpret_cast<char*>( memory->data ) + index, length } ).into<Fix>().content;
+}
+
+void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
+{
+  if ( index + length > (int64_t)mem->size ) {
+    wasm_rt_trap( WASM_RT_TRAP_OOB );
+  }
+  for ( int i = index; i < index + length; i++ ) {
+    cout << mem->data[i];
+  }
+  cout << endl;
+  flush( cout );
+}
+
+u8x32 create_tree( wasm_rt_externref_table_t* table, size_t size )
+{
   if ( size > table->size ) {
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
 
-  auto tree = OwnedMutTree::claim_allocated( {
-    reinterpret_cast<Handle*>( table->data ),
-    size,
-  } );
+  auto tree = OwnedTree(
+    {
+      reinterpret_cast<Handle<Fix>*>( table->data ),
+      size,
+    },
+    AllocationType::Allocated );
   table->data = NULL;
   table->size = 0;
-  return Runtime::get_instance().storage().add_tree( std::move( tree ) );
+
+  return storage->create( make_shared<OwnedTree>( move( tree ) ) )
+    .visit<Handle<Fix>>( []( auto h ) { return h; } )
+    .content;
 }
 
-__m256i create_tag( __m256i handle, __m256i type )
+u8x32 create_tag( u8x32 handle, u8x32 type )
 {
-  GlobalScopeTimer<Timer::Category::CreateTree> record_timer;
-
   auto tree = OwnedMutTree::allocate( 3 );
 
-  tree[0] = Runtime::get_instance().get_current_procedure();
-  tree[1] = handle;
-  tree[2] = type;
+  tree[0] = current_procedure;
+  tree[1] = Handle<Fix>::forge( handle );
+  tree[2] = Handle<Fix>::forge( type );
 
-  return Runtime::get_instance().storage().add_tree( std::move( tree ) ).as_tag();
+  auto tree_handle = storage->create( make_shared<OwnedTree>( std::move( tree ) ) );
+
+  return tree_handle.visit<Handle<Fix>>( []( auto h ) { return h.tag(); } ).content;
 }
 
-__m256i create_thunk( __m256i handle )
+u8x32 create_application_thunk( u8x32 handle )
 {
-  Handle encode( handle );
-  return Handle::get_thunk_name( encode );
+  auto fix_handle = Handle<Fix>::forge( handle );
+  optional<Handle<AnyTree>> h
+    = handle::extract<ExpressionTree>( fix_handle )
+        .transform( []( auto h ) -> Handle<AnyTree> { return h; } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ObjectTree>( fix_handle ); } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ValueTree>( fix_handle ); } );
+
+  check( h );
+
+  return Handle<Thunk>( Handle<Application>( handle::upcast( h.value() ) ) ).into<Fix>().content;
 }
 
-uint32_t get_value_type( __m256i handle )
+u8x32 create_identification_thunk( u8x32 handle )
 {
-  Handle object( handle );
-  return static_cast<uint32_t>( object.get_content_type() );
+  auto h = handle::extract<Value>( Handle<Fix>::forge( handle ) ).transform( []( auto h ) {
+    return h.template into<Identification>().template into<Thunk>();
+  } );
+
+  check( h );
+  return h->into<Fix>().content;
 }
 
-uint32_t equality( __m256i lhs, __m256i rhs )
+u8x32 create_selection_thunk( u8x32 handle )
 {
-  Handle left( lhs );
-  Handle right( rhs );
-  return Runtime::get_instance().storage().compare_handles( left, right );
+  auto h = handle::extract<ObjectTree>( Handle<Fix>::forge( handle ) ).transform( []( auto h ) {
+    return h.template into<Selection>().template into<Thunk>();
+  } );
+
+  check( h );
+  return h->into<Fix>().content;
 }
+
+uint32_t get_length( u8x32 handle )
+{
+  return handle::size( Handle<Fix>::forge( handle ) );
+}
+
+u8x32 create_strict_encode( u8x32 handle )
+{
+  auto h = handle::extract<Thunk>( Handle<Fix>::forge( handle ) ).transform( []( auto h ) {
+    return h.template into<Strict>().template into<Encode>();
+  } );
+
+  check( h );
+  return h->into<Fix>().content;
+}
+
+u8x32 create_shallow_encode( u8x32 handle )
+{
+  auto h = handle::extract<Thunk>( Handle<Fix>::forge( handle ) ).transform( []( auto h ) {
+    return h.template into<Shallow>().template into<Encode>();
+  } );
+
+  check( h );
+  return h->into<Fix>().content;
+}
+
+uint32_t is_equal( u8x32 lhs, u8x32 rhs )
+{
+  auto lhs_h = handle::extract<Value>( Handle<Fix>::forge( lhs ) );
+  auto rhs_h = handle::extract<Value>( Handle<Fix>::forge( rhs ) );
+
+  check( lhs_h );
+  check( rhs_h );
+
+  return *lhs_h == *rhs_h;
+}
+
+uint32_t is_blob( u8x32 handle )
+{
+  return handle::extract<Blob>( Handle<Fix>::forge( handle ) ).has_value();
+}
+
+uint32_t is_tree( u8x32 handle )
+{
+  auto fix_handle = Handle<Fix>::forge( handle );
+  optional<Handle<AnyTree>> h
+    = handle::extract<ExpressionTree>( fix_handle )
+        .transform( []( auto h ) -> Handle<AnyTree> { return h; } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ObjectTree>( fix_handle ); } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ValueTree>( fix_handle ); } );
+
+  return h.has_value();
+}
+
+uint32_t is_tag( u8x32 handle )
+{
+  auto fix_handle = Handle<Fix>::forge( handle );
+  optional<Handle<AnyTree>> h
+    = handle::extract<ExpressionTree>( fix_handle )
+        .transform( []( auto h ) -> Handle<AnyTree> { return h; } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ObjectTree>( fix_handle ); } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ValueTree>( fix_handle ); } );
+
+  if ( h.has_value() ) {
+    return h->visit<bool>( []( auto h ) { return h.is_tag(); } );
+  } else {
+    return false;
+  }
+}
+
+uint32_t is_blob_ref( u8x32 handle )
+{
+  return handle::extract<BlobRef>( Handle<Fix>::forge( handle ) ).has_value();
+}
+
+uint32_t is_tree_ref( u8x32 handle )
+{
+  return handle::extract<ValueTreeRef>( Handle<Fix>::forge( handle ) ).has_value()
+         || handle::extract<ObjectTreeRef>( Handle<Fix>::forge( handle ) ).has_value();
+}
+
+uint32_t is_value( u8x32 handle )
+{
+  return handle::kind( Handle<Fix>::forge( handle ) ) == FixKind::Value;
+}
+
+uint32_t is_object( u8x32 handle )
+{
+  return handle::kind( Handle<Fix>::forge( handle ) ) == FixKind::Object;
+}
+
+uint32_t is_thunk( u8x32 handle )
+{
+  return handle::extract<Thunk>( Handle<Fix>::forge( handle ) ).has_value();
+}
+
+uint32_t is_encode( u8x32 handle )
+{
+  return handle::extract<Encode>( Handle<Fix>::forge( handle ) ).has_value();
+}
+
+uint32_t is_strict( u8x32 handle )
+{
+  return handle::extract<Strict>( Handle<Fix>::forge( handle ) ).has_value();
+}
+
+uint32_t is_shallow( u8x32 handle )
+{
+  return handle::extract<Shallow>( Handle<Fix>::forge( handle ) ).has_value();
+}
+}
+#if 0
 
 uint32_t pin( __m256i src, __m256i dst )
 {
@@ -128,13 +305,6 @@ void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
   }
   std::cout << std::endl;
   std::flush( std::cout );
-}
-
-uint32_t get_length( __m256i handle )
-{
-  Handle h( handle );
-  CHECK( not h.is_lazy() );
-  return Handle( h ).get_length();
 }
 
 uint32_t get_access( __m256i handle )

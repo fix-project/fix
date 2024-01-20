@@ -1,6 +1,8 @@
+#include <cmath>
 #include <iostream>
 
 #include "elfloader.hh"
+#include "fixpointapi.hh"
 #include "spans.hh"
 
 using namespace std;
@@ -14,8 +16,6 @@ static void throw_assertion_failure( const char* __assertion,
                        + to_string( __line ) + " (" + string( __function ) + ")" );
 }
 
-const static map<string, uint64_t> library_func_map = { { "__assert_fail", (uint64_t)throw_assertion_failure } };
-#if 0
 const static map<string, uint64_t> library_func_map
   = { { "wasm_rt_trap", (uint64_t)wasm_rt_trap },
       { "wasm_rt_allocate_memory", (uint64_t)wasm_rt_allocate_memory },
@@ -48,17 +48,23 @@ const static map<string, uint64_t> library_func_map
       { "fixpoint_create_blob", (uint64_t)fixpoint::create_blob },
       { "fixpoint_create_tag", (uint64_t)fixpoint::create_tag },
       { "fixpoint_create_blob_i32", (uint64_t)fixpoint::create_blob_i32 },
-      { "fixpoint_create_thunk", (uint64_t)fixpoint::create_thunk },
-      { "fixpoint_get_value_type", (uint64_t)fixpoint::get_value_type },
-      { "fixpoint_unsafe_io", (uint64_t)fixpoint::unsafe_io },
-      { "fixpoint_equality", (uint64_t)fixpoint::equality },
-      { "fixpoint_get_access", (uint64_t)fixpoint::get_access },
+      { "fixpoint_create_blob_i64", (uint64_t)fixpoint::create_blob_i64 },
+      { "fixpoint_create_blob_string", (uint64_t)fixpoint::create_blob_string },
+      { "fixpoint_create_application_thunk", (uint64_t)fixpoint::create_application_thunk },
+      // { "fixpoint_create_identity_thunk", (uint64_t)fixpoint::create_identity_thunk },
+      // { "fixpoint_create_selection_thunk", (uint64_t)fixpoint::create_selection_thunk },
       { "fixpoint_get_length", (uint64_t)fixpoint::get_length },
+      { "fixpoint_create_strict_encode", (uint64_t)fixpoint::create_strict_encode },
+      { "fixpoint_create_shallow_encode", (uint64_t)fixpoint::create_shallow_encode },
+      { "fixpoint_unsafe_io", (uint64_t)fixpoint::unsafe_io },
+      { "fixpoint_is_equal", (uint64_t)fixpoint::is_equal },
+      { "fixpoint_is_blob", (uint64_t)fixpoint::is_blob },
+      { "fixpoint_is_tree", (uint64_t)fixpoint::is_tree },
+      { "fixpoint_is_tag", (uint64_t)fixpoint::is_tag },
+      { "fixpoint_is_thunk", (uint64_t)fixpoint::is_thunk },
       // { "fixpoint_debug_try_lift", (uint64_t)fixpoint_debug::try_lift },
       // { "fixpoint_debug_try_inspect", (uint64_t)fixpoint_debug::try_inspect },
       // { "fixpoint_debug_try_evaluate", (uint64_t)fixpoint_debug::try_evaluate },
-      { "fixpoint_lower", (uint64_t)fixpoint::lower },
-      { "fixpoint_pin", (uint64_t)fixpoint::pin },
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
       { "memset", (uint64_t)memset },
@@ -68,7 +74,6 @@ const static map<string, uint64_t> library_func_map
       { "floor", ( uint64_t ) static_cast<double ( * )( double )>( floor ) },
       { "nearbyint", ( uint64_t ) static_cast<double ( * )( double )>( nearbyint ) },
       { "__assert_fail", (uint64_t)throw_assertion_failure } };
-#endif
 
 void __stack_chk_fail( void )
 {

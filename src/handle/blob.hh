@@ -30,7 +30,8 @@ public:
     : content {}
   {
     assert( str.size() <= 30 );
-    memcpy( &content, str.data(), str.size() );
+    if ( str.size() > 0 )
+      memcpy( &content, str.data(), str.size() );
     content[30] = str.size() << 3;
   }
 

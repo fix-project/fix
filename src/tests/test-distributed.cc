@@ -26,7 +26,9 @@ public:
   void put( Handle<AnyTree> name, TreeData data ) override { storage_.create( data, name ); }
   void put( Handle<Relation> name, Handle<Object> data ) override { storage_.create( name, data ); }
 
-  bool contains( Handle<Fix> handle ) override { return storage_.contains( handle ); };
+  bool contains( Handle<Named> handle ) override { return storage_.contains( handle ); }
+  bool contains( Handle<AnyTree> handle ) override { return storage_.contains( handle ); }
+  bool contains( Handle<Relation> handle ) override { return storage_.contains( handle ); }
 };
 
 template<FixHandle... Args>
@@ -102,11 +104,7 @@ void client()
 
   // Test gets
   for ( const auto& check : checks ) {
-    auto error = std::visit( overload { [&]( Handle<AnyTree> h ) {
-                                         return !rt->contains( h.visit<Handle<Fix>>( []( auto h ) { return h; } ) );
-                                       },
-                                        [&]( auto h ) { return !rt->contains( h ); } },
-                             check );
+    auto error = std::visit( [&]( auto h ) { return !rt->contains( h ); }, check );
     if ( error )
       exit( 1 );
   }
@@ -134,11 +132,7 @@ void server( int client_pid )
 
   // Test puts
   for ( const auto& check : checks ) {
-    auto error = std::visit( overload { [&]( Handle<AnyTree> h ) {
-                                         return !rt->contains( h.visit<Handle<Fix>>( []( auto h ) { return h; } ) );
-                                       },
-                                        [&]( auto h ) { return !rt->contains( h ); } },
-                             check );
+    auto error = std::visit( [&]( auto h ) { return !rt->contains( h ); }, check );
     if ( error )
       exit( 1 );
   }

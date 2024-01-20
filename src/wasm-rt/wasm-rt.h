@@ -17,7 +17,6 @@
 #ifndef WASM_RT_H_
 #define WASM_RT_H_
 
-#include <immintrin.h>
 #include <setjmp.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -211,10 +210,11 @@ typedef struct
 static const wasm_rt_funcref_t wasm_rt_funcref_null_value = { NULL, NULL, NULL };
 
 /** The type of an external reference (opaque to WebAssembly). */
-typedef __m256i wasm_rt_externref_t;
+typedef unsigned char __attribute__( ( vector_size( 32 ) ) ) u8x32;
+typedef u8x32 wasm_rt_externref_t;
 
 /** Default (null) value of an externref. Strict accessible blob of size zero. */
-static const wasm_rt_externref_t wasm_rt_externref_null_value = { 0, 0, 0, 4611686018427387904 };
+static const wasm_rt_externref_t wasm_rt_externref_null_value = { 0 };
 
 /** A Memory object. */
 typedef struct

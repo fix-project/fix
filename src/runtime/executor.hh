@@ -44,6 +44,14 @@ public:
     return current.unwrap<Value>();
   }
 
+  template<FixType T>
+  void visit( Handle<T> root,
+              std::function<void( Handle<Fix> )> visitor,
+              std::unordered_set<Handle<Fix>> visited = {} );
+  std::vector<Handle<Fix>> minrepo( Handle<Fix> handle );
+  void load_to_storage( Handle<Fix> handle );
+  void load_minrepo( Handle<ObjectTree> handle );
+
   RuntimeStorage& storage() { return storage_; }
 
 private:
@@ -82,6 +90,7 @@ public:
   virtual bool contains( Handle<Named> handle ) override;
   virtual bool contains( Handle<AnyTree> handle ) override;
   virtual bool contains( Handle<Relation> handle ) override;
+  virtual Handle<Fix> labeled( const std::string_view label ) override;
 
   /* }@ */
 };

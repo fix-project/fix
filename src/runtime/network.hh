@@ -76,7 +76,9 @@ public:
   void put( Handle<AnyTree> name, TreeData data ) override;
   void put( Handle<Relation> name, Handle<Object> data ) override;
 
-  bool contains( Handle<Fix> handle ) override;
+  bool contains( Handle<Named> handle ) override;
+  bool contains( Handle<AnyTree> handle ) override;
+  bool contains( Handle<Relation> handle ) override;
   std::optional<Info> get_info() override;
 
   void push_message( OutgoingMessage&& msg );

@@ -149,7 +149,19 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
   }
 }
 
-bool Remote::contains( __attribute__( ( unused ) ) Handle<Fix> handle )
+bool Remote::contains( __attribute__( ( unused ) ) Handle<Named> handle )
+{
+  // TODO
+  return false;
+}
+
+bool Remote::contains( __attribute__( ( unused ) ) Handle<AnyTree> handle )
+{
+  // TODO
+  return false;
+}
+
+bool Remote::contains( __attribute__( ( unused ) ) Handle<Relation> handle )
 {
   // TODO
   return false;

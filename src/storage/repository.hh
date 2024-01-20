@@ -27,7 +27,7 @@ public:
   virtual void put( Handle<AnyTree> name, TreeData data ) override;
   virtual void put( Handle<Relation> name, Handle<Object> data ) override;
 
-  Handle<Fix> labeled( const std::string_view label ) const;
+  Handle<Fix> labeled( const std::string_view label ) override;
   void label( const std::string_view label, Handle<Fix> target );
 
   std::unordered_set<Handle<Fix>> pinned( Handle<Fix> src ) const;

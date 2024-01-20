@@ -73,7 +73,7 @@ public:
 
   size_t get_instance_and_context_size() const { return instance_context_size_; }
 
-  Handle<Object> execute( Handle<ExpressionTree> encode_name ) const
+  Handle<Object> execute( Handle<ObjectTree> encode_name ) const
   {
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );

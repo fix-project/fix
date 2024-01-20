@@ -75,7 +75,7 @@ TreeData RuntimeStorage::get( Handle<AnyTree> handle )
 {
   VLOG( 2 ) << "get " << handle;
   auto trees = trees_.read();
-  auto generic = handle::upcast( handle );
+  auto generic = handle::upcast( handle ).untag();
   if ( trees->contains( generic ) ) {
     return trees->at( generic );
   }
@@ -91,7 +91,6 @@ Handle<Object> RuntimeStorage::get( Handle<Relation> handle )
   throw HandleNotFound( handle );
 }
 
-#if 0
 template<FixType T>
 void RuntimeStorage::visit( Handle<T> handle,
                             std::function<void( Handle<Fix> )> visitor,
@@ -103,7 +102,7 @@ void RuntimeStorage::visit( Handle<T> handle,
     return;
 
   if constexpr ( Handle<T>::is_fix_sum_type ) {
-    if ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef> or std::same_as<T, ValueTreeRef> ) ) {
+    if ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) ) {
       std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
     }
     if constexpr ( std::same_as<T, Relation> ) {
@@ -123,6 +122,7 @@ void RuntimeStorage::visit( Handle<T> handle,
   }
 }
 
+#if 0
 template<FixType T>
 void RuntimeStorage::visit_full(
   Handle<T> handle,
@@ -316,7 +316,7 @@ bool RuntimeStorage::contains( Handle<Named> handle )
 
 bool RuntimeStorage::contains( Handle<AnyTree> handle )
 {
-  return trees_.read()->contains( handle::upcast( handle ) );
+  return trees_.read()->contains( handle::upcast( handle ).untag() );
 }
 
 bool RuntimeStorage::contains( Handle<Relation> handle )
@@ -384,14 +384,19 @@ bool RuntimeStorage::compare_handles( Handle<Fix> x, Handle<Fix> y )
     return true;
   return canonicalize( x ) == canonicalize( y );
 }
+#endif
 
 bool RuntimeStorage::complete( Handle<Fix> handle )
 {
   bool res {};
-  visit( handle, [&]( Handle<Fix> h ) { res |= contains( h ); } );
+  visit( handle, [&]( Handle<Fix> h ) {
+    res |= handle::data( h ).visit<bool>(
+      overload { []( Handle<Literal> ) { return true; }, [&]( auto h ) { return contains( h ); } } );
+  } );
   return res;
 }
 
+#if 0
 std::vector<Handle<Fix>> RuntimeStorage::minrepo( Handle<Fix> handle )
 {
   vector<Handle<Fix>> handles {};

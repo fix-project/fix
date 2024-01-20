@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <glog/logging.h>
+#include <iostream>
 
 #include "base16.hh"
 #include "repository.hh"
@@ -155,7 +156,7 @@ void Repository::put( Handle<Relation> relation, Handle<Object> target )
   }
 }
 
-Handle<Fix> Repository::labeled( const std::string_view label ) const
+Handle<Fix> Repository::labeled( const std::string_view label )
 {
   try {
     return Handle<Fix>::forge( base16::decode( fs::read_symlink( repo_ / "labels" / label ).filename().string() ) );

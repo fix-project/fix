@@ -1,22 +1,25 @@
 #include <stdio.h>
 
+#include "handle_post.hh"
 #include "test.hh"
 
 using namespace std;
 
+auto rt = ReadOnlyTester::init();
+
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  rt.storage().deserialize();
-  Handle t = thunk( tree( {
-    blob( "unused" ),
-    compile( file( "applications-prefix/src/applications-build/map/add_2_map.wasm" ) ),
-    Handle( 0 ),
-  } ) );
-  Tree result = rt.storage().get_tree( rt.eval( t ) );
+  auto t = Handle<Application>( handle::upcast(
+    tree( *rt,
+          blob( *rt, "unused" ),
+          compile( *rt, file( *rt, "applications-prefix/src/applications-build/map/add_2_map.wasm" ) ),
+          Handle<Literal>( 0 ) ) ) );
+
+  auto result = rt->executor().execute( Handle<Eval>( t ) );
+  auto tree = rt->get( result.try_into<ValueTree>().value() );
   uint32_t results[3];
   for ( size_t i = 0; i < 3; i++ ) {
-    memcpy( &results[i], result[i].literal_blob().data(), sizeof( uint32_t ) );
+    memcpy( &results[i], handle::extract<Literal>( tree.value()->at( i ) )->data(), sizeof( uint32_t ) );
   }
   if ( results[0] == 6 and results[1] == 10 and results[2] == 3 ) {
     exit( 0 );

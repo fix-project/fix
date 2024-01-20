@@ -3,11 +3,14 @@
 #include <vector>
 
 #include "executor.hh"
+#include "fixpointapi.hh"
 #include "overload.hh"
 #include "storage_exception.hh"
 
 template<typename T>
 using Result = Executor::Result<T>;
+
+using namespace std;
 
 Executor::Executor( size_t threads, std::weak_ptr<IRuntime> parent, std::shared_ptr<Runner> runner )
   : evaluator_( *this )
@@ -15,7 +18,10 @@ Executor::Executor( size_t threads, std::weak_ptr<IRuntime> parent, std::shared_
   , runner_( runner )
 {
   for ( size_t i = 0; i < threads; i++ ) {
-    threads_.emplace_back( [&]() { run(); } );
+    threads_.emplace_back( [&]() {
+      fixpoint::storage = &storage_;
+      run();
+    } );
   }
 }
 
@@ -106,16 +112,28 @@ Result<Value> Executor::load( Handle<Value> value )
 Result<Object> Executor::apply( Handle<ObjectTree> combination )
 {
   Handle<Apply> goal( combination );
+
+  if ( storage_.contains( goal ) ) {
+    return storage_.get( goal );
+  }
+
   TreeData tree;
   {
-    if ( storage_.contains( goal ) ) {
-      return storage_.get( goal );
+    auto live = live_.write();
+    if ( live->contains( goal ) ) {
+      return {};
     }
-    tree = storage_.get( combination );
-    // releasing the lock here should be safe, since the TreeData is immutable and its memory is managed
+    live->insert( goal );
   }
+  tree = storage_.get( combination );
+
+  // Load minrepo to memory
+  load_minrepo( combination );
+
   auto result = runner_->apply( combination, tree );
   storage_.create( goal, result );
+  auto live = live_.write();
+  live->erase( goal );
   return result;
 }
 
@@ -163,7 +181,10 @@ Result<ValueTree> Executor::mapEval( Handle<ObjectTree> tree )
       Handle<Eval> eval( obj );
       values[i] = get_or_delegate( eval ).value().unwrap<Value>();
     }
-    {
+
+    if ( tree.is_tag() ) {
+      return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>().tag();
+    } else {
       return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>();
     }
   }
@@ -189,7 +210,11 @@ Result<ObjectTree> Executor::mapReduce( Handle<ExpressionTree> tree )
     auto exp = data->at( i ).unwrap<Expression>();
     objs[i] = evaluator_.reduce( exp ).value();
   }
-  {
+
+  if ( tree.is_tag() ) {
+    return handle::tree_unwrap<ObjectTree>( storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ) )
+      .tag();
+  } else {
     return handle::tree_unwrap<ObjectTree>( storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ) );
   }
 }
@@ -215,7 +240,10 @@ Result<ValueTree> Executor::mapLift( Handle<ValueTree> tree )
     auto exp = x.unwrap<Expression>();
     objs[i] = evaluator_.reduce( exp ).value();
   }
-  {
+
+  if ( tree.is_tag() ) {
+    return storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ).unwrap<ValueTree>().tag();
+  } else {
     return storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ).unwrap<ValueTree>();
   }
 }
@@ -273,4 +301,61 @@ bool Executor::contains( Handle<AnyTree> handle )
 bool Executor::contains( Handle<Relation> handle )
 {
   return storage_.contains( handle );
+}
+
+Handle<Fix> Executor::labeled( const std::string_view label )
+{
+  return storage_.labeled( label );
+};
+
+template<FixType T>
+void Executor::visit( Handle<T> handle,
+                      std::function<void( Handle<Fix> )> visitor,
+                      std::unordered_set<Handle<Fix>> visited )
+{
+  if ( visited.contains( handle ) )
+    return;
+  if constexpr ( std::same_as<T, Literal> )
+    return;
+
+  if constexpr ( Handle<T>::is_fix_sum_type ) {
+    if ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) ) {
+      std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
+    }
+    if constexpr ( std::same_as<T, Relation> ) {
+      auto target = get_or_delegate( handle );
+      std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, target->get() );
+    }
+  } else {
+    if constexpr ( FixTreeType<T> ) {
+      auto tree = get_or_delegate( handle );
+      for ( const auto& element : tree.value()->span() ) {
+        visit( element, visitor, visited );
+      }
+    }
+    VLOG( 2 ) << "visiting " << handle;
+    visitor( handle );
+    visited.insert( handle );
+  }
+}
+
+vector<Handle<Fix>> Executor::minrepo( Handle<Fix> handle )
+{
+  vector<Handle<Fix>> handles {};
+  visit( handle, [&]( Handle<Fix> h ) { handles.push_back( h ); } );
+  return handles;
+}
+
+void Executor::load_to_storage( Handle<Fix> handle )
+{
+  handle::data( handle ).visit<void>( overload { []( Handle<Literal> ) { return; },
+                                                 [&]( auto h ) {
+                                                   if ( !contains( h ) )
+                                                     put( h, get_or_delegate( h ).value() );
+                                                 } } );
+}
+
+void Executor::load_minrepo( Handle<ObjectTree> combination )
+{
+  visit( combination, [&]( Handle<Fix> h ) { load_to_storage( h ); } );
 }
