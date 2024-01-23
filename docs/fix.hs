@@ -74,22 +74,22 @@ apply _ = undefined
 -- | Evaluate an Object by repeatedly replacing Thunks with their Values, producing a concrete value (not a Ref).
 evalStrict :: Object -> Value
 evalStrict (Value x) = lift x
-evalStrict (Thunk x) = evalStrict $ force x
+evalStrict (Thunk x) = evalStrict $ think x
 evalStrict (ObjectTree x) = ValueTree $ treeMap evalStrict x
 evalStrict (ObjectTreeRef x) = ValueTree $ treeMap evalStrict $ load x
 
 -- | Evaluate an Object by repeatedly replacing Thunks with their Values, producing a Ref.  This provides partial evaluation, as subtrees will not yet be evaluated.
 evalShallow :: Object -> Object
 evalShallow (Value x) = Value $ lower x
-evalShallow (Thunk x) = evalShallow $ force x
+evalShallow (Thunk x) = evalShallow $ think x
 evalShallow (ObjectTree x) = ObjectTreeRef $ name x
 evalShallow (ObjectTreeRef x) = ObjectTreeRef x
 
--- | Force a Thunk to completion.  In most cases this will apply a combination; however, as an optimization, a thunk describing an application of the identity function may be represented inline.
-force :: Thunk -> Object
-force (Identification x) = Value x
-force (Application x) = apply $ treeMap reduce $ load x
-force (Selection x) = select x
+-- | Execute one step of the evaluation of a Thunk.  This might produce another Thunk, or a Tree containing Thunks.
+think :: Thunk -> Object
+think (Identification x) = Value x
+think (Application x) = apply $ treeMap reduce $ load x
+think (Selection x) = select x
 
 -- | Select data as specified by an ObjectTree, without loading or evaluating the rest of the tree.
 select :: Name ObjectTree -> Object
@@ -98,8 +98,8 @@ select = undefined -- TODO
 -- | Converts an Expression into an Object by executing any Encodes contained within the Expression.
 reduce :: Expression -> Object
 reduce (Object x) = x
-reduce (Encode (Strict x)) = Value $ evalStrict $ force x
-reduce (Encode (Shallow x)) = evalShallow $ force x
+reduce (Encode (Strict x)) = Value $ evalStrict $ think x
+reduce (Encode (Shallow x)) = evalShallow $ think x
 reduce (ExpressionTree x) = ObjectTree $ treeMap reduce x
 
 -- | Convert a Value into a "concrete" Value, adding its data to the reachable set.
