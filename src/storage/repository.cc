@@ -24,7 +24,7 @@ std::filesystem::path Repository::find( std::filesystem::path directory )
     }
     current_directory = current_directory.parent_path();
   }
-  return directory / ".fix";
+  return current_directory / ".fix";
 }
 
 std::unordered_set<Handle<Fix>> Repository::data() const
