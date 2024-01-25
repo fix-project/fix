@@ -120,7 +120,8 @@ Handle<T> tree_unwrap( Handle<Expression> handle )
 
 static inline Handle<ExpressionTree> upcast( Handle<AnyTree> tree )
 {
-  return tree.visit<Handle<ExpressionTree>>(
-    []( auto t ) -> Handle<ExpressionTree> { return Handle<ExpressionTree>( t ); } );
+  return tree.visit<Handle<ExpressionTree>>( []( auto t ) -> Handle<ExpressionTree> {
+    return t.is_tag() ? Handle<ExpressionTree>( t ).tag() : Handle<ExpressionTree>( t );
+  } );
 }
 }

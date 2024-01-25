@@ -53,7 +53,7 @@ externref run( externref resource_limits, externref joined_encode )
     set_rw_table_0( i + 2, get_ro_table_0( i + 4 ) );
   }
 
-  return tagged_output( create_thunk( create_tree_rw_table_0( num_args + 2 ) ), true );
+  return tagged_output( create_application_thunk( create_tree_rw_table_0( num_args + 2 ) ), true );
 }
 
 /**
@@ -113,7 +113,7 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
   attach_tree_ro_table_0( encode );
   attach_tree_ro_table_1( get_ro_table_0( 1 ) ); // Attach current program tag
 
-  if ( get_value_type( get_ro_table_1( 1 ) ) == VALUE_TYPE::Blob ) { // Initial (unwrapped) call
+  if ( fixpoint_is_blob( get_ro_table_1( 1 ) ) ) { // Initial (unwrapped) call
     return tagged_output( encode, true );
   }
 

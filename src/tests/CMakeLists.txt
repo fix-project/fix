@@ -32,6 +32,9 @@ target_link_libraries(test-trap runtime)
 add_executable(test-map test-map.cc main.cc)
 target_link_libraries(test-map runtime)
 
+add_executable(test-curry test-curry.cc main.cc)
+target_link_libraries(test-curry runtime)
+
 add_executable(test-self-host test-self-host.cc main.cc)
 target_link_libraries(test-self-host runtime)
 
