@@ -12,7 +12,7 @@ using namespace std;
 //! \param[in] domain is as described in [socket(7)](\ref man7::socket), probably `AF_INET` or `AF_UNIX`
 //! \param[in] type is as described in [socket(7)](\ref man7::socket)
 Socket::Socket( const int domain, const int type )
-  : FileDescriptor( CheckSystemCall( "socket", socket( domain, type, 0 ) ) )
+  : FileDescriptor( ::CheckSystemCall( "socket", socket( domain, type, 0 ) ) )
 {}
 
 // construct from file descriptor
