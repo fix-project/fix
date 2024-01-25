@@ -31,7 +31,7 @@ Handle<AnyTree> RuntimeStorage::create( TreeData tree, std::optional<Handle<AnyT
   auto handle = name.or_else( [&] -> decltype( name ) { return handle::create( tree ); } ).value();
   handle.visit<void>( overload {
     [&]( auto name ) {
-      trees_.write()->insert( { handle::upcast( name ), tree } );
+      trees_.write()->insert( { handle::upcast( name ).untag(), tree } );
     },
   } );
   return handle;
