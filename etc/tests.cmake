@@ -23,6 +23,7 @@ add_test(NAME t_trap COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh)
 add_test(NAME t_map COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-map)
 add_test(NAME t_curry COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-curry)
 add_test(NAME t_self_host WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-self-host)
+# add_test(NAME t_api WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-api.py)
 
 add_test(NAME f_add_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add-flatware)
 add_test(NAME f_return_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-return-flatware)
