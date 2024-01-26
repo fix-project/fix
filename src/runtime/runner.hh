@@ -5,6 +5,7 @@
 #include "handle_post.hh"
 #include "mutex.hh"
 #include "object.hh"
+#include "overload.hh"
 #include "program.hh"
 #include "runtimestorage.hh"
 #include "types.hh"
@@ -41,18 +42,11 @@ public:
     std::optional<Handle<AnyTree>> function_tag {};
 
     while ( true ) {
-      function_tag = combination->at( 1 )
-                       .try_into<Expression>()
-                       .and_then( &Handle<Expression>::try_into<Object> )
-                       .and_then( &Handle<Object>::try_into<ObjectTree> );
-
-      if ( not function_tag.has_value() ) {
-        function_tag = combination->at( 1 )
-                         .try_into<Expression>()
-                         .and_then( &Handle<Expression>::try_into<Object> )
-                         .and_then( &Handle<Object>::try_into<Value> )
-                         .and_then( &Handle<Value>::try_into<ValueTree> );
-      }
+      function_tag = handle::extract<ObjectTree>( combination->at( 1 ) )
+                       .transform( []( auto h ) -> Handle<AnyTree> { return h; } )
+                       .or_else( [&]() -> std::optional<Handle<AnyTree>> {
+                         return handle::extract<ValueTree>( combination->at( 1 ) );
+                       } );
 
       if ( not function_tag.has_value() ) {
         throw std::runtime_error( "Function is not an object/value tree." );
@@ -61,13 +55,8 @@ public:
       combination = fixpoint::storage->get( function_tag.value() );
       auto next_level = combination->at( 1 );
 
-      if ( next_level.try_into<Expression>()
-             .and_then( &Handle<Expression>::try_into<Object> )
-             .and_then( &Handle<Object>::try_into<Value> )
-             .and_then( &Handle<Value>::try_into<Blob> )
-             .has_value() ) {
+      if ( handle::extract<Blob>( next_level ).has_value() )
         break;
-      }
     }
 
     if ( not function_tag->visit<bool>( []( auto h ) { return h.is_tag(); } ) ) {
@@ -87,12 +76,22 @@ public:
       std::cerr << "- author: " << tag->at( 2 ) << std::endl;
       // std::cerr << "- type: " << std::string_view( storage_.get( tag->at( 2 ) ) ) << endl;
       Handle<Fix> handle = tag->at( 1 );
-      auto data = fixpoint::storage->get( handle::extract<Blob>( handle )->try_into<Named>().value() );
-      bool is_printable = std::count_if(
-        data->span().begin(), data->span().end(), []( unsigned char c ) { return std::isprint( c ); } );
-      if ( is_printable == data->size() ) {
+      auto data
+        = handle::extract<Named>( handle ).transform( [&]( auto h ) { return fixpoint::storage->get( h ); } );
+      auto literal = handle::extract<Literal>( handle );
+
+      std::string_view view;
+      if ( data.has_value() ) {
+        view = { data.value()->data(), data.value()->size() };
+      } else {
+        view = literal.value().view();
+      }
+
+      bool is_printable
+        = std::count_if( view.begin(), view.end(), []( unsigned char c ) { return std::isprint( c ); } );
+      if ( is_printable == view.size() ) {
         std::cerr << "--- ERROR ---" << std::endl;
-        std::cerr << std::string_view( data->data(), data->size() ) << std::endl;
+        std::cerr << view << std::endl;
         std::cerr << "-------------" << std::endl;
       } else {
         std::cerr << "Object is not printable." << std::endl;
@@ -100,27 +99,22 @@ public:
       throw std::runtime_error( "Procedure is not runnable" );
     }
 
-    auto function_name = tag->at( 1 )
-                           .try_into<Expression>()
-                           .and_then( &Handle<Expression>::try_into<Object> )
-                           .and_then( &Handle<Object>::try_into<Value> )
-                           .and_then( &Handle<Value>::try_into<Blob> )
-                           .and_then( &Handle<Blob>::try_into<Named> )
-                           .value();
+    auto function_name = handle::extract<Blob>( tag->at( 1 ) ).value();
 
     if ( !programs_.read()->contains( function_name ) ) {
-      auto program = link_program( fixpoint::storage->get( function_name )->span() );
+      auto program = function_name.visit<Program>(
+        overload { [&]( Handle<Literal> f ) { return link_program( f.view() ); },
+                   [&]( Handle<Named> f ) { return link_program( fixpoint::storage->get( f )->span() ); } } );
       programs_.write()->emplace( function_name, std::move( program ) );
     }
 
     const Program& program = programs_.read()->at( function_name );
-
     fixpoint::current_procedure = function_name;
     return program.execute( handle );
   }
 
 private:
-  SharedMutex<absl::flat_hash_map<Handle<Named>, Program>> programs_ {};
+  SharedMutex<absl::flat_hash_map<Handle<Blob>, Program>> programs_ {};
 };
 
 /**
