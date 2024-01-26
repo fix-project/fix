@@ -16,7 +16,7 @@ void check( optional<T> t )
   if ( t ) {
     return;
   } else {
-    throw std::runtime_error( "Invaid handle" );
+    throw std::runtime_error( "Invalid handle" );
   }
 }
 
@@ -287,42 +287,3 @@ uint32_t is_shallow( u8x32 handle )
   return handle::extract<Shallow>( Handle<Fix>::forge( handle ) ).has_value();
 }
 }
-#if 0
-
-uint32_t pin( __m256i src, __m256i dst )
-{
-  Runtime::get_instance().pin( Handle( src ), Handle( dst ) );
-  return 0;
-}
-
-void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
-{
-  if ( index + length > (int64_t)mem->size ) {
-    wasm_rt_trap( WASM_RT_TRAP_OOB );
-  }
-  for ( int i = index; i < index + length; i++ ) {
-    std::cout << mem->data[i];
-  }
-  std::cout << std::endl;
-  std::flush( std::cout );
-}
-
-uint32_t get_access( __m256i handle )
-{
-  return static_cast<uint32_t>( Handle( handle ).get_laziness() );
-}
-__m256i lower( __m256i handle )
-{
-  Handle h( handle );
-  switch ( h.get_laziness() ) {
-    case Laziness::Lazy:
-      return h;
-    case Laziness::Shallow:
-      return h.as_lazy();
-    case Laziness::Strict:
-      return h.as_shallow();
-  }
-  __builtin_unreachable();
-}
-}
-#endif

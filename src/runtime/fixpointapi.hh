@@ -58,7 +58,9 @@ uint32_t is_equal( u8x32 lhs, u8x32 rhs );
 
 // XXX
 uint32_t is_blob( u8x32 handle );
+// Return true iff handle is a Handle<ValueTree> or Handle<ObjectTree> or Handle<ExpressionTree>
 uint32_t is_tree( u8x32 handle );
+// Return true iff handle is a tagged Handle<ValueTree> or Handle<ObjectTree> or Handle<ExpressionTree>
 uint32_t is_tag( u8x32 handle );
 uint32_t is_blob_ref( u8x32 handle );
 uint32_t is_tree_ref( u8x32 handle );
@@ -72,17 +74,4 @@ uint32_t is_strict( u8x32 handle );
 // Unsafe_io prints the contents mem[str_index: index + length]. Traps if
 // index + length - 1 is out of bounds.
 void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* memory );
-
-uint32_t pin( u8x32 src, u8x32 dst );
-}
-
-namespace fixpoint_debug {
-// Attempt to lift the current handle to a stronger accessibility (nondeterministic)
-u8x32 try_lift( u8x32 handle );
-
-// Attempt to get the Encode from a Handle to a Thunk (nondeterministic if we add GC)
-u8x32 try_inspect( u8x32 handle );
-
-// Attempt to get the evaluated version of a Handle (nondeterministic)
-u8x32 try_evaluate( u8x32 handle );
 }
