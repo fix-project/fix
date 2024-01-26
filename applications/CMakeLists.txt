@@ -7,7 +7,6 @@ add_subdirectory(util)
 add_subdirectory(curry)
 add_subdirectory(map)
 add_subdirectory(flatware)
-#add_subdirectory(scheduler)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -mreference-types -I ~/wasm-toolchain/wasix/include -fno-exceptions")
