@@ -20,8 +20,8 @@ public:
   static std::shared_ptr<ReadOnlyTester> init()
   {
     auto runtime = std::make_shared<ReadOnlyTester>();
-    runtime->executor_.emplace( std::thread::hardware_concurrency(), runtime );
     runtime->repository_.emplace();
+    runtime->executor_.emplace( std::thread::hardware_concurrency(), runtime );
     return runtime;
   }
 
@@ -83,7 +83,14 @@ public:
     return executor_->contains( handle ) || repository_->contains( handle );
   }
 
-  virtual Handle<Fix> labeled( const std::string_view label ) override { return repository_->labeled( label ); };
+  virtual Handle<Fix> labeled( const std::string_view label ) override
+  {
+    if ( repository_->contains( label ) ) {
+      return repository_->labeled( label );
+    }
+
+    return executor_->labeled( label );
+  }
 };
 
 static Handle<Strict> compile( ReadOnlyTester& rt, Handle<Fix> wasm )

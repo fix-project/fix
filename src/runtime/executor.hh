@@ -27,7 +27,7 @@ class Executor
 public:
   Executor( size_t threads = std::thread::hardware_concurrency(),
             std::weak_ptr<IRuntime> parent = {},
-            std::shared_ptr<Runner> runner = std::make_shared<WasmRunner>() );
+            std::optional<std::shared_ptr<Runner>> runner = {} );
 
   ~Executor();
 

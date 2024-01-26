@@ -12,10 +12,11 @@ using Result = Executor::Result<T>;
 
 using namespace std;
 
-Executor::Executor( size_t threads, std::weak_ptr<IRuntime> parent, std::shared_ptr<Runner> runner )
+Executor::Executor( size_t threads, weak_ptr<IRuntime> parent, optional<shared_ptr<Runner>> runner )
   : evaluator_( *this )
   , parent_( parent )
-  , runner_( runner )
+  , runner_( runner.has_value() ? runner.value()
+                                : make_shared<WasmRunner>( parent.lock()->labeled( "compile-elf" ) ) )
 {
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
