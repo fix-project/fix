@@ -23,9 +23,16 @@ cmake --build build/ --parallel 256
 ```
 
 # How to run tests:
-Fix contains a set of test cases. To run them:
+Fix contains a set of test cases.
+* unit-test: Unit tests for individual components of Fixpoint implementation
+* fixpoint-check: End-to-end tests that execute functions from Wasm modules
+* all-fixpoint-check: fixpoint-check + a test that verifies the trusted compilation toolchain is self-hosting
+* flatware-check: End-to-end tests that execute functions written against POSIX and ported to Fixpoint via the Flatware library
+* test: Include all tests above
+
+To run them:
 ```
-cmake --build build/ --target test
+cmake --build build/ --target ${test-name}
 ```
 `etc/tests.cmake` contains the location of test files.
 

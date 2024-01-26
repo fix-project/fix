@@ -28,7 +28,7 @@ wget https://github.com/fix-project/bootstrap/releases/download/v0.5/bootstrap.t
 ```
 or use `gh`
 ```
-gh release download --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+gh release download --pattern 'bootstrap.tar.gz' --repo 'fix-project/bootstrap'
 ```
 
 ## Upgrade Bootstrap
