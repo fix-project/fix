@@ -33,7 +33,6 @@ static constexpr size_t mebi = 1024 * 1024;
 **/
 
 // Web server to expose computation graph through HTTP API for a viewer.
-// Example client at fix/src/tester/http-client.
 
 void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 {
