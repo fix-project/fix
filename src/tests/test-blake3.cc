@@ -7,7 +7,7 @@ using namespace std;
 
 void test( void )
 {
-  __m256i hash;
+  u8x32 hash;
 
   // "hello world" test
   string_view test1_s1 = "d74981efa70a0c880b8d8c1985d075dbcbf679b99a5f9914e5aaf96b831a9e24";
