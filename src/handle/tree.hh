@@ -23,20 +23,22 @@ private:
   {}
 
 public:
-  inline Handle( const u8x32 hash, uint64_t size )
+  inline Handle( const u8x32 hash, uint64_t size, bool tag = false )
     : content( hash )
   {
     assert( ( size & 0xffff000000000000 ) == 0 );
     ( *(u64x4*)&content )[3] = size;
+    content[30] |= ( tag << 6 );
   }
 
-  inline Handle( uint64_t local_name, uint64_t size )
+  inline Handle( uint64_t local_name, uint64_t size, bool tag = false )
     : content()
   {
     ( *(u64x4*)&content )[0] = local_name;
     assert( ( size & 0xffff000000000000 ) == 0 );
     ( *(u64x4*)&content )[3] = size;
     content[30] |= ( 1 << 7 );
+    content[30] |= ( tag << 6 );
   }
 
   inline static Handle nil()
@@ -77,18 +79,18 @@ public:
   explicit inline operator Handle<ObjectTree>() const requires std::same_as<T, Value>
   {
     if ( is_local() ) {
-      return { local_name(), size() };
+      return { local_name(), size(), is_tag() };
     } else {
-      return { hash(), size() };
+      return { hash(), size(), is_tag() };
     }
   }
 
   explicit inline operator Handle<ExpressionTree>() const requires std::same_as<T, Object> or std::same_as<T, Value>
   {
     if ( is_local() ) {
-      return { local_name(), size() };
+      return { local_name(), size(), is_tag() };
     } else {
-      return { hash(), size() };
+      return { hash(), size(), is_tag() };
     }
   }
 
