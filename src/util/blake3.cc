@@ -6,7 +6,7 @@
 using namespace std;
 
 namespace blake3 {
-void encode( std::string_view input, __m256i& output )
+void encode( std::string_view input, u8x32& output )
 {
   array<uint8_t, BLAKE3_OUT_LEN> tmp;
   blake3_hasher hasher;

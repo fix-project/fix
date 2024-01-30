@@ -24,11 +24,11 @@ After building, copy `./.fix/` to the source directory of Fix.
 ## Way 1: Fetch from Release
 Either
 ```
-wget https://github.com/fix-project/bootstrap/releases/download/v0.4.3/bootstrap.zip
+wget https://github.com/fix-project/bootstrap/releases/download/v0.5/bootstrap.tar.gz
 ```
 or use `gh`
 ```
-gh release download --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+gh release download --pattern 'bootstrap.tar.gz' --repo 'fix-project/bootstrap'
 ```
 
 ## Upgrade Bootstrap

@@ -1,59 +1,67 @@
 #include <stdio.h>
 
+#include "handle_post.hh"
 #include "test.hh"
+#include "types.hh"
+
+namespace tester {
+auto rt = ReadOnlyTester::init();
+auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
+auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
+auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
+auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
+}
 
 using namespace std;
 
-static Handle curry_compiled;
-static Handle add_simple_compiled;
+static Handle<Fix> curry_compiled;
+static Handle<Fix> add_simple_compiled;
 
-Handle curry( Runtime& rt, Handle program, Handle num_args )
+Handle<Value> curry( Handle<Fix> program, Handle<Fix> num_args )
 {
-  return rt.eval( thunk( tree( {
-    blob( "unused" ),
-    curry_compiled,
-    program,
-    num_args,
-  } ) ) );
+  return tester::rt->executor().execute( Handle<Eval>(
+    Handle<Application>( tester::Tree( tester::Blob( "unused" ), curry_compiled, program, num_args ) ) ) );
 }
 
-Handle apply_args( Runtime& rt, Handle curried, const initializer_list<Handle>& elements )
+Handle<Value> apply_args( Handle<Value> curried, const initializer_list<Handle<Fix>>& elements )
 {
   for ( auto& e : elements ) {
-    curried = rt.eval( thunk( tree( {
-      blob( "unused" ),
-      curried,
-      e,
-    } ) ) );
+    curried = tester::rt->executor().execute(
+      Handle<Eval>( Handle<Application>( tester::Tree( tester::Blob( "unused" ), curried, e ) ) ) );
   }
   return curried;
 }
 
-optional<uint32_t> unwrap_tag( Runtime& rt, const Handle& tag )
+optional<uint32_t> unwrap_tag( Handle<Fix> tag )
 {
-  if ( tag.get_content_type() != ContentType::Tag ) {
-    cout << "unwrap_tag: Expected tag, got " << tag.get_content_type() << endl;
-    return {};
-  }
-  auto& tag_state = rt.storage().get_tree( tag )[2];
-  if ( not rt.storage().compare_handles( tag_state, Handle( true ) ) ) {
-    cout << "unwrap_tag: Tag was not successful" << endl;
+  auto h = handle::extract<ExpressionTree>( tag )
+             .transform( []( auto h ) -> Handle<AnyTree> { return h; } )
+             .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ObjectTree>( tag ); } )
+             .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ValueTree>( tag ); } );
+
+  if ( !h.has_value() or !h->visit<bool>( []( auto h ) { return h.is_tag(); } ) ) {
+    cout << "unwrap_tag: Expected tag, got non-tag " << tag << endl;
     return {};
   }
 
-  auto& tag_contents = rt.storage().get_tree( tag )[1];
+  auto tag_state = tester::rt->get( h.value() ).value()->at( 2 );
+  if ( handle::extract<Literal>( tag_state ).value() != Handle<Literal>( static_cast<uint32_t>( true ) ) ) {
+    cout << "unwrap_tag: Tag was not successful " << tag_state << endl;
+    return {};
+  }
+
+  auto tag_contents = tester::rt->get( h.value() ).value()->at( 1 );
   uint32_t blob_result = -1;
-  memcpy( &blob_result, rt.storage().get_blob( tag_contents ).data(), sizeof( uint32_t ) );
+  memcpy( &blob_result, handle::extract<Literal>( tag_contents ).value().data(), sizeof( uint32_t ) );
   return blob_result;
 }
 
-void test_add_simple( Runtime& rt )
+void test_add_simple()
 {
-  Handle curried = curry( rt, add_simple_compiled, Handle( 2 ) );
+  auto curried = curry( add_simple_compiled, Handle<Literal>( 2 ) );
+  auto curried_result = apply_args( curried, { Handle<Literal>( 1 ), Handle<Literal>( 3 ) } );
 
-  Handle curried_result = apply_args( rt, curried, { Handle( 1 ), Handle( 3 ) } );
-
-  auto optional_result = unwrap_tag( rt, curried_result );
+  auto optional_result = unwrap_tag( curried_result );
   if ( not optional_result ) {
     printf( "test_add_simple: Result was not successful\n" );
     exit( 1 );
@@ -63,18 +71,13 @@ void test_add_simple( Runtime& rt )
   }
 }
 
-void test_add_as_encode( Runtime& rt )
+void test_add_as_encode()
 {
-  Handle curried = curry( rt,
-                          tree( {
-                            blob( "unused" ),
-                            add_simple_compiled,
-                          } ),
-                          Handle( 2 ) );
+  auto curried = curry( tester::Tree( tester::Blob( "unused" ), add_simple_compiled ), Handle<Literal>( 2 ) );
 
-  Handle curried_result = apply_args( rt, curried, { Handle( 1 ), Handle( 3 ) } );
+  auto curried_result = apply_args( curried, { Handle<Literal>( 1 ), Handle<Literal>( 3 ) } );
 
-  auto optional_result = unwrap_tag( rt, curried_result );
+  auto optional_result = unwrap_tag( curried_result );
   if ( not optional_result ) {
     printf( "test_add_as_encode: Result was not successful\n" );
     exit( 1 );
@@ -84,16 +87,20 @@ void test_add_as_encode( Runtime& rt )
   }
 }
 
-void test_curry_self( Runtime& rt )
+void test_curry_self()
 {
-  Handle curried = curry( rt, curry_compiled, Handle( 2 ) );
+  auto curried = curry( curry_compiled, Handle<Literal>( 2 ) );
 
-  Handle curried_curry_result = apply_args( rt, curried, { add_simple_compiled, Handle( 2 ) } );
+  auto curried_curry_result = apply_args( curried, { add_simple_compiled, Handle<Literal>( 2 ) } );
 
-  Handle unwrapped_curried_curry_result = rt.storage().get_tree( curried_curry_result )[1];
-  Handle curried_add_result = apply_args( rt, unwrapped_curried_curry_result, { Handle( 1 ), Handle( 3 ) } );
+  auto unwrapped_curried_curry_result
+    = handle::extract<Value>(
+        tester::rt->get( curried_curry_result.try_into<ValueTree>().value() ).value()->at( 1 ) )
+        .value();
+  auto curried_add_result
+    = apply_args( unwrapped_curried_curry_result, { Handle<Literal>( 1 ), Handle<Literal>( 3 ) } );
 
-  auto optional_result = unwrap_tag( rt, curried_add_result );
+  auto optional_result = unwrap_tag( curried_add_result );
   if ( not optional_result ) {
     printf( "test_curry_self: Result was not successful\n" );
     exit( 1 );
@@ -105,14 +112,11 @@ void test_curry_self( Runtime& rt )
 
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  rt.storage().deserialize();
+  curry_compiled = tester::Compile( tester::File( "applications-prefix/src/applications-build/curry/curry.wasm" ) );
+  add_simple_compiled = tester::Compile( tester::File( "testing/wasm-examples/add-simple.wasm" ) );
 
-  curry_compiled = compile( file( "applications-prefix/src/applications-build/curry/curry.wasm" ) );
-  add_simple_compiled = compile( file( "testing/wasm-examples/add-simple.wasm" ) );
-
-  test_add_simple( rt );
-  test_add_as_encode( rt );
-  test_curry_self( rt );
+  test_add_simple();
+  test_add_as_encode();
+  test_curry_self();
   exit( 0 );
 }

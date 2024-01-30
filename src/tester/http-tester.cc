@@ -32,9 +32,6 @@ static constexpr size_t mebi = 1024 * 1024;
  * - tree_contents(handle): returns the contents of this object if it is a tree.
 **/
 
-// Web server to expose computation graph through HTTP API for a viewer.
-// Example client at fix/src/tester/http-client.
-
 void kick_off( span_view<char*> args, vector<ReadOnlyFile>& open_files )
 {
   // make the combination from the given arguments

@@ -1,10 +1,9 @@
+#include <cmath>
 #include <iostream>
-#include <math.h>
 
 #include "elfloader.hh"
-#include "runtimestorage.hh"
+#include "fixpointapi.hh"
 #include "spans.hh"
-#include "timer.hh"
 
 using namespace std;
 
@@ -49,17 +48,20 @@ const static map<string, uint64_t> library_func_map
       { "fixpoint_create_blob", (uint64_t)fixpoint::create_blob },
       { "fixpoint_create_tag", (uint64_t)fixpoint::create_tag },
       { "fixpoint_create_blob_i32", (uint64_t)fixpoint::create_blob_i32 },
-      { "fixpoint_create_thunk", (uint64_t)fixpoint::create_thunk },
-      { "fixpoint_get_value_type", (uint64_t)fixpoint::get_value_type },
-      { "fixpoint_unsafe_io", (uint64_t)fixpoint::unsafe_io },
-      { "fixpoint_equality", (uint64_t)fixpoint::equality },
-      { "fixpoint_get_access", (uint64_t)fixpoint::get_access },
+      { "fixpoint_create_blob_i64", (uint64_t)fixpoint::create_blob_i64 },
+      { "fixpoint_create_blob_string", (uint64_t)fixpoint::create_blob_string },
+      { "fixpoint_create_application_thunk", (uint64_t)fixpoint::create_application_thunk },
+      // { "fixpoint_create_identity_thunk", (uint64_t)fixpoint::create_identity_thunk },
+      // { "fixpoint_create_selection_thunk", (uint64_t)fixpoint::create_selection_thunk },
       { "fixpoint_get_length", (uint64_t)fixpoint::get_length },
-      // { "fixpoint_debug_try_lift", (uint64_t)fixpoint_debug::try_lift },
-      // { "fixpoint_debug_try_inspect", (uint64_t)fixpoint_debug::try_inspect },
-      // { "fixpoint_debug_try_evaluate", (uint64_t)fixpoint_debug::try_evaluate },
-      { "fixpoint_lower", (uint64_t)fixpoint::lower },
-      { "fixpoint_pin", (uint64_t)fixpoint::pin },
+      { "fixpoint_create_strict_encode", (uint64_t)fixpoint::create_strict_encode },
+      { "fixpoint_create_shallow_encode", (uint64_t)fixpoint::create_shallow_encode },
+      { "fixpoint_unsafe_io", (uint64_t)fixpoint::unsafe_io },
+      { "fixpoint_is_equal", (uint64_t)fixpoint::is_equal },
+      { "fixpoint_is_blob", (uint64_t)fixpoint::is_blob },
+      { "fixpoint_is_tree", (uint64_t)fixpoint::is_tree },
+      { "fixpoint_is_tag", (uint64_t)fixpoint::is_tag },
+      { "fixpoint_is_thunk", (uint64_t)fixpoint::is_thunk },
       { "memcpy", (uint64_t)memcpy },
       { "memmove", (uint64_t)memmove },
       { "memset", (uint64_t)memset },

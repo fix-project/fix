@@ -28,7 +28,7 @@ jobs:
       - name: install g++ 13
         run: sudo add-apt-repository 'ppa:ubuntu-toolchain-r/test' && sudo apt update && sudo apt-get install gcc-13 g++-13 -y
       - name: install gh
-        run: sudo apt install gh unzip -y
+        run: sudo apt install gh -y
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - if: matrix.sanitizer == 'asan'
@@ -51,15 +51,19 @@ jobs:
       - name: compile
         run: cmake --build out --parallel 8
       - name: download bootstrap seed
-        run: gh release download v0.4.4 --pattern 'bootstrap.zip' --repo 'fix-project/bootstrap'
+        run: gh release download v0.5 --pattern 'bootstrap.tar.gz' --repo 'fix-project/bootstrap'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: unzip bootstrap seed
-        run: unzip bootstrap.zip
+      - name: untar bootstrap seed
+        run: tar -xvzf bootstrap.tar.gz
       - name: print directory structure
         run: ls -R -a
-      - name: test
+      - name: unit test
+        run: cmake --build out --target unit-test
+      - name: fixpoint test
         run: cmake --build out --target fixpoint-check
+      - name: flatware test
+        run: cmake --build out --target flatware-check
   typecheck-spec:
     runs-on: ubuntu-latest
     steps:

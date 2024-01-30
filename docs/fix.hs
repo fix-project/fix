@@ -1,131 +1,129 @@
-import Data.Set (Set)
-import qualified Data.Set as Set
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 
--- | Describes, essentially, a file on disk/in RAM.  A Blob stores a sequence
--- of bytes, while a Tree stores a sequence of Handles.  Note that this usage
--- of "Blob" and "Tree" is slightly different than the Names below.
-data Data = BlobData StoredBlob | TreeData StoredTree deriving (Eq, Ord)
-type StoredBlob  = [Char]
-type StoredTree = [Handle]
+-- | The Fix language (types and evaluation rules)
+module Fix where
 
--- | This ID is some opaque identifier that uniquely identifies a specific
--- piece of data.  For example, this could be a sha256 hash of the data.
-data Id = Id Int deriving (Eq, Ord)
-data BlobId = BlobId Id deriving (Eq, Ord)
-data TreeId = TreeId Id deriving (Eq, Ord)
+import Data.Word (Word64)
 
--- | We can go from a BlobId or a TreeId to the stored equivalents, a
--- StoredBlob or a StoredTree.
-class DataId a b where
-  load :: a -> b
-  create :: b -> a
-instance DataId BlobId StoredBlob where
-  load = undefined
-  create = undefined
-instance DataId TreeId StoredTree where
-  load = undefined
-  create = undefined
+-- * Fix Types
 
--- | A Name is a way to identify a Blob (a sequence of bytes), a Tree (a
--- sequence of Handles), a Tag (a "signature" produced by a computation), or a
--- Thunk (a computation)
-data Name = Blob BlobId | Tree TreeId | Tag TreeId | Thunk TreeId deriving (Eq, Ord)
+-- | A Name is some opaque identifier, in this case a 256-bit number.
+newtype Name a = Name (Word64, Word64, Word64, Word64)
 
--- | A Handle represents a certain access level for a certain Name. Strict
--- accessibility means a running computation can see the full contents of a
--- Name, essentially calling `load` as described above.  Shallow accessibility
--- means a running computation can see certain information about a Handle,
--- including getting lazy versions of the first layer of Trees.  Lazy
--- accessibility means a running computation cannot inspect a Name at all, but
--- only include it in its result.
-data Handle = Strict Name | Shallow Name | Lazy Name deriving (Eq, Ord)
+-- | A Blob is a collection of bytes.
+type Blob = [Char]
 
--- | When sending the "data" of an object, we can be selective about what we
--- send.  Lazy Handles only need the name itself, Shallow Handles only need the
--- name and the size/length of the object, and Strict Handles need the full
--- data of an object.
-data NameData = JustName Name | NameAndSize (Name, Int) | NameAndData (Name, Data) deriving (Eq, Ord)
+-- | A Tree is a collection of Names of a particular type.
+data Tree a = Tree [Name a] | Tag [Name a]
 
--- | Look up the Data corresponding to a Name.
-deref :: Name -> Data
-deref name = case name of
-  Blob id -> BlobData $ load id
-  Tree id -> TreeData $ load id
-  Tag id -> TreeData $ load id
-  Thunk id -> TreeData $ load id
+-- | A Ref is a reference to an object.
+type Ref a = Name a
 
--- | Get the length of some Data.
-size :: Data -> Int
-size (BlobData b) = length b
-size (TreeData t) = length t
+-- | A Value is a datum which has been fully computed.  It is safe to compare Values for equality.  Values may provide either the full contents of a datum or just the name of a datum.
+data Value = ValueTree ValueTree | ValueTreeRef (Ref ValueTree) | Blob Blob | BlobRef (Ref Blob)
+-- | A Tree of Values.
+type ValueTree = Tree Value
 
--- | Given a Handle, select the Data it represents.
-dat :: Handle -> NameData
-dat handle = case handle of
-  Lazy n -> JustName n
-  Shallow (n) -> NameAndSize (n, size $ deref n)
-  Strict (n) -> NameAndData (n, deref n)
+-- | An Object is a Value which may or may not have been computed yet.  Uncomputed data are represented as Thunks.
+data Object = Thunk Thunk | Value Value | ObjectTree ObjectTree | ObjectTreeRef (Ref ObjectTree)
+-- | A Thunk is a Value which has yet to be evaluated.  It is either described as an Application (of a function to arguments), an Identification (of an already-computed Value), or a Selection (of a particular element or subrange of a large structure).  It is better to use Identification or Selection Thunks where possible than applying an equivalent function, as these special Thunks have a smaller data footprint.
+data Thunk = Application (Name ExpressionTree) | Identification Value | Selection (Name ObjectTree)
+-- | A Tree of Objects.
+type ObjectTree = Tree Object
 
--- | A core Fix operation; apply runs a computation represented by a Tree in a
--- specified (ENCODE) format.
-apply :: Handle -> Handle
-apply (Strict (Tree _)) = undefined
+-- | An Expression is a computation which may be further evaluated.  When evaluated, it will produce an Object.
+data Expression = Object Object | Encode Encode | ExpressionTree ExpressionTree
+-- | An Encode is an instruction requesting that a Thunk be replaced by the result of the function it represents.  A Strict Encode requests the complete expansion of the result, while a Shallow Encode requests partial (i.e., lazy) expansion.
+data Encode = Strict Thunk | Shallow Thunk
+-- | A Tree of Expressions.
+type ExpressionTree = Tree Expression
 
--- | A core Fix operation; eval applies any strict or shallow Thunks within an
--- Object.
-eval :: Handle -> Handle
-eval handle = case handle of
-  Lazy _ -> handle
-  Shallow (Blob _) -> handle
-  Shallow (Tree t) -> handle
-  Shallow (Tag t) -> handle
-  Shallow (Thunk t) -> eval $ shallow $ apply $ eval $ encode t
-  Strict (Blob _) -> handle
-  Strict (Tree t) -> Strict (Tree $ recurse t)
-  Strict (Tag t) -> Strict (Tag $ recurse t)
-  Strict (Thunk t) -> eval $ apply $ eval $ encode t
-  where recurse = create . map eval . load
-        encode t = Strict (Tree t)
-        shallow x = case x of
-          Strict (Tree t) -> Shallow (Tree t)
-          Strict (Tag t) -> Shallow (Tag t)
-          h -> h
+-- | Fix represents any Fix type, including both Expressions and Relations.
+data Fix = Expression Expression | Relation Relation
+-- | A Relation represents either the Application of a Tree or the Evaluation of an Object.
+data Relation = Apply ObjectTree | Eval Object
 
--- | Calculates the set of Handles which are necessary to begin application of
--- a Thunk.
-attachableSet :: Handle -> Set Handle
-attachableSet handle = case handle of
-  Lazy _ -> Set.singleton handle
-  Shallow (Thunk t) -> Set.insert handle $ recurse t
-  Strict (Thunk t) -> Set.insert handle $ recurse t
-  Shallow _ -> Set.singleton $ handle
-  Strict (Blob _) -> Set.singleton $ handle
-  Strict (Tree t) -> Set.insert handle $ recurse t
-  Strict (Tag t) -> Set.insert handle $ recurse t
-  where recurse id = foldr
-                      Set.union
-                      Set.empty
-                      (map attachableSet $ load id)
+-- * Functions
 
-attachableData :: Handle -> Set NameData
-attachableData = Set.map dat . attachableSet
+-- ** Runtime-Provided Functions
 
--- | Calculates the set of Names which are necessary to fully evaluate an
--- object.
-reachableSet :: Name -> Set Name
-reachableSet name = case name of
-  Blob _ -> Set.singleton name
-  Tree t -> Set.insert name $ recurse t
-  Tag t -> Set.insert name $ recurse t
-  Thunk t -> Set.insert name $ recurse t
-  where recurse id = foldr
-                      Set.union
-                      Set.empty
-                      (map (reachableSet . getName) $ load id)
-        getName (Strict (n)) = n
-        getName (Shallow (n)) = n
-        getName (Lazy (n)) = n
+-- | Map a function over the elements of a Tree.  
+treeMap :: (a -> b) -> Tree a -> Tree b
+treeMap f x = case x of
+    Tree x' -> Tree $ map (name . f . load) x'
+    Tag x' -> Tag $ map (name . f . load) x'
 
-main :: IO ()
-main = do
-  return ()
+-- | Given a name, produce its data.
+load :: Name a -> a
+load = undefined
+
+-- | Given a name of a tree, produce a shallow copy of its data.
+loadShallow :: Name (Tree a) -> [Name a]
+loadShallow = undefined
+
+-- | Given data, compute its name.
+name :: a -> Name a
+name = undefined
+
+-- | Apply a function described by a combination.
+apply :: ObjectTree -> Object
+apply _ = undefined
+
+-- ** Evaluation Rules
+
+-- | Evaluate an Object by repeatedly replacing Thunks with their Values, producing a concrete value (not a Ref).
+evalStrict :: Object -> Value
+evalStrict (Value x) = lift x
+evalStrict (Thunk x) = evalStrict $ think x
+evalStrict (ObjectTree x) = ValueTree $ treeMap evalStrict x
+evalStrict (ObjectTreeRef x) = ValueTree $ treeMap evalStrict $ load x
+
+-- | Evaluate an Object by repeatedly replacing Thunks with their Values, producing a Ref.  This provides partial evaluation, as subtrees will not yet be evaluated.
+evalShallow :: Object -> Object
+evalShallow (Value x) = Value $ lower x
+evalShallow (Thunk x) = evalShallow $ think x
+evalShallow (ObjectTree x) = ObjectTreeRef $ name x
+evalShallow (ObjectTreeRef x) = ObjectTreeRef x
+
+-- | Execute one step of the evaluation of a Thunk.  This might produce another Thunk, or a Tree containing Thunks.
+think :: Thunk -> Object
+think (Identification x) = Value x
+think (Application x) = apply $ treeMap reduce $ load x
+think (Selection x) = select x
+
+-- | Select data as specified by an ObjectTree, without loading or evaluating the rest of the tree.
+select :: Name ObjectTree -> Object
+select = undefined -- TODO
+
+-- | Converts an Expression into an Object by executing any Encodes contained within the Expression.
+reduce :: Expression -> Object
+reduce (Object x) = x
+reduce (Encode (Strict x)) = Value $ evalStrict $ think x
+reduce (Encode (Shallow x)) = evalShallow $ think x
+reduce (ExpressionTree x) = ObjectTree $ treeMap reduce x
+
+-- | Convert a Value into a "concrete" Value, adding its data to the reachable set.
+lift :: Value -> Value
+lift (Blob x) = Blob x
+lift (BlobRef x) = Blob $ load x
+lift (ValueTree x) = ValueTree $ treeMap lift x
+lift (ValueTreeRef x) = ValueTree $ treeMap lift $ load x
+
+-- | Convert a Value into a "ref" Value, removing its data from the reachable set.
+lower :: Value -> Value
+lower (Blob x) = BlobRef $ name x
+lower (BlobRef x) = BlobRef x
+lower (ValueTree x) = ValueTreeRef $ name x
+lower (ValueTreeRef x) = ValueTreeRef x
+
+-- ** Forcing Functions (names subject to change)
+
+-- | Given a Relation, finds the "result", otherwise passes Expressions through unchanged.
+relate :: Fix -> Object
+relate (Relation (Apply x)) = apply x
+relate (Relation (Eval x)) = Value $ evalStrict x
+relate (Expression x) = reduce x
+
+-- | Evaluates anything in Fix to a Value.  The result will be concrete.  This is most likely what a user wants to do.
+eval :: Fix -> Value
+eval = lift . evalStrict . relate

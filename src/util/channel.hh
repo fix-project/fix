@@ -2,12 +2,8 @@
 
 #include <concurrentqueue/concurrentqueue.h>
 #include <condition_variable>
-#include <deque>
-#include <iostream>
-#include <memory>
 #include <mutex>
 #include <optional>
-#include <shared_mutex>
 
 class ChannelClosed : public std::exception
 {
@@ -16,9 +12,8 @@ public:
   const char* what() { return "Channel was closed."; }
 };
 
-/** An inter-thread communication data structure, analogous to Go's channels. Semantically, a Channel is a way to
- * transfer ownership of an object from one location to another, so for safety reasons it only
- * accepts rvalue references.
+/**
+ * An inter-thread communication data structure, analogous to Go's channels.
  */
 template<typename T>
 class Channel
@@ -39,6 +34,28 @@ public:
   }
 
   void push( T&& item )
+  {
+    std::unique_lock lock( mutex_ );
+    if ( shutdown_ ) {
+      throw ChannelClosed {};
+    }
+    data_.enqueue( std::move( item ) );
+    ++size_;
+    cv_.notify_one();
+  }
+
+  void move_push( T&& item )
+  {
+    std::unique_lock lock( mutex_ );
+    if ( shutdown_ ) {
+      throw ChannelClosed {};
+    }
+    data_.enqueue( std::move( item ) );
+    ++size_;
+    cv_.notify_one();
+  }
+
+  void push( T item )
   {
     std::unique_lock lock( mutex_ );
     if ( shutdown_ ) {
@@ -82,7 +99,9 @@ public:
   size_t size_approx() { return data_.size_approx(); }
 
   void operator<<( T&& item ) { push( std::move( item ) ); }
+  void operator<<( T item ) { push( item ); }
   void operator>>( std::optional<T>& item ) { item = pop(); }
+  void operator>>( T& item ) { item = pop_or_wait(); }
 
   void close()
   {
@@ -91,4 +110,6 @@ public:
     ++size_;
     cv_.notify_all();
   }
+
+  ~Channel() { close(); }
 };

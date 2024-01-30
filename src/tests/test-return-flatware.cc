@@ -4,16 +4,24 @@
 
 using namespace std;
 
+namespace tester {
+auto rt = ReadOnlyTester::init();
+auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
+auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
+auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
+auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
+}
+
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  rt.storage().deserialize();
-  Tree result = rt.storage().get_tree( rt.eval( thunk( tree( {
-    blob( "unused" ),
-    compile( file( "applications-prefix/src/applications-build/flatware/examples/return3/return3-fixpoint.wasm" ) ),
-  } ) ) ) );
+  auto res = tester::rt->executor().execute( Handle<Eval>( Handle<Application>( tester::Tree(
+    tester::Blob( "unused" ),
+    tester::Compile( tester::File(
+      "applications-prefix/src/applications-build/flatware/examples/return3/return3-fixpoint.wasm" ) ) ) ) ) );
 
-  auto blob = rt.storage().get_blob( result[0] );
+  auto result_tree = tester::rt->get( res.try_into<ValueTree>().value() ).value();
+
+  auto blob = handle::extract<Literal>( result_tree->at( 0 ) ).value();
   CHECK( blob.size() == 4 );
   uint32_t x = *( reinterpret_cast<const uint32_t*>( blob.data() ) );
   if ( x != 3 ) {

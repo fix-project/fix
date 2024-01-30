@@ -10,11 +10,11 @@ bool is_dir( int32_t ro_table_index )
 {
   externref ret = get_content( ro_table_index );
 
-  if ( get_value_type( ret ) == 0 ) { // if is tree
-    return true;
+  if ( fixpoint_is_blob( ret ) == 1 ) { // if is blob
+    return false;
   }
 
-  return false;
+  return true;
 }
 
 struct substring get_name( int32_t ro_table_index )

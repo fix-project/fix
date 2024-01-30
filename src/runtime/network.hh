@@ -1,26 +1,24 @@
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
 #include <concurrentqueue/concurrentqueue.h>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 
 #include "channel.hh"
 #include "eventloop.hh"
-#include "fixcache.hh"
 #include "handle.hh"
 #include "interface.hh"
 #include "message.hh"
 #include "ring_buffer.hh"
 #include "socket.hh"
-#include "spans.hh"
-#include "task.hh"
 
-using ResultChannel = Channel<std::pair<Task, Handle>>;
-using WorkChannel = Channel<Task>;
 using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, MessagePayload>>;
 
 struct EventCategories
@@ -36,15 +34,13 @@ struct EventCategories
   size_t forward_msg;
 };
 
-class Runtime;
-
-class Remote : public ITaskRunner
+class Remote : public IRuntime
 {
-  EventLoop& events_;
   TCPSocket socket_;
 
   MessageQueue& msg_q_;
-  Runtime& runtime_;
+  std::weak_ptr<IRuntime> parent_;
+  size_t index_;
 
   RingBuffer rx_data_ { 8192 };
   RingBuffer tx_data_ { 8192 };
@@ -58,13 +54,9 @@ class Remote : public ITaskRunner
 
   std::vector<EventLoop::RuleHandle> installed_rules_ {};
 
-  size_t index_ {};
-
-  std::shared_mutex info_mutex_ {};
-  std::optional<ITaskRunner::Info> info_ {};
-
-  absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to_;
-  std::shared_mutex& mutex_;
+  std::shared_mutex mutex_ {};
+  std::optional<Info> info_ {};
+  absl::flat_hash_set<Handle<Relation>> reply_to_ {};
 
   bool dead_ { false };
 
@@ -74,27 +66,35 @@ public:
           TCPSocket socket,
           size_t index,
           MessageQueue& msg_q,
-          Runtime& runtime,
-          absl::flat_hash_map<Task, size_t, absl::Hash<Task>>& reply_to,
-          std::shared_mutex& mutex );
+          std::weak_ptr<IRuntime> parent );
 
-  std::optional<Handle> start( Task&& task ) override;
-  std::optional<ITaskRunner::Info> get_info() override
-  {
-    std::shared_lock lock( info_mutex_ );
-    return info_;
-  }
+  std::optional<BlobData> get( Handle<Named> name ) override;
+  std::optional<TreeData> get( Handle<AnyTree> name ) override;
+  std::optional<Handle<Object>> get( Handle<Relation> name ) override;
+
+  void put( Handle<Named> name, BlobData data ) override;
+  void put( Handle<AnyTree> name, TreeData data ) override;
+  void put( Handle<Relation> name, Handle<Object> data ) override;
+
+  bool contains( Handle<Named> handle ) override;
+  bool contains( Handle<AnyTree> handle ) override;
+  bool contains( Handle<Relation> handle ) override;
+  std::optional<Info> get_info() override;
 
   void push_message( OutgoingMessage&& msg );
 
   Address local_address() { return socket_.local_address(); }
   Address peer_address() { return socket_.peer_address(); }
 
-  void send_object( Handle handle );
-
-  std::unordered_set<Task> pending_result_ {};
+  std::unordered_set<Handle<Relation>> pending_result_ {};
 
   bool dead() const { return dead_; }
+
+  bool erase_reply_to( Handle<Relation> handle )
+  {
+    std::unique_lock lock( mutex_ );
+    return reply_to_.erase( handle );
+  }
   ~Remote();
 
 private:
@@ -104,13 +104,13 @@ private:
   void install_rule( EventLoop::RuleHandle rule ) { installed_rules_.push_back( rule ); }
   void process_incoming_message( IncomingMessage&& msg );
 
-  void send_blob( Blob blob );
-  void send_tree( Tree tree );
+  void send_blob( BlobData blob );
+  void send_tree( TreeData tree );
 
   void clean_up();
 };
 
-class NetworkWorker : public IResultCache
+class NetworkWorker
 {
 private:
   EventCategories categories_ {};
@@ -127,17 +127,16 @@ private:
   std::vector<TCPSocket> server_sockets_ {};
 
   MessageQueue msg_q_ {};
-  Runtime& runtime_;
 
-  absl::flat_hash_map<Task, size_t, absl::Hash<Task>> reply_to_ {};
-  std::shared_mutex mutex_ {};
+  std::weak_ptr<IRuntime> parent_;
 
   void run_loop();
   void process_outgoing_message( size_t remote_id, MessagePayload&& message );
 
 public:
-  NetworkWorker( Runtime& runtime )
-    : runtime_( runtime ) {};
+  NetworkWorker( std::weak_ptr<IRuntime> parent )
+    : parent_( parent )
+  {}
 
   void start() { network_thread_ = std::thread( std::bind( &NetworkWorker::run_loop, this ) ); }
 
@@ -157,7 +156,7 @@ public:
     socket.listen();
     socket.set_blocking( false );
     Address listen_address = socket.local_address();
-    listening_sockets_ << std::move( socket );
+    listening_sockets_.move_push( std::move( socket ) );
     return listen_address;
   }
 
@@ -165,8 +164,8 @@ public:
   {
     TCPSocket socket;
     socket.connect( address );
-    connecting_sockets_ << std::move( socket );
+    connecting_sockets_.move_push( std::move( socket ) );
   }
 
-  void finish( Task&& task, Handle result ) override;
+  std::shared_ptr<Remote> get_remote( size_t index ) { return connections_.at( index ); }
 };
