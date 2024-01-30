@@ -14,6 +14,9 @@ set(ABSL_PROPAGATE_CXX_STD on)
 add_subdirectory(${PROJECT_SOURCE_DIR}/third-party/abseil-cpp)
 include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/third-party/abseil-cpp")
 
+add_subdirectory(${PROJECT_SOURCE_DIR}/third-party/BLAKE3/c)
+include_directories(SYSTEM "${PROJECT_SOURCE_DIR}/third-party/BLAKE3/c")
+
 include(ExternalProject)
 ExternalProject_Add(applications
   SOURCE_DIR "${PROJECT_SOURCE_DIR}/applications"

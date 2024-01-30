@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <string_view>
@@ -16,6 +17,7 @@ public:
   static string_span from_view( std::string_view s ) { return { s }; }
 
   char* mutable_data() { return const_cast<char*>( data() ); }
+  uint8_t* mutable_data_unsigned() { return const_cast<uint8_t*>( reinterpret_cast<const uint8_t*>( data() ) ); }
 
   size_t copy( const std::string_view other )
   {

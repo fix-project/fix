@@ -6,6 +6,7 @@ add_custom_target (fixpoint-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-fai
 add_custom_target (all-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^t_" COMMENT "Testing...")
 
 add_test(NAME t_add WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add)
+add_test(NAME t_blake3 WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-blake3)
 add_test(NAME t_fib WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib)
 add_test(NAME t_trap WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh)
 add_test(NAME t_api WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-api.py)
