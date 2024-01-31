@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <format>
 #include <functional>
 #include <iostream>
@@ -13,8 +14,10 @@
 #include "base16.hh"
 #include "object.hh"
 #include "overload.hh"
+#include "readonlyrt.hh"
 #include "repository.hh"
 #include "storage_exception.hh"
+#include "tester-utils.hh"
 
 using namespace std;
 
@@ -330,6 +333,27 @@ void label( int argc, char* argv[] )
   storage.label( new_label, handle );
 }
 
+void eval( int argc, char* argv[] )
+{
+  if ( argc == 0 or string( argv[1] ) == "--help" ) {
+    parser_usage_message();
+    exit( EXIT_FAILURE );
+  }
+
+  auto rt = ReadOnlyTester::init();
+  span_view<char*> args = { argv, static_cast<size_t>( argc ) };
+  args.remove_prefix( 1 );
+  auto handle = parse_args( *rt, args );
+
+  if ( !handle::extract<Object>( handle ).has_value() ) {
+    cerr << "Handle is not an Object";
+    exit( EXIT_FAILURE );
+  }
+
+  auto res = rt->executor().execute( Handle<Eval>( handle::extract<Object>( handle ).value() ) );
+  cout << res << endl;
+}
+
 void init( int, char*[] )
 {
   bool exists = false;
@@ -390,6 +414,7 @@ map<string, pair<function<void( int, char*[] )>, const char*>> commands = {
   { "labels", { labels, "List all available labels." } },
   { "ls", { tree::ls, "List the contents of a Tree." } },
   { "ls-tree", { tree::ls, "List the contents of a Tree." } },
+  { "eval", { eval, "Eval" } },
 };
 
 void help( ostream& os = cout )

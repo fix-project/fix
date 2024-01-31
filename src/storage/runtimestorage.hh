@@ -116,6 +116,7 @@ public:
 
   void label( Handle<Fix> target, const std::string_view label );
   Handle<Fix> labeled( const std::string_view label );
+  bool contains( const std::string_view label );
   std::unordered_set<std::string> labels();
 
   Handle<Fix> serialize( Handle<Fix> root, bool pins = true );

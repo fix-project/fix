@@ -1,5 +1,6 @@
 #include <glog/logging.h>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include "executor.hh"
@@ -308,6 +309,11 @@ Handle<Fix> Executor::labeled( const std::string_view label )
 {
   return storage_.labeled( label );
 };
+
+bool Executor::contains( const std::string_view label )
+{
+  return storage_.contains( label );
+}
 
 template<FixType T>
 void Executor::visit( Handle<T> handle,

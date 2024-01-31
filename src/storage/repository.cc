@@ -255,7 +255,7 @@ bool Repository::contains( Handle<Fix> handle )
 }
 #endif
 
-bool Repository::contains( const std::string_view label ) const
+bool Repository::contains( const std::string_view label )
 {
   try {
     return fs::exists( repo_ / "labels" / label );

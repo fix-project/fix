@@ -91,6 +91,7 @@ public:
   virtual bool contains( Handle<AnyTree> handle ) override;
   virtual bool contains( Handle<Relation> handle ) override;
   virtual Handle<Fix> labeled( const std::string_view label ) override;
+  virtual bool contains( const std::string_view label ) override;
 
   /* }@ */
 };

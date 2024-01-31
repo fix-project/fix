@@ -2,6 +2,7 @@
 #include <string_view>
 
 #include "handle.hh"
+#include "handle_post.hh"
 #include "object.hh"
 #include "sha256.hh"
 

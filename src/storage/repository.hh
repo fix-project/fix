@@ -37,7 +37,7 @@ public:
   virtual bool contains( Handle<AnyTree> name ) override;
   virtual bool contains( Handle<Relation> name ) override;
 
-  bool contains( const std::string_view label ) const;
+  bool contains( const std::string_view label ) override;
 
   std::filesystem::path path() { return repo_; }
 

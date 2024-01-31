@@ -1,7 +1,8 @@
 include_directories(${CMAKE_BINARY_DIR}/src/runtime)
 
-add_executable(fix "fix.cc")
-target_link_libraries(fix storage)
+add_executable(fix "fix.cc" "tester-utils.cc")
+target_link_libraries(fix runtime storage)
+target_include_directories (fix PUBLIC "${PROJECT_SOURCE_DIR}/src/tests")
 
 # add_executable(stateless-tester "stateless-tester.cc" "main.cc" "tester-utils.cc")
 # target_link_libraries(stateless-tester runtime)
