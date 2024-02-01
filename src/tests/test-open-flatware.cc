@@ -3,7 +3,7 @@
 #include "test.hh"
 
 namespace tester {
-auto rt = ReadOnlyTester::init();
+auto rt = ReadOnlyRT::init();
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
@@ -45,9 +45,7 @@ int run_flatware( const string& name, Handle<Fix> elf, Handle<Fix> home )
 {
   printf( "### TEST %s\n", name.c_str() );
   auto exe = Handle<Application>( tester::Tree( tester::Blob( "unused" ), elf, tester::Tree(), home ) );
-  auto result
-    = tester::rt->get( tester::rt->executor().execute( Handle<Eval>( exe ) ).try_into<ValueTree>().value() )
-        .value();
+  auto result = tester::rt->get( tester::rt->execute( Handle<Eval>( exe ) ).try_into<ValueTree>().value() ).value();
   uint32_t code = -1;
   memcpy( &code, handle::extract<Literal>( result->at( 0 ) ).value().data(), sizeof( uint32_t ) );
   printf( "%s returned %d\n", name.c_str(), code );

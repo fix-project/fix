@@ -4,7 +4,7 @@
 #include "test.hh"
 
 namespace tester {
-auto rt = ReadOnlyTester::init();
+auto rt = ReadOnlyRT::init();
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
@@ -21,7 +21,7 @@ uint32_t fix_add( char a, char b, Handle<Fix> add_elf )
                   tester::Tree( tester::Blob( "add" ), tester::Blob( { &a, 1 } ), tester::Blob( { &b, 1 } ) ) ) );
   (void)a, (void)b;
 
-  auto result = tester::rt->executor().execute( Handle<Eval>( add ) );
+  auto result = tester::rt->execute( Handle<Eval>( add ) );
   auto tree = tester::rt->get( result.try_into<ValueTree>().value() ).value();
   auto sum = tree->at( 0 );
   uint32_t x = -1;

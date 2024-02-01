@@ -4,7 +4,7 @@
 #include "test.hh"
 
 namespace tester {
-auto rt = ReadOnlyTester::init();
+auto rt = ReadOnlyRT::init();
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
@@ -15,7 +15,7 @@ using namespace std;
 
 void test( void )
 {
-  auto res = tester::rt->executor().execute( Handle<Eval>( Handle<Application>(
+  auto res = tester::rt->execute( Handle<Eval>( Handle<Application>(
     tester::Tree( tester::Blob( "unused" ),
                   tester::Compile( tester::File( "applications-prefix/src/applications-build/flatware/examples/"
                                                  "helloworld/helloworld-fixpoint.wasm" ) ) ) ) ) );

@@ -316,9 +316,10 @@ bool Executor::contains( const std::string_view label )
 }
 
 template<FixType T>
-void Executor::visit( Handle<T> handle,
-                      std::function<void( Handle<Fix> )> visitor,
-                      std::unordered_set<Handle<Fix>> visited )
+requires std::convertible_to<Handle<T>, Handle<Object>>
+void Executor::visit_minrepo( Handle<T> handle,
+                              std::function<void( Handle<Object> )> visitor,
+                              std::unordered_set<Handle<Object>> visited )
 {
   if ( visited.contains( handle ) )
     return;
@@ -326,31 +327,20 @@ void Executor::visit( Handle<T> handle,
     return;
 
   if constexpr ( Handle<T>::is_fix_sum_type ) {
-    if ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) ) {
-      std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
-    }
-    if constexpr ( std::same_as<T, Relation> ) {
-      auto target = get_or_delegate( handle );
-      std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, target->get() );
-    }
+    if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef>
+                        or std::same_as<T, ObjectTreeRef> ) )
+      std::visit( [&]( const auto x ) { visit_minrepo( x, visitor, visited ); }, handle.get() );
   } else {
     if constexpr ( FixTreeType<T> ) {
       auto tree = get_or_delegate( handle );
       for ( const auto& element : tree.value()->span() ) {
-        visit( element, visitor, visited );
+        visit_minrepo( handle::extract<Object>( element ).value(), visitor, visited );
       }
     }
     VLOG( 2 ) << "visiting " << handle;
     visitor( handle );
     visited.insert( handle );
   }
-}
-
-vector<Handle<Fix>> Executor::minrepo( Handle<Fix> handle )
-{
-  vector<Handle<Fix>> handles {};
-  visit( handle, [&]( Handle<Fix> h ) { handles.push_back( h ); } );
-  return handles;
 }
 
 void Executor::load_to_storage( Handle<Fix> handle )
@@ -364,5 +354,5 @@ void Executor::load_to_storage( Handle<Fix> handle )
 
 void Executor::load_minrepo( Handle<ObjectTree> combination )
 {
-  visit( combination, [&]( Handle<Fix> h ) { load_to_storage( h ); } );
+  visit_minrepo( combination, [&]( Handle<Object> h ) { load_to_storage( h ); } );
 }

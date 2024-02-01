@@ -5,7 +5,7 @@
 
 using namespace std;
 
-auto rt = ReadOnlyTester::init();
+auto rt = ReadOnlyRT::init();
 
 void test( void )
 {
@@ -15,7 +15,7 @@ void test( void )
           compile( *rt, file( *rt, "applications-prefix/src/applications-build/map/add_2_map.wasm" ) ),
           Handle<Literal>( 0 ) ) ) );
 
-  auto result = rt->executor().execute( Handle<Eval>( t ) );
+  auto result = rt->execute( Handle<Eval>( t ) );
   auto tree = rt->get( result.try_into<ValueTree>().value() );
   uint32_t results[3];
   for ( size_t i = 0; i < 3; i++ ) {

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "readonlyrt.hh"
+#include "runtimes.hh"
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-static Handle<Strict> compile( ReadOnlyTester& rt, Handle<Fix> wasm )
+static Handle<Strict> compile( FrontendRT& rt, Handle<Fix> wasm )
 {
   auto compiler = rt.labeled( "compile-encode" );
 
@@ -18,7 +18,7 @@ static Handle<Strict> compile( ReadOnlyTester& rt, Handle<Fix> wasm )
 }
 
 template<FixHandle... Args>
-Handle<AnyTree> tree( ReadOnlyTester& rt, Args... args )
+Handle<AnyTree> tree( FrontendRT& rt, Args... args )
 {
   OwnedMutTree tree = OwnedMutTree::allocate( sizeof...( args ) );
   size_t i = 0;
@@ -33,14 +33,14 @@ Handle<AnyTree> tree( ReadOnlyTester& rt, Args... args )
   return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) );
 }
 
-static Handle<Blob> blob( ReadOnlyTester& rt, std::string_view contents )
+static Handle<Blob> blob( FrontendRT& rt, std::string_view contents )
 {
   auto blob = OwnedMutBlob::allocate( contents.size() );
   memcpy( blob.data(), contents.data(), contents.size() );
   return rt.create( std::make_shared<OwnedBlob>( std::move( blob ) ) );
 }
 
-static Handle<Blob> file( ReadOnlyTester& rt, std::filesystem::path path )
+static Handle<Blob> file( FrontendRT& rt, std::filesystem::path path )
 {
   return rt.create( std::make_shared<OwnedBlob>( path ) );
 }

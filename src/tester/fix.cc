@@ -14,8 +14,8 @@
 #include "base16.hh"
 #include "object.hh"
 #include "overload.hh"
-#include "readonlyrt.hh"
 #include "repository.hh"
+#include "runtimes.hh"
 #include "storage_exception.hh"
 #include "tester-utils.hh"
 
@@ -203,6 +203,7 @@ void ls( int argc, char* argv[] )
   Repository storage;
   auto handle = handle::data( storage.lookup( ref ) )
                   .visit<Handle<AnyTree>>( overload {
+                    []( Handle<ValueTree> x ) { return x; },
                     []( Handle<AnyTree> x ) { return x; },
                     [&]( auto ) -> Handle<AnyTree> {
                       cerr << std::format( "Ref {} does not a describe a tree.", ref );
@@ -340,7 +341,7 @@ void eval( int argc, char* argv[] )
     exit( EXIT_FAILURE );
   }
 
-  auto rt = ReadOnlyTester::init();
+  auto rt = ReadWriteRT::init();
   span_view<char*> args = { argv, static_cast<size_t>( argc ) };
   args.remove_prefix( 1 );
   auto handle = parse_args( *rt, args );
@@ -350,7 +351,7 @@ void eval( int argc, char* argv[] )
     exit( EXIT_FAILURE );
   }
 
-  auto res = rt->executor().execute( Handle<Eval>( handle::extract<Object>( handle ).value() ) );
+  auto res = rt->execute( Handle<Eval>( handle::extract<Object>( handle ).value() ) );
   cout << res << endl;
 }
 
