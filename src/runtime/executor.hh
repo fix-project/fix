@@ -1,5 +1,5 @@
 #pragma once
-#include <concepts>
+
 #include <memory>
 #include <thread>
 #include <unordered_set>
@@ -7,6 +7,7 @@
 
 #include "channel.hh"
 #include "evaluator.hh"
+#include "handle.hh"
 #include "interface.hh"
 #include "mutex.hh"
 #include "runner.hh"
@@ -48,12 +49,12 @@ public:
   template<FixType T>
   requires std::convertible_to<Handle<T>, Handle<Object>>
   void visit_minrepo( Handle<T> root,
-                      std::function<void( Handle<Object> )> visitor,
+                      std::function<void( Handle<AnyDataType> )> visitor,
                       std::unordered_set<Handle<Object>> visited = {} );
 
   template<FixType T>
   void visit( Handle<T> handle,
-              std::function<void( Handle<Fix> )> visitor,
+              std::function<void( Handle<AnyDataType> )> visitor,
               std::unordered_set<Handle<Fix>> visited = {} )
   {
     if ( visited.contains( handle ) )
@@ -92,7 +93,7 @@ public:
     }
   }
 
-  void load_to_storage( Handle<Fix> handle );
+  void load_to_storage( Handle<AnyDataType> handle );
   void load_minrepo( Handle<ObjectTree> handle );
 
   RuntimeStorage& storage() { return storage_; }

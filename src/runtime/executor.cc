@@ -318,7 +318,7 @@ bool Executor::contains( const std::string_view label )
 template<FixType T>
 requires std::convertible_to<Handle<T>, Handle<Object>>
 void Executor::visit_minrepo( Handle<T> handle,
-                              std::function<void( Handle<Object> )> visitor,
+                              std::function<void( Handle<AnyDataType> )> visitor,
                               std::unordered_set<Handle<Object>> visited )
 {
   if ( visited.contains( handle ) )
@@ -343,7 +343,7 @@ void Executor::visit_minrepo( Handle<T> handle,
   }
 }
 
-void Executor::load_to_storage( Handle<Fix> handle )
+void Executor::load_to_storage( Handle<AnyDataType> handle )
 {
   handle::data( handle ).visit<void>( overload { []( Handle<Literal> ) { return; },
                                                  [&]( auto h ) {
@@ -354,5 +354,5 @@ void Executor::load_to_storage( Handle<Fix> handle )
 
 void Executor::load_minrepo( Handle<ObjectTree> combination )
 {
-  visit_minrepo( combination, [&]( Handle<Object> h ) { load_to_storage( h ); } );
+  visit_minrepo( combination, [&]( Handle<AnyDataType> h ) { load_to_storage( h ); } );
 }
