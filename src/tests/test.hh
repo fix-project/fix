@@ -50,3 +50,20 @@ static Handle file( std::filesystem::path path )
   OwnedBlob blob = OwnedBlob::from_file( path );
   return rt.storage().add_blob( std::move( blob ) );
 }
+
+static Handle flatware_input( Handle program,
+                              Handle filesystem = tree( {} ),
+                              Handle args = tree( {} ),
+                              Handle stdin = blob( "" ),
+                              Handle env = tree( {} ) )
+{
+  auto& rt = Runtime::get_instance();
+  auto flatware_input = OwnedMutTree::allocate( 6 );
+  flatware_input.at( 0 ) = Handle( "unused" );
+  flatware_input.at( 1 ) = program;
+  flatware_input.at( 2 ) = filesystem;
+  flatware_input.at( 3 ) = args;
+  flatware_input.at( 4 ) = stdin;
+  flatware_input.at( 5 ) = env;
+  return rt.storage().add_tree( std::move( flatware_input ) ).as_thunk();
+}
