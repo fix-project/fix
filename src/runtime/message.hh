@@ -131,13 +131,18 @@ struct TransferPayload
 using ProposeTransferPayload = TransferPayload<Message::Opcode::PROPOSE_TRANSFER>;
 using AcceptTransferPayload = TransferPayload<Message::Opcode::ACCEPT_TRANSFER>;
 
+using BlobDataPayload = std::pair<Handle<Fix>, BlobData>;
+using TreeDataPayload = std::pair<Handle<Fix>, TreeData>;
+
 using MessagePayload = std::variant<RunPayload,
                                     ResultPayload,
                                     InfoPayload,
                                     ProposeTransferPayload,
                                     AcceptTransferPayload,
                                     RequestBlobPayload,
-                                    RequestTreePayload>;
+                                    RequestTreePayload,
+                                    BlobDataPayload,
+                                    TreeDataPayload>;
 
 class IncomingMessage : public Message
 {

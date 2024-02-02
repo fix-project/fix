@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <stdexcept>
@@ -11,6 +12,7 @@
 
 #include "eventloop.hh"
 #include "handle.hh"
+#include "handle_post.hh"
 #include "message.hh"
 #include "network.hh"
 #include "object.hh"
@@ -59,43 +61,6 @@ void Remote::send_tree( TreeData tree )
   push_message( { Opcode::TREEDATA, tree } );
 }
 
-// void Remote::send_object( Handle<Fix> handle )
-//{
-//   if ( not handle.try_into<Expression>().has_value() ) {
-//     throw runtime_error( "Unimplemented" );
-//   }
-//
-//   auto blob = handle.try_into<Expression>()
-//     .and_then( []( auto h ) { return h.template try_into<Object>(); } )
-//     .and_then( []( auto h ) { return h.template try_into<Value>(); } )
-//     .and_then( []( auto h ) { return h.template try_into<Blob>(); } )
-//     .and_then( []( auto h ) { return h.template try_into<Named>(); } );
-//
-//   if ( blob ) {
-//     send_blob( storage_.get( blob.value() ) );
-//     return;
-//   }
-//
-//   auto valuetree = handle.try_into<Expression>()
-//     .and_then( []( auto h ) { return h.template try_into<Object>(); } )
-//     .and_then( []( auto h ) { return h.template try_into<Value>(); } )
-//     .and_then( []( auto h ) { return h.template try_into<ValueTree>(); } );
-//
-//   if ( valuetree ) {
-//     send_tree( storage_.get( valuetree.value() ) );
-//     return;
-//   }
-//
-//   auto objecttree = handle.try_into<Expression>()
-//     .and_then( []( auto h ) { return h.template try_into<Object>(); } )
-//     .and_then( []( auto h ) { return h.template try_into<ObjectTree>(); } );
-//
-//   if ( objecttree ) {
-//     send_tree( storage_.get( objecttree.value() ) );
-//     return;
-//   }
-// }
-
 void Remote::push_message( OutgoingMessage&& msg )
 {
   VLOG( 1 ) << "push_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
@@ -124,29 +89,29 @@ optional<TreeData> Remote::get( Handle<AnyTree> name )
 
 optional<Handle<Object>> Remote::get( Handle<Relation> name )
 {
-  VLOG( 1 ) << "Pushing runpayload " << name;
   RunPayload payload { .task = name };
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
   return {};
 }
 
-void Remote::put( __attribute__( ( unused ) ) Handle<Named> name, BlobData data )
+void Remote::put( Handle<Named> name, BlobData data )
 {
-  send_blob( data );
+  msg_q_.enqueue( make_pair( index_, make_pair( name, data ) ) );
 }
 
-void Remote::put( __attribute__( ( unused ) ) Handle<AnyTree> name, TreeData data )
+void Remote::put( Handle<AnyTree> name, TreeData data )
 {
-  send_tree( data );
+  msg_q_.enqueue( make_pair( index_, make_pair( handle::fix( name ), data ) ) );
 }
 
 void Remote::put( Handle<Relation> name, Handle<Object> data )
 {
-  shared_lock lock( mutex_ );
+  unique_lock lock( mutex_ );
   if ( reply_to_.contains( name ) ) {
     ResultPayload payload { .task = name, .result = data };
     msg_q_.enqueue( make_pair( index_, move( payload ) ) );
+    reply_to_.erase( name );
   }
 }
 
@@ -298,39 +263,78 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::PROPOSE_TRANSFER: {
-      // auto [todo, result, handles] = parse<ProposeTransferPayload>( std::get<string>( msg.payload() ) );
+      auto [todo, result, handles] = parse<ProposeTransferPayload>( std::get<string>( msg.payload() ) );
 
-      // size_t original = handles.size();
-      // for ( auto it = handles.begin(); it != handles.end(); ) {
-      //   if ( parent_.lock()->contains( *it ) ) {
-      //     it = handles.erase( it );
-      //   } else {
-      //     ++it;
-      //   }
-      // }
-      // VLOG( 2 ) << "Accepting " << handles.size() << " of " << original << " objects.";
-      // for ( const auto& h : handles ) {
-      //   VLOG( 3 ) << "Accepting " << h;
-      // }
-      // push_message( OutgoingMessage::to_message( AcceptTransferPayload { todo, result, handles } ) );
-      throw runtime_error( "Unimplemented" );
+      size_t original = handles.size();
+
+      for ( auto it = handles.begin(); it != handles.end(); ) {
+        auto contained
+          = handle::extract<Named>( *it )
+              .transform( []( auto h ) -> Handle<AnyDataType> { return h; } )
+              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ValueTree>( *it ); } )
+              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ObjectTree>( *it ); } )
+              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ExpressionTree>( *it ); } )
+              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<Relation>( *it ); } )
+              .transform( [&]( auto h ) {
+                return h.template visit<bool>( overload { []( Handle<Literal> ) { return true; },
+                                                          [&]( auto h ) {
+                                                            auto parent = parent_.lock();
+                                                            if ( parent )
+                                                              return parent->contains( h );
+                                                            return false;
+                                                          } } );
+              } );
+
+        if ( contained.has_value() and contained.value() ) {
+          it = handles.erase( it );
+        } else {
+          ++it;
+        }
+      }
+      VLOG( 2 ) << "Accepting " << handles.size() << " of " << original << " objects.";
+      for ( const auto& h : handles ) {
+        VLOG( 3 ) << "Accepting " << h;
+      }
+      push_message( OutgoingMessage::to_message( AcceptTransferPayload { todo, result, handles } ) );
       break;
     }
 
     case Opcode::ACCEPT_TRANSFER: {
-      // auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string>( msg.payload() ) );
+      auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string>( msg.payload() ) );
 
-      // VLOG( 2 ) << "Sending " << handles.size() << " objects.";
-      // for ( const auto& h : handles ) {
-      //   VLOG( 3 ) << "Sending " << h;
-      //   send_object( h );
-      // }
-      // if ( result ) {
-      //   push_message( OutgoingMessage::to_message( ResultPayload { .task = todo, .result = *result } ) );
-      // } else {
-      //   push_message( OutgoingMessage::to_message( RunPayload { .task = todo } ) );
-      // }
-      throw runtime_error( "Unimplemented" );
+      VLOG( 2 ) << "Sending " << handles.size() << " objects.";
+      for ( const auto& h : handles ) {
+        auto anydata
+          = handle::extract<Named>( h )
+              .transform( []( auto h ) -> Handle<AnyDataType> { return h; } )
+              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ValueTree>( h ); } )
+              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ObjectTree>( h ); } )
+              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ExpressionTree>( h ); } )
+              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<Relation>( h ); } );
+
+        if ( anydata ) {
+          VLOG( 3 ) << "Sending " << handle::fix( anydata.value() );
+          anydata->visit<void>( overload {
+            [&]( Handle<Named> n ) {
+              push_message( { Opcode::BLOBDATA, std::get<BlobData>( proposed_proposals_.at( todo )->at( n ) ) } );
+            },
+            [&]( Handle<AnyTree> n ) {
+              push_message( { Opcode::TREEDATA,
+                              std::get<TreeData>( proposed_proposals_.at( todo )->at( handle::fix( n ) ) ) } );
+            },
+            []( Handle<Relation> ) {},
+            []( Handle<Literal> ) {},
+          } );
+        }
+      }
+
+      proposed_proposals_.erase( todo );
+
+      if ( result ) {
+        push_message( OutgoingMessage::to_message( ResultPayload { .task = todo, .result = *result } ) );
+      } else {
+        push_message( OutgoingMessage::to_message( RunPayload { .task = todo } ) );
+      }
       break;
     }
 
@@ -367,39 +371,40 @@ Remote::~Remote()
 void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&& payload )
 {
   if ( !connections_.read()->contains( remote_idx ) ) {
-    // Forward back any run
-    // if ( holds_alternative<ProposeTransferPayload>( payload ) ) {
-    //  auto proposed_payload = get<ProposeTransferPayload>( payload );
-    //  parent_.lock()->get( move( proposed_payload.todo ) );
-    //}
     if ( holds_alternative<RunPayload>( payload ) ) {
       parent_.lock()->get( move( std::get<RunPayload>( payload ).task ) );
     }
   } else {
     Remote& connection = *connections_.read()->at( remote_idx );
 
-    bool need_send = false;
+    visit( overload {
+             [&]( BlobDataPayload b ) { connection.incomplete_proposal_->emplace( b.first, b.second ); },
+             [&]( TreeDataPayload t ) { connection.incomplete_proposal_->emplace( t.first, t.second ); },
+             [&]( RunPayload r ) {
+               ProposeTransferPayload payload;
+               payload.todo = r.task;
+               for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
+                 payload.handles.push_back( name );
+               }
+               connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+               connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
+               connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
 
-    if ( holds_alternative<ProposeTransferPayload>( payload ) ) {
-      // const auto& proposed_payload = get<ProposeTransferPayload>( payload );
-      // if ( !proposed_payload.result.has_value() ) {
-      //   connection.pending_result_.insert( proposed_payload.todo );
-      // }
-      // need_send = true;
-      throw std::runtime_error( "Unimplemented" );
-    } else if ( holds_alternative<RunPayload>( payload ) ) {
-      connection.pending_result_.insert( std::get<RunPayload>( payload ).task );
-      need_send = true;
-    } else if ( holds_alternative<ResultPayload>( payload ) ) {
-      const auto& result_payload = std::get<ResultPayload>( payload );
-      need_send = connection.erase_reply_to( result_payload.task );
-    } else {
-      need_send = true;
-    }
-
-    if ( need_send ) {
-      connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-    }
+               connection.pending_result_.insert( r.task );
+             },
+             [&]( ResultPayload r ) {
+               ProposeTransferPayload payload;
+               payload.todo = r.task;
+               payload.result = r.result;
+               for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
+                 payload.handles.push_back( name );
+               }
+               connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+               connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
+               connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+             },
+             [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },
+           payload );
   }
 }
 

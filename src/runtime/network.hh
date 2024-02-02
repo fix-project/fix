@@ -18,6 +18,7 @@
 #include "message.hh"
 #include "mutex.hh"
 #include "ring_buffer.hh"
+#include "runtimestorage.hh"
 #include "socket.hh"
 
 using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, MessagePayload>>;
@@ -35,8 +36,12 @@ struct EventCategories
   size_t forward_msg;
 };
 
+class NetworkWorker;
+
 class Remote : public IRuntime
 {
+  friend class NetworkWorker;
+
   TCPSocket socket_;
 
   MessageQueue& msg_q_;
@@ -60,6 +65,10 @@ class Remote : public IRuntime
   absl::flat_hash_set<Handle<Relation>> reply_to_ {};
 
   bool dead_ { false };
+
+  using DataProposal = absl::flat_hash_map<Handle<Fix>, std::variant<BlobData, TreeData>, AbslHash>;
+  std::unique_ptr<DataProposal> incomplete_proposal_ { std::make_unique<DataProposal>() };
+  absl::flat_hash_map<Handle<Relation>, std::unique_ptr<DataProposal>> proposed_proposals_ {};
 
 public:
   Remote( EventLoop& events,
