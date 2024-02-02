@@ -7,7 +7,6 @@
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 
@@ -16,6 +15,7 @@
 #include "handle.hh"
 #include "interface.hh"
 #include "message.hh"
+#include "mutex.hh"
 #include "ring_buffer.hh"
 #include "socket.hh"
 
@@ -79,6 +79,7 @@ public:
   bool contains( Handle<Named> handle ) override;
   bool contains( Handle<AnyTree> handle ) override;
   bool contains( Handle<Relation> handle ) override;
+  bool contains( const std::string_view label ) override;
   std::optional<Info> get_info() override;
 
   void push_message( OutgoingMessage&& msg );
@@ -123,7 +124,7 @@ private:
   Channel<TCPSocket> connecting_sockets_ {};
 
   std::size_t next_connection_id_ { 0 };
-  std::unordered_map<size_t, std::shared_ptr<Remote>> connections_ {};
+  SharedMutex<std::unordered_map<std::string, size_t>> addresses_ {};
   std::vector<TCPSocket> server_sockets_ {};
 
   MessageQueue msg_q_ {};
@@ -134,6 +135,8 @@ private:
   void process_outgoing_message( size_t remote_id, MessagePayload&& message );
 
 public:
+  SharedMutex<std::unordered_map<size_t, std::shared_ptr<Remote>>> connections_ {};
+
   NetworkWorker( std::weak_ptr<IRuntime> parent )
     : parent_( parent )
   {}
@@ -167,5 +170,10 @@ public:
     connecting_sockets_.move_push( std::move( socket ) );
   }
 
-  std::shared_ptr<Remote> get_remote( size_t index ) { return connections_.at( index ); }
+  std::shared_ptr<Remote> get_remote( const Address& address )
+  {
+    auto address_str = address.to_string();
+    addresses_.read().wait( [&] { return addresses_.read()->contains( address_str ); } );
+    return connections_.read()->at( addresses_.read()->at( address_str ) );
+  }
 };

@@ -8,7 +8,7 @@
 
 using namespace std;
 
-Address address( "0.0.0.0", 12345 );
+Address address( "127.0.0.1", 12345 );
 
 const std::string path = "testing/wasm-examples/addblob.wasm";
 const std::string path2 = "testing/wasm-examples/fib.wasm";
@@ -88,7 +88,7 @@ void client()
 
   auto tests = init_rt_set1( rt );
   auto checks = init_rt_set2( rt_check );
-  auto remote = nw.get_remote( 0 );
+  auto remote = nw.get_remote( address );
 
   // Send puts
   for ( const auto& test : tests ) {

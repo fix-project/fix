@@ -167,6 +167,12 @@ bool Remote::contains( __attribute__( ( unused ) ) Handle<Relation> handle )
   return false;
 }
 
+bool Remote::contains( __attribute__( ( unused ) ) const std::string_view label )
+{
+  // TODO
+  return false;
+}
+
 std::optional<IRuntime::Info> Remote::get_info()
 {
   shared_lock lock( mutex_ );
@@ -359,7 +365,7 @@ Remote::~Remote()
 
 void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&& payload )
 {
-  if ( !connections_.contains( remote_idx ) ) {
+  if ( !connections_.read()->contains( remote_idx ) ) {
     // Forward back any run
     // if ( holds_alternative<ProposeTransferPayload>( payload ) ) {
     //  auto proposed_payload = get<ProposeTransferPayload>( payload );
@@ -369,7 +375,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
       parent_.lock()->get( move( std::get<RunPayload>( payload ).task ) );
     }
   } else {
-    Remote& connection = *connections_.at( remote_idx );
+    Remote& connection = *connections_.read()->at( remote_idx );
 
     bool need_send = false;
 
@@ -416,12 +422,16 @@ void NetworkWorker::run_loop()
       TCPSocket& server_socket = server_sockets_.back();
       // When someone connects to the socket, accept it and add the new connection to the event loop
       events_.add_rule( categories_.server_new_connection, server_socket, Direction::In, [&] {
-        connections_.emplace(
+        connections_.write()->emplace(
           next_connection_id_,
           make_unique<Remote>(
             events_, categories_, server_socket.accept(), next_connection_id_, msg_q_, parent_ ) );
-        // XXX
-        // runtime_.add_task_runner( connections_.at( next_connection_id_ ) );
+
+        {
+          addresses_.write()->emplace( connections_.read()->at( next_connection_id_ )->peer_address().to_string(),
+                                       next_connection_id_ );
+        }
+
         next_connection_id_++;
       } );
     },
@@ -432,12 +442,14 @@ void NetworkWorker::run_loop()
     categories_.client_new_connection,
     [&] {
       TCPSocket client_socket = *connecting_sockets_.pop();
-      connections_.emplace(
+      connections_.write()->emplace(
         next_connection_id_,
         make_unique<Remote>(
           events_, categories_, std::move( client_socket ), next_connection_id_, msg_q_, parent_ ) );
-      // XXX
-      // runtime_.add_task_runner( connections_.at( next_connection_id_ ) );
+
+      addresses_.write()->emplace( connections_.read()->at( next_connection_id_ )->peer_address().to_string(),
+                                   next_connection_id_ );
+
       next_connection_id_++;
     },
     [&] { return connecting_sockets_.size_approx() > 0; } );
@@ -455,7 +467,7 @@ void NetworkWorker::run_loop()
 
   // TODO: kick
   while ( not should_exit_ ) {
-    std::erase_if( connections_, []( const auto& item ) {
+    std::erase_if( connections_.write().get(), []( const auto& item ) {
       auto const& [_, value] = item;
       return value->dead();
     } );
