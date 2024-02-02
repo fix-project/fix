@@ -3,6 +3,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <concurrentqueue/concurrentqueue.h>
+#include <glog/logging.h>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -166,6 +167,7 @@ public:
   void connect( const Address& address )
   {
     TCPSocket socket;
+    VLOG( 1 ) << "Connecting to " << address.to_string();
     socket.connect( address );
     connecting_sockets_.move_push( std::move( socket ) );
   }

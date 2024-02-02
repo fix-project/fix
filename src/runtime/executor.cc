@@ -113,6 +113,7 @@ Result<Value> Executor::load( Handle<Value> value )
 
 Result<Object> Executor::apply( Handle<ObjectTree> combination )
 {
+  VLOG( 2 ) << "Apply " << combination;
   Handle<Apply> goal( combination );
 
   if ( storage_.contains( goal ) ) {
@@ -133,7 +134,12 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   load_minrepo( combination );
 
   auto result = runner_->apply( combination, tree );
+
   storage_.create( goal, result );
+  auto parent = parent_.lock();
+  if ( parent )
+    parent->put( goal, result );
+
   auto live = live_.write();
   live->erase( goal );
   return result;
@@ -150,7 +156,12 @@ Result<Value> Executor::evalStrict( Handle<Object> expression )
   auto result = evaluator_.evalStrict( expression );
   if ( !result )
     return {};
+
   storage_.create( goal, *result );
+  auto parent = parent_.lock();
+  if ( parent )
+    parent->put( goal, *result );
+
   return result;
 }
 

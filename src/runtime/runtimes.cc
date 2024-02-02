@@ -121,10 +121,21 @@ shared_ptr<Client> Client::init( const Address& address )
   auto runtime = make_shared<Client>();
   runtime->repository_.emplace();
   runtime->network_worker_.emplace( runtime );
+  runtime->network_worker_->start();
   runtime->network_worker_->connect( address );
   runtime->remote_ = runtime->network_worker_->get_remote( address );
   runtime->executor_.emplace( 0, runtime );
   return runtime;
+}
+
+Client::~Client()
+{
+  network_worker_->stop();
+}
+
+Server::~Server()
+{
+  network_worker_->stop();
 }
 
 shared_ptr<Server> Server::init( const Address& address )
@@ -132,6 +143,7 @@ shared_ptr<Server> Server::init( const Address& address )
   auto runtime = std::make_shared<Server>();
   runtime->repository_.emplace();
   runtime->network_worker_.emplace( runtime );
+  runtime->network_worker_->start();
   runtime->network_worker_->start_server( address );
   runtime->executor_.emplace( std::thread::hardware_concurrency(), runtime );
   return runtime;
@@ -142,7 +154,7 @@ Handle<Value> Client::execute( Handle<Relation> x )
   auto send = [&]( Handle<AnyDataType> h ) {
     h.visit<void>( overload { []( Handle<Literal> ) {},
                               []( Handle<Relation> ) {},
-                              [&]( auto x ) { remote_->put( x, executor_->get( x ).value() ); } } );
+                              [&]( auto x ) { remote_->put( x, get( x ).value() ); } } );
   };
 
   x.visit<void>( overload { [&]( Handle<Apply> x ) { executor_->visit_minrepo( x.unwrap<ObjectTree>(), send ); },
@@ -258,10 +270,11 @@ optional<Handle<Object>> Server::get( Handle<Relation> name )
 template<typename T, typename S>
 void Server::put( Handle<S> name, T data )
 {
-  executor_->put( name, data );
-  for ( const auto& connection : network_worker_->connections_.read().get() ) {
-    connection.second->put( name, data );
-  }
+  if ( !executor_->contains( name ) )
+    executor_->put( name, data );
+  // for ( const auto& connection : network_worker_->connections_.read().get() ) {
+  //   connection.second->put( name, data );
+  // }
 }
 
 void Server::put( Handle<Named> name, BlobData data )
@@ -274,7 +287,10 @@ void Server::put( Handle<AnyTree> name, TreeData data )
 }
 void Server::put( Handle<Relation> name, Handle<Object> data )
 {
-  return put<Handle<Object>, Relation>( name, data );
+  put<Handle<Object>, Relation>( name, data );
+  for ( const auto& connection : network_worker_->connections_.read().get() ) {
+    connection.second->put( name, data );
+  }
 }
 
 template<typename T>

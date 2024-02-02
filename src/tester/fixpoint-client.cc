@@ -1,10 +1,8 @@
-#include <charconv>
-#include <cstdlib>
 #include <iostream>
 #include <unistd.h>
 
-#define RUNTIME_THREADS 1
-
+#include "handle_post.hh"
+#include "runtimes.hh"
 #include "tester-utils.hh"
 
 using namespace std;
@@ -12,58 +10,46 @@ using namespace std;
 int min_args = 2;
 int max_args = -1;
 
-void program_body( span_view<char*> args )
+void program_body( std::span<char*> argspan )
 {
+  span_view<char*> args = { argspan.data(), argspan.size() };
+
   ios::sync_with_stdio( false );
-  vector<ReadOnlyFile> open_files;
+  args.remove_prefix( 1 );
 
-  args.remove_prefix( 1 ); // ignore argv[ 0 ]
+  std::shared_ptr<Client> client;
 
-  auto& runtime = Runtime::get_instance( RUNTIME_THREADS );
-
-  while ( not args.empty() and args[0][0] == '+' ) {
+  if ( not args.empty() and args[0][0] == '+' ) {
     string addr( &args[0][1] );
     args.remove_prefix( 1 );
     if ( addr.find( ':' ) == string::npos ) {
       throw runtime_error( "invalid argument " + addr );
     }
     Address address( addr.substr( 0, addr.find( ':' ) ), stoi( addr.substr( addr.find( ':' ) + 1 ) ) );
-    cout << "Connecting to remote " << address.to_string() << "\n";
-    runtime.connect( address );
+    client = Client::init( address );
+  } else {
+    exit( 1 );
   }
 
   // make the combination from the given arguments
-  Handle encode_name = parse_args( args, open_files );
+  auto handle = parse_args( *client, args );
 
   if ( not args.empty() ) {
     throw runtime_error( "unexpected argument: "s + args.at( 0 ) );
   }
 
-  // add the combination to the store, and print it
-  cout << "Combination:\n" << pretty_print( encode_name ) << endl;
+  if ( !handle::extract<Object>( handle ).has_value() ) {
+    cerr << "Handle is not an Object" << endl;
+  }
 
-  // make a Thunk that points to the combination
-  Handle thunk_name = encode_name.as_thunk();
-
-  // Wait for the handshake
-  sleep( 1 );
-
-  // force the Thunk and print it
-  Handle result = runtime.eval( thunk_name );
+  auto res = client->execute( Handle<Eval>( handle::extract<Object>( handle ).value() ) );
 
   // print the result
-  cout << "Result:\n" << pretty_print( result );
+  cout << "Result:\n" << res << endl;
 }
 
 void usage_message( const char* argv0 )
 {
-  cerr << "Usage: " << argv0 << " [+server:port]... entry...\n";
-  cerr << "   entry :=   file:<filename>\n";
-  cerr << "            | string:<string>\n";
-  cerr << "            | name:<base16-encoded name>\n";
-  cerr << "            | uint<n>:<integer> (with <n> = 8 | 16 | 32 | 64)\n";
-  cerr << "            | tree:<n> (followed by <n> entries)\n";
-  cerr << "            | thunk: (followed by tree:<n>)\n";
-  cerr << "            | compile:<filename>\n";
-  cerr << "            | ref:<ref>\n";
+  cerr << "Usage: " << argv0 << " +address:port entries...\n";
+  parser_usage_message();
 }

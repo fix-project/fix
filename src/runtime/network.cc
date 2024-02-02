@@ -124,6 +124,7 @@ optional<TreeData> Remote::get( Handle<AnyTree> name )
 
 optional<Handle<Object>> Remote::get( Handle<Relation> name )
 {
+  VLOG( 1 ) << "Pushing runpayload " << name;
   RunPayload payload { .task = name };
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
@@ -388,6 +389,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
       throw std::runtime_error( "Unimplemented" );
     } else if ( holds_alternative<RunPayload>( payload ) ) {
       connection.pending_result_.insert( std::get<RunPayload>( payload ).task );
+      need_send = true;
     } else if ( holds_alternative<ResultPayload>( payload ) ) {
       const auto& result_payload = std::get<ResultPayload>( payload );
       need_send = connection.erase_reply_to( result_payload.task );
@@ -420,6 +422,8 @@ void NetworkWorker::run_loop()
     [&] {
       server_sockets_.push_back( *listening_sockets_.pop() );
       TCPSocket& server_socket = server_sockets_.back();
+
+      VLOG( 1 ) << "Listening on " << server_socket.local_address();
       // When someone connects to the socket, accept it and add the new connection to the event loop
       events_.add_rule( categories_.server_new_connection, server_socket, Direction::In, [&] {
         connections_.write()->emplace(
@@ -431,6 +435,9 @@ void NetworkWorker::run_loop()
           addresses_.write()->emplace( connections_.read()->at( next_connection_id_ )->peer_address().to_string(),
                                        next_connection_id_ );
         }
+
+        VLOG( 1 ) << "New connection from "
+                  << connections_.read()->at( next_connection_id_ )->peer_address().to_string();
 
         next_connection_id_++;
       } );
@@ -450,6 +457,8 @@ void NetworkWorker::run_loop()
       addresses_.write()->emplace( connections_.read()->at( next_connection_id_ )->peer_address().to_string(),
                                    next_connection_id_ );
 
+      VLOG( 1 ) << "New connection to "
+                << connections_.read()->at( next_connection_id_ )->peer_address().to_string();
       next_connection_id_++;
     },
     [&] { return connecting_sockets_.size_approx() > 0; } );

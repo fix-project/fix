@@ -89,6 +89,8 @@ public:
   bool contains( T name );
 
   virtual Handle<Value> execute( Handle<Relation> x ) override;
+
+  ~Client();
 };
 
 class Server : public IRuntime
@@ -121,4 +123,6 @@ public:
   void put( Handle<S> name, T data );
   template<typename T>
   bool contains( T name );
+
+  ~Server();
 };
