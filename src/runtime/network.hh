@@ -181,7 +181,7 @@ public:
     connecting_sockets_.move_push( std::move( socket ) );
   }
 
-  std::shared_ptr<Remote> get_remote( const Address& address )
+  std::weak_ptr<Remote> get_remote( const Address& address )
   {
     auto address_str = address.to_string();
     addresses_.read().wait( [&] { return addresses_.read()->contains( address_str ); } );

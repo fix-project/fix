@@ -282,6 +282,9 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   if ( storage_.contains( name ) ) {
     return storage_.get( name );
   }
+  if ( threads_.size() == 0 ) {
+    throw HandleNotFound( name );
+  }
   todo_ << name;
   return {};
 }

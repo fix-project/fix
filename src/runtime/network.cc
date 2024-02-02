@@ -194,7 +194,12 @@ Remote::Remote( EventLoop& events,
 
 void Remote::process_incoming_message( IncomingMessage&& msg )
 {
+  auto parent = parent_.lock();
+  if ( !parent )
+    return;
+
   VLOG( 1 ) << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
+
   switch ( msg.opcode() ) {
     case Opcode::RUN: {
       auto payload = parse<RunPayload>( std::get<string>( msg.payload() ) );
@@ -204,7 +209,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
         reply_to_.insert( task );
       }
 
-      auto res = parent_.lock()->get( payload.task );
+      auto res = parent->get( payload.task );
       if ( res.has_value() ) {
         bool need_send = erase_reply_to( task );
 
@@ -219,13 +224,12 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::RESULT: {
       auto payload = parse<ResultPayload>( std::get<string>( msg.payload() ) );
       pending_result_.erase( payload.task );
-      parent_.lock()->put( payload.task, payload.result );
+      parent->put( payload.task, payload.result );
       break;
     }
 
     case Opcode::REQUESTINFO: {
-      InfoPayload payload {
-        parent_.lock()->get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } ) };
+      InfoPayload payload { parent->get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } ) };
       push_message( OutgoingMessage::to_message( move( payload ) ) );
       break;
     }
@@ -238,7 +242,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::REQUESTTREE: {
       auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
-      auto tree = parent_.lock()->get( payload.handle );
+      auto tree = parent->get( payload.handle );
       if ( tree )
         send_tree( *tree );
       break;
@@ -246,19 +250,19 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::REQUESTBLOB: {
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
-      auto blob = parent_.lock()->get( payload.handle );
+      auto blob = parent->get( payload.handle );
       if ( blob )
         send_blob( blob.value() );
       break;
     }
 
     case Opcode::BLOBDATA: {
-      parent_.lock()->create( msg.get_blob() );
+      parent->create( msg.get_blob() );
       break;
     }
 
     case Opcode::TREEDATA: {
-      parent_.lock()->create( msg.get_tree() );
+      parent->create( msg.get_tree() );
       break;
     }
 
@@ -277,12 +281,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
               .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<Relation>( *it ); } )
               .transform( [&]( auto h ) {
                 return h.template visit<bool>( overload { []( Handle<Literal> ) { return true; },
-                                                          [&]( auto h ) {
-                                                            auto parent = parent_.lock();
-                                                            if ( parent )
-                                                              return parent->contains( h );
-                                                            return false;
-                                                          } } );
+                                                          [&]( auto h ) { return parent->contains( h ); } } );
               } );
 
         if ( contained.has_value() and contained.value() ) {
@@ -361,10 +360,13 @@ Remote::~Remote()
     handle.cancel();
   }
 
+  auto parent = parent_.lock();
   // Forward pending tasks
-  for ( auto it = pending_result_.begin(); it != pending_result_.end(); ) {
-    auto task = pending_result_.extract( it++ );
-    parent_.lock()->get( task.value() );
+  if ( parent ) {
+    for ( auto it = pending_result_.begin(); it != pending_result_.end(); ) {
+      auto task = pending_result_.extract( it++ );
+      parent->get( task.value() );
+    }
   }
 }
 
@@ -372,7 +374,11 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
 {
   if ( !connections_.read()->contains( remote_idx ) ) {
     if ( holds_alternative<RunPayload>( payload ) ) {
-      parent_.lock()->get( move( std::get<RunPayload>( payload ).task ) );
+      auto parent = parent_.lock();
+      if ( !parent )
+        return;
+
+      parent->get( move( std::get<RunPayload>( payload ).task ) );
     }
   } else {
     Remote& connection = *connections_.read()->at( remote_idx );

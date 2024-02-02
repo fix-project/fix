@@ -154,13 +154,25 @@ Handle<Value> Client::execute( Handle<Relation> x )
   auto send = [&]( Handle<AnyDataType> h ) {
     h.visit<void>( overload { []( Handle<Literal> ) {},
                               []( Handle<Relation> ) {},
-                              [&]( auto x ) { remote_->put( x, get( x ).value() ); } } );
+                              [&]( auto x ) {
+                                auto remote = remote_.lock();
+                                if ( remote )
+                                  remote->put( x, get( x ).value() );
+                              } } );
   };
 
   x.visit<void>( overload { [&]( Handle<Apply> x ) { executor_->visit_minrepo( x.unwrap<ObjectTree>(), send ); },
                             [&]( Handle<Eval> x ) { executor_->visit( x.unwrap<Object>(), send ); } } );
 
-  remote_->get( x );
+  {
+    auto remote = remote_.lock();
+    if ( remote ) {
+      remote->get( x );
+    } else {
+      executor_->get( x );
+    }
+  }
+
   return executor_->execute( x );
 }
 
@@ -176,7 +188,12 @@ optional<T> Client::get( Handle<S> name )
     return *data;
   }
 
-  return remote_->get( name );
+  auto remote = remote_.lock();
+  if ( remote ) {
+    return remote->get( name );
+  } else {
+    return executor_->get( name );
+  }
 }
 
 optional<BlobData> Client::get( Handle<Named> name )
@@ -214,7 +231,12 @@ void Client::put( Handle<Relation> name, Handle<Object> data )
 template<typename T>
 bool Client::contains( T name )
 {
-  return executor_->contains( name ) || repository_->contains( name ) || remote_->contains( name );
+  auto contain = executor_->contains( name ) || repository_->contains( name );
+  auto remote = remote_.lock();
+  if ( remote ) {
+    contain |= remote->contains( name );
+  }
+  return contain;
 }
 
 bool Client::contains( Handle<Named> handle )

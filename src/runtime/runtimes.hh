@@ -58,7 +58,7 @@ class Client : public FrontendRT
 protected:
   std::optional<Repository> repository_ {};
   std::optional<NetworkWorker> network_worker_ {};
-  std::shared_ptr<Remote> remote_ {};
+  std::weak_ptr<Remote> remote_ {};
   std::optional<Executor> executor_ {};
 
 public:

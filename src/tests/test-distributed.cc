@@ -92,12 +92,12 @@ void client()
 
   // Send puts
   for ( const auto& test : tests ) {
-    std::visit( [&]( auto h ) { remote->put( h, rt->get( h ).value() ); }, test );
+    std::visit( [&]( auto h ) { remote.lock()->put( h, rt->get( h ).value() ); }, test );
   }
 
   // Send gets
   for ( const auto& check : checks ) {
-    std::visit( [&]( auto h ) { remote->get( h ); }, check );
+    std::visit( [&]( auto h ) { remote.lock()->get( h ); }, check );
   }
 
   sleep( 1 );
