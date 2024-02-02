@@ -80,4 +80,9 @@ int32_t page_size_rw_mem( int32_t mem_id ) {
   return page_size_rw_mem_functions[mem_id]();
 }
 
+int32_t size_rw_table( int32_t table_id )
+{
+  return size_rw_table_functions[table_id]();
+}
+
 #pragma clang diagnostic pop

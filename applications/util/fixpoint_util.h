@@ -63,3 +63,5 @@ int32_t grow_rw_mem_pages( int32_t mem_id, int32_t delta );
 int32_t grow_rw_table( int32_t table_id, int32_t delta, externref init_value );
 
 int32_t page_size_rw_mem( int32_t mem_id );
+
+int32_t size_rw_table( int32_t table_id );
