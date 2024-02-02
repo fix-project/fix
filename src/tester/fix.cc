@@ -170,7 +170,11 @@ void cat( int argc, char* argv[] )
         cout << data->at( i ).content << "\n";
       }
     },
-    [&]( auto ) {
+    [&]( Handle<Relation> ) {
+      cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
+      exit( EXIT_FAILURE );
+    },
+    [&]( Handle<Blob> ) {
       cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
       exit( EXIT_FAILURE );
     },
@@ -203,9 +207,12 @@ void ls( int argc, char* argv[] )
   Repository storage;
   auto handle = handle::data( storage.lookup( ref ) )
                   .visit<Handle<AnyTree>>( overload {
-                    []( Handle<ValueTree> x ) { return x; },
                     []( Handle<AnyTree> x ) { return x; },
-                    [&]( auto ) -> Handle<AnyTree> {
+                    [&]( Handle<Relation> ) -> Handle<AnyTree> {
+                      cerr << std::format( "Ref {} does not a describe a tree.", ref );
+                      exit( EXIT_FAILURE );
+                    },
+                    [&]( Handle<Blob> ) -> Handle<AnyTree> {
                       cerr << std::format( "Ref {} does not a describe a tree.", ref );
                       exit( EXIT_FAILURE );
                     },
