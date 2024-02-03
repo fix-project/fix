@@ -70,6 +70,8 @@ class Remote : public IRuntime
   std::unique_ptr<DataProposal> incomplete_proposal_ { std::make_unique<DataProposal>() };
   absl::flat_hash_map<Handle<Relation>, std::unique_ptr<DataProposal>> proposed_proposals_ {};
 
+  SharedMutex<absl::flat_hash_set<Handle<Fix>, AbslHash>> view_ {};
+
 public:
   Remote( EventLoop& events,
           EventCategories categories,

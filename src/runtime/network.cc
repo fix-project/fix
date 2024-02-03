@@ -97,40 +97,43 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
 
 void Remote::put( Handle<Named> name, BlobData data )
 {
-  msg_q_.enqueue( make_pair( index_, make_pair( name, data ) ) );
+  if ( !contains( name ) ) {
+    msg_q_.enqueue( make_pair( index_, make_pair( name, data ) ) );
+  }
 }
 
 void Remote::put( Handle<AnyTree> name, TreeData data )
 {
-  msg_q_.enqueue( make_pair( index_, make_pair( handle::fix( name ), data ) ) );
+  if ( !contains( name ) ) {
+    msg_q_.enqueue( make_pair( index_, make_pair( handle::fix( name ), data ) ) );
+  }
 }
 
 void Remote::put( Handle<Relation> name, Handle<Object> data )
 {
   unique_lock lock( mutex_ );
   if ( reply_to_.contains( name ) ) {
-    ResultPayload payload { .task = name, .result = data };
-    msg_q_.enqueue( make_pair( index_, move( payload ) ) );
+    if ( !contains( name ) ) {
+      ResultPayload payload { .task = name, .result = data };
+      msg_q_.enqueue( make_pair( index_, move( payload ) ) );
+    }
     reply_to_.erase( name );
   }
 }
 
-bool Remote::contains( __attribute__( ( unused ) ) Handle<Named> handle )
+bool Remote::contains( Handle<Named> handle )
 {
-  // TODO
-  return false;
+  return view_.read()->contains( handle );
 }
 
-bool Remote::contains( __attribute__( ( unused ) ) Handle<AnyTree> handle )
+bool Remote::contains( Handle<AnyTree> handle )
 {
-  // TODO
-  return false;
+  return view_.read()->contains( handle::fix( handle ) );
 }
 
-bool Remote::contains( __attribute__( ( unused ) ) Handle<Relation> handle )
+bool Remote::contains( Handle<Relation> handle )
 {
-  // TODO
-  return false;
+  return view_.read()->contains( handle );
 }
 
 bool Remote::contains( __attribute__( ( unused ) ) const std::string_view label )
@@ -272,6 +275,9 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       size_t original = handles.size();
 
       for ( auto it = handles.begin(); it != handles.end(); ) {
+        // Any handle proposed by the remote are considered "existing" on remote
+        view_.write()->insert( *it );
+
         auto contained
           = handle::extract<Named>( *it )
               .transform( []( auto h ) -> Handle<AnyDataType> { return h; } )
@@ -325,6 +331,11 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
             []( Handle<Literal> ) {},
           } );
         }
+      }
+
+      // Any objects in this proposal are considered "exising" on the remote side
+      for ( const auto& [h, _] : *proposed_proposals_.at( todo ) ) {
+        view_.write()->insert( h );
       }
 
       proposed_proposals_.erase( todo );
@@ -387,27 +398,36 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
              [&]( BlobDataPayload b ) { connection.incomplete_proposal_->emplace( b.first, b.second ); },
              [&]( TreeDataPayload t ) { connection.incomplete_proposal_->emplace( t.first, t.second ); },
              [&]( RunPayload r ) {
-               ProposeTransferPayload payload;
-               payload.todo = r.task;
-               for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
-                 payload.handles.push_back( name );
+               if ( connection.incomplete_proposal_->empty() ) {
+                 connection.push_message( OutgoingMessage::to_message( r ) );
+               } else {
+                 ProposeTransferPayload payload;
+                 payload.todo = r.task;
+                 for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
+                   payload.handles.push_back( name );
+                 }
+                 connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+                 connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
+                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
                }
-               connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-               connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
-               connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
 
                connection.pending_result_.insert( r.task );
              },
              [&]( ResultPayload r ) {
-               ProposeTransferPayload payload;
-               payload.todo = r.task;
-               payload.result = r.result;
-               for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
-                 payload.handles.push_back( name );
+               if ( connection.incomplete_proposal_->empty() ) {
+                 connection.push_message( OutgoingMessage::to_message( r ) );
+               } else {
+                 ProposeTransferPayload payload;
+                 payload.todo = r.task;
+                 payload.result = r.result;
+                 for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
+                   VLOG( 1 ) << "Proposing " << name;
+                   payload.handles.push_back( name );
+                 }
+                 connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+                 connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
+                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
                }
-               connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-               connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
-               connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
              },
              [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },
            payload );

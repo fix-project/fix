@@ -294,9 +294,10 @@ void Server::put( Handle<S> name, T data )
 {
   if ( !executor_->contains( name ) )
     executor_->put( name, data );
-  // for ( const auto& connection : network_worker_->connections_.read().get() ) {
-  //   connection.second->put( name, data );
-  // }
+  for ( const auto& connection : network_worker_->connections_.read().get() ) {
+    if ( !connection.second->contains( name ) )
+      connection.second->put( name, data );
+  }
 }
 
 void Server::put( Handle<Named> name, BlobData data )
@@ -309,10 +310,7 @@ void Server::put( Handle<AnyTree> name, TreeData data )
 }
 void Server::put( Handle<Relation> name, Handle<Object> data )
 {
-  put<Handle<Object>, Relation>( name, data );
-  for ( const auto& connection : network_worker_->connections_.read().get() ) {
-    connection.second->put( name, data );
-  }
+  return put<Handle<Object>, Relation>( name, data );
 }
 
 template<typename T>
