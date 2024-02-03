@@ -2,10 +2,10 @@
 
 #include <cstdint>
 #include <cstring>
+#include <span>
 #include <string>
 
 #include "exception.hh"
-#include "spans.hh"
 
 class Parser
 {
@@ -40,13 +40,13 @@ public:
     input_.remove_prefix( sizeof( T ) );
   }
 
-  void string( string_span out )
+  void string( std::span<char> out )
   {
     check_size( out.size() );
     if ( error() ) {
       return;
     }
-    memcpy( out.mutable_data(), input_.data(), out.size() );
+    memcpy( out.data(), input_.data(), out.size() );
     input_.remove_prefix( out.size() );
   }
 
@@ -61,7 +61,7 @@ public:
 
 class Serializer
 {
-  string_span output_;
+  std::span<char> output_;
   size_t original_size_;
 
   void check_size( const size_t size )
@@ -72,7 +72,7 @@ class Serializer
   }
 
 public:
-  Serializer( string_span output )
+  Serializer( std::span<char> output )
     : output_( output )
     , original_size_( output.size() )
   {}
@@ -83,15 +83,15 @@ public:
   void integer( const T& val )
   {
     check_size( sizeof( T ) );
-    memcpy( output_.mutable_data(), &val, sizeof( T ) );
-    output_.remove_prefix( sizeof( T ) );
+    memcpy( output_.data(), &val, sizeof( T ) );
+    output_ = output_.subspan( sizeof( T ) );
   }
 
   void string( const std::string_view str )
   {
     check_size( str.size() );
-    memcpy( output_.mutable_data(), str.data(), str.size() );
-    output_.remove_prefix( str.size() );
+    memcpy( output_.data(), str.data(), str.size() );
+    output_ = output_.subspan( str.size() );
   }
 
   template<typename T>

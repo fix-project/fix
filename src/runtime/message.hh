@@ -1,6 +1,7 @@
 #pragma once
 
 #include <queue>
+#include <span>
 #include <variant>
 #include <vector>
 
@@ -206,7 +207,7 @@ std::string serialize( const T& obj )
 {
   std::string out;
   out.resize( obj.payload_length() );
-  Serializer s { string_span::from_view( out ) };
+  Serializer s { out };
   obj.serialize( s );
   return out;
 }

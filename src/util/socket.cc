@@ -100,42 +100,6 @@ void Socket::shutdown( const int how )
   }
 }
 
-//! \note If `mtu` is too small to hold the received datagram, this method throws a std::runtime_error
-void UDPSocket::recv( Address& source_address, string_span& payload, const size_t mtu )
-{
-  // receive source address and payload
-  Address::Raw datagram_source_address;
-  if ( payload.size() < mtu ) {
-    throw std::runtime_error( "UDPSocket::recv: payload storage smaller than MTU" );
-  }
-
-  socklen_t fromlen = sizeof( datagram_source_address );
-
-  const ssize_t recv_len = CheckSystemCall(
-    "recvfrom", ::recvfrom( fd_num(), payload.mutable_data(), mtu, MSG_TRUNC, datagram_source_address, &fromlen ) );
-
-  if ( recv_len > ssize_t( mtu ) ) {
-    throw runtime_error( "recvfrom (oversized datagram)" );
-  }
-
-  register_read();
-  source_address = { datagram_source_address, fromlen };
-  payload = payload.substr( 0, recv_len );
-}
-
-void UDPSocket::sendto( const Address& destination, const string_view payload )
-{
-  CheckSystemCall( "sendto",
-                   ::sendto( fd_num(), payload.data(), payload.length(), 0, destination, destination.size() ) );
-  register_write();
-}
-
-void UDPSocket::send( const string_view payload )
-{
-  CheckSystemCall( "send", ::send( fd_num(), payload.data(), payload.length(), 0 ) );
-  register_write();
-}
-
 // mark the socket as listening for incoming connections
 //! \param[in] backlog is the number of waiting connections to queue (see [listen(2)](\ref man2::listen))
 void TCPSocket::listen( const int backlog )

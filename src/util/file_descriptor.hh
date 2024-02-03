@@ -3,9 +3,8 @@
 #include <cstddef>
 #include <limits>
 #include <memory>
+#include <span>
 #include <vector>
-
-#include "spans.hh"
 
 //! A reference-counted handle to a file descriptor
 class FileDescriptor
@@ -67,7 +66,7 @@ public:
 
   //! Read into `buffer`
   //! \returns number of bytes read
-  size_t read( string_span buffer );
+  size_t read( std::span<char> buffer );
 
   //! Attempt to write a buffer
   //! \returns number of bytes written

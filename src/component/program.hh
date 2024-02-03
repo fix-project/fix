@@ -1,10 +1,10 @@
 #pragma once
 
 #include <memory>
+#include <span>
 #include <string>
 
 #include "handle.hh"
-#include "spans.hh"
 #include "wasm-rt.h"
 
 #include "timer.hh"
@@ -64,11 +64,11 @@ public:
     }
   }
 
-  void populate_instance_and_context( string_span instance ) const
+  void populate_instance_and_context( std::span<char> instance ) const
   {
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
-    init_func( instance.mutable_data() );
+    init_func( instance.data() );
   }
 
   size_t get_instance_and_context_size() const { return instance_context_size_; }

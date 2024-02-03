@@ -1,10 +1,10 @@
 #pragma once
 
+#include <span>
 #include <vector>
 
 #include "file_descriptor.hh"
 #include "mmap.hh"
-#include "spans.hh"
 
 class RingStorage
 {
@@ -12,7 +12,7 @@ class RingStorage
   MMap_Region virtual_address_space_, first_mapping_, second_mapping_;
 
 protected:
-  string_span mutable_storage( const size_t index )
+  std::span<char> mutable_storage( const size_t index )
   {
     return { virtual_address_space_.addr() + index, capacity() };
   }
@@ -38,7 +38,7 @@ class RingBuffer : public RingStorage
 public:
   using RingStorage::RingStorage;
 
-  string_span writable_region();
+  std::span<char> writable_region();
   std::string_view writable_region() const;
   void push( const size_t num_bytes );
 

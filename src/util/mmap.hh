@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdlib>
+#include <span>
 #include <string_view>
 
 #include "file_descriptor.hh"
@@ -49,5 +50,5 @@ class ReadWriteFile : public MMap_Region
 
 public:
   ReadWriteFile( FileDescriptor&& fd );
-  operator string_span() const { return { addr(), length() }; }
+  operator std::span<char>() const { return { addr(), length() }; }
 };
