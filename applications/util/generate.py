@@ -1,10 +1,10 @@
 """ Generates a wat file that defines rw/ro tables and memories and a c
  file that imports those tables/memories and corresponding helper functions."""
 
-NUM_RO_MEM = 4
-NUM_RO_TABLE = 8
-NUM_RW_MEM = 3
-NUM_RW_TABLE = 3
+NUM_RO_MEM = 32
+NUM_RO_TABLE = 32
+NUM_RW_MEM = 32
+NUM_RW_TABLE = 32
 
 PATH = 'applications/util/'
 MODULE = 'fixpoint_storage'

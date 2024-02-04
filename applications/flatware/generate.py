@@ -1,8 +1,8 @@
 """ Generates a wat file that defines the ro/rw memory operations to and from fixpoint program memory. """
 
 MEM_SIZES = {
-    "rw": 3,
-    "ro": 4,
+    "rw": 32,
+    "ro": 32,
 }
 
 OTHER_MEM_TYPES = ["program", "flatware"]

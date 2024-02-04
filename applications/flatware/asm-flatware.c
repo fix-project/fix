@@ -9,7 +9,65 @@ extern void rw_mem_1_to_program_mem( int32_t program_offset, int32_t rw_offset, 
     __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_1_to_program_mem" ) ) );
 extern void rw_mem_2_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
     __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_2_to_program_mem" ) ) );
-static void (*const rw_to_program_functions[]) ( int32_t, int32_t, int32_t ) = {rw_mem_0_to_program_mem, rw_mem_1_to_program_mem, rw_mem_2_to_program_mem};
+extern void rw_mem_3_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_3_to_program_mem" ) ) );
+extern void rw_mem_4_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_4_to_program_mem" ) ) );
+extern void rw_mem_5_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_5_to_program_mem" ) ) );
+extern void rw_mem_6_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_6_to_program_mem" ) ) );
+extern void rw_mem_7_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_7_to_program_mem" ) ) );
+extern void rw_mem_8_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_8_to_program_mem" ) ) );
+extern void rw_mem_9_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_9_to_program_mem" ) ) );
+extern void rw_mem_10_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_10_to_program_mem" ) ) );
+extern void rw_mem_11_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_11_to_program_mem" ) ) );
+extern void rw_mem_12_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_12_to_program_mem" ) ) );
+extern void rw_mem_13_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_13_to_program_mem" ) ) );
+extern void rw_mem_14_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_14_to_program_mem" ) ) );
+extern void rw_mem_15_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_15_to_program_mem" ) ) );
+extern void rw_mem_16_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_16_to_program_mem" ) ) );
+extern void rw_mem_17_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_17_to_program_mem" ) ) );
+extern void rw_mem_18_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_18_to_program_mem" ) ) );
+extern void rw_mem_19_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_19_to_program_mem" ) ) );
+extern void rw_mem_20_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_20_to_program_mem" ) ) );
+extern void rw_mem_21_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_21_to_program_mem" ) ) );
+extern void rw_mem_22_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_22_to_program_mem" ) ) );
+extern void rw_mem_23_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_23_to_program_mem" ) ) );
+extern void rw_mem_24_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_24_to_program_mem" ) ) );
+extern void rw_mem_25_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_25_to_program_mem" ) ) );
+extern void rw_mem_26_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_26_to_program_mem" ) ) );
+extern void rw_mem_27_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_27_to_program_mem" ) ) );
+extern void rw_mem_28_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_28_to_program_mem" ) ) );
+extern void rw_mem_29_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_29_to_program_mem" ) ) );
+extern void rw_mem_30_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_30_to_program_mem" ) ) );
+extern void rw_mem_31_to_program_mem( int32_t program_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_31_to_program_mem" ) ) );
+static void (*const rw_to_program_functions[]) ( int32_t, int32_t, int32_t ) = {rw_mem_0_to_program_mem, rw_mem_1_to_program_mem, rw_mem_2_to_program_mem, rw_mem_3_to_program_mem, rw_mem_4_to_program_mem, rw_mem_5_to_program_mem, rw_mem_6_to_program_mem, rw_mem_7_to_program_mem, rw_mem_8_to_program_mem, rw_mem_9_to_program_mem, rw_mem_10_to_program_mem, rw_mem_11_to_program_mem, rw_mem_12_to_program_mem, rw_mem_13_to_program_mem, rw_mem_14_to_program_mem, rw_mem_15_to_program_mem, rw_mem_16_to_program_mem, rw_mem_17_to_program_mem, rw_mem_18_to_program_mem, rw_mem_19_to_program_mem, rw_mem_20_to_program_mem, rw_mem_21_to_program_mem, rw_mem_22_to_program_mem, rw_mem_23_to_program_mem, rw_mem_24_to_program_mem, rw_mem_25_to_program_mem, rw_mem_26_to_program_mem, rw_mem_27_to_program_mem, rw_mem_28_to_program_mem, rw_mem_29_to_program_mem, rw_mem_30_to_program_mem, rw_mem_31_to_program_mem};
 void rw_mem_to_program_mem( int32_t rw_mem_id, int32_t program_offset, int32_t rw_offset, int32_t len )
     {
     rw_to_program_functions[rw_mem_id]( program_offset, rw_offset, len );
@@ -22,7 +80,63 @@ extern void ro_mem_2_to_program_mem( int32_t program_offset, int32_t ro_offset, 
     __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_2_to_program_mem" ) ) );
 extern void ro_mem_3_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
     __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_3_to_program_mem" ) ) );
-static void (*const ro_to_program_functions[]) ( int32_t, int32_t, int32_t ) = {ro_mem_0_to_program_mem, ro_mem_1_to_program_mem, ro_mem_2_to_program_mem, ro_mem_3_to_program_mem};
+extern void ro_mem_4_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_4_to_program_mem" ) ) );
+extern void ro_mem_5_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_5_to_program_mem" ) ) );
+extern void ro_mem_6_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_6_to_program_mem" ) ) );
+extern void ro_mem_7_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_7_to_program_mem" ) ) );
+extern void ro_mem_8_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_8_to_program_mem" ) ) );
+extern void ro_mem_9_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_9_to_program_mem" ) ) );
+extern void ro_mem_10_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_10_to_program_mem" ) ) );
+extern void ro_mem_11_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_11_to_program_mem" ) ) );
+extern void ro_mem_12_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_12_to_program_mem" ) ) );
+extern void ro_mem_13_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_13_to_program_mem" ) ) );
+extern void ro_mem_14_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_14_to_program_mem" ) ) );
+extern void ro_mem_15_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_15_to_program_mem" ) ) );
+extern void ro_mem_16_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_16_to_program_mem" ) ) );
+extern void ro_mem_17_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_17_to_program_mem" ) ) );
+extern void ro_mem_18_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_18_to_program_mem" ) ) );
+extern void ro_mem_19_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_19_to_program_mem" ) ) );
+extern void ro_mem_20_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_20_to_program_mem" ) ) );
+extern void ro_mem_21_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_21_to_program_mem" ) ) );
+extern void ro_mem_22_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_22_to_program_mem" ) ) );
+extern void ro_mem_23_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_23_to_program_mem" ) ) );
+extern void ro_mem_24_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_24_to_program_mem" ) ) );
+extern void ro_mem_25_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_25_to_program_mem" ) ) );
+extern void ro_mem_26_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_26_to_program_mem" ) ) );
+extern void ro_mem_27_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_27_to_program_mem" ) ) );
+extern void ro_mem_28_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_28_to_program_mem" ) ) );
+extern void ro_mem_29_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_29_to_program_mem" ) ) );
+extern void ro_mem_30_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_30_to_program_mem" ) ) );
+extern void ro_mem_31_to_program_mem( int32_t program_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_31_to_program_mem" ) ) );
+static void (*const ro_to_program_functions[]) ( int32_t, int32_t, int32_t ) = {ro_mem_0_to_program_mem, ro_mem_1_to_program_mem, ro_mem_2_to_program_mem, ro_mem_3_to_program_mem, ro_mem_4_to_program_mem, ro_mem_5_to_program_mem, ro_mem_6_to_program_mem, ro_mem_7_to_program_mem, ro_mem_8_to_program_mem, ro_mem_9_to_program_mem, ro_mem_10_to_program_mem, ro_mem_11_to_program_mem, ro_mem_12_to_program_mem, ro_mem_13_to_program_mem, ro_mem_14_to_program_mem, ro_mem_15_to_program_mem, ro_mem_16_to_program_mem, ro_mem_17_to_program_mem, ro_mem_18_to_program_mem, ro_mem_19_to_program_mem, ro_mem_20_to_program_mem, ro_mem_21_to_program_mem, ro_mem_22_to_program_mem, ro_mem_23_to_program_mem, ro_mem_24_to_program_mem, ro_mem_25_to_program_mem, ro_mem_26_to_program_mem, ro_mem_27_to_program_mem, ro_mem_28_to_program_mem, ro_mem_29_to_program_mem, ro_mem_30_to_program_mem, ro_mem_31_to_program_mem};
 void ro_mem_to_program_mem( int32_t ro_mem_id, int32_t program_offset, int32_t ro_offset, int32_t len )
     {
     ro_to_program_functions[ro_mem_id]( program_offset, ro_offset, len );
@@ -33,7 +147,65 @@ extern void rw_mem_1_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset
     __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_1_to_flatware_mem" ) ) );
 extern void rw_mem_2_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
     __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_2_to_flatware_mem" ) ) );
-static void (*const rw_to_flatware_functions[]) ( int32_t, int32_t, int32_t ) = {rw_mem_0_to_flatware_mem, rw_mem_1_to_flatware_mem, rw_mem_2_to_flatware_mem};
+extern void rw_mem_3_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_3_to_flatware_mem" ) ) );
+extern void rw_mem_4_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_4_to_flatware_mem" ) ) );
+extern void rw_mem_5_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_5_to_flatware_mem" ) ) );
+extern void rw_mem_6_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_6_to_flatware_mem" ) ) );
+extern void rw_mem_7_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_7_to_flatware_mem" ) ) );
+extern void rw_mem_8_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_8_to_flatware_mem" ) ) );
+extern void rw_mem_9_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_9_to_flatware_mem" ) ) );
+extern void rw_mem_10_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_10_to_flatware_mem" ) ) );
+extern void rw_mem_11_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_11_to_flatware_mem" ) ) );
+extern void rw_mem_12_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_12_to_flatware_mem" ) ) );
+extern void rw_mem_13_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_13_to_flatware_mem" ) ) );
+extern void rw_mem_14_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_14_to_flatware_mem" ) ) );
+extern void rw_mem_15_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_15_to_flatware_mem" ) ) );
+extern void rw_mem_16_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_16_to_flatware_mem" ) ) );
+extern void rw_mem_17_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_17_to_flatware_mem" ) ) );
+extern void rw_mem_18_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_18_to_flatware_mem" ) ) );
+extern void rw_mem_19_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_19_to_flatware_mem" ) ) );
+extern void rw_mem_20_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_20_to_flatware_mem" ) ) );
+extern void rw_mem_21_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_21_to_flatware_mem" ) ) );
+extern void rw_mem_22_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_22_to_flatware_mem" ) ) );
+extern void rw_mem_23_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_23_to_flatware_mem" ) ) );
+extern void rw_mem_24_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_24_to_flatware_mem" ) ) );
+extern void rw_mem_25_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_25_to_flatware_mem" ) ) );
+extern void rw_mem_26_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_26_to_flatware_mem" ) ) );
+extern void rw_mem_27_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_27_to_flatware_mem" ) ) );
+extern void rw_mem_28_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_28_to_flatware_mem" ) ) );
+extern void rw_mem_29_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_29_to_flatware_mem" ) ) );
+extern void rw_mem_30_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_30_to_flatware_mem" ) ) );
+extern void rw_mem_31_to_flatware_mem( int32_t flatware_offset, int32_t rw_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "rw_mem_31_to_flatware_mem" ) ) );
+static void (*const rw_to_flatware_functions[]) ( int32_t, int32_t, int32_t ) = {rw_mem_0_to_flatware_mem, rw_mem_1_to_flatware_mem, rw_mem_2_to_flatware_mem, rw_mem_3_to_flatware_mem, rw_mem_4_to_flatware_mem, rw_mem_5_to_flatware_mem, rw_mem_6_to_flatware_mem, rw_mem_7_to_flatware_mem, rw_mem_8_to_flatware_mem, rw_mem_9_to_flatware_mem, rw_mem_10_to_flatware_mem, rw_mem_11_to_flatware_mem, rw_mem_12_to_flatware_mem, rw_mem_13_to_flatware_mem, rw_mem_14_to_flatware_mem, rw_mem_15_to_flatware_mem, rw_mem_16_to_flatware_mem, rw_mem_17_to_flatware_mem, rw_mem_18_to_flatware_mem, rw_mem_19_to_flatware_mem, rw_mem_20_to_flatware_mem, rw_mem_21_to_flatware_mem, rw_mem_22_to_flatware_mem, rw_mem_23_to_flatware_mem, rw_mem_24_to_flatware_mem, rw_mem_25_to_flatware_mem, rw_mem_26_to_flatware_mem, rw_mem_27_to_flatware_mem, rw_mem_28_to_flatware_mem, rw_mem_29_to_flatware_mem, rw_mem_30_to_flatware_mem, rw_mem_31_to_flatware_mem};
 void rw_mem_to_flatware_mem( int32_t rw_mem_id, int32_t flatware_offset, int32_t rw_offset, int32_t len )
     {
     rw_to_flatware_functions[rw_mem_id]( flatware_offset, rw_offset, len );
@@ -46,7 +218,63 @@ extern void ro_mem_2_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset
     __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_2_to_flatware_mem" ) ) );
 extern void ro_mem_3_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
     __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_3_to_flatware_mem" ) ) );
-static void (*const ro_to_flatware_functions[]) ( int32_t, int32_t, int32_t ) = {ro_mem_0_to_flatware_mem, ro_mem_1_to_flatware_mem, ro_mem_2_to_flatware_mem, ro_mem_3_to_flatware_mem};
+extern void ro_mem_4_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_4_to_flatware_mem" ) ) );
+extern void ro_mem_5_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_5_to_flatware_mem" ) ) );
+extern void ro_mem_6_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_6_to_flatware_mem" ) ) );
+extern void ro_mem_7_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_7_to_flatware_mem" ) ) );
+extern void ro_mem_8_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_8_to_flatware_mem" ) ) );
+extern void ro_mem_9_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_9_to_flatware_mem" ) ) );
+extern void ro_mem_10_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_10_to_flatware_mem" ) ) );
+extern void ro_mem_11_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_11_to_flatware_mem" ) ) );
+extern void ro_mem_12_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_12_to_flatware_mem" ) ) );
+extern void ro_mem_13_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_13_to_flatware_mem" ) ) );
+extern void ro_mem_14_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_14_to_flatware_mem" ) ) );
+extern void ro_mem_15_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_15_to_flatware_mem" ) ) );
+extern void ro_mem_16_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_16_to_flatware_mem" ) ) );
+extern void ro_mem_17_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_17_to_flatware_mem" ) ) );
+extern void ro_mem_18_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_18_to_flatware_mem" ) ) );
+extern void ro_mem_19_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_19_to_flatware_mem" ) ) );
+extern void ro_mem_20_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_20_to_flatware_mem" ) ) );
+extern void ro_mem_21_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_21_to_flatware_mem" ) ) );
+extern void ro_mem_22_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_22_to_flatware_mem" ) ) );
+extern void ro_mem_23_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_23_to_flatware_mem" ) ) );
+extern void ro_mem_24_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_24_to_flatware_mem" ) ) );
+extern void ro_mem_25_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_25_to_flatware_mem" ) ) );
+extern void ro_mem_26_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_26_to_flatware_mem" ) ) );
+extern void ro_mem_27_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_27_to_flatware_mem" ) ) );
+extern void ro_mem_28_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_28_to_flatware_mem" ) ) );
+extern void ro_mem_29_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_29_to_flatware_mem" ) ) );
+extern void ro_mem_30_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_30_to_flatware_mem" ) ) );
+extern void ro_mem_31_to_flatware_mem( int32_t flatware_offset, int32_t ro_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "ro_mem_31_to_flatware_mem" ) ) );
+static void (*const ro_to_flatware_functions[]) ( int32_t, int32_t, int32_t ) = {ro_mem_0_to_flatware_mem, ro_mem_1_to_flatware_mem, ro_mem_2_to_flatware_mem, ro_mem_3_to_flatware_mem, ro_mem_4_to_flatware_mem, ro_mem_5_to_flatware_mem, ro_mem_6_to_flatware_mem, ro_mem_7_to_flatware_mem, ro_mem_8_to_flatware_mem, ro_mem_9_to_flatware_mem, ro_mem_10_to_flatware_mem, ro_mem_11_to_flatware_mem, ro_mem_12_to_flatware_mem, ro_mem_13_to_flatware_mem, ro_mem_14_to_flatware_mem, ro_mem_15_to_flatware_mem, ro_mem_16_to_flatware_mem, ro_mem_17_to_flatware_mem, ro_mem_18_to_flatware_mem, ro_mem_19_to_flatware_mem, ro_mem_20_to_flatware_mem, ro_mem_21_to_flatware_mem, ro_mem_22_to_flatware_mem, ro_mem_23_to_flatware_mem, ro_mem_24_to_flatware_mem, ro_mem_25_to_flatware_mem, ro_mem_26_to_flatware_mem, ro_mem_27_to_flatware_mem, ro_mem_28_to_flatware_mem, ro_mem_29_to_flatware_mem, ro_mem_30_to_flatware_mem, ro_mem_31_to_flatware_mem};
 void ro_mem_to_flatware_mem( int32_t ro_mem_id, int32_t flatware_offset, int32_t ro_offset, int32_t len )
     {
     ro_to_flatware_functions[ro_mem_id]( flatware_offset, ro_offset, len );
@@ -57,7 +285,65 @@ extern void program_mem_to_rw_mem_1( int32_t rw_offset, int32_t program_offset, 
     __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_1" ) ) );
 extern void program_mem_to_rw_mem_2( int32_t rw_offset, int32_t program_offset, int32_t len )
     __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_2" ) ) );
-static void (*const program_to_rw_functions[]) ( int32_t, int32_t, int32_t ) = {program_mem_to_rw_mem_0, program_mem_to_rw_mem_1, program_mem_to_rw_mem_2};
+extern void program_mem_to_rw_mem_3( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_3" ) ) );
+extern void program_mem_to_rw_mem_4( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_4" ) ) );
+extern void program_mem_to_rw_mem_5( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_5" ) ) );
+extern void program_mem_to_rw_mem_6( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_6" ) ) );
+extern void program_mem_to_rw_mem_7( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_7" ) ) );
+extern void program_mem_to_rw_mem_8( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_8" ) ) );
+extern void program_mem_to_rw_mem_9( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_9" ) ) );
+extern void program_mem_to_rw_mem_10( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_10" ) ) );
+extern void program_mem_to_rw_mem_11( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_11" ) ) );
+extern void program_mem_to_rw_mem_12( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_12" ) ) );
+extern void program_mem_to_rw_mem_13( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_13" ) ) );
+extern void program_mem_to_rw_mem_14( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_14" ) ) );
+extern void program_mem_to_rw_mem_15( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_15" ) ) );
+extern void program_mem_to_rw_mem_16( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_16" ) ) );
+extern void program_mem_to_rw_mem_17( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_17" ) ) );
+extern void program_mem_to_rw_mem_18( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_18" ) ) );
+extern void program_mem_to_rw_mem_19( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_19" ) ) );
+extern void program_mem_to_rw_mem_20( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_20" ) ) );
+extern void program_mem_to_rw_mem_21( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_21" ) ) );
+extern void program_mem_to_rw_mem_22( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_22" ) ) );
+extern void program_mem_to_rw_mem_23( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_23" ) ) );
+extern void program_mem_to_rw_mem_24( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_24" ) ) );
+extern void program_mem_to_rw_mem_25( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_25" ) ) );
+extern void program_mem_to_rw_mem_26( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_26" ) ) );
+extern void program_mem_to_rw_mem_27( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_27" ) ) );
+extern void program_mem_to_rw_mem_28( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_28" ) ) );
+extern void program_mem_to_rw_mem_29( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_29" ) ) );
+extern void program_mem_to_rw_mem_30( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_30" ) ) );
+extern void program_mem_to_rw_mem_31( int32_t rw_offset, int32_t program_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "program_mem_to_rw_mem_31" ) ) );
+static void (*const program_to_rw_functions[]) ( int32_t, int32_t, int32_t ) = {program_mem_to_rw_mem_0, program_mem_to_rw_mem_1, program_mem_to_rw_mem_2, program_mem_to_rw_mem_3, program_mem_to_rw_mem_4, program_mem_to_rw_mem_5, program_mem_to_rw_mem_6, program_mem_to_rw_mem_7, program_mem_to_rw_mem_8, program_mem_to_rw_mem_9, program_mem_to_rw_mem_10, program_mem_to_rw_mem_11, program_mem_to_rw_mem_12, program_mem_to_rw_mem_13, program_mem_to_rw_mem_14, program_mem_to_rw_mem_15, program_mem_to_rw_mem_16, program_mem_to_rw_mem_17, program_mem_to_rw_mem_18, program_mem_to_rw_mem_19, program_mem_to_rw_mem_20, program_mem_to_rw_mem_21, program_mem_to_rw_mem_22, program_mem_to_rw_mem_23, program_mem_to_rw_mem_24, program_mem_to_rw_mem_25, program_mem_to_rw_mem_26, program_mem_to_rw_mem_27, program_mem_to_rw_mem_28, program_mem_to_rw_mem_29, program_mem_to_rw_mem_30, program_mem_to_rw_mem_31};
 void program_mem_to_rw_mem( int32_t rw_mem_id, int32_t rw_offset, int32_t program_offset, int32_t len )
     {
     program_to_rw_functions[rw_mem_id]( rw_offset, program_offset, len );
@@ -68,7 +354,65 @@ extern void flatware_mem_to_rw_mem_1( int32_t rw_offset, int32_t flatware_offset
     __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_1" ) ) );
 extern void flatware_mem_to_rw_mem_2( int32_t rw_offset, int32_t flatware_offset, int32_t len )
     __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_2" ) ) );
-static void (*const flatware_to_rw_functions[]) ( int32_t, int32_t, int32_t ) = {flatware_mem_to_rw_mem_0, flatware_mem_to_rw_mem_1, flatware_mem_to_rw_mem_2};
+extern void flatware_mem_to_rw_mem_3( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_3" ) ) );
+extern void flatware_mem_to_rw_mem_4( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_4" ) ) );
+extern void flatware_mem_to_rw_mem_5( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_5" ) ) );
+extern void flatware_mem_to_rw_mem_6( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_6" ) ) );
+extern void flatware_mem_to_rw_mem_7( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_7" ) ) );
+extern void flatware_mem_to_rw_mem_8( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_8" ) ) );
+extern void flatware_mem_to_rw_mem_9( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_9" ) ) );
+extern void flatware_mem_to_rw_mem_10( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_10" ) ) );
+extern void flatware_mem_to_rw_mem_11( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_11" ) ) );
+extern void flatware_mem_to_rw_mem_12( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_12" ) ) );
+extern void flatware_mem_to_rw_mem_13( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_13" ) ) );
+extern void flatware_mem_to_rw_mem_14( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_14" ) ) );
+extern void flatware_mem_to_rw_mem_15( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_15" ) ) );
+extern void flatware_mem_to_rw_mem_16( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_16" ) ) );
+extern void flatware_mem_to_rw_mem_17( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_17" ) ) );
+extern void flatware_mem_to_rw_mem_18( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_18" ) ) );
+extern void flatware_mem_to_rw_mem_19( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_19" ) ) );
+extern void flatware_mem_to_rw_mem_20( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_20" ) ) );
+extern void flatware_mem_to_rw_mem_21( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_21" ) ) );
+extern void flatware_mem_to_rw_mem_22( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_22" ) ) );
+extern void flatware_mem_to_rw_mem_23( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_23" ) ) );
+extern void flatware_mem_to_rw_mem_24( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_24" ) ) );
+extern void flatware_mem_to_rw_mem_25( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_25" ) ) );
+extern void flatware_mem_to_rw_mem_26( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_26" ) ) );
+extern void flatware_mem_to_rw_mem_27( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_27" ) ) );
+extern void flatware_mem_to_rw_mem_28( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_28" ) ) );
+extern void flatware_mem_to_rw_mem_29( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_29" ) ) );
+extern void flatware_mem_to_rw_mem_30( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_30" ) ) );
+extern void flatware_mem_to_rw_mem_31( int32_t rw_offset, int32_t flatware_offset, int32_t len )
+    __attribute__( (import_module( "asm-flatware" ), import_name( "flatware_mem_to_rw_mem_31" ) ) );
+static void (*const flatware_to_rw_functions[]) ( int32_t, int32_t, int32_t ) = {flatware_mem_to_rw_mem_0, flatware_mem_to_rw_mem_1, flatware_mem_to_rw_mem_2, flatware_mem_to_rw_mem_3, flatware_mem_to_rw_mem_4, flatware_mem_to_rw_mem_5, flatware_mem_to_rw_mem_6, flatware_mem_to_rw_mem_7, flatware_mem_to_rw_mem_8, flatware_mem_to_rw_mem_9, flatware_mem_to_rw_mem_10, flatware_mem_to_rw_mem_11, flatware_mem_to_rw_mem_12, flatware_mem_to_rw_mem_13, flatware_mem_to_rw_mem_14, flatware_mem_to_rw_mem_15, flatware_mem_to_rw_mem_16, flatware_mem_to_rw_mem_17, flatware_mem_to_rw_mem_18, flatware_mem_to_rw_mem_19, flatware_mem_to_rw_mem_20, flatware_mem_to_rw_mem_21, flatware_mem_to_rw_mem_22, flatware_mem_to_rw_mem_23, flatware_mem_to_rw_mem_24, flatware_mem_to_rw_mem_25, flatware_mem_to_rw_mem_26, flatware_mem_to_rw_mem_27, flatware_mem_to_rw_mem_28, flatware_mem_to_rw_mem_29, flatware_mem_to_rw_mem_30, flatware_mem_to_rw_mem_31};
 void flatware_mem_to_rw_mem( int32_t rw_mem_id, int32_t rw_offset, int32_t flatware_offset, int32_t len )
     {
     flatware_to_rw_functions[rw_mem_id]( rw_offset, flatware_offset, len );
