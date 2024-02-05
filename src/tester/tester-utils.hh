@@ -2,7 +2,6 @@
 
 #include "handle.hh"
 #include "interface.hh"
-#include "spans.hh"
 
-Handle<Fix> parse_args( IRuntime& rt, span_view<char*>& args );
+Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args );
 void parser_usage_message();

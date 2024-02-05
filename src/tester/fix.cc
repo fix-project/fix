@@ -349,8 +349,7 @@ void eval( int argc, char* argv[] )
   }
 
   auto rt = ReadWriteRT::init();
-  span_view<char*> args = { argv, static_cast<size_t>( argc ) };
-  args.remove_prefix( 1 );
+  span<char*> args = { argv + 1, static_cast<size_t>( argc ) - 1 };
   auto handle = parse_args( *rt, args );
 
   if ( !handle::extract<Object>( handle ).has_value() ) {

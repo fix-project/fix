@@ -74,7 +74,7 @@ Handle<Fix> make_blob( IRuntime& rt, T t ) requires std::is_integral_v<T>
  * Adds the args to RuntimeStorage, loading files and creating objects as necessary.
  * The contents of @p open_files must outlive this RuntimeStorage instance.
  */
-Handle<Fix> parse_args( IRuntime& rt, span_view<char*>& args )
+Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args )
 {
   if ( args.empty() ) {
     throw runtime_error( "not enough args" );
@@ -84,18 +84,18 @@ Handle<Fix> parse_args( IRuntime& rt, span_view<char*>& args )
 
   if ( str.starts_with( "file:" ) ) {
     std::filesystem::path file( string( str.substr( 5 ) ) );
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     return make_blob( rt, file );
   }
 
   if ( str.starts_with( "compile:" ) ) {
     std::filesystem::path file( string( str.substr( 8 ) ) );
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     return make_compile( rt, make_blob( rt, file ) );
   }
 
   if ( str.starts_with( "label:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     auto label = str.substr( 6 );
     if ( rt.contains( label ) ) {
       return rt.labeled( label );
@@ -105,7 +105,7 @@ Handle<Fix> parse_args( IRuntime& rt, span_view<char*>& args )
   }
 
   if ( str.starts_with( "name:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     return Handle<Fix>::forge( base16::decode( str.substr( 5 ) ) );
   }
 
@@ -116,33 +116,33 @@ Handle<Fix> parse_args( IRuntime& rt, span_view<char*>& args )
   }
 
   if ( str.starts_with( "string:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     return make_blob( rt, str.substr( 7 ) );
   }
 
   if ( str.starts_with( "uint8:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     return make_blob( rt, to_int<uint8_t>( str.substr( 6 ) ) );
   }
 
   if ( str.starts_with( "uint16:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     return make_blob( rt, to_int<uint16_t>( str.substr( 7 ) ) );
   }
 
   if ( str.starts_with( "uint32:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     return make_blob( rt, to_int<uint32_t>( str.substr( 7 ) ) );
   }
 
   if ( str.starts_with( "uint64:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     return make_blob( rt, to_int<uint64_t>( str.substr( 7 ) ) );
   }
 
   if ( str.starts_with( "tree:" ) ) {
     const uint32_t tree_size = to_int<uint32_t>( str.substr( 5 ) );
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     if ( args.size() < tree_size ) {
       throw runtime_error( "not enough args to make Tree of length " + to_string( tree_size ) );
     }
@@ -155,7 +155,7 @@ Handle<Fix> parse_args( IRuntime& rt, span_view<char*>& args )
   }
 
   if ( str.starts_with( "application:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     const string_view str1 { args[0] };
     if ( !str1.starts_with( "tree:" ) ) {
       throw runtime_error( "thunk not refering a tree" );
@@ -172,7 +172,7 @@ Handle<Fix> parse_args( IRuntime& rt, span_view<char*>& args )
   }
 
   if ( str.starts_with( "strict:" ) ) {
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     const string_view str1 { args[0] };
     if ( !str1.starts_with( "application:" ) ) {
       throw runtime_error( "encode not refering a thunk" );

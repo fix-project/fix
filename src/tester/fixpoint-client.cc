@@ -10,18 +10,16 @@ using namespace std;
 int min_args = 2;
 int max_args = -1;
 
-void program_body( std::span<char*> argspan )
+void program_body( std::span<char*> args )
 {
-  span_view<char*> args = { argspan.data(), argspan.size() };
-
   ios::sync_with_stdio( false );
-  args.remove_prefix( 1 );
+  args = args.subspan( 1 );
 
   std::shared_ptr<Client> client;
 
   if ( not args.empty() and args[0][0] == '+' ) {
     string addr( &args[0][1] );
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
     if ( addr.find( ':' ) == string::npos ) {
       throw runtime_error( "invalid argument " + addr );
     }
@@ -35,7 +33,7 @@ void program_body( std::span<char*> argspan )
   auto handle = parse_args( *client, args );
 
   if ( not args.empty() ) {
-    throw runtime_error( "unexpected argument: "s + args.at( 0 ) );
+    throw runtime_error( "unexpected argument: "s + args[0] );
   }
 
   if ( !handle::extract<Object>( handle ).has_value() ) {

@@ -7,17 +7,16 @@ using namespace std;
 int min_args = 1;
 int max_args = 2;
 
-void program_body( std::span<char*> argspan )
+void program_body( std::span<char*> args )
 {
-  span_view<char*> args = { argspan.data(), argspan.size() };
 
   ios::sync_with_stdio( false );
-  args.remove_prefix( 1 ); // ignore argv[ 0 ]
+  args = args.subspan( 1 );
 
   uint16_t port = 0;
   if ( not args.empty() ) {
     port = stoi( args[0] );
-    args.remove_prefix( 1 );
+    args = args.subspan( 1 );
   }
 
   Address address( "0.0.0.0", port );
