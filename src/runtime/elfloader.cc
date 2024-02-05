@@ -3,7 +3,6 @@
 
 #include "elfloader.hh"
 #include "fixpointapi.hh"
-#include "spans.hh"
 
 using namespace std;
 
@@ -77,6 +76,15 @@ void __stack_chk_fail( void )
   cerr << "stack smashing detected." << endl;
 }
 
+template<typename T>
+span<const T> typed_span( span<const char> untyped, size_t offset, size_t byte_length )
+{
+  if ( byte_length % sizeof( T ) or offset + byte_length > untyped.size() ) {
+    throw runtime_error( "invalid typed_span" );
+  }
+  return { reinterpret_cast<const T*>( untyped.data() + offset ), byte_length / sizeof( T ) };
+}
+
 Elf_Info load_program( std::span<const char> program_content )
 {
   Elf_Info res;
@@ -99,9 +107,7 @@ Elf_Info load_program( std::span<const char> program_content )
   }
 
   // Step 2: Read section headers
-  res.sheader
-    = span_view<Elf64_Shdr>( reinterpret_cast<const Elf64_Shdr*>( program_content.data() + header->e_shoff ),
-                             static_cast<size_t>( header->e_shnum ) );
+  res.sheader = typed_span<Elf64_Shdr>( program_content, header->e_shoff, header->e_shnum * sizeof( Elf64_Shdr ) );
 
   // Step 2.1: Read section header string table
   res.namestrs = string_view( program_content.data() + res.sheader[header->e_shstrndx].sh_offset,
@@ -126,8 +132,7 @@ Elf_Info load_program( std::span<const char> program_content )
     // Process symbol table
     if ( section.sh_type == SHT_SYMTAB ) {
       // Load symbol table
-      res.symtb
-        = span_view<Elf64_Sym>( string_view( program_content.data() + section.sh_offset, section.sh_size ) );
+      res.symtb = typed_span<Elf64_Sym>( program_content, section.sh_offset, section.sh_size );
 
       // Load symbol table string
       int symbstrs_idx = section.sh_link;
@@ -160,7 +165,7 @@ Elf_Info load_program( std::span<const char> program_content )
   return res;
 }
 
-Program link_program( std::span<const char> program_content )
+Program link_program( span<const char> program_content )
 {
   Elf_Info elf_info = load_program( program_content );
 
@@ -187,8 +192,7 @@ Program link_program( std::span<const char> program_content )
   // Step 3: Relocate every section
   for ( const auto& reloc_table_idx : elf_info.relocation_tables ) {
     const auto& section = elf_info.sheader[reloc_table_idx];
-    span_view<Elf64_Rela> reloctb
-      = span_view<Elf64_Rela>( string_view( program_content.data() + section.sh_offset, section.sh_size ) );
+    auto reloctb = typed_span<Elf64_Rela>( program_content, section.sh_offset, section.sh_size );
 
     if ( elf_info.idx_to_offset.find( section.sh_info ) != elf_info.idx_to_offset.end() ) {
       for ( const auto& reloc_entry : reloctb ) {

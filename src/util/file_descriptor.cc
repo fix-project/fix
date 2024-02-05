@@ -61,13 +61,13 @@ FileDescriptor FileDescriptor::duplicate() const
 }
 
 //! \param[out] str is the string to be read
-size_t FileDescriptor::read( string_span buffer )
+size_t FileDescriptor::read( span<char> buffer )
 {
   if ( buffer.empty() ) {
     throw runtime_error( "FileDescriptor::read: no space to read" );
   }
 
-  const ssize_t bytes_read = ::read( fd_num(), buffer.mutable_data(), buffer.size() );
+  const ssize_t bytes_read = ::read( fd_num(), buffer.data(), buffer.size() );
   if ( bytes_read < 0 ) {
     if ( _internal_fd->_non_blocking and ( errno == EAGAIN or errno == EINPROGRESS ) ) {
       return 0;

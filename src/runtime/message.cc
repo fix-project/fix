@@ -41,7 +41,7 @@ OutgoingMessage::OutgoingMessage( const Message::Opcode opcode, string&& payload
 void OutgoingMessage::serialize_header( string& out )
 {
   out.resize( Message::HEADER_LENGTH );
-  Serializer s( string_span::from_view( out ) );
+  Serializer s { out };
   s.integer( payload_length() );
   s.integer( static_cast<uint8_t>( opcode() ) );
 
