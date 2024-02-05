@@ -8,10 +8,8 @@ void test( void )
 {
   auto& rt = Runtime::get_instance();
   rt.storage().deserialize();
-  Tree result = rt.storage().get_tree( rt.eval( thunk( tree( {
-    blob( "unused" ),
-    compile( file( "applications-prefix/src/applications-build/flatware/examples/return3/return3-fixpoint.wasm" ) ),
-  } ) ) ) );
+  Tree result = rt.storage().get_tree( rt.eval( flatware_input( compile(
+    file( "applications-prefix/src/applications-build/flatware/examples/return3/return3-fixpoint.wasm" ) ) ) ) );
 
   auto blob = rt.storage().get_blob( result[0] );
   CHECK( blob.size() == 4 );
