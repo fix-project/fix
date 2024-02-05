@@ -66,11 +66,13 @@ class Remote : public IRuntime
 
   bool dead_ { false };
 
-  using DataProposal = absl::flat_hash_map<Handle<Fix>, std::variant<BlobData, TreeData>, AbslHash>;
+  using DataProposal = absl::flat_hash_map<Handle<AnyDataType>, std::variant<BlobData, TreeData>, AbslHash>;
   std::unique_ptr<DataProposal> incomplete_proposal_ { std::make_unique<DataProposal>() };
   absl::flat_hash_map<Handle<Relation>, std::unique_ptr<DataProposal>> proposed_proposals_ {};
 
-  SharedMutex<absl::flat_hash_set<Handle<Fix>, AbslHash>> view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> blobs_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash>> trees_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> relations_view_ {};
 
 public:
   Remote( EventLoop& events,

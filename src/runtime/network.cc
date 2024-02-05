@@ -105,7 +105,7 @@ void Remote::put( Handle<Named> name, BlobData data )
 void Remote::put( Handle<AnyTree> name, TreeData data )
 {
   if ( !contains( name ) ) {
-    msg_q_.enqueue( make_pair( index_, make_pair( handle::fix( name ), data ) ) );
+    msg_q_.enqueue( make_pair( index_, make_pair( name, data ) ) );
   }
 }
 
@@ -123,17 +123,17 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
 
 bool Remote::contains( Handle<Named> handle )
 {
-  return view_.read()->contains( handle );
+  return blobs_view_.read()->contains( handle );
 }
 
 bool Remote::contains( Handle<AnyTree> handle )
 {
-  return view_.read()->contains( handle::fix( handle ) );
+  return trees_view_.read()->contains( handle::upcast( handle ) );
 }
 
 bool Remote::contains( Handle<Relation> handle )
 {
-  return view_.read()->contains( handle );
+  return relations_view_.read()->contains( handle );
 }
 
 bool Remote::contains( __attribute__( ( unused ) ) const std::string_view label )
@@ -276,29 +276,30 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
       for ( auto it = handles.begin(); it != handles.end(); ) {
         // Any handle proposed by the remote are considered "existing" on remote
-        view_.write()->insert( *it );
+        auto contained = std::visit( overload { [&]( Handle<Named> h ) {
+                                                 blobs_view_.write()->insert( h );
+                                                 return parent->contains( h );
+                                               },
+                                                [&]( Handle<AnyTree> t ) {
+                                                  trees_view_.write()->insert( handle::upcast( t ) );
+                                                  return parent->contains( t );
+                                                },
+                                                [&]( Handle<Literal> ) { return true; },
+                                                [&]( Handle<Relation> ) { return true; } },
+                                     //[&]( auto ) -> bool { VLOG( 1 ) << handle::fix( *it );
+                                     // throw std::runtime_error( "Invalid propose transfer payload." ); } },
+                                     it->get() );
 
-        auto contained
-          = handle::extract<Named>( *it )
-              .transform( []( auto h ) -> Handle<AnyDataType> { return h; } )
-              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ValueTree>( *it ); } )
-              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ObjectTree>( *it ); } )
-              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ExpressionTree>( *it ); } )
-              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<Relation>( *it ); } )
-              .transform( [&]( auto h ) {
-                return h.template visit<bool>( overload { []( Handle<Literal> ) { return true; },
-                                                          [&]( auto h ) { return parent->contains( h ); } } );
-              } );
-
-        if ( contained.has_value() and contained.value() ) {
+        if ( contained ) {
           it = handles.erase( it );
         } else {
           ++it;
         }
       }
-      VLOG( 2 ) << "Accepting " << handles.size() << " of " << original << " objects.";
+
+      VLOG( 1 ) << "Accepting " << handles.size() << " of " << original << " objects.";
       for ( const auto& h : handles ) {
-        VLOG( 3 ) << "Accepting " << h;
+        VLOG( 2 ) << "Accepting " << h;
       }
       push_message( OutgoingMessage::to_message( AcceptTransferPayload { todo, result, handles } ) );
       break;
@@ -307,41 +308,37 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::ACCEPT_TRANSFER: {
       auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string>( msg.payload() ) );
 
-      VLOG( 2 ) << "Sending " << handles.size() << " objects.";
+      VLOG( 1 ) << "Sending " << handles.size() << " objects.";
       for ( const auto& h : handles ) {
-        auto anydata
-          = handle::extract<Named>( h )
-              .transform( []( auto h ) -> Handle<AnyDataType> { return h; } )
-              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ValueTree>( h ); } )
-              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ObjectTree>( h ); } )
-              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<ExpressionTree>( h ); } )
-              .or_else( [&]() -> optional<Handle<AnyDataType>> { return handle::extract<Relation>( h ); } );
-
-        if ( anydata ) {
-          VLOG( 3 ) << "Sending " << handle::fix( anydata.value() );
-          anydata->visit<void>( overload {
-            [&]( Handle<Named> n ) {
-              push_message( { Opcode::BLOBDATA, std::get<BlobData>( proposed_proposals_.at( todo )->at( n ) ) } );
+        VLOG( 1 ) << "Sending " << handle::fix( h );
+        std::visit(
+          overload {
+            [&]( Handle<Named> ) {
+              push_message( { Opcode::BLOBDATA, std::get<BlobData>( proposed_proposals_.at( todo )->at( h ) ) } );
             },
-            [&]( Handle<AnyTree> n ) {
-              push_message( { Opcode::TREEDATA,
-                              std::get<TreeData>( proposed_proposals_.at( todo )->at( handle::fix( n ) ) ) } );
+            [&]( Handle<AnyTree> ) {
+              push_message( { Opcode::TREEDATA, std::get<TreeData>( proposed_proposals_.at( todo )->at( h ) ) } );
             },
-            []( Handle<Relation> ) {},
             []( Handle<Literal> ) {},
-          } );
-        }
+            []( Handle<Relation> ) {},
+          },
+          h.get() );
       }
 
       // Any objects in this proposal are considered "exising" on the remote side
       for ( const auto& [h, _] : *proposed_proposals_.at( todo ) ) {
-        view_.write()->insert( h );
+        std::visit( overload { [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
+                               [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
+                               []( Handle<Relation> ) {},
+                               []( Handle<Literal> ) {} },
+                    h.get() );
       }
 
       proposed_proposals_.erase( todo );
 
       if ( result ) {
         push_message( OutgoingMessage::to_message( ResultPayload { .task = todo, .result = *result } ) );
+        relations_view_.write()->insert( todo );
       } else {
         push_message( OutgoingMessage::to_message( RunPayload { .task = todo } ) );
       }
@@ -396,7 +393,10 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
 
     visit( overload {
              [&]( BlobDataPayload b ) { connection.incomplete_proposal_->emplace( b.first, b.second ); },
-             [&]( TreeDataPayload t ) { connection.incomplete_proposal_->emplace( t.first, t.second ); },
+             [&]( TreeDataPayload t ) {
+               connection.incomplete_proposal_->emplace(
+                 visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
+             },
              [&]( RunPayload r ) {
                if ( connection.incomplete_proposal_->empty() ) {
                  connection.push_message( OutgoingMessage::to_message( r ) );
@@ -416,12 +416,13 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
              [&]( ResultPayload r ) {
                if ( connection.incomplete_proposal_->empty() ) {
                  connection.push_message( OutgoingMessage::to_message( r ) );
+                 connection.relations_view_.write()->insert( r.task );
                } else {
                  ProposeTransferPayload payload;
                  payload.todo = r.task;
                  payload.result = r.result;
                  for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
-                   VLOG( 1 ) << "Proposing " << name;
+                   VLOG( 2 ) << "Proposing " << name;
                    payload.handles.push_back( name );
                  }
                  connection.push_message( OutgoingMessage::to_message( move( payload ) ) );

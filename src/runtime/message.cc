@@ -1,4 +1,5 @@
 #include "message.hh"
+#include "handle.hh"
 #include "object.hh"
 #include "overload.hh"
 #include "parser.hh"
@@ -281,7 +282,7 @@ TransferPayload<O> TransferPayload<O>::parse( Parser& parser )
   parser.integer<size_t>( count );
   payload.handles.reserve( count );
   for ( size_t i = 0; i < count; i++ ) {
-    payload.handles.push_back( parse_handle<Fix>( parser ) );
+    payload.handles.push_back( parse_handle<AnyDataType>( parser ) );
   }
   return payload;
 }
@@ -296,7 +297,7 @@ void TransferPayload<O>::serialize( Serializer& serializer ) const
   }
   serializer.integer<size_t>( handles.size() );
   for ( const auto& h : handles ) {
-    serializer.integer( h.into<Fix>().content );
+    serializer.integer( h.content );
   }
 }
 
