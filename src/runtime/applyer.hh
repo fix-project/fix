@@ -23,13 +23,13 @@ class Applyer : public Runner
 {
 private:
   std::vector<std::thread> threads_ {};
-  Channel<ApplyEnv> todo_ {};
-  Channel<ApplyResult> result_ {};
+  Channel<std::unique_ptr<ApplyEnv>> todo_ {};
+  Channel<std::unique_ptr<ApplyResult>> result_ {};
   std::shared_ptr<Runner> runner_ {};
 
 private:
   void run();
-  void progress( ApplyEnv&& apply_todo );
+  void progress( std::unique_ptr<ApplyEnv> apply_todo );
 
 public:
   virtual void init() override;

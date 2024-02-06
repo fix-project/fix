@@ -1,11 +1,12 @@
 #include "applyer.hh"
+#include "runner.hh"
 
 using namespace std;
 
 void Applyer::run()
 {
   try {
-    ApplyEnv next;
+    unique_ptr<ApplyEnv> next;
     while ( true ) {
       todo_ >> next;
       progress( std::move( next ) );
@@ -15,16 +16,17 @@ void Applyer::run()
   }
 }
 
-void Applyer::progress( ApplyEnv&& apply_todo )
+void Applyer::progress( unique_ptr<ApplyEnv> apply_todo )
 {
   auto res = runner_->apply(
-    apply_todo.handle, std::move( apply_todo.minrepo_blobs ), std::move( apply_todo.minrepo_trees ) );
+    apply_todo->handle, std::move( apply_todo->minrepo_blobs ), std::move( apply_todo->minrepo_trees ) );
 
   if ( res.has_value() ) {
-    ApplyResult result { .handle = apply_todo.handle,
-                         .result = res.value(),
-                         .minrepo_blobs = std::move( curr_minrepo_blobs ),
-                         .minrepo_trees = std::move( curr_minrepo_trees ) };
+    auto result = make_unique<ApplyResult>();
+    result->handle = apply_todo->handle;
+    result->result = res.value();
+    result->minrepo_blobs = std::move( curr_minrepo_blobs );
+    result->minrepo_trees = std::move( curr_minrepo_trees );
     result_.move_push( std::move( result ) );
   }
 }
@@ -41,8 +43,11 @@ std::optional<Handle<Object>> Applyer::apply( Handle<ObjectTree> handle,
                                               BlobMap&& minrepo_blobs,
                                               TreeMap&& minrepo_trees )
 {
-  ApplyEnv env {
-    .handle = handle, .minrepo_blobs = std::move( minrepo_blobs ), .minrepo_trees = std::move( minrepo_trees ) };
+  auto env = make_unique<ApplyEnv>();
+  env->handle = handle;
+  env->minrepo_blobs = std::move( minrepo_blobs );
+  env->minrepo_trees = std::move( minrepo_trees );
   todo_.move_push( std::move( env ) );
+
   return {};
 }
