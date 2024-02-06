@@ -5,7 +5,7 @@
 #include "types.hh"
 
 namespace tester {
-auto rt = ReadOnlyTester::init();
+auto rt = ReadOnlyRT::init();
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
@@ -19,14 +19,14 @@ static Handle<Fix> add_simple_compiled;
 
 Handle<Value> curry( Handle<Fix> program, Handle<Fix> num_args )
 {
-  return tester::rt->executor().execute( Handle<Eval>(
+  return tester::rt->execute( Handle<Eval>(
     Handle<Application>( tester::Tree( tester::Blob( "unused" ), curry_compiled, program, num_args ) ) ) );
 }
 
 Handle<Value> apply_args( Handle<Value> curried, const initializer_list<Handle<Fix>>& elements )
 {
   for ( auto& e : elements ) {
-    curried = tester::rt->executor().execute(
+    curried = tester::rt->execute(
       Handle<Eval>( Handle<Application>( tester::Tree( tester::Blob( "unused" ), curried, e ) ) ) );
   }
   return curried;

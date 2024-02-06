@@ -99,6 +99,7 @@ public:
   virtual std::optional<Info> get_info() { return {}; }
 
   virtual Handle<Fix> labeled( [[maybe_unused]] const std::string_view label ) { return Handle<Literal>::nil(); };
+  virtual bool contains( [[maybe_unused]] const std::string_view label ) { return false; };
 
   virtual ~IRuntime() {}
 };

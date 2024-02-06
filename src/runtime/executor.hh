@@ -1,4 +1,5 @@
 #pragma once
+
 #include <memory>
 #include <thread>
 #include <unordered_set>
@@ -6,6 +7,7 @@
 
 #include "channel.hh"
 #include "evaluator.hh"
+#include "handle.hh"
 #include "interface.hh"
 #include "mutex.hh"
 #include "runner.hh"
@@ -45,11 +47,53 @@ public:
   }
 
   template<FixType T>
-  void visit( Handle<T> root,
-              std::function<void( Handle<Fix> )> visitor,
-              std::unordered_set<Handle<Fix>> visited = {} );
-  std::vector<Handle<Fix>> minrepo( Handle<Fix> handle );
-  void load_to_storage( Handle<Fix> handle );
+  requires std::convertible_to<Handle<T>, Handle<Object>>
+  void visit_minrepo( Handle<T> root,
+                      std::function<void( Handle<AnyDataType> )> visitor,
+                      std::unordered_set<Handle<Object>> visited = {} );
+
+  template<FixType T>
+  void visit( Handle<T> handle,
+              std::function<void( Handle<AnyDataType> )> visitor,
+              std::unordered_set<Handle<Fix>> visited = {} )
+  {
+    if ( visited.contains( handle ) )
+      return;
+    if constexpr ( std::same_as<T, Literal> )
+      return;
+
+    if constexpr ( Handle<T>::is_fix_sum_type ) {
+      if ( not( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) ) {
+        std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
+      }
+      if constexpr ( std::same_as<T, Relation> ) {
+        auto target = get_or_delegate( handle );
+        std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, target->get() );
+
+        auto lhs = handle.template visit<Handle<Object>>(
+          overload { []( Handle<Apply> h ) { return h.unwrap<ObjectTree>(); },
+                     []( Handle<Eval> h ) { return h.unwrap<Object>(); } } );
+        std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, lhs.get() );
+
+        VLOG( 2 ) << "visiting " << handle;
+        visitor( handle );
+        visited.insert( handle );
+      }
+
+    } else {
+      if constexpr ( FixTreeType<T> ) {
+        auto tree = get_or_delegate( handle );
+        for ( const auto& element : tree.value()->span() ) {
+          visit( element, visitor, visited );
+        }
+      }
+      VLOG( 2 ) << "visiting " << handle;
+      visitor( handle );
+      visited.insert( handle );
+    }
+  }
+
+  void load_to_storage( Handle<AnyDataType> handle );
   void load_minrepo( Handle<ObjectTree> handle );
 
   RuntimeStorage& storage() { return storage_; }
@@ -91,6 +135,7 @@ public:
   virtual bool contains( Handle<AnyTree> handle ) override;
   virtual bool contains( Handle<Relation> handle ) override;
   virtual Handle<Fix> labeled( const std::string_view label ) override;
+  virtual bool contains( const std::string_view label ) override;
 
   /* }@ */
 };

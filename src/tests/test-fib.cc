@@ -4,7 +4,7 @@
 
 using namespace std;
 
-auto rt = ReadOnlyTester::init();
+auto rt = ReadOnlyRT::init();
 
 uint32_t fix_fib( uint32_t x )
 {
@@ -12,7 +12,7 @@ uint32_t fix_fib( uint32_t x )
   static auto fib = compile( *rt, file( *rt, "testing/wasm-examples/fib.wasm" ) );
   auto thunk = Handle<Application>(
     handle::upcast( tree( *rt, blob( *rt, "unused" ), fib, Handle<Literal>( x ), addblob ) ) );
-  auto result = rt->executor().execute( Handle<Eval>( thunk ) );
+  auto result = rt->execute( Handle<Eval>( thunk ) );
   uint32_t y = -1;
 
   auto res = result.try_into<Blob>().and_then( []( auto h ) { return h.template try_into<Literal>(); } );

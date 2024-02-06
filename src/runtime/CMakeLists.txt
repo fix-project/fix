@@ -1,4 +1,4 @@
-file (GLOB LIB_SOURCES evaluator.cc executor.cc message.cc network.cc fixpointapi.cc elfloader.cc)
+file (GLOB LIB_SOURCES evaluator.cc executor.cc message.cc network.cc fixpointapi.cc elfloader.cc runtimes.cc)
 
 add_library (runtime STATIC ${LIB_SOURCES})
 target_include_directories (runtime PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")

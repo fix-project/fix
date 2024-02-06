@@ -4,7 +4,7 @@
 
 using namespace std;
 
-auto rt = ReadOnlyTester::init();
+auto rt = ReadOnlyRT::init();
 
 void test( void )
 {
@@ -21,7 +21,7 @@ void test( void )
   }
 
   auto new_elf_thunk_tree = rt->create( make_shared<OwnedTree>( std::move( new_elf_thunks ) ) );
-  auto new_elfs = rt->executor().execute( Handle<Eval>( new_elf_thunk_tree.try_into<ObjectTree>().value() ) );
+  auto new_elfs = rt->execute( Handle<Eval>( new_elf_thunk_tree.try_into<ObjectTree>().value() ) );
   auto new_elf_names = rt->get( new_elfs.try_into<ValueTree>().value() ).value();
 
   size_t index = 0;

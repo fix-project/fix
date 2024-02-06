@@ -1,4 +1,5 @@
 #include "message.hh"
+#include "handle.hh"
 #include "object.hh"
 #include "overload.hh"
 #include "parser.hh"
@@ -91,12 +92,17 @@ size_t IncomingMessage::expected_payload_length( string_view header )
 
 OutgoingMessage OutgoingMessage::to_message( MessagePayload&& payload )
 {
-  return std::visit(
-    []( auto&& p ) -> OutgoingMessage {
-      using T = std::decay_t<decltype( p )>;
-      return { T::OPCODE, serialize( p ) };
-    },
-    payload );
+  return std::visit( overload { []( BlobDataPayload b ) -> OutgoingMessage {
+                                 return { Opcode::BLOBDATA, b.second };
+                               },
+                                []( TreeDataPayload t ) -> OutgoingMessage {
+                                  return { Opcode::TREEDATA, t.second };
+                                },
+                                []( auto&& p ) -> OutgoingMessage {
+                                  using T = std::decay_t<decltype( p )>;
+                                  return { T::OPCODE, serialize( p ) };
+                                } },
+                     payload );
 }
 
 void MessageParser::complete_message()
@@ -276,7 +282,7 @@ TransferPayload<O> TransferPayload<O>::parse( Parser& parser )
   parser.integer<size_t>( count );
   payload.handles.reserve( count );
   for ( size_t i = 0; i < count; i++ ) {
-    payload.handles.push_back( parse_handle<Fix>( parser ) );
+    payload.handles.push_back( parse_handle<AnyDataType>( parser ) );
   }
   return payload;
 }
@@ -291,7 +297,7 @@ void TransferPayload<O>::serialize( Serializer& serializer ) const
   }
   serializer.integer<size_t>( handles.size() );
   for ( const auto& h : handles ) {
-    serializer.integer( h.into<Fix>().content );
+    serializer.integer( h.content );
   }
 }
 

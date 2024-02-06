@@ -115,7 +115,7 @@ struct TransferPayload
 {
   Handle<Relation> todo {};
   std::optional<Handle<Object>> result {};
-  std::vector<Handle<Fix>> handles {};
+  std::vector<Handle<AnyDataType>> handles {};
 
   static TransferPayload parse( Parser& parser );
   void serialize( Serializer& serializer ) const;
@@ -131,13 +131,18 @@ struct TransferPayload
 using ProposeTransferPayload = TransferPayload<Message::Opcode::PROPOSE_TRANSFER>;
 using AcceptTransferPayload = TransferPayload<Message::Opcode::ACCEPT_TRANSFER>;
 
+using BlobDataPayload = std::pair<Handle<Named>, BlobData>;
+using TreeDataPayload = std::pair<Handle<AnyTree>, TreeData>;
+
 using MessagePayload = std::variant<RunPayload,
                                     ResultPayload,
                                     InfoPayload,
                                     ProposeTransferPayload,
                                     AcceptTransferPayload,
                                     RequestBlobPayload,
-                                    RequestTreePayload>;
+                                    RequestTreePayload,
+                                    BlobDataPayload,
+                                    TreeDataPayload>;
 
 class IncomingMessage : public Message
 {

@@ -5,7 +5,7 @@
 
 using namespace std;
 
-auto rt = ReadOnlyTester::init();
+auto rt = ReadOnlyRT::init();
 
 uint32_t fix_add( uint32_t a, uint32_t b, Handle<Fix> add_elf )
 {
@@ -17,7 +17,7 @@ uint32_t fix_add( uint32_t a, uint32_t b, Handle<Fix> add_elf )
                        .visit<Handle<ExpressionTree>>( []( auto h ) { return Handle<ExpressionTree>( h ); } );
   auto add = Handle<Application>( combination );
   (void)a, (void)b;
-  auto result = rt->executor().execute( Handle<Eval>( add ) );
+  auto result = rt->execute( Handle<Eval>( add ) );
   uint32_t x = -1;
 
   auto res = result.try_into<Blob>().and_then( []( auto h ) { return h.template try_into<Literal>(); } );

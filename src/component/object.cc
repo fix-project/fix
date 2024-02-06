@@ -17,7 +17,7 @@ Owned<S>::Owned( std::filesystem::path path ) requires std::is_const_v<element_t
   : span_()
   , allocation_type_( AllocationType::Mapped )
 {
-  VLOG( 1 ) << "mapping " << path << " as read-only";
+  VLOG( 2 ) << "mapping " << path << " as read-only";
   size_t size = std::filesystem::file_size( path );
   int fd = open( path.c_str(), O_RDONLY );
   CHECK( fd >= 0 );
@@ -40,7 +40,7 @@ Owned<S>::Owned( size_t size, AllocationType type ) requires( not std::is_const_
         reinterpret_cast<pointer>( p ),
         size,
       };
-      VLOG( 1 ) << "allocated " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
+      VLOG( 2 ) << "allocated " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
                 << reinterpret_cast<void*>( span_.data() );
       return;
     }
@@ -55,7 +55,7 @@ Owned<S>::Owned( size_t size, AllocationType type ) requires( not std::is_const_
         reinterpret_cast<pointer>( p ),
         size,
       };
-      VLOG( 1 ) << "mapped " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
+      VLOG( 2 ) << "mapped " << size << " elements (" << size * sizeof( element_type ) << " bytes) at "
                 << reinterpret_cast<void*>( span_.data() );
       return;
     }
@@ -67,7 +67,7 @@ Owned<S>::Owned( size_t size, AllocationType type ) requires( not std::is_const_
 template<typename S>
 void Owned<S>::to_file( const std::filesystem::path path ) requires std::is_const_v<element_type>
 {
-  VLOG( 1 ) << "writing " << path << " to disk";
+  VLOG( 2 ) << "writing " << path << " to disk";
   size_t bytes = span_.size_bytes();
   CHECK( not std::filesystem::exists( path ) );
   int fd = open( path.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
@@ -174,11 +174,11 @@ Owned<S>::~Owned()
     case AllocationType::Static:
       break;
     case AllocationType::Allocated:
-      VLOG( 1 ) << "freeing " << span_.size() << " bytes at " << reinterpret_cast<const void*>( span_.data() );
+      VLOG( 2 ) << "freeing " << span_.size() << " bytes at " << reinterpret_cast<const void*>( span_.data() );
       free( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ) );
       break;
     case AllocationType::Mapped:
-      VLOG( 1 ) << "unmapping " << span_.size() << " bytes at " << reinterpret_cast<const void*>( span_.data() );
+      VLOG( 2 ) << "unmapping " << span_.size() << " bytes at " << reinterpret_cast<const void*>( span_.data() );
       munmap( const_cast<void*>( reinterpret_cast<const void*>( span_.data() ) ), span_.size() );
       break;
   }

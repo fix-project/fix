@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <format>
 #include <functional>
 #include <iostream>
@@ -14,7 +15,9 @@
 #include "object.hh"
 #include "overload.hh"
 #include "repository.hh"
+#include "runtimes.hh"
 #include "storage_exception.hh"
+#include "tester-utils.hh"
 
 using namespace std;
 
@@ -167,7 +170,11 @@ void cat( int argc, char* argv[] )
         cout << data->at( i ).content << "\n";
       }
     },
-    [&]( auto ) {
+    [&]( Handle<Relation> ) {
+      cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
+      exit( EXIT_FAILURE );
+    },
+    [&]( Handle<Blob> ) {
       cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
       exit( EXIT_FAILURE );
     },
@@ -201,7 +208,11 @@ void ls( int argc, char* argv[] )
   auto handle = handle::data( storage.lookup( ref ) )
                   .visit<Handle<AnyTree>>( overload {
                     []( Handle<AnyTree> x ) { return x; },
-                    [&]( auto ) -> Handle<AnyTree> {
+                    [&]( Handle<Relation> ) -> Handle<AnyTree> {
+                      cerr << std::format( "Ref {} does not a describe a tree.", ref );
+                      exit( EXIT_FAILURE );
+                    },
+                    [&]( Handle<Blob> ) -> Handle<AnyTree> {
                       cerr << std::format( "Ref {} does not a describe a tree.", ref );
                       exit( EXIT_FAILURE );
                     },
@@ -330,6 +341,26 @@ void label( int argc, char* argv[] )
   storage.label( new_label, handle );
 }
 
+void eval( int argc, char* argv[] )
+{
+  if ( argc == 0 or string( argv[1] ) == "--help" ) {
+    parser_usage_message();
+    exit( EXIT_FAILURE );
+  }
+
+  auto rt = ReadWriteRT::init();
+  span<char*> args = { argv + 1, static_cast<size_t>( argc ) - 1 };
+  auto handle = parse_args( *rt, args );
+
+  if ( !handle::extract<Object>( handle ).has_value() ) {
+    cerr << "Handle is not an Object";
+    exit( EXIT_FAILURE );
+  }
+
+  auto res = rt->execute( Handle<Eval>( handle::extract<Object>( handle ).value() ) );
+  cout << res << endl;
+}
+
 void init( int, char*[] )
 {
   bool exists = false;
@@ -390,6 +421,7 @@ map<string, pair<function<void( int, char*[] )>, const char*>> commands = {
   { "labels", { labels, "List all available labels." } },
   { "ls", { tree::ls, "List the contents of a Tree." } },
   { "ls-tree", { tree::ls, "List the contents of a Tree." } },
+  { "eval", { eval, "Eval" } },
 };
 
 void help( ostream& os = cout )

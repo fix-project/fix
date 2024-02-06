@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include <glog/logging.h>
+#include <string_view>
 #include <variant>
 
 #include "handle.hh"
@@ -254,6 +255,12 @@ Handle<Fix> RuntimeStorage::labeled( const std::string_view label )
     return labels->at( l );
   }
   throw LabelNotFound( label );
+}
+
+bool RuntimeStorage::contains( const std::string_view label )
+{
+  auto labels = labels_.read();
+  return labels->contains( label );
 }
 
 std::unordered_set<std::string> RuntimeStorage::labels()

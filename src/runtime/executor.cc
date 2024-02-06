@@ -1,5 +1,6 @@
 #include <glog/logging.h>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include "executor.hh"
@@ -112,6 +113,7 @@ Result<Value> Executor::load( Handle<Value> value )
 
 Result<Object> Executor::apply( Handle<ObjectTree> combination )
 {
+  VLOG( 2 ) << "Apply " << combination;
   Handle<Apply> goal( combination );
 
   if ( storage_.contains( goal ) ) {
@@ -132,7 +134,12 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   load_minrepo( combination );
 
   auto result = runner_->apply( combination, tree );
+
   storage_.create( goal, result );
+  auto parent = parent_.lock();
+  if ( parent )
+    parent->put( goal, result );
+
   auto live = live_.write();
   live->erase( goal );
   return result;
@@ -149,7 +156,12 @@ Result<Value> Executor::evalStrict( Handle<Object> expression )
   auto result = evaluator_.evalStrict( expression );
   if ( !result )
     return {};
+
   storage_.create( goal, *result );
+  auto parent = parent_.lock();
+  if ( parent )
+    parent->put( goal, *result );
+
   return result;
 }
 
@@ -270,6 +282,9 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   if ( storage_.contains( name ) ) {
     return storage_.get( name );
   }
+  if ( threads_.size() == 0 ) {
+    throw HandleNotFound( name );
+  }
   todo_ << name;
   return {};
 }
@@ -309,10 +324,16 @@ Handle<Fix> Executor::labeled( const std::string_view label )
   return storage_.labeled( label );
 };
 
+bool Executor::contains( const std::string_view label )
+{
+  return storage_.contains( label );
+}
+
 template<FixType T>
-void Executor::visit( Handle<T> handle,
-                      std::function<void( Handle<Fix> )> visitor,
-                      std::unordered_set<Handle<Fix>> visited )
+requires std::convertible_to<Handle<T>, Handle<Object>>
+void Executor::visit_minrepo( Handle<T> handle,
+                              std::function<void( Handle<AnyDataType> )> visitor,
+                              std::unordered_set<Handle<Object>> visited )
 {
   if ( visited.contains( handle ) )
     return;
@@ -320,18 +341,14 @@ void Executor::visit( Handle<T> handle,
     return;
 
   if constexpr ( Handle<T>::is_fix_sum_type ) {
-    if ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) ) {
-      std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
-    }
-    if constexpr ( std::same_as<T, Relation> ) {
-      auto target = get_or_delegate( handle );
-      std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, target->get() );
-    }
+    if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef>
+                        or std::same_as<T, ObjectTreeRef> ) )
+      std::visit( [&]( const auto x ) { visit_minrepo( x, visitor, visited ); }, handle.get() );
   } else {
     if constexpr ( FixTreeType<T> ) {
       auto tree = get_or_delegate( handle );
       for ( const auto& element : tree.value()->span() ) {
-        visit( element, visitor, visited );
+        visit_minrepo( handle::extract<Object>( element ).value(), visitor, visited );
       }
     }
     VLOG( 2 ) << "visiting " << handle;
@@ -340,14 +357,7 @@ void Executor::visit( Handle<T> handle,
   }
 }
 
-vector<Handle<Fix>> Executor::minrepo( Handle<Fix> handle )
-{
-  vector<Handle<Fix>> handles {};
-  visit( handle, [&]( Handle<Fix> h ) { handles.push_back( h ); } );
-  return handles;
-}
-
-void Executor::load_to_storage( Handle<Fix> handle )
+void Executor::load_to_storage( Handle<AnyDataType> handle )
 {
   handle::data( handle ).visit<void>( overload { []( Handle<Literal> ) { return; },
                                                  [&]( auto h ) {
@@ -358,5 +368,5 @@ void Executor::load_to_storage( Handle<Fix> handle )
 
 void Executor::load_minrepo( Handle<ObjectTree> combination )
 {
-  visit( combination, [&]( Handle<Fix> h ) { load_to_storage( h ); } );
+  visit_minrepo( combination, [&]( Handle<AnyDataType> h ) { load_to_storage( h ); } );
 }

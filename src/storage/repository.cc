@@ -150,7 +150,8 @@ void Repository::put( Handle<Relation> relation, Handle<Object> target )
     auto path = repo_ / "relations" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
-    fs::create_symlink( path, "../data/" + base16::encode( target.content ) );
+    VLOG( 1 ) << "linking to " << target.content;
+    fs::create_symlink( "../data/" + base16::encode( target.content ), path );
   } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
@@ -255,7 +256,7 @@ bool Repository::contains( Handle<Fix> handle )
 }
 #endif
 
-bool Repository::contains( const std::string_view label ) const
+bool Repository::contains( const std::string_view label )
 {
   try {
     return fs::exists( repo_ / "labels" / label );

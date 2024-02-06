@@ -3,11 +3,11 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <concurrentqueue/concurrentqueue.h>
+#include <glog/logging.h>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 
@@ -16,7 +16,9 @@
 #include "handle.hh"
 #include "interface.hh"
 #include "message.hh"
+#include "mutex.hh"
 #include "ring_buffer.hh"
+#include "runtimestorage.hh"
 #include "socket.hh"
 
 using MessageQueue = moodycamel::ConcurrentQueue<std::pair<uint32_t, MessagePayload>>;
@@ -34,8 +36,12 @@ struct EventCategories
   size_t forward_msg;
 };
 
+class NetworkWorker;
+
 class Remote : public IRuntime
 {
+  friend class NetworkWorker;
+
   TCPSocket socket_;
 
   MessageQueue& msg_q_;
@@ -60,6 +66,14 @@ class Remote : public IRuntime
 
   bool dead_ { false };
 
+  using DataProposal = absl::flat_hash_map<Handle<AnyDataType>, std::variant<BlobData, TreeData>, AbslHash>;
+  std::unique_ptr<DataProposal> incomplete_proposal_ { std::make_unique<DataProposal>() };
+  absl::flat_hash_map<Handle<Relation>, std::unique_ptr<DataProposal>> proposed_proposals_ {};
+
+  SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> blobs_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash>> trees_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> relations_view_ {};
+
 public:
   Remote( EventLoop& events,
           EventCategories categories,
@@ -79,6 +93,7 @@ public:
   bool contains( Handle<Named> handle ) override;
   bool contains( Handle<AnyTree> handle ) override;
   bool contains( Handle<Relation> handle ) override;
+  bool contains( const std::string_view label ) override;
   std::optional<Info> get_info() override;
 
   void push_message( OutgoingMessage&& msg );
@@ -123,7 +138,7 @@ private:
   Channel<TCPSocket> connecting_sockets_ {};
 
   std::size_t next_connection_id_ { 0 };
-  std::unordered_map<size_t, std::shared_ptr<Remote>> connections_ {};
+  SharedMutex<std::unordered_map<std::string, size_t>> addresses_ {};
   std::vector<TCPSocket> server_sockets_ {};
 
   MessageQueue msg_q_ {};
@@ -134,6 +149,8 @@ private:
   void process_outgoing_message( size_t remote_id, MessagePayload&& message );
 
 public:
+  SharedMutex<std::unordered_map<size_t, std::shared_ptr<Remote>>> connections_ {};
+
   NetworkWorker( std::weak_ptr<IRuntime> parent )
     : parent_( parent )
   {}
@@ -163,9 +180,15 @@ public:
   void connect( const Address& address )
   {
     TCPSocket socket;
+    VLOG( 1 ) << "Connecting to " << address.to_string();
     socket.connect( address );
     connecting_sockets_.move_push( std::move( socket ) );
   }
 
-  std::shared_ptr<Remote> get_remote( size_t index ) { return connections_.at( index ); }
+  std::weak_ptr<Remote> get_remote( const Address& address )
+  {
+    auto address_str = address.to_string();
+    addresses_.read().wait( [&] { return addresses_.read()->contains( address_str ); } );
+    return connections_.read()->at( addresses_.read()->at( address_str ) );
+  }
 };
