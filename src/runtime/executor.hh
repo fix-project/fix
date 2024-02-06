@@ -12,9 +12,10 @@
 #include "runtimestorage.hh"
 
 class Executor
-  : private FixRuntime
+  : protected FixRuntime
   , public IRuntime
 {
+protected:
   std::vector<std::thread> threads_ {};
   Channel<Handle<Relation>> todo_ {};
   RuntimeStorage storage_ {};
@@ -51,10 +52,11 @@ public:
   std::vector<Handle<Fix>> minrepo( Handle<Fix> handle );
   void load_to_storage( Handle<Fix> handle );
   void load_minrepo( Handle<ObjectTree> handle );
+  std::pair<Runner::BlobMap, Runner::TreeMap> collect_minrepo( Handle<ObjectTree> handle );
 
   RuntimeStorage& storage() { return storage_; }
 
-private:
+protected:
   void run();
   void progress( Handle<Relation> relation );
 

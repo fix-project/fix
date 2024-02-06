@@ -130,11 +130,16 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
 
   // Load minrepo to memory
   load_minrepo( combination );
+  auto [minrepo_blobs, minrepo_trees] = collect_minrepo( combination );
 
-  auto result = runner_->apply( combination, tree );
-  storage_.create( goal, result );
-  auto live = live_.write();
-  live->erase( goal );
+  auto result = runner_->apply( combination, std::move( minrepo_blobs ), std::move( minrepo_trees ) );
+
+  if ( result.has_value() ) {
+    storage_.create( goal, result.value() );
+    auto live = live_.write();
+    live->erase( goal );
+  }
+
   return result;
 }
 
@@ -359,4 +364,23 @@ void Executor::load_to_storage( Handle<Fix> handle )
 void Executor::load_minrepo( Handle<ObjectTree> combination )
 {
   visit( combination, [&]( Handle<Fix> h ) { load_to_storage( h ); } );
+}
+
+pair<Runner::BlobMap, Runner::TreeMap> Executor::collect_minrepo( Handle<ObjectTree> combination )
+{
+  Runner::BlobMap minrepo_blobs;
+  Runner::TreeMap minrepo_trees;
+
+  visit( combination, [&]( Handle<Fix> h ) {
+    handle::data( h ).visit<void>( overload { []( Handle<Literal> ) {},
+                                              []( Handle<Relation> ) {},
+                                              [&]( Handle<Named> b ) {
+                                                minrepo_blobs.insert( { b, get( b ).value() } );
+                                              },
+                                              [&]( Handle<AnyTree> t ) {
+                                                minrepo_trees.insert( { handle::upcast( t ), get( t ).value() } );
+                                              } } );
+  } );
+
+  return { std::move( minrepo_blobs ), std::move( minrepo_trees ) };
 }
