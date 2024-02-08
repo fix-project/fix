@@ -1,10 +1,10 @@
 #pragma once
 #include <string_view>
 
+#include "blake3.hh"
 #include "handle.hh"
 #include "handle_post.hh"
 #include "object.hh"
-#include "sha256.hh"
 
 namespace handle {
 static inline Handle<Blob> create( const BlobData& blob )
@@ -12,9 +12,7 @@ static inline Handle<Blob> create( const BlobData& blob )
   if ( blob->size() < Handle<Literal>::MAXIMUM_LENGTH ) {
     return Handle<Literal>( { blob->span().data(), blob->size() } );
   }
-  std::string str = sha256::encode_span( blob->span() );
-  u8x32 hash;
-  memcpy( &hash, str.data(), 32 );
+  u8x32 hash = blake3::encode( std::as_bytes( blob->span() ) );
   return Handle<Named> { hash, blob->size() };
 }
 
@@ -31,9 +29,7 @@ static inline FixKind tree_kind( const TreeData& tree )
 
 static inline Handle<AnyTree> create( const TreeData& data )
 {
-  std::string str = sha256::encode_span( data->span() );
-  u8x32 hash;
-  memcpy( &hash, str.data(), 32 );
+  u8x32 hash = blake3::encode( std::as_bytes( data->span() ) );
   switch ( tree_kind( data ) ) {
     case FixKind::Value:
       return Handle<ValueTree>( hash, data->size() );

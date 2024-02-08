@@ -2,8 +2,9 @@
 
 #include "types.hh"
 #include <immintrin.h>
+#include <span>
 #include <string_view>
 
 namespace blake3 {
-void encode( std::string_view input, u8x32& output );
+u8x32 encode( std::span<const std::byte> );
 }
