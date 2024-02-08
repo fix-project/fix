@@ -27,7 +27,7 @@ type ValueTree = Tree Value
 -- | An Object is a Value which may or may not have been computed yet.  Uncomputed data are represented as Thunks.
 data Object = Thunk Thunk | Value Value | ObjectTree ObjectTree | ObjectTreeRef (Ref ObjectTree)
 -- | A Thunk is a Value which has yet to be evaluated.  It is either described as an Application (of a function to arguments), an Identification (of an already-computed Value), or a Selection (of a particular element or subrange of a large structure).  It is better to use Identification or Selection Thunks where possible than applying an equivalent function, as these special Thunks have a smaller data footprint.
-data Thunk = Application (Name ExpressionTree) | Identification Value | Selection (Name ObjectTree)
+data Thunk = Application (Name ExpressionTree) | Identification (Name Value) | Selection (Name ObjectTree)
 -- | A Tree of Objects.
 type ObjectTree = Tree Object
 
@@ -87,7 +87,7 @@ evalShallow (ObjectTreeRef x) = ObjectTreeRef x
 
 -- | Execute one step of the evaluation of a Thunk.  This might produce another Thunk, or a Tree containing Thunks.
 think :: Thunk -> Object
-think (Identification x) = Value x
+think (Identification x) = Value $ load x
 think (Application x) = apply $ treeMap reduce $ load x
 think (Selection x) = select x
 
