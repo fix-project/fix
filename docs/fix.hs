@@ -98,8 +98,8 @@ select = undefined -- TODO
 -- | Converts an Expression into an Object by executing any Encodes contained within the Expression.
 reduce :: Expression -> Object
 reduce (Object x) = x
-reduce (Encode (Strict x)) = Value $ evalStrict $ think x
-reduce (Encode (Shallow x)) = evalShallow $ think x
+reduce (Encode (Strict x)) = Value $ evalStrict $ Thunk x
+reduce (Encode (Shallow x)) = evalShallow $ Thunk x
 reduce (ExpressionTree x) = ObjectTree $ treeMap reduce x
 
 -- | Convert a Value into a "concrete" Value, adding its data to the reachable set.
