@@ -37,9 +37,10 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
 {
   auto mapReduce = [&]( auto x ) { return rt_.mapReduce( x ); };
   auto apply = [&]( auto x ) { return rt_.apply( x ); };
+  auto load = [&]( auto x ) { return rt_.load( x ); };
 
   return x.visit<Result<Object>>( overload {
-    [&]( Handle<Identification> x ) { return x.unwrap<Value>(); },
+    [&]( Handle<Identification> x ) { return load( x.unwrap<Value>() ); },
     [&]( Handle<Application> x ) { return mapReduce( x.unwrap<ExpressionTree>() ).and_then( apply ); },
     [&]( Handle<Selection> ) -> Handle<Object> { throw std::runtime_error( "unimplemented" ); },
   } );
@@ -50,14 +51,13 @@ Result<Object> FixEvaluator::reduce( Handle<Expression> x )
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
   auto evalShallow = [&]( auto x ) { return rt_.evalShallow( x ); };
   auto mapReduce = [&]( auto x ) { return rt_.mapReduce( x ); };
-  auto force = [&]( auto x ) { return this->force( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Object> x ) { return x; },
     [&]( Handle<Encode> x ) {
       return x.visit<Result<Object>>( overload {
-        [&]( Handle<Strict> x ) { return force( x.unwrap<Thunk>() ).and_then( evalStrict ); },
-        [&]( Handle<Shallow> x ) { return force( x.unwrap<Thunk>() ).and_then( evalShallow ); },
+        [&]( Handle<Strict> x ) { return evalStrict( x.unwrap<Thunk>() ); },
+        [&]( Handle<Shallow> x ) { return evalShallow( x.unwrap<Thunk>() ); },
       } );
     },
     [&]( Handle<ExpressionTree> x ) { return mapReduce( x ); },

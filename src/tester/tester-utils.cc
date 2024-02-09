@@ -7,21 +7,38 @@
 #include "base16.hh"
 #include "handle.hh"
 #include "handle_post.hh"
+#include "object.hh"
 #include "tester-utils.hh"
 #include "tree.hh"
+#include "types.hh"
 
 using namespace std;
 
-static Handle<Strict> make_compile( IRuntime& rt, Handle<Fix> wasm )
+bool consumed = false;
+
+static Handle<Fix> make_identification( Handle<Fix> name )
+{
+  return handle::extract<Value>( name )
+    .transform( [&]( auto h ) -> Handle<Fix> {
+      return h.template visit<Handle<Fix>>(
+        overload { []( Handle<Blob> b ) { return Handle<Identification>( b ); },
+                   []( Handle<ValueTree> t ) { return Handle<Identification>( t ); },
+                   [&]( auto ) { return name; } } );
+    } )
+    .or_else( [&]() -> optional<Handle<Fix>> { throw std::runtime_error( "Not Identification-able" ); } )
+    .value();
+}
+
+static Handle<Application> make_compile( IRuntime& rt, Handle<Fix> wasm )
 {
   auto compiler = rt.labeled( "compile-encode" );
 
   auto tree = OwnedMutTree::allocate( 3 );
   tree.at( 0 ) = Handle<Literal>( "unused" );
-  tree.at( 1 ) = compiler;
+  tree.at( 1 ) = Handle<Strict>( handle::extract<Identification>( make_identification( compiler ) ).value() );
   tree.at( 2 ) = wasm;
-  return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) ).visit<Handle<Strict>>( []( auto x ) {
-    return Handle<Strict>( Handle<Application>( Handle<ExpressionTree>( x ) ) );
+  return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) ).visit<Handle<Application>>( []( auto x ) {
+    return Handle<Application>( Handle<ExpressionTree>( x ) );
   } );
 }
 
@@ -91,14 +108,26 @@ Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args )
   if ( str.starts_with( "compile:" ) ) {
     std::filesystem::path file( string( str.substr( 8 ) ) );
     args = args.subspan( 1 );
-    return make_compile( rt, make_blob( rt, file ) );
+    if ( consumed ) {
+      return Handle<Strict>( make_compile( rt, make_blob( rt, file ) ) );
+    } else {
+      return make_compile( rt, make_blob( rt, file ) );
+    }
   }
 
   if ( str.starts_with( "label:" ) ) {
     args = args.subspan( 1 );
     auto label = str.substr( 6 );
     if ( rt.contains( label ) ) {
-      return rt.labeled( label );
+      if ( consumed ) {
+        auto id = make_identification( rt.labeled( label ) );
+        return handle::extract<Identification>( id )
+          .transform( []( auto h ) -> Handle<Fix> { return Handle<Strict>( h ); } )
+          .or_else( [&]() -> optional<Handle<Fix>> { return id; } )
+          .value();
+      } else {
+        return make_identification( rt.labeled( label ) );
+      }
     } else {
       throw runtime_error( string( "Label not found: " ).append( str.substr( 6 ) ) );
     }
@@ -106,7 +135,15 @@ Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args )
 
   if ( str.starts_with( "name:" ) ) {
     args = args.subspan( 1 );
-    return Handle<Fix>::forge( base16::decode( str.substr( 5 ) ) );
+    if ( consumed ) {
+      auto id = make_identification( Handle<Fix>::forge( base16::decode( str.substr( 5 ) ) ) );
+      return handle::extract<Identification>( id )
+        .transform( []( auto h ) -> Handle<Fix> { return Handle<Strict>( h ); } )
+        .or_else( [&]() -> optional<Handle<Fix>> { return id; } )
+        .value();
+    } else {
+      return make_identification( Handle<Fix>::forge( base16::decode( str.substr( 5 ) ) ) );
+    }
   }
 
   if ( str.starts_with( "short-name:" ) ) {
@@ -161,12 +198,16 @@ Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args )
       throw runtime_error( "thunk not refering a tree" );
     }
 
+    consumed = true;
+
     auto h = parse_args( rt, args );
     auto tree_name = handle::extract<ExpressionTree>( h )
                        .transform( []( auto t ) -> Handle<AnyTree> { return t; } )
                        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ObjectTree>( h ); } )
                        .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ValueTree>( h ); } )
                        .transform( &handle::upcast );
+
+    consumed = false;
 
     return Handle<Application>( tree_name.value() );
   }

@@ -35,9 +35,15 @@ public:
 
   Handle<Value> execute( Handle<Relation> x )
   {
-    if ( storage_.contains( x ) ) {
-      return storage_.get( x ).unwrap<Value>();
+    {
+      auto parent = parent_.lock();
+      if ( parent && parent->contains( x ) ) {
+        VLOG( 2 ) << "Relation existed " << x;
+        return parent->get( x )->unwrap<Value>();
+      }
     }
+
+    VLOG( 1 ) << "Relation does not exit " << x.content;
     todo_ << x;
     Handle<Object> current = storage_.wait( x );
     while ( not current.contains<Value>() ) {
