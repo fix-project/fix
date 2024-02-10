@@ -189,7 +189,7 @@ Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args )
 template<integral T>
 T to_int( const string_view str )
 {
-  T ret;
+  T ret {};
 
   const auto [ptr, ec] = from_chars( str.data(), str.data() + str.size(), ret );
 
@@ -204,7 +204,7 @@ T to_int( const string_view str )
 template<integral T>
 T from_int( const std::span<const char> str )
 {
-  T ret;
+  T ret {};
   if ( sizeof( T ) != str.size() ) {
     throw runtime_error( "to_int( string_view ) size mismatch" );
   }
