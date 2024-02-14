@@ -357,13 +357,14 @@ void Executor::put( Handle<AnyTree> name, TreeData data )
 
 void Executor::put( Handle<Relation> name, Handle<Object> data )
 {
-  storage_.create( name, data );
   absl::flat_hash_set<Handle<Relation>> unblocked;
   auto graph = graph_.write();
   graph->finish( name, unblocked );
   for ( auto x : unblocked ) {
     todo_ << x;
   }
+  storage_.create( name, data );
+  // TODO: race condition?
 }
 
 bool Executor::contains( Handle<Named> handle )
