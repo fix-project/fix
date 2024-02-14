@@ -124,10 +124,11 @@ Result<Value> Executor::load( Handle<Value> value )
         return x;
 
       return get_or_delegate( x ).and_then( [&]( auto t ) -> Result<Value> {
-        bool all_loaded = false;
+        bool all_loaded = true;
         for ( const auto& handle : t->span() ) {
           all_loaded
-            &= handle::extract<Value>( handle ).and_then( [&]( auto h ) { return load( h ); } ).has_value();
+            = all_loaded
+              && handle::extract<Value>( handle ).and_then( [&]( auto h ) { return load( h ); } ).has_value();
         }
         if ( all_loaded ) {
           return x;
