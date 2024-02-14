@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "channel.hh"
+#include "dependency_graph.hh"
 #include "evaluator.hh"
 #include "handle.hh"
 #include "interface.hh"
@@ -20,7 +21,7 @@ class Executor
   std::vector<std::thread> threads_ {};
   Channel<Handle<Relation>> todo_ {};
   RuntimeStorage storage_ {};
-  SharedMutex<std::unordered_set<Handle<Relation>>> live_ {};
+  SharedMutex<DependencyGraph> graph_ {};
 
   FixEvaluator evaluator_;
   std::weak_ptr<IRuntime> parent_ {};
@@ -73,7 +74,7 @@ public:
         std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
       }
       if constexpr ( std::same_as<T, Relation> ) {
-        auto target = get_or_delegate( handle );
+        auto target = get_or_delegate( handle, handle );
         std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, target->get() );
 
         auto lhs = handle.template visit<Handle<Object>>(
@@ -110,7 +111,7 @@ private:
 
   std::optional<BlobData> get_or_delegate( Handle<Named> goal );
   std::optional<TreeData> get_or_delegate( Handle<AnyTree> goal );
-  Result<Object> get_or_delegate( Handle<Relation> goal );
+  Result<Object> get_or_delegate( Handle<Relation> goal, Handle<Relation> blocked );
 
   /** @defgroup Implementation of FixRuntime
    * @{
