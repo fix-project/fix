@@ -50,6 +50,13 @@ void Executor::run()
 
 void Executor::progress( Handle<Relation> relation )
 {
+  {
+    auto parent = parent_.lock();
+    if ( parent && parent->contains( relation ) ) {
+      return;
+    }
+  }
+
   auto result = evaluator_.relate( relation );
   if ( !result ) {
     todo_ << relation;
@@ -61,6 +68,7 @@ std::optional<BlobData> Executor::get_or_delegate( Handle<Named> goal )
   if ( storage_.contains( goal ) ) {
     return storage_.get( goal );
   }
+
   auto parent = parent_.lock();
   if ( parent ) {
     return parent->get( goal );
@@ -75,6 +83,7 @@ std::optional<TreeData> Executor::get_or_delegate( Handle<AnyTree> goal )
   if ( storage_.contains( goal ) ) {
     return storage_.get( goal );
   }
+
   auto parent = parent_.lock();
   if ( parent ) {
     return parent->get( goal );
@@ -104,9 +113,30 @@ Result<Value> Executor::load( Handle<Value> value )
     [&]( Handle<Blob> x ) -> Result<Blob> {
       if ( x.contains<Literal>() )
         return x;
+
+      if ( storage_.contains( x.unwrap<Named>() ) )
+        return x;
+
       return get_or_delegate( x.unwrap<Named>() ).transform( [&]( auto ) { return x; } );
     },
-    [&]( Handle<ValueTree> x ) { return get_or_delegate( x ).transform( [&]( auto ) { return x; } ); },
+    [&]( Handle<ValueTree> x ) -> Result<Value> {
+      if ( storage_.contains( x ) )
+        return x;
+
+      return get_or_delegate( x ).and_then( [&]( auto t ) -> Result<Value> {
+        bool all_loaded = true;
+        for ( const auto& handle : t->span() ) {
+          all_loaded
+            = all_loaded
+              && handle::extract<Value>( handle ).and_then( [&]( auto h ) { return load( h ); } ).has_value();
+        }
+        if ( all_loaded ) {
+          return x;
+        } else {
+          return {};
+        }
+      } );
+    },
     [&]( auto x ) { return x; },
   } );
 }
@@ -118,6 +148,24 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
 
   if ( storage_.contains( goal ) ) {
     return storage_.get( goal );
+  } else {
+    auto parent = parent_.lock();
+    if ( parent && parent->contains( goal ) ) {
+      VLOG( 2 ) << "Relation existed " << goal;
+      auto res = parent->get( goal );
+
+      handle::data( res.value() )
+        .visit<void>( overload {
+          [&]( Handle<Named> n ) { load( n ); },
+          [&]( Handle<ValueTree> t ) { load( t ); },
+          [&]( Handle<ObjectTree> ) { throw std::runtime_error( "unimplemented" ); },
+          [&]( Handle<ExpressionTree> ) { throw std::runtime_error( "unimplemented" ); },
+          [&]( Handle<Literal> ) {},
+          [&]( Handle<Relation> ) {},
+        } );
+
+      return res;
+    }
   }
 
   TreeData tree;
@@ -130,15 +178,15 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   }
   tree = storage_.get( combination );
 
-  // Load minrepo to memory
-  load_minrepo( combination );
-
   auto result = runner_->apply( combination, tree );
 
   storage_.create( goal, result );
-  auto parent = parent_.lock();
-  if ( parent )
-    parent->put( goal, result );
+
+  {
+    auto parent = parent_.lock();
+    if ( parent )
+      parent->put( goal, result );
+  }
 
   auto live = live_.write();
   live->erase( goal );
@@ -148,11 +196,24 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
 Result<Value> Executor::evalStrict( Handle<Object> expression )
 {
   Handle<Eval> goal( expression );
-  {
-    if ( storage_.contains( goal ) ) {
-      return storage_.get_relation( goal );
+
+  if ( storage_.contains( goal ) ) {
+    return storage_.get( goal ).unwrap<Value>();
+  } else {
+    auto parent = parent_.lock();
+    if ( parent && parent->contains( goal ) ) {
+      VLOG( 2 ) << "Relation existed " << goal;
+      auto res = parent->get( goal )->unwrap<Value>();
+      res.visit<void>( overload {
+        [&]( Handle<Blob> n ) { load( n ); },
+        [&]( Handle<ValueTree> t ) { load( t ); },
+        []( auto ) {},
+      } );
+
+      return res;
     }
   }
+
   auto result = evaluator_.evalStrict( expression );
   if ( !result )
     return {};

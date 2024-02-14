@@ -106,6 +106,10 @@ Handle<Value> ReadOnlyRT::execute( Handle<Relation> x )
 
 Handle<Value> ReadWriteRT::execute( Handle<Relation> x )
 {
+  if ( contains( x ) ) {
+    return get( x ).value().unwrap<Value>();
+  }
+
   auto res = executor_->execute( x );
 
   executor_->visit( x, [this]( Handle<AnyDataType> h ) {

@@ -4,13 +4,26 @@
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
+static Handle<Fix> make_identification( Handle<Fix> name )
+{
+  return handle::extract<Value>( name )
+    .transform( [&]( auto h ) -> Handle<Fix> {
+      return h.template visit<Handle<Fix>>(
+        overload { []( Handle<Blob> b ) { return Handle<Identification>( b ); },
+                   []( Handle<ValueTree> t ) { return Handle<Identification>( t ); },
+                   [&]( auto ) { return name; } } );
+    } )
+    .or_else( [&]() -> std::optional<Handle<Fix>> { throw std::runtime_error( "Not Identification-able" ); } )
+    .value();
+}
+
 static Handle<Strict> compile( FrontendRT& rt, Handle<Fix> wasm )
 {
   auto compiler = rt.labeled( "compile-encode" );
 
   auto tree = OwnedMutTree::allocate( 3 );
   tree.at( 0 ) = Handle<Literal>( "unused" );
-  tree.at( 1 ) = compiler;
+  tree.at( 1 ) = Handle<Strict>( handle::extract<Identification>( make_identification( compiler ) ).value() );
   tree.at( 2 ) = wasm;
   return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) ).visit<Handle<Strict>>( []( auto x ) {
     return Handle<Strict>( Handle<Application>( Handle<ExpressionTree>( x ) ) );

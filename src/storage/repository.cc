@@ -232,7 +232,7 @@ bool Repository::contains( Handle<AnyTree> handle )
 bool Repository::contains( Handle<Relation> handle )
 {
   try {
-    return fs::exists( repo_ / "relations" / base16::encode( handle.content ) );
+    return fs::is_symlink( repo_ / "relations" / base16::encode( Handle<Fix>( handle ).content ) );
   } catch ( fs::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
