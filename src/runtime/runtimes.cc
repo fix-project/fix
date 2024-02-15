@@ -10,7 +10,7 @@ shared_ptr<ReadOnlyRT> ReadOnlyRT::init()
 {
   auto runtime = std::make_shared<ReadOnlyRT>();
   runtime->repository_.emplace();
-  runtime->executor_.emplace( std::thread::hardware_concurrency(), runtime );
+  runtime->executor_.emplace( std::thread::hardware_concurrency(), *runtime );
   return runtime;
 }
 
@@ -18,7 +18,7 @@ shared_ptr<ReadWriteRT> ReadWriteRT::init()
 {
   auto runtime = std::make_shared<ReadWriteRT>();
   runtime->repository_.emplace();
-  runtime->executor_.emplace( std::thread::hardware_concurrency(), runtime );
+  runtime->executor_.emplace( std::thread::hardware_concurrency(), *runtime );
   return runtime;
 }
 
@@ -128,7 +128,7 @@ shared_ptr<Client> Client::init( const Address& address )
   runtime->network_worker_->start();
   runtime->network_worker_->connect( address );
   runtime->remote_ = runtime->network_worker_->get_remote( address );
-  runtime->executor_.emplace( 0, runtime );
+  runtime->executor_.emplace( 0, *runtime );
   return runtime;
 }
 
@@ -149,7 +149,7 @@ shared_ptr<Server> Server::init( const Address& address )
   runtime->network_worker_.emplace( runtime );
   runtime->network_worker_->start();
   runtime->network_worker_->start_server( address );
-  runtime->executor_.emplace( std::thread::hardware_concurrency(), runtime );
+  runtime->executor_.emplace( std::thread::hardware_concurrency(), *runtime );
   return runtime;
 }
 
