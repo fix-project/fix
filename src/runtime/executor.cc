@@ -111,7 +111,8 @@ Result<Object> Executor::get_or_delegate( Handle<Relation> goal, Handle<Relation
     }
   }
   auto graph = graph_.write();
-  graph->add_dependency( goal, blocked );
+  if ( graph->add_dependency( goal, blocked ) )
+    todo_ << goal;
   return {};
 }
 
@@ -340,8 +341,8 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
     throw HandleNotFound( name );
   }
   auto graph = graph_.write();
-  graph->start( name );
-  todo_ << name;
+  if ( graph->start( name ) )
+    todo_ << name;
   return {};
 }
 
