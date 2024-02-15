@@ -13,6 +13,8 @@ using Result = Executor::Result<T>;
 
 using namespace std;
 
+thread_local static std::optional<Handle<Relation>> current_ {};
+
 Executor::Executor( size_t threads, weak_ptr<IRuntime> parent, optional<shared_ptr<Runner>> runner )
   : evaluator_( *this )
   , parent_( parent )
@@ -21,6 +23,7 @@ Executor::Executor( size_t threads, weak_ptr<IRuntime> parent, optional<shared_p
 {
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
+      current_ = {};
       fixpoint::storage = &storage_;
       run();
     } );
@@ -57,7 +60,9 @@ void Executor::progress( Handle<Relation> relation )
     }
   }
 
+  current_ = relation;
   auto result = evaluator_.relate( relation );
+  current_ = {};
   if ( !result ) {
     todo_ << relation;
   }
@@ -93,18 +98,21 @@ std::optional<TreeData> Executor::get_or_delegate( Handle<AnyTree> goal )
   }
 }
 
-Result<Object> Executor::get_or_delegate( Handle<Relation> goal )
+Result<Object> Executor::get_or_delegate( Handle<Relation> goal, Handle<Relation> blocked )
 {
   if ( storage_.contains( goal ) ) {
     return storage_.get( goal );
   }
   auto parent = parent_.lock();
   if ( parent ) {
-    return parent->get( goal );
-  } else {
-    todo_ << goal;
-    return {};
+    auto result = parent->get( goal );
+    if ( result ) {
+      return result;
+    }
   }
+  auto graph = graph_.write();
+  graph->add_dependency( goal, blocked );
+  return {};
 }
 
 Result<Value> Executor::load( Handle<Value> value )
@@ -168,28 +176,15 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
     }
   }
 
-  TreeData tree;
-  {
-    auto live = live_.write();
-    if ( live->contains( goal ) ) {
-      return {};
-    }
-    live->insert( goal );
-  }
-  tree = storage_.get( combination );
+  TreeData tree = storage_.get( combination );
 
   auto result = runner_->apply( combination, tree );
 
-  storage_.create( goal, result );
+  put( goal, result );
+  auto parent = parent_.lock();
+  if ( parent )
+    parent->put( goal, result );
 
-  {
-    auto parent = parent_.lock();
-    if ( parent )
-      parent->put( goal, result );
-  }
-
-  auto live = live_.write();
-  live->erase( goal );
   return result;
 }
 
@@ -218,7 +213,7 @@ Result<Value> Executor::evalStrict( Handle<Object> expression )
   if ( !result )
     return {};
 
-  storage_.create( goal, *result );
+  put( goal, *result );
   auto parent = parent_.lock();
   if ( parent )
     parent->put( goal, *result );
@@ -233,34 +228,32 @@ Result<Object> Executor::evalShallow( Handle<Object> expression )
 
 Result<ValueTree> Executor::mapEval( Handle<ObjectTree> tree )
 {
-  {
-    bool ready = true;
-    auto data = storage_.get( tree );
-    for ( const auto& x : data->span() ) {
-      auto obj = x.unwrap<Expression>().unwrap<Object>();
-      Handle<Eval> eval( obj );
-      auto result = get_or_delegate( eval ); // this will start the relevant eval if it's not ready
-      if ( not result ) {
-        ready = false;
-      }
+  bool ready = true;
+  auto data = storage_.get( tree );
+  for ( const auto& x : data->span() ) {
+    auto obj = x.unwrap<Expression>().unwrap<Object>();
+    Handle<Eval> eval( obj );
+    auto result = get_or_delegate( eval, current_.value() ); // this will start the relevant eval if it's not ready
+    if ( not result ) {
+      ready = false;
     }
-    if ( not ready ) {
-      return {};
-    }
+  }
+  if ( not ready ) {
+    return {};
+  }
 
-    auto values = OwnedMutTree::allocate( data->size() );
-    for ( size_t i = 0; i < data->size(); i++ ) {
-      auto x = data->at( i );
-      auto obj = x.unwrap<Expression>().unwrap<Object>();
-      Handle<Eval> eval( obj );
-      values[i] = get_or_delegate( eval ).value().unwrap<Value>();
-    }
+  auto values = OwnedMutTree::allocate( data->size() );
+  for ( size_t i = 0; i < data->size(); i++ ) {
+    auto x = data->at( i );
+    auto obj = x.unwrap<Expression>().unwrap<Object>();
+    Handle<Eval> eval( obj );
+    values[i] = get_or_delegate( eval, current_.value() ).value().unwrap<Value>();
+  }
 
-    if ( tree.is_tag() ) {
-      return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>().tag();
-    } else {
-      return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>();
-    }
+  if ( tree.is_tag() ) {
+    return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>().tag();
+  } else {
+    return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>();
   }
 }
 
@@ -346,6 +339,8 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   if ( threads_.size() == 0 ) {
     throw HandleNotFound( name );
   }
+  auto graph = graph_.write();
+  graph->start( name );
   todo_ << name;
   return {};
 }
@@ -362,7 +357,14 @@ void Executor::put( Handle<AnyTree> name, TreeData data )
 
 void Executor::put( Handle<Relation> name, Handle<Object> data )
 {
+  absl::flat_hash_set<Handle<Relation>> unblocked;
+  auto graph = graph_.write();
+  graph->finish( name, unblocked );
+  for ( auto x : unblocked ) {
+    todo_ << x;
+  }
   storage_.create( name, data );
+  // TODO: race condition?
 }
 
 bool Executor::contains( Handle<Named> handle )
@@ -421,6 +423,10 @@ void Executor::visit_minrepo( Handle<T> handle,
 void Executor::load_to_storage( Handle<AnyDataType> handle )
 {
   handle::data( handle ).visit<void>( overload { []( Handle<Literal> ) { return; },
+                                                 [&]( Handle<Relation> h ) {
+                                                   if ( !contains( h ) )
+                                                     put( h, get_or_delegate( h, h ).value() );
+                                                 },
                                                  [&]( auto h ) {
                                                    if ( !contains( h ) )
                                                      put( h, get_or_delegate( h ).value() );

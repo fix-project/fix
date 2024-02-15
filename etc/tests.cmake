@@ -16,6 +16,7 @@ add_test(NAME u_evaluator COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-eva
 add_test(NAME u_executor COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-executor)
 add_test(NAME u_distributed COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-distributed)
 add_test(NAME u_blake3 WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-blake3)
+add_test(NAME u_dependency_graph COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-dependency-graph)
 
 add_test(NAME t_add COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add)
 add_test(NAME t_fib COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib)
