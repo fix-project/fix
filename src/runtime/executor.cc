@@ -15,11 +15,13 @@ using namespace std;
 
 thread_local static std::optional<Handle<Relation>> current_ {};
 
-Executor::Executor( size_t threads, weak_ptr<IRuntime> parent, optional<shared_ptr<Runner>> runner )
+Executor::Executor( size_t threads,
+                    optional<reference_wrapper<IRuntime>> parent,
+                    optional<shared_ptr<Runner>> runner )
   : evaluator_( *this )
   , parent_( parent )
   , runner_( runner.has_value() ? runner.value()
-                                : make_shared<WasmRunner>( parent.lock()->labeled( "compile-elf" ) ) )
+                                : make_shared<WasmRunner>( parent.value().get().labeled( "compile-elf" ) ) )
 {
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
@@ -54,8 +56,7 @@ void Executor::run()
 void Executor::progress( Handle<Relation> relation )
 {
   {
-    auto parent = parent_.lock();
-    if ( parent && parent->contains( relation ) ) {
+    if ( parent_.has_value() && parent_->get().contains( relation ) ) {
       return;
     }
   }
@@ -74,9 +75,8 @@ std::optional<BlobData> Executor::get_or_delegate( Handle<Named> goal )
     return storage_.get( goal );
   }
 
-  auto parent = parent_.lock();
-  if ( parent ) {
-    return parent->get( goal );
+  if ( parent_.has_value() ) {
+    return parent_->get().get( goal );
   } else {
     // we have no way to get this
     throw HandleNotFound( goal );
@@ -89,9 +89,8 @@ std::optional<TreeData> Executor::get_or_delegate( Handle<AnyTree> goal )
     return storage_.get( goal );
   }
 
-  auto parent = parent_.lock();
-  if ( parent ) {
-    return parent->get( goal );
+  if ( parent_.has_value() ) {
+    return parent_->get().get( goal );
   } else {
     // we have no way to get this
     throw HandleNotFound( handle::fix( goal ) );
@@ -103,15 +102,15 @@ Result<Object> Executor::get_or_delegate( Handle<Relation> goal, Handle<Relation
   if ( storage_.contains( goal ) ) {
     return storage_.get( goal );
   }
-  auto parent = parent_.lock();
-  if ( parent ) {
-    auto result = parent->get( goal );
+  if ( parent_.has_value() ) {
+    auto result = parent_->get().get( goal );
     if ( result ) {
       return result;
     }
   }
   auto graph = graph_.write();
-  graph->add_dependency( goal, blocked );
+  if ( graph->add_dependency( goal, blocked ) )
+    todo_ << goal;
   return {};
 }
 
@@ -157,10 +156,9 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   if ( storage_.contains( goal ) ) {
     return storage_.get( goal );
   } else {
-    auto parent = parent_.lock();
-    if ( parent && parent->contains( goal ) ) {
+    if ( parent_.has_value() && parent_->get().contains( goal ) ) {
       VLOG( 2 ) << "Relation existed " << goal;
-      auto res = parent->get( goal );
+      auto res = parent_->get().get( goal );
 
       handle::data( res.value() )
         .visit<void>( overload {
@@ -181,9 +179,8 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   auto result = runner_->apply( combination, tree );
 
   put( goal, result );
-  auto parent = parent_.lock();
-  if ( parent )
-    parent->put( goal, result );
+  if ( parent_.has_value() )
+    parent_->get().put( goal, result );
 
   return result;
 }
@@ -195,10 +192,9 @@ Result<Value> Executor::evalStrict( Handle<Object> expression )
   if ( storage_.contains( goal ) ) {
     return storage_.get( goal ).unwrap<Value>();
   } else {
-    auto parent = parent_.lock();
-    if ( parent && parent->contains( goal ) ) {
+    if ( parent_.has_value() && parent_->get().contains( goal ) ) {
       VLOG( 2 ) << "Relation existed " << goal;
-      auto res = parent->get( goal )->unwrap<Value>();
+      auto res = parent_->get().get( goal )->unwrap<Value>();
       res.visit<void>( overload {
         [&]( Handle<Blob> n ) { load( n ); },
         [&]( Handle<ValueTree> t ) { load( t ); },
@@ -214,9 +210,8 @@ Result<Value> Executor::evalStrict( Handle<Object> expression )
     return {};
 
   put( goal, *result );
-  auto parent = parent_.lock();
-  if ( parent )
-    parent->put( goal, *result );
+  if ( parent_.has_value() )
+    parent_->get().put( goal, *result );
 
   return result;
 }
@@ -340,8 +335,8 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
     throw HandleNotFound( name );
   }
   auto graph = graph_.write();
-  graph->start( name );
-  todo_ << name;
+  if ( graph->start( name ) )
+    todo_ << name;
   return {};
 }
 
@@ -357,14 +352,13 @@ void Executor::put( Handle<AnyTree> name, TreeData data )
 
 void Executor::put( Handle<Relation> name, Handle<Object> data )
 {
+  storage_.create( name, data );
   absl::flat_hash_set<Handle<Relation>> unblocked;
   auto graph = graph_.write();
   graph->finish( name, unblocked );
   for ( auto x : unblocked ) {
     todo_ << x;
   }
-  storage_.create( name, data );
-  // TODO: race condition?
 }
 
 bool Executor::contains( Handle<Named> handle )
