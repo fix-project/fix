@@ -13,7 +13,7 @@ static Handle<Fix> make_identification( Handle<Fix> name )
                    []( Handle<ValueTree> t ) { return Handle<Identification>( t ); },
                    [&]( auto ) { return name; } } );
     } )
-    .or_else( [&]() -> std::optional<Handle<Fix>> { throw std::runtime_error( "Not Identification-able" ); } )
+    .or_else( [&]() -> std::optional<Handle<Fix>> { throw std::runtime_error( "Not Identifiable" ); } )
     .value();
 }
 
