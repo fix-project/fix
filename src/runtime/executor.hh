@@ -24,12 +24,12 @@ class Executor
   SharedMutex<DependencyGraph> graph_ {};
 
   FixEvaluator evaluator_;
-  std::weak_ptr<IRuntime> parent_ {};
+  std::optional<std::reference_wrapper<IRuntime>> parent_;
   std::shared_ptr<Runner> runner_;
 
 public:
   Executor( size_t threads = std::thread::hardware_concurrency(),
-            std::weak_ptr<IRuntime> parent = {},
+            std::optional<std::reference_wrapper<IRuntime>> parent = {},
             std::optional<std::shared_ptr<Runner>> runner = {} );
 
   ~Executor();
@@ -37,10 +37,9 @@ public:
   Handle<Value> execute( Handle<Relation> x )
   {
     {
-      auto parent = parent_.lock();
-      if ( parent && parent->contains( x ) ) {
+      if ( parent_.has_value() && parent_->get().contains( x ) ) {
         VLOG( 2 ) << "Relation existed " << x;
-        return parent->get( x )->unwrap<Value>();
+        return parent_->get().get( x )->unwrap<Value>();
       }
     }
 
