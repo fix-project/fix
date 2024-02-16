@@ -6,6 +6,48 @@
 
 using namespace std;
 
+template<FixType T>
+void get_from_repository( Handle<T> handle, Repository& rp, IRuntime& rt )
+{
+  if constexpr ( std::same_as<T, Literal> )
+    return;
+
+  if constexpr ( Handle<T>::is_fix_sum_type ) {
+    if constexpr ( std::same_as<T, Encode> ) {
+      Handle<Thunk> thunk
+        = handle.template visit<Handle<Thunk>>( []( auto s ) { return s.template unwrap<Thunk>(); } );
+      thunk.visit<void>(
+        overload { [&]( Handle<Application> a ) { get_from_repository( a.unwrap<ExpressionTree>(), rp, rt ); },
+                   []( auto ) {} } );
+    }
+
+    if constexpr ( std::same_as<T, Relation> ) {
+      rt.put( handle, rp.get( handle ).value() );
+      return;
+    }
+
+    if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
+                        or std::same_as<T, ObjectTreeRef> ) )
+      std::visit( [&]( const auto x ) { get_from_repository( x, rp, rt ); }, handle.get() );
+
+  } else {
+    if constexpr ( FixTreeType<T> ) {
+      // Having the handle means that the data presents in storage
+      if ( rt.contains( handle ) )
+        return;
+
+      auto tree = rp.get( handle );
+      for ( const auto& element : tree.value()->span() ) {
+        get_from_repository( element, rp, rt );
+      }
+      rt.put( handle, tree.value() );
+    } else {
+      auto named = handle::extract<Named>( handle ).value();
+      rt.put( named, rp.get( named ).value() );
+    }
+  }
+}
+
 shared_ptr<ReadOnlyRT> ReadOnlyRT::init()
 {
   auto runtime = std::make_shared<ReadOnlyRT>();
@@ -25,14 +67,9 @@ shared_ptr<ReadWriteRT> ReadWriteRT::init()
 template<typename T, typename S>
 optional<T> ReadOnlyRT::get( Handle<S> name )
 {
-  if ( executor_->contains( name ) ) {
-    return executor_->get( name );
-  } else if ( repository_->contains( name ) ) {
-    auto data = repository_->get( name );
-    executor_->put( name, *data );
-    return *data;
+  if ( not executor_->contains( name ) and repository_->contains( name ) ) {
+    get_from_repository( name, *repository_, *executor_ );
   }
-
   return executor_->get( name );
 }
 
@@ -187,9 +224,8 @@ optional<T> Client::get( Handle<S> name )
     return executor_->get( name );
 
   if ( repository_->contains( name ) ) {
-    auto data = repository_->get( name );
-    executor_->put( name, *data );
-    return *data;
+    get_from_repository( name, *repository_, *executor_ );
+    return executor_->get( name );
   }
 
   auto remote = remote_.lock();
@@ -271,12 +307,9 @@ Handle<Fix> Client::labeled( const std::string_view label )
 template<typename T, typename S>
 optional<T> Server::get( Handle<S> name )
 {
-  if ( executor_->contains( name ) )
-    return executor_->get( name );
-
-  if ( repository_->contains( name ) )
-    return repository_->get( name );
-
+  if ( not executor_->contains( name ) and repository_->contains( name ) ) {
+    get_from_repository( name, *repository_, *executor_ );
+  }
   return executor_->get( name );
 }
 

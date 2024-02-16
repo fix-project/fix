@@ -145,6 +145,7 @@ Result<Object> Executor::get_or_delegate( Handle<Relation> goal, Handle<Relation
 
 Result<Value> Executor::load( Handle<Value> value )
 {
+  VLOG( 2 ) << "Loading " << value;
   return value.visit<Result<Value>>( overload {
     [&]( Handle<Blob> x ) -> Result<Blob> {
       if ( x.contains<Literal>() )
