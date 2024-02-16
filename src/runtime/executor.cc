@@ -302,17 +302,17 @@ Result<ValueTree> Executor::mapLift( Handle<ValueTree> tree )
     return {};
   }
 
-  auto objs = OwnedMutTree::allocate( data->size() );
+  auto vals = OwnedMutTree::allocate( data->size() );
   for ( size_t i = 0; i < data->size(); i++ ) {
     auto x = data->at( i );
-    auto exp = x.unwrap<Expression>();
-    objs[i] = evaluator_.reduce( exp ).value();
+    auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
+    vals[i] = evaluator_.lift( val ).value();
   }
 
   if ( tree.is_tag() ) {
-    return storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ).unwrap<ValueTree>().tag();
+    return storage_.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>().tag();
   } else {
-    return storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ).unwrap<ValueTree>();
+    return storage_.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>();
   }
 }
 

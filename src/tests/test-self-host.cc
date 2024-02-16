@@ -9,15 +9,16 @@ auto rt = ReadOnlyRT::init();
 void test( void )
 {
   array<std::string, 5> tasks = { "wasm-to-c-fix", "c-to-elf-fix", "link-elfs-fix", "compile", "map" };
-  vector<Handle<Fix>> wasm_names;
+  vector<Handle<Thunk>> wasm_names;
   for ( auto task : tasks ) {
-    wasm_names.push_back( rt->labeled( task + "-wasm" ) );
+    auto id = handle::extract<Identification>( make_identification( rt->labeled( task + "-wasm" ) ) ).value();
+    wasm_names.push_back( id );
   }
 
   // Apply compile-encode to each wasm
   auto new_elf_thunks = OwnedMutTree::allocate( wasm_names.size() );
   for ( size_t i = 0; i < wasm_names.size(); i++ ) {
-    new_elf_thunks[i] = compile( *rt, wasm_names[i] ).unwrap<Thunk>();
+    new_elf_thunks[i] = compile( *rt, Handle<Strict>( wasm_names[i] ) ).unwrap<Thunk>();
   }
 
   auto new_elf_thunk_tree = rt->create( make_shared<OwnedTree>( std::move( new_elf_thunks ) ) );
