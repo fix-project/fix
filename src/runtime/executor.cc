@@ -42,12 +42,41 @@ Executor::~Executor()
 
 void Executor::run()
 {
+  static std::mutex error_mutex;
   try {
     Handle<Relation> next;
     while ( true ) {
       todo_ >> next;
       progress( next );
     }
+  } catch ( StorageException& e ) {
+    std::unique_lock lock( error_mutex );
+    cerr << "--- STORAGE ERROR ---\n";
+    cerr << "what: " << e.what() << endl;
+    if ( current_ ) {
+      auto graph = graph_.write();
+      cerr << "backtrace:\n";
+      int i = 0;
+      auto current = current_.value();
+      cerr << ++i << ". ";
+      while ( true ) {
+        current.visit<void>( [&]( auto x ) { cerr << x; } );
+        cerr << endl;
+        i++;
+        absl::flat_hash_set<Handle<Relation>> unblocked;
+        graph->finish( current, unblocked );
+        if ( unblocked.empty() ) {
+          break;
+        }
+        cerr << i << ". ";
+        if ( unblocked.size() >= 2 ) {
+          cerr << std::format( "[1/{}] ", unblocked.size() );
+        }
+        current = *unblocked.begin();
+      }
+    }
+    cerr << "---------------------\n";
+    std::terminate();
   } catch ( ChannelClosed& ) {
     return;
   }
