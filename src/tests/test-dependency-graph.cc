@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <glog/logging.h>
 
 #include "dependency_graph.hh"

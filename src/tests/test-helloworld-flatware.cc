@@ -1,10 +1,10 @@
 #include <stdio.h>
 
-#include "handle_post.hh"
+#include "relater.hh"
 #include "test.hh"
 
 namespace tester {
-auto rt = ReadOnlyRT::init();
+auto rt = std::make_shared<Relater>();
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };

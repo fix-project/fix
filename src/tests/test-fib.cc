@@ -1,10 +1,11 @@
 #include <stdio.h>
 
+#include "relater.hh"
 #include "test.hh"
 
 using namespace std;
 
-auto rt = ReadOnlyRT::init();
+auto rt = make_shared<Relater>();
 
 uint32_t fix_fib( uint32_t x )
 {

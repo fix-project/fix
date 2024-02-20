@@ -103,3 +103,9 @@ public:
 
   virtual ~IRuntime() {}
 };
+
+class MultiWorkerRuntime : public IRuntime
+{
+public:
+  virtual void add_worker( std::shared_ptr<IRuntime> ) = 0;
+};
