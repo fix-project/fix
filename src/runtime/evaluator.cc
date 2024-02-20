@@ -70,12 +70,8 @@ Result<Value> FixEvaluator::lift( Handle<Value> x )
   auto load = [&]( auto x ) { return rt_.load( x ); };
 
   return x.visit<Result<Value>>( overload {
-    [&]( Handle<Blob> x ) { return load( x ); },
-    [&]( Handle<ValueTree> x ) -> Result<ValueTree> {
-      if ( load( x ) )
-        return mapLift( x );
-      return {};
-    },
+    [&]( Handle<Blob> x ) { return x; },
+    [&]( Handle<ValueTree> x ) -> Result<ValueTree> { return mapLift( x ); },
     [&]( Handle<BlobRef> x ) -> Result<Blob> {
       auto blob = x.unwrap<Blob>();
       if ( load( blob ) )
