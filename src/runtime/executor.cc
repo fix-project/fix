@@ -188,19 +188,7 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   } else {
     if ( parent_.has_value() && parent_->get().contains( goal ) ) {
       VLOG( 2 ) << "Relation existed " << goal;
-      auto res = parent_->get().get( goal );
-
-      handle::data( res.value() )
-        .visit<void>( overload {
-          [&]( Handle<Named> n ) { load( n ); },
-          [&]( Handle<ValueTree> t ) { load( t ); },
-          [&]( Handle<ObjectTree> ) { throw std::runtime_error( "unimplemented" ); },
-          [&]( Handle<ExpressionTree> ) { throw std::runtime_error( "unimplemented" ); },
-          [&]( Handle<Literal> ) {},
-          [&]( Handle<Relation> ) {},
-        } );
-
-      return res;
+      return parent_->get().get( goal );
     }
   }
 
@@ -224,14 +212,7 @@ Result<Value> Executor::evalStrict( Handle<Object> expression )
   } else {
     if ( parent_.has_value() && parent_->get().contains( goal ) ) {
       VLOG( 2 ) << "Relation existed " << goal;
-      auto res = parent_->get().get( goal )->unwrap<Value>();
-      res.visit<void>( overload {
-        [&]( Handle<Blob> n ) { load( n ); },
-        [&]( Handle<ValueTree> t ) { load( t ); },
-        []( auto ) {},
-      } );
-
-      return res;
+      return parent_->get().get( goal )->unwrap<Value>();
     }
   }
 
