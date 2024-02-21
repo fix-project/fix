@@ -22,6 +22,8 @@ void get_from_repository( Handle<T> handle, Repository& rp, IRuntime& rt )
     }
 
     if constexpr ( std::same_as<T, Relation> ) {
+      auto rhs = rp.get( handle ).value();
+      get_from_repository( rhs, rp, rt );
       rt.put( handle, rp.get( handle ).value() );
       return;
     }
