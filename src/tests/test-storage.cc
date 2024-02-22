@@ -1,38 +1,62 @@
 #include <stdio.h>
 
-#include "test.hh"
+#include "handle.hh"
+#include "overload.hh"
+#include "runtimestorage.hh"
+
+#include <glog/logging.h>
 
 using namespace std;
 
-#define TEST( condition )                                                                                          \
-  if ( not( condition ) ) {                                                                                        \
-    fprintf( stderr, "%s:%d - assertion '%s' failed\n", __FILE__, __LINE__, #condition );                          \
-    exit( 1 );                                                                                                     \
-  }
+const std::string aeneid = "Arma virumque canō, Trōiae quī prīmus ab ōrīs\n"
+                           "Ītaliam, fātō profugus, Lāvīniaque vēnit\n"
+                           "lītora, multum ille et terrīs iactātus et altō\n"
+                           "vī superum saevae memorem Iūnōnis ob īram;\n"
+                           "multa quoque et bellō passus, dum conderet urbem\n"
+                           "inferretque deōs Latiō, genus unde Latīnum,\n"
+                           "Albānīque patrēs, atque altae moenia Rōmae.\n"
+                           "\n"
+                           "Mūsa, mihī causās memorā, quō nūmine laesō,\n"
+                           "quidve dolēns, rēgīna deum tot volvere cāsūs\n"
+                           "īnsīgnem pietāte virum, tot adīre labōrēs\n"
+                           "impulerit. Tantaene animīs caelestibus īrae? \n";
+
+const std::string de_bello_gallico
+  = "Gallia est omnis divisa in partes tres, quarum unam incolunt Belgae, aliam Aquitani, tertiam qui ipsorum "
+    "lingua Celtae, nostra Galli appellantur. Hi omnes lingua, institutis, legibus inter se differunt. Gallos ab "
+    "Aquitanis Garumna flumen, a Belgis Matrona et Sequana dividit. Horum omnium fortissimi sunt Belgae, propterea "
+    "quod a cultu atque humanitate provinciae longissime absunt, minimeque ad eos mercatores saepe commeant atque "
+    "ea quae ad effeminandos animos pertinent important, proximique sunt Germanis, qui trans Rhenum incolunt, "
+    "quibuscum continenter bellum gerunt. Qua de causa Helvetii quoque reliquos Gallos virtute praecedunt, quod "
+    "fere cotidianis proeliis cum Germanis contendunt, cum aut suis finibus eos prohibent aut ipsi in eorum "
+    "finibus bellum gerunt. Eorum una pars, quam Gallos obtinere dictum est, initium capit a flumine Rhodano, "
+    "continetur Garumna flumine, Oceano, finibus Belgarum, attingit etiam ab Sequanis et Helvetiis flumen Rhenum, "
+    "vergit ad septentriones. Belgae ab extremis Galliae finibus oriuntur, pertinent ad inferiorem partem fluminis "
+    "Rheni, spectant in septentrionem et orientem solem. Aquitania a Garumna flumine ad Pyrenaeos montes et eam "
+    "partem Oceani quae est ad Hispaniam pertinet; spectat inter occasum solis et septentriones.";
 
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  auto& s = rt.storage();
+  RuntimeStorage storage;
 
-  Handle data = tree( {
-    blob( "visible 1" ),
-    blob( "visible 2" ),
-    tree( { blob( "not visible" ) } ).as_lazy(),
-    blob( "visible 3" ),
-    thunk( tree( {
-             blob( "unused" ),
-             blob( "elf" ),
-           } ) )
-      .as_lazy(),
-  } );
+  Handle virgil = storage.create( aeneid );
+  CHECK_EQ( storage.get( virgil.unwrap<Named>() )->size(), aeneid.size() );
+  Handle caesar = storage.create( de_bello_gallico );
+  CHECK_EQ( storage.get( caesar.unwrap<Named>() )->size(), de_bello_gallico.size() );
 
-  size_t count = 0;
-  s.visit( data, [&]( Handle h ) {
-    count++;
-    TEST( not s.compare_handles( h, blob( "not visible" ) ) );
-    TEST( not s.compare_handles( h, blob( "unused" ) ) );
-    TEST( not s.compare_handles( h, blob( "elf" ) ) );
-  } );
-  TEST( count == 6 );
+  /* Handle<Application> combination */
+  /*   = storage.construct_tree<ExpressionTree>( "unused"_literal, "elf"_literal, caesar ); */
+
+  /* Handle<Identification> hidden = storage.construct_tree<ValueTree>( "not visible"_literal ); */
+
+  /* auto full */
+  /*   = storage.construct( "visible 1"_literal, "visible 2"_literal, hidden, virgil, combination, 100_literal32 );
+   */
+
+  // TODO: reimplement visiting and add tests here
+  Handle<Apply> apply( storage.construct_tree<ObjectTree>( virgil ) );
+  Handle<Object> target( caesar );
+  storage.create( apply, target );
+  CHECK( storage.contains( apply ) );
+  CHECK_EQ( storage.get( apply ), target );
 }

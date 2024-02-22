@@ -2,50 +2,53 @@
 
 #include "test.hh"
 
-using namespace std;
-
-Handle dirent( string_view name, string_view permissions, Handle content )
-{
-  return tree( { blob( name ), blob( permissions ), content } );
+namespace tester {
+auto rt = ReadOnlyRT::init();
+auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
+auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
+auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
+auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
 }
 
-Handle fs()
+using namespace std;
+
+Handle<Fix> dirent( string_view name, string_view permissions, Handle<Fix> content )
+{
+  return tester::Tree( tester::Blob( name ), tester::Blob( permissions ), content );
+}
+
+Handle<Fix> fs()
 {
   static string d = "040000";
   static string f = "100644";
-  static Handle e = dirent(
+  static auto e = dirent(
     ".",
     d,
-    tree(
-      { dirent(
-          "a",
+    tester::Tree( dirent(
+      "a",
+      d,
+      tester::Tree(
+        dirent( "a_1.txt", f, tester::Blob( "Hello, this is a_1.txt!" ) ),
+        dirent( "a_2.txt", f, tester::Blob( "Hello, this is a_2.txt!" ) ),
+        dirent(
+          "b",
           d,
-          tree(
-            { dirent( "a_1.txt", f, blob( "Hello, this is a_1.txt!" ) ),
-              dirent( "a_2.txt", f, blob( "Hello, this is a_2.txt!" ) ),
-              dirent(
-                "b",
-                d,
-                tree( { dirent( "b_1.txt", f, blob( "this is b_1.txt!" ) ),
-                        dirent( "hello",
-                                d,
-                                tree( {
-                                  dirent( "greeter.txt", f, blob( "Hi, I am greeter.txt" ) ),
-                                } ) ),
-                        dirent( "c", d, tree( { dirent( "fixpoint", f, blob( "Hello, World!" ) ) } ) ) } ) ) } ) ),
-        dirent( "fixpoint", f, blob( "Hello, World!" ) ) } ) );
+          tester::Tree(
+            dirent( "b_1.txt", f, tester::Blob( "this is b_1.txt!" ) ),
+            dirent(
+              "hello", d, tester::Tree( dirent( "greeter.txt", f, tester::Blob( "Hi, I am greeter.txt" ) ) ) ),
+            dirent( "c", d, tester::Tree( dirent( "fixpoint", f, tester::Blob( "Hello, World!" ) ) ) ) ) ) ) ) ),
+    dirent( "fixpoint", f, tester::Blob( "Hello, World!" ) ) );
   return e;
 }
 
-int run_flatware( const string& name, Handle elf, Handle home )
+int run_flatware( const string& name, Handle<Fix> elf, Handle<Fix> home )
 {
   printf( "### TEST %s\n", name.c_str() );
-  Handle exe = flatware_input( elf, home );
-  auto& rt = Runtime::get_instance();
-  Handle result_handle = rt.eval( exe );
-  Tree result = rt.storage().get_tree( result_handle );
+  auto exe = Handle<Application>( tester::Tree( tester::Blob( "unused" ), elf, tester::Tree(), home ) );
+  auto result = tester::rt->get( tester::rt->execute( Handle<Eval>( exe ) ).try_into<ValueTree>().value() ).value();
   uint32_t code = -1;
-  memcpy( &code, result[0].literal_blob().data(), sizeof( uint32_t ) );
+  memcpy( &code, handle::extract<Literal>( result->at( 0 ) ).value().data(), sizeof( uint32_t ) );
   printf( "%s returned %d\n", name.c_str(), code );
   if ( code != 0 ) {
     fprintf( stderr, "%s exited with non-zero status\n", name.c_str() );
@@ -56,14 +59,12 @@ int run_flatware( const string& name, Handle elf, Handle home )
 
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  rt.storage().deserialize();
-  run_flatware(
-    "open",
-    compile( file( "applications-prefix/src/applications-build/flatware/examples/open/open-fixpoint.wasm" ) ),
-    fs() );
-  run_flatware(
-    "open-deep",
-    compile( file( "applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm" ) ),
-    fs() );
+  run_flatware( "open",
+                tester::Compile( tester::File(
+                  "applications-prefix/src/applications-build/flatware/examples/open/open-fixpoint.wasm" ) ),
+                fs() );
+  run_flatware( "open-deep",
+                tester::Compile( tester::File(
+                  "applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm" ) ),
+                fs() );
 }

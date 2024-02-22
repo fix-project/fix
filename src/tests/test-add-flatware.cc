@@ -1,24 +1,34 @@
 #include <stdio.h>
 
+#include "handle_post.hh"
 #include "test.hh"
+
+namespace tester {
+auto rt = ReadOnlyRT::init();
+auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
+auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
+auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
+auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
+}
 
 using namespace std;
 
-uint32_t fix_add( char a, char b, Handle add_elf )
+uint32_t fix_add( char a, char b, Handle<Fix> add_elf )
 {
-  Handle add
-    = flatware_input( add_elf, tree( {} ), tree( { blob( "add" ), blob( { &a, 1 } ), blob( { &b, 1 } ) } ) );
+  Handle add 
+    = flatware_input( add_elf, tester::Tree( {} ), tester::Tree( { tester::Blob( "add" ), tester::Blob( { &a, 1 } ), tester::Blob( { &b, 1 } ) } ) } ) );
   auto& rt = Runtime::get_instance();
   (void)a, (void)b;
-  Handle result = rt.eval( add );
-  Tree tree = rt.storage().get_tree( result );
-  Handle sum = tree[0];
+
+  auto result = tester::rt->execute( Handle<Eval>( add ) );
+  auto tree = tester::rt->get( result.try_into<ValueTree>().value() ).value();
+  auto sum = tree->at( 0 );
   uint32_t x = -1;
-  memcpy( &x, sum.literal_blob().data(), sizeof( uint32_t ) );
+  memcpy( &x, handle::extract<Literal>( sum )->data(), sizeof( uint32_t ) );
   return x;
 }
 
-void check_add( uint8_t a, uint8_t b, Handle add, string name )
+void check_add( uint8_t a, uint8_t b, Handle<Fix> add, string name )
 {
   uint32_t sum_blob = fix_add( a, b, add );
   printf( "%s: %u + %u = %u\n", name.c_str(), (uint8_t)a, (uint8_t)b, sum_blob );
@@ -31,15 +41,13 @@ void check_add( uint8_t a, uint8_t b, Handle add, string name )
 
 void check_add( uint8_t a, uint8_t b )
 {
-  static Handle add_flatware
-    = compile( file( "applications-prefix/src/applications-build/flatware/examples/add/add-fixpoint.wasm" ) );
+  static Handle add_flatware = tester::Compile(
+    tester::File( "applications-prefix/src/applications-build/flatware/examples/add/add-fixpoint.wasm" ) );
   check_add( a, b, add_flatware, "add-fixpoint" );
 }
 
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  rt.storage().deserialize();
   for ( size_t i = 0; i < 32; i++ ) {
     check_add( random(), random() );
   }

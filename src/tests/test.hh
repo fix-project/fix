@@ -1,54 +1,61 @@
 #pragma once
-#include "mmap.hh"
-#include "runtime.hh"
+
+#include "runtimes.hh"
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
-static Handle thunk( Handle tree )
+static Handle<Fix> make_identification( Handle<Fix> name )
 {
-  return tree.as_thunk();
-};
+  return handle::extract<Value>( name )
+    .transform( [&]( auto h ) -> Handle<Fix> {
+      return h.template visit<Handle<Fix>>(
+        overload { []( Handle<Blob> b ) { return Handle<Identification>( b ); },
+                   []( Handle<ValueTree> t ) { return Handle<Identification>( t ); },
+                   [&]( auto ) { return name; } } );
+    } )
+    .or_else( [&]() -> std::optional<Handle<Fix>> { throw std::runtime_error( "Not Identifiable" ); } )
+    .value();
+}
 
-static Handle compile( Handle wasm )
+static Handle<Strict> compile( FrontendRT& rt, Handle<Fix> wasm )
 {
-  auto& rt = Runtime::get_instance();
-  auto compiler = rt.storage().get_ref( "compile-encode" );
-  if ( not compiler.has_value() ) {
-    fprintf( stderr, "Ref 'compile-encode' not defined." );
-    exit( 1 );
-  }
+  auto compiler = rt.labeled( "compile-encode" );
 
   auto tree = OwnedMutTree::allocate( 3 );
-  tree.at( 0 ) = Handle( "unused" );
-  tree.at( 1 ) = *compiler;
+  tree.at( 0 ) = Handle<Literal>( "unused" );
+  tree.at( 1 ) = Handle<Strict>( handle::extract<Identification>( make_identification( compiler ) ).value() );
   tree.at( 2 ) = wasm;
-  return thunk( rt.storage().add_tree( std::move( tree ) ) );
+  return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) ).visit<Handle<Strict>>( []( auto x ) {
+    return Handle<Strict>( Handle<Application>( Handle<ExpressionTree>( x ) ) );
+  } );
 }
 
-static Handle tree( std::initializer_list<Handle> elements )
+template<FixHandle... Args>
+Handle<AnyTree> tree( FrontendRT& rt, Args... args )
 {
-  auto& rt = Runtime::get_instance();
-  auto t = OwnedMutTree::allocate( static_cast<uint32_t>( elements.size() ) );
+  OwnedMutTree tree = OwnedMutTree::allocate( sizeof...( args ) );
   size_t i = 0;
-  for ( Handle element : elements ) {
-    t.at( i++ ) = element;
-  }
-  return rt.storage().add_tree( std::move( t ) );
+  (void)i;
+  (
+    [&] {
+      tree[i] = args;
+      i++;
+    }(),
+    ... );
+
+  return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) );
 }
 
-static Handle blob( std::string_view contents )
+static Handle<Blob> blob( FrontendRT& rt, std::string_view contents )
 {
-  auto& rt = Runtime::get_instance();
   auto blob = OwnedMutBlob::allocate( contents.size() );
   memcpy( blob.data(), contents.data(), contents.size() );
-  return rt.storage().add_blob( std::move( blob ) );
+  return rt.create( std::make_shared<OwnedBlob>( std::move( blob ) ) );
 }
 
-static Handle file( std::filesystem::path path )
+static Handle<Blob> file( FrontendRT& rt, std::filesystem::path path )
 {
-  auto& rt = Runtime::get_instance();
-  OwnedBlob blob = OwnedBlob::from_file( path );
-  return rt.storage().add_blob( std::move( blob ) );
+  return rt.create( std::make_shared<OwnedBlob>( path ) );
 }
 
 static Handle flatware_input( Handle program,

@@ -7,14 +7,12 @@
 #include <unistd.h>
 
 #include <map>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "fixpointapi.hh"
 #include "program.hh"
-#include "spans.hh"
-#include "wasm-rt.h"
 
 // Represents one object file
 struct Elf_Info
@@ -27,9 +25,9 @@ struct Elf_Info
   // String signs for section header
   std::string_view namestrs;
   // Symbol table
-  span_view<Elf64_Sym> symtb;
+  std::span<const Elf64_Sym> symtb;
   // Section header
-  span_view<Elf64_Shdr> sheader;
+  std::span<const Elf64_Shdr> sheader;
 
   // Map from function/variable name to st_value
   std::map<std::string, uint64_t> func_map;

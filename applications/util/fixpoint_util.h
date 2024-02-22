@@ -8,22 +8,23 @@ const static int WASM_RT_PAGESIZE = 65536;
 
 extern externref create_blob_i32( int32_t number )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_blob_i32" ) ) );
-extern externref create_thunk( externref pointer )
-  __attribute__( ( import_module( "fixpoint" ), import_name( "create_thunk" ) ) );
+extern externref create_application_thunk( externref pointer )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_application_thunk" ) ) );
+extern externref create_strict_encode( externref pointer )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_strict_encode" ) ) );
+extern externref create_tag( externref object, externref blob )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_tag" ) ) );
+
 extern void fixpoint_unsafe_io( const char* s, int32_t size )
   __attribute__( ( import_module( "fixpoint" ), import_name( "unsafe_io" ) ) );
 
-extern bool fixpoint_equality( externref x, externref y )
-  __attribute__( ( import_module( "fixpoint" ), import_name( "equality" ) ) );
+extern bool fixpoint_is_equal( externref x, externref y )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "is_equal" ) ) );
+extern bool fixpoint_is_blob( externref x )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "is_blob" ) ) );
 
-extern int32_t get_value_type( externref )
-  __attribute( ( import_module( "fixpoint" ), import_name( "get_value_type" ) ) );
 extern uint32_t get_length( externref handle )
   __attribute__( ( import_module( "fixpoint" ), import_name( "get_length" ) ) );
-extern uint32_t get_access( externref handle )
-  __attribute__( ( import_module( "fixpoint" ), import_name( "get_access" ) ) );
-
-extern externref lower( externref handle ) __attribute__( ( import_module( "fixpoint" ), import_name( "lower" ) ) );
 
 // copies memory from ro_mem_[ro_mem_id] to rw_mem_[ro_mem_id].
 void copy_ro_to_rw_mem( int32_t rw_mem_id, int32_t ro_mem_id, int32_t rw_offset, int32_t ro_offset, int32_t len );
@@ -44,6 +45,8 @@ void set_rw_table( int32_t table_id, int32_t index, externref val );
 void set_i32_rw_mem( int32_t mem_id, int32_t index, int32_t val );
 
 int32_t get_i32_rw_mem( int32_t mem_id, int32_t index );
+
+int32_t get_i32_ro_mem( int32_t mem_id, int32_t index );
 
 // Returns the size of mem_id in PAGES (not bytes)
 int32_t byte_size_ro_mem( int32_t mem_id );

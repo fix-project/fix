@@ -1,12 +1,12 @@
 [submodule "flatware/tools/wasi-headers/WASI"]
 	path = flatware/tools/wasi-headers/WASI
 	url = https://github.com/WebAssembly/WASI
-[submodule "third-party/PicoSHA2"]
-	path = third-party/PicoSHA2
-	url = https://github.com/okdshin/PicoSHA2
 [submodule "third-party/concurrentqueue"]
 	path = third-party/concurrentqueue
 	url = https://github.com/cameron314/concurrentqueue
 [submodule "third-party/abseil-cpp"]
 	path = third-party/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp
+[submodule "third-party/BLAKE3"]
+	path = third-party/BLAKE3
+	url = https://github.com/BLAKE3-team/BLAKE3

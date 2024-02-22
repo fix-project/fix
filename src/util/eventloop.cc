@@ -3,6 +3,7 @@
 #include "socket.hh"
 #include "timer.hh"
 
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 

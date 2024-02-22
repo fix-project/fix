@@ -2,10 +2,10 @@
 
 #include "address.hh"
 #include "file_descriptor.hh"
-#include "spans.hh"
 
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <sys/socket.h>
 
 //! \brief Base class for network sockets (TCP, UDP, etc.)
@@ -52,32 +52,6 @@ public:
 
   //! Check for errors (will be seen on non-blocking sockets)
   void throw_if_error() const;
-};
-
-//! A wrapper around [UDP sockets](\ref man7::udp)
-class UDPSocket : public Socket
-{
-protected:
-  //! \brief Construct from FileDescriptor (used by TCPOverUDPSocketAdapter)
-  //! \param[in] fd is the FileDescriptor from which to construct
-  explicit UDPSocket( FileDescriptor&& fd )
-    : Socket( std::move( fd ), AF_INET, SOCK_DGRAM )
-  {}
-
-public:
-  //! Default: construct an unbound, unconnected UDP socket
-  UDPSocket()
-    : Socket( AF_INET, SOCK_DGRAM )
-  {}
-
-  //! Receive a datagram and the Address of its sender (caller can allocate storage)
-  void recv( Address& source_address, string_span& payload, const size_t mtu = 2048 );
-
-  //! Send a datagram to specified Address
-  void sendto( const Address& destination, const std::string_view payload );
-
-  //! Send datagram to the socket's connected address (must call connect() first)
-  void send( const std::string_view payload );
 };
 
 //! A wrapper around [TCP sockets](\ref man7::tcp)

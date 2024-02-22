@@ -5,46 +5,13 @@
 
 #include "handle.hh"
 
-template<typename T>
-constexpr inline bool is_span = false;
+using BlobSpan = std::span<const char>;
+using TreeSpan = std::span<const Handle<Fix>>;
+using Span = std::variant<BlobSpan, TreeSpan>;
 
-template<typename T>
-constexpr inline bool is_span<std::span<T>> = true;
-
-template<typename T>
-concept any_span = is_span<T>;
-
-using Blob = std::span<const char>;
-using Tree = std::span<const Handle>;
-using Object = std::variant<Blob, Tree>;
-
-template<typename T>
-constexpr inline bool is_object = false;
-
-template<>
-constexpr inline bool is_object<Blob> = true;
-
-template<>
-constexpr inline bool is_object<Tree> = true;
-
-template<typename T>
-concept object = is_object<T>;
-
-using MutBlob = std::span<char>;
-using MutTree = std::span<Handle>;
-using MutObject = std::variant<MutBlob, MutTree>;
-
-template<typename T>
-constexpr inline bool is_mutable_object = false;
-
-template<>
-constexpr inline bool is_mutable_object<MutBlob> = true;
-
-template<>
-constexpr inline bool is_mutable_object<MutTree> = true;
-
-template<typename T>
-concept mutable_object = is_mutable_object<T>;
+using MutBlobSpan = std::span<char>;
+using MutTreeSpan = std::span<Handle<Fix>>;
+using MutSpan = std::variant<MutBlobSpan, MutTreeSpan>;
 
 enum class AllocationType
 {
@@ -53,13 +20,11 @@ enum class AllocationType
   Mapped,
 };
 
-template<any_span S>
+template<typename S>
 class Owned
 {
   S span_;
   AllocationType allocation_type_;
-
-  Owned( S span, AllocationType allocation_type );
 
 public:
   using span_type = S;
@@ -67,26 +32,33 @@ public:
   using value_type = S::value_type;
   using pointer = element_type*;
   using reference = element_type&;
+
   using const_pointer = const element_type*;
   using const_reference = const element_type&;
-
-  using mutable_span = std::span<value_type>;
   using const_span = std::span<const element_type>;
 
+  using mutable_pointer = value_type*;
+  using mutable_reference = value_type&;
+  using mutable_span = std::span<value_type>;
+
+  Owned( S span, AllocationType allocation_type );
+  Owned( Owned& other ) = delete;
   Owned( Owned&& other );
 
   Owned( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>;
+  Owned( std::filesystem::path path ) requires std::is_const_v<element_type>;
+  Owned( size_t size, AllocationType type ) requires( not std::is_const_v<element_type> );
 
-  static Owned allocate( size_t size ) requires( not std::is_const_v<element_type> );
-  static Owned map( size_t size ) requires( not std::is_const_v<element_type> );
+  static Owned allocate( size_t size ) requires( not std::is_const_v<element_type> )
+  {
+    return Owned( size, AllocationType::Allocated );
+  }
+  static Owned map( size_t size ) requires( not std::is_const_v<element_type> )
+  {
+    return Owned( size, AllocationType::Mapped );
+  }
 
-  static Owned claim_static( S span );
-  static Owned claim_allocated( S span );
-  static Owned claim_mapped( S span );
-
-  static Owned from_file( const std::filesystem::path path ) requires std::is_const_v<element_type>;
   void to_file( const std::filesystem::path path ) requires std::is_const_v<element_type>;
-  static Owned copy( std::span<element_type> data );
 
   void leak();
 
@@ -96,11 +68,9 @@ public:
   pointer data() const { return span_.data(); };
   size_t size() const { return span_.size(); };
 
-  operator span_type() const { return span(); }
-  operator const_span() const requires( not std::is_const_v<element_type> ) { return span(); }
-
   Owned& operator=( Owned<std::span<value_type>>&& original ) requires std::is_const_v<element_type>;
   Owned& operator=( Owned&& other );
+  Owned& operator=( Owned& other ) = delete;
 
   element_type& operator[]( size_t index );
   element_type& at( size_t index ) { return ( *this )[index]; }
@@ -108,10 +78,14 @@ public:
   ~Owned();
 };
 
-using OwnedMutBlob = Owned<MutBlob>;
-using OwnedMutTree = Owned<MutTree>;
-using OwnedMutObject = std::variant<OwnedMutBlob, OwnedMutTree>;
+using OwnedBlob = Owned<BlobSpan>;
+using OwnedTree = Owned<TreeSpan>;
+using OwnedMutBlob = Owned<MutBlobSpan>;
+using OwnedMutTree = Owned<MutTreeSpan>;
 
-using OwnedBlob = Owned<Blob>;
-using OwnedTree = Owned<Tree>;
-using OwnedObject = std::variant<OwnedBlob, OwnedTree>;
+using OwnedSpan = std::variant<OwnedBlob, OwnedTree>;
+using OwnedMutSpan = std::variant<OwnedMutBlob, OwnedMutTree>;
+
+using BlobData = std::shared_ptr<OwnedBlob>;
+using TreeData = std::shared_ptr<OwnedTree>;
+using Data = std::variant<BlobData, TreeData>;

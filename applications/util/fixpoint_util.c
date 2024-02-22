@@ -41,6 +41,11 @@ int32_t get_i32_rw_mem( int32_t mem_id, int32_t index )
   return get_i32_rw_mem_functions[mem_id]( index );
 }
 
+int32_t get_i32_ro_mem( int32_t mem_id, int32_t index )
+{
+  return get_i32_ro_mem_functions[mem_id]( index );
+}
+
 int32_t byte_size_ro_mem( int32_t mem_id )
 {
   return byte_size_ro_mem_functions[mem_id]();

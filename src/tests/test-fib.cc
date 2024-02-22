@@ -4,15 +4,23 @@
 
 using namespace std;
 
+auto rt = ReadOnlyRT::init();
+
 uint32_t fix_fib( uint32_t x )
 {
-  static Handle addblob = compile( file( "testing/wasm-examples/addblob.wasm" ) );
-  static Handle fib = compile( file( "testing/wasm-examples/fib.wasm" ) );
-  Handle t = thunk( tree( { blob( "unused" ), fib, x, addblob } ) );
-  auto& rt = Runtime::get_instance();
-  Handle result = rt.eval( t );
+  static auto addblob = compile( *rt, file( *rt, "testing/wasm-examples/addblob.wasm" ) );
+  static auto fib = compile( *rt, file( *rt, "testing/wasm-examples/fib.wasm" ) );
+  auto thunk = Handle<Application>(
+    handle::upcast( tree( *rt, blob( *rt, "unused" ), fib, Handle<Literal>( x ), addblob ) ) );
+  auto result = rt->execute( Handle<Eval>( thunk ) );
   uint32_t y = -1;
-  memcpy( &y, rt.storage().get_blob( result ).data(), sizeof( uint32_t ) );
+
+  auto res = result.try_into<Blob>().and_then( []( auto h ) { return h.template try_into<Literal>(); } );
+  if ( res ) {
+    memcpy( &y, res->data(), sizeof( uint32_t ) );
+  } else {
+    throw runtime_error( "Invalid add result." );
+  }
   return y;
 }
 
@@ -42,8 +50,6 @@ void check_fib( uint32_t x )
 
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  rt.storage().deserialize();
   for ( ssize_t i = 15; i >= 0; i-- ) {
     check_fib( i );
   }

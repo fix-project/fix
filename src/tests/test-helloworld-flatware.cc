@@ -1,26 +1,35 @@
 #include <stdio.h>
 
+#include "handle_post.hh"
 #include "test.hh"
+
+namespace tester {
+auto rt = ReadOnlyRT::init();
+auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
+auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
+auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
+auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
+}
 
 using namespace std;
 
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  rt.storage().deserialize();
-  Handle input = flatware_input( compile(
-    file( "applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm" ) ) );
-  Handle result_handle = rt.eval( input );
-  Tree result = rt.storage().get_tree( result_handle );
+
+  auto input = flatware_input( tester::Compile( tester::File(
+    "applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm" ) ) );
+  auto result_handle = tester::rt->execute( input );
+  auto result_tree = tester::rt->get( result_handle.try_into<ValueTree>().value() ).value();
 
   uint32_t x = -1;
-  memcpy( &x, rt.storage().get_blob( result[0] ).data(), sizeof( uint32_t ) );
+  memcpy( &x, handle::extract<Literal>( result_tree->at( 0 ) ).value().data(), sizeof( uint32_t ) );
   if ( x != 0 ) {
     fprintf( stderr, "Return failed, returned %d != 0\n", x );
     exit( 1 );
   }
-  auto out = rt.storage().get_blob( result[2] );
-  if ( std::string_view( out.data(), out.size() ) != "Hello, World!\n" ) {
+
+  auto out = handle::extract<Literal>( result_tree->at( 1 ) ).value();
+  if ( std::string_view( out.data(), out.size() ) != "Hello, World!" ) {
     fprintf( stderr, "Output did not match expected 'Hello, World!'\n" );
     exit( 1 );
   }

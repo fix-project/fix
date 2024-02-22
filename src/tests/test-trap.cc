@@ -1,15 +1,13 @@
-#include <stdio.h>
-
+#include "handle.hh"
 #include "test.hh"
 
 using namespace std;
 
+auto rt = ReadOnlyRT::init();
+
 void test( void )
 {
-  auto& rt = Runtime::get_instance();
-  rt.storage().deserialize();
-  rt.storage().get_tree( rt.eval( thunk( tree( {
-    blob( "unused" ),
-    compile( file( "testing/wasm-examples/trap.wasm" ) ),
-  } ) ) ) );
+  auto thunk = Handle<Application>( handle::upcast(
+    tree( *rt, blob( *rt, "unused" ), compile( *rt, ( file( *rt, "testing/wasm-examples/trap.wasm" ) ) ) ) ) );
+  rt->execute( Handle<Eval>( thunk ) );
 }

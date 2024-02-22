@@ -46,14 +46,14 @@ std::string_view RingBuffer::writable_region() const
   return storage( next_index_to_write() ).substr( 0, capacity() - bytes_stored() );
 }
 
-string_span RingBuffer::writable_region()
+span<char> RingBuffer::writable_region()
 {
-  return mutable_storage( next_index_to_write() ).substr( 0, capacity() - bytes_stored() );
+  return mutable_storage( next_index_to_write() ).subspan( 0, capacity() - bytes_stored() );
 }
 
 void RingBuffer::push( const size_t num_bytes )
 {
-  if ( num_bytes > writable_region().length() ) {
+  if ( num_bytes > writable_region().size() ) {
     throw runtime_error( "RingBuffer::push exceeded size of writable region" );
   }
 
@@ -67,7 +67,7 @@ std::string_view RingBuffer::readable_region() const
 
 void RingBuffer::pop( const size_t num_bytes )
 {
-  if ( num_bytes > readable_region().length() ) {
+  if ( num_bytes > readable_region().size() ) {
     throw runtime_error( "RingBuffer::pop exceeded size of readable region" );
   }
 
@@ -76,7 +76,8 @@ void RingBuffer::pop( const size_t num_bytes )
 
 size_t RingBuffer::push_from_const_str( const string_view str )
 {
-  const size_t bytes_written = writable_region().copy( str );
-  push( bytes_written );
-  return bytes_written;
+  const size_t amount_to_copy = min( writable_region().size(), str.size() );
+  copy( str.begin(), str.begin() + amount_to_copy, writable_region().begin() );
+  push( amount_to_copy );
+  return amount_to_copy;
 }

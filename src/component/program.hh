@@ -1,13 +1,10 @@
 #pragma once
 
-#include <iostream>
 #include <memory>
+#include <span>
 #include <string>
-#include <vector>
 
 #include "handle.hh"
-#include "parser.hh"
-#include "spans.hh"
 #include "wasm-rt.h"
 
 #include "timer.hh"
@@ -67,16 +64,16 @@ public:
     }
   }
 
-  void populate_instance_and_context( string_span instance ) const
+  void populate_instance_and_context( std::span<char> instance ) const
   {
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
-    init_func( instance.mutable_data() );
+    init_func( instance.data() );
   }
 
   size_t get_instance_and_context_size() const { return instance_context_size_; }
 
-  __m256i execute( Handle encode_name ) const
+  Handle<Object> execute( Handle<ObjectTree> encode_name ) const
   {
     void ( *init_func )( void* );
     init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
@@ -84,8 +81,8 @@ public:
     char* instance = static_cast<char*>( aligned_alloc( alignof( __m256i ), instance_context_size_ ) );
     init_func( instance );
 
-    __m256i ( *main_func )( void*, __m256i );
-    main_func = reinterpret_cast<__m256i ( * )( void*, __m256i )>( code_.get() + main_entry_ );
+    u8x32 ( *main_func )( void*, u8x32 );
+    main_func = reinterpret_cast<u8x32 ( * )( void*, u8x32 )>( code_.get() + main_entry_ );
 
     void ( *cleanup_func )( void* );
     cleanup_func = reinterpret_cast<void ( * )( void* )>( code_.get() + cleanup_entry_ );
@@ -98,12 +95,12 @@ public:
       throw std::runtime_error( std::string( "Execution trapped: " ) + wasm_rt_strerror( code ) );
     }
 
-    __m256i result = main_func( instance, encode_name );
+    u8x32 result = main_func( instance, encode_name.into<Expression>().into<Fix>().content );
 
     cleanup_func( instance );
     free( instance );
 
-    return result;
+    return Handle<Fix>::forge( result ).try_into<Expression>().value().try_into<Object>().value();
   }
 
   Program( const Program& ) = delete;
