@@ -6,8 +6,8 @@ using namespace std;
 
 uint32_t fix_add( char a, char b, Handle add_elf )
 {
-  Handle add = thunk(
-    tree( { blob( "unused" ), add_elf, tree( { blob( "add" ), blob( { &a, 1 } ), blob( { &b, 1 } ) } ) } ) );
+  Handle add
+    = flatware_input( add_elf, tree( {} ), tree( { blob( "add" ), blob( { &a, 1 } ), blob( { &b, 1 } ) } ) );
   auto& rt = Runtime::get_instance();
   (void)a, (void)b;
   Handle result = rt.eval( add );

@@ -16,10 +16,12 @@ Handle fs()
   static Handle e = dirent(
     ".",
     d,
-    tree( { dirent(
-      "a",
-      d,
-      tree( { dirent( "a_1.txt", f, blob( "Hello, this is a_1.txt!" ) ),
+    tree(
+      { dirent(
+          "a",
+          d,
+          tree(
+            { dirent( "a_1.txt", f, blob( "Hello, this is a_1.txt!" ) ),
               dirent( "a_2.txt", f, blob( "Hello, this is a_2.txt!" ) ),
               dirent(
                 "b",
@@ -30,17 +32,18 @@ Handle fs()
                                 tree( {
                                   dirent( "greeter.txt", f, blob( "Hi, I am greeter.txt" ) ),
                                 } ) ),
-                        dirent(
-                          "c", d, tree( { dirent( "fixpoint", f, blob( "Hello, World!" ) ) } ) ) } ) ) } ) ) } ) );
+                        dirent( "c", d, tree( { dirent( "fixpoint", f, blob( "Hello, World!" ) ) } ) ) } ) ) } ) ),
+        dirent( "fixpoint", f, blob( "Hello, World!" ) ) } ) );
   return e;
 }
 
 int run_flatware( const string& name, Handle elf, Handle home )
 {
   printf( "### TEST %s\n", name.c_str() );
-  Handle exe = thunk( tree( { blob( "unused" ), elf, tree( {} ), home } ) );
+  Handle exe = flatware_input( elf, home );
   auto& rt = Runtime::get_instance();
-  Tree result = rt.storage().get_tree( rt.eval( exe ) );
+  Handle result_handle = rt.eval( exe );
+  Tree result = rt.storage().get_tree( result_handle );
   uint32_t code = -1;
   memcpy( &code, result[0].literal_blob().data(), sizeof( uint32_t ) );
   printf( "%s returned %d\n", name.c_str(), code );
