@@ -16,8 +16,10 @@ using namespace std;
 void test( void )
 {
 
-  auto input = flatware_input( *tester::rt, tester::Compile( tester::File(
-    "applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm" ) ) );
+  auto input = flatware_input(
+    *tester::rt,
+    tester::Compile( tester::File(
+      "applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm" ) ) );
   auto result_handle = tester::rt->execute( input );
   auto result_tree = tester::rt->get( result_handle.try_into<ValueTree>().value() ).value();
 

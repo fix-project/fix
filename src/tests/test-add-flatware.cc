@@ -15,11 +15,10 @@ using namespace std;
 
 uint32_t fix_add( char a, char b, Handle<Fix> add_elf )
 {
-  Handle add
-    = flatware_input( *tester::rt,
-                      add_elf,
-                      tester::Tree(),
-                      tester::Tree( tester::Blob( "add" ), tester::Blob( &a ), tester::Blob( &b ) ) );
+  Handle add = flatware_input( *tester::rt,
+                               add_elf,
+                               tester::Tree(),
+                               tester::Tree( tester::Blob( "add" ), tester::Blob( &a ), tester::Blob( &b ) ) );
   (void)a, (void)b;
 
   auto result = tester::rt->execute( add );
