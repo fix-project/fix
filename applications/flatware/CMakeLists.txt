@@ -18,6 +18,10 @@ add_library(filesys_obj OBJECT "filesys.c")
 add_library(c_flatware_obj OBJECT "c-flatware.c")
 add_library(asm_flatware_obj OBJECT "asm-flatware.c")
 
+add_dependencies(filesys_obj generate-flatware)
+add_dependencies(c_flatware_obj generate-flatware)
+add_dependencies(asm_flatware_obj generate-flatware)
+
 add_custom_command(
   OUTPUT  "c-flatware.wasm"
   DEPENDS filesys_obj c_flatware_obj asm_flatware_obj util/fixpoint_util_obj filesys.c c-flatware.c asm-flatware.c
@@ -94,6 +98,12 @@ add_custom_command(
           --enable-exceptions
           -e wasi_snapshot_preview1
           wasi_snapshot_preview1.wasm 2> import-check.log
+)
+
+add_custom_target(
+        generate-flatware
+        COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/generate.py ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating flatware"
 )
 
 add_custom_target( import-check-flatware ALL DEPENDS import-check.log )
