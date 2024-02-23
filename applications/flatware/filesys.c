@@ -17,7 +17,7 @@ bool is_dir( int32_t dirent_ROTable_index )
 {
   externref ret = get_content( dirent_ROTable_index );
 
-  if ( fixpoint_is_blob( ret ) == 1 ) { // if is blob
+  if ( fixpoint_is_blob( ret ) ) {
     return false;
   }
 

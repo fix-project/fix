@@ -16,7 +16,7 @@ using namespace std;
 void test( void )
 {
 
-  auto input = flatware_input( tester::Compile( tester::File(
+  auto input = flatware_input( *tester::rt, tester::Compile( tester::File(
     "applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm" ) ) );
   auto result_handle = tester::rt->execute( input );
   auto result_tree = tester::rt->get( result_handle.try_into<ValueTree>().value() ).value();
@@ -28,9 +28,10 @@ void test( void )
     exit( 1 );
   }
 
-  auto out = handle::extract<Literal>( result_tree->at( 1 ) ).value();
-  if ( std::string_view( out.data(), out.size() ) != "Hello, World!" ) {
+  auto out = handle::extract<Literal>( result_tree->at( 2 ) ).value();
+  if ( std::string_view( out.data(), out.size() ) != "Hello, World!\n" ) {
     fprintf( stderr, "Output did not match expected 'Hello, World!'\n" );
+    fprintf( stderr, "Output: %.*s", (int)out.size(), out.data() );
     exit( 1 );
   }
 }
