@@ -70,7 +70,7 @@ Relater::Result<Value> Relater::load( Handle<Value> value )
 {
   auto eval = Handle<Relation>( Handle<Eval>( Handle<Identification>( value ) ) );
   if ( eval != current_ ) {
-    graph_.write()->add_dependency_no_running( current_.value(), eval );
+    graph_.write()->add_dependency( current_.value(), eval );
   }
   works_.push_back( Handle<Eval>( Handle<Identification>( value ) ) );
   return {};
@@ -89,7 +89,7 @@ Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
   }
 
   if ( apply != current_ ) {
-    graph_.write()->add_dependency_no_running( current_.value(), apply );
+    graph_.write()->add_dependency( current_.value(), apply );
   }
   works_.push_back( Handle<Apply>( combination ) );
   return {};
@@ -102,7 +102,7 @@ Relater::Result<Object> Relater::get_or_block( Handle<Relation> goal )
   current_ = goal;
   auto res = evaluator_.relate( goal );
   if ( !res.has_value() and prev_current.has_value() ) {
-    graph_.write()->add_dependency_no_running( prev_current.value(), goal );
+    graph_.write()->add_dependency( prev_current.value(), goal );
   }
 
   current_ = prev_current;
