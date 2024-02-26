@@ -1,11 +1,11 @@
 #include <stdio.h>
 
-#include "handle_post.hh"
+#include "relater.hh"
 #include "test.hh"
 
 using namespace std;
 
-auto rt = ReadOnlyRT::init();
+auto rt = std::make_shared<Relater>();
 
 void test( void )
 {

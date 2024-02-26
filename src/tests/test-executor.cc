@@ -1,9 +1,9 @@
-#include "executor.hh"
+#include "relater.hh"
 #include <glog/logging.h>
 
 using namespace std;
 
-Executor rt( std::thread::hardware_concurrency(), {}, std::make_shared<PointerRunner>() );
+Relater rt( std::thread::hardware_concurrency(), std::make_shared<PointerRunner>() );
 
 template<FixHandle... Args>
 Handle<Application> application( Handle<Object> ( *f )( Handle<ObjectTree> ), Args... args )
@@ -50,25 +50,25 @@ Handle<Object> fib( Handle<ObjectTree> combination )
 
 Handle<Object> manyfib( Handle<ObjectTree> combination )
 {
-  auto data = rt.storage().get( combination );
+  auto data = rt.get( combination );
   uint64_t x(
-    data->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+    data.value()->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
   auto tree = OwnedMutTree::allocate( x );
   for ( uint64_t i = 0; i < tree.size(); i++ ) {
     tree[i] = application( fib, Handle<Literal>( i ) );
   }
-  return handle::tree_unwrap<ObjectTree>( rt.storage().create( std::make_shared<OwnedTree>( std::move( tree ) ) ) );
+  return handle::tree_unwrap<ObjectTree>( rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) ) );
 }
 
 void test( void )
 {
   if ( getenv( "FIB" ) ) {
     auto fibs_h = rt.execute( Handle<Eval>( application( manyfib, 94_literal64 ) ) ).unwrap<ValueTree>();
-    auto fibs = rt.storage().get( fibs_h );
+    auto fibs = rt.get( fibs_h );
     uint64_t a = 0;
     uint64_t b = 1;
-    for ( size_t i = 0; i < fibs->size(); i++ ) {
-      CHECK_EQ( fibs->at( i ), Handle<Fix>( Handle<Literal>( a ) ) );
+    for ( size_t i = 0; i < fibs.value()->size(); i++ ) {
+      CHECK_EQ( fibs.value()->at( i ), Handle<Fix>( Handle<Literal>( a ) ) );
       b = a + b;
       a = b - a;
     }

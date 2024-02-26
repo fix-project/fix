@@ -1,11 +1,12 @@
 #include <stdexcept>
 #include <stdio.h>
 
+#include "relater.hh"
 #include "test.hh"
 
 using namespace std;
 
-auto rt = ReadOnlyRT::init();
+auto rt = make_shared<Relater>();
 
 uint32_t fix_add( uint32_t a, uint32_t b, Handle<Fix> add_elf )
 {

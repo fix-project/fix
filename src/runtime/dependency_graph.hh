@@ -44,18 +44,17 @@ public:
   }
 
   /**
-   * Marks a Task as depending upon another.  Returns whether the dependee is new.
+   * Marks a Task as depending upon another.
    *
    * @p blocked   The Task to mark as blocked on @p runnable.
    * @p runnable  The Task to mark as runnable, blocking @p blocked.
-   * @return      If the @p runnable should actually be started.
    */
-  bool add_dependency( Task blocked, Task runnable )
+  void add_dependency( Task blocked, Task runnable )
   {
-    VLOG( 1 ) << "adding dependency from " << blocked << " to " << runnable;
+    VLOG( 1 ) << "adding dependency from " << blocked << " to " << runnable << " without running";
     forward_dependencies_[blocked].insert( runnable );
     backward_dependencies_[runnable].insert( blocked );
-    return start( runnable );
+    running_.erase( blocked );
   }
 
   /**

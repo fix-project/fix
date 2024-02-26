@@ -101,12 +101,13 @@ Result<Object> FixEvaluator::relate( Handle<Fix> x )
 {
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
   auto mapReduce = [&]( auto x ) { return rt_.mapReduce( x ); };
+  auto apply = [&]( auto x ) { return rt_.apply( x ); };
   auto reduce = [&]( auto x ) { return this->reduce( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Relation> x ) {
       return x.visit<Result<Object>>( overload {
-        [&]( Handle<Apply> x ) { return mapReduce( x.unwrap<ExpressionTree>() ); },
+        [&]( Handle<Apply> x ) { return mapReduce( x.unwrap<ExpressionTree>() ).and_then( apply ); },
         [&]( Handle<Eval> x ) { return evalStrict( x.unwrap<Object>() ); },
       } );
     },

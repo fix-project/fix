@@ -3,6 +3,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <concurrentqueue/concurrentqueue.h>
+#include <functional>
 #include <glog/logging.h>
 #include <memory>
 #include <mutex>
@@ -17,6 +18,7 @@
 #include "interface.hh"
 #include "message.hh"
 #include "mutex.hh"
+#include "relater.hh"
 #include "ring_buffer.hh"
 #include "runtimestorage.hh"
 #include "socket.hh"
@@ -45,7 +47,7 @@ class Remote : public IRuntime
   TCPSocket socket_;
 
   MessageQueue& msg_q_;
-  std::weak_ptr<IRuntime> parent_;
+  std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent_;
   size_t index_;
 
   RingBuffer rx_data_ { 8192 };
@@ -80,7 +82,7 @@ public:
           TCPSocket socket,
           size_t index,
           MessageQueue& msg_q,
-          std::weak_ptr<IRuntime> parent );
+          std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent );
 
   std::optional<BlobData> get( Handle<Named> name ) override;
   std::optional<TreeData> get( Handle<AnyTree> name ) override;
@@ -143,7 +145,7 @@ private:
 
   MessageQueue msg_q_ {};
 
-  std::weak_ptr<IRuntime> parent_;
+  std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent_;
 
   void run_loop();
   void process_outgoing_message( size_t remote_id, MessagePayload&& message );
@@ -151,7 +153,7 @@ private:
 public:
   SharedMutex<std::unordered_map<size_t, std::shared_ptr<Remote>>> connections_ {};
 
-  NetworkWorker( std::weak_ptr<IRuntime> parent )
+  NetworkWorker( std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent = {} )
     : parent_( parent )
   {}
 
@@ -185,10 +187,10 @@ public:
     connecting_sockets_.move_push( std::move( socket ) );
   }
 
-  std::weak_ptr<Remote> get_remote( const Address& address )
+  std::shared_ptr<IRuntime> get_remote( const Address& address )
   {
     auto address_str = address.to_string();
     addresses_.read().wait( [&] { return addresses_.read()->contains( address_str ); } );
-    return connections_.read()->at( addresses_.read()->at( address_str ) );
+    return std::static_pointer_cast<IRuntime>( connections_.read()->at( addresses_.read()->at( address_str ) ) );
   }
 };

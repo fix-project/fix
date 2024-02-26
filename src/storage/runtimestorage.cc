@@ -1,5 +1,3 @@
-#include <cassert>
-#include <iostream>
 #include <stdexcept>
 
 #include <glog/logging.h>
@@ -38,7 +36,7 @@ Handle<AnyTree> RuntimeStorage::create( TreeData tree, std::optional<Handle<AnyT
   return handle;
 }
 
-void RuntimeStorage::create( Handle<Relation> relation, Handle<Object> result )
+void RuntimeStorage::create( Handle<Object> result, Handle<Relation> relation )
 {
   relations_.write()->insert( { relation, result } );
 }
