@@ -39,3 +39,27 @@ public:
                          Handle<Relation> top_level_job,
                          Relater& rt ) override;
 };
+
+class OnePassScheduler : public Scheduler
+{
+  std::shared_ptr<IRuntime> schedule_rec( SharedMutex<std::vector<std::weak_ptr<IRuntime>>>& remotes,
+                                          std::shared_ptr<IRuntime> local,
+                                          SharedMutex<DependencyGraph>& graph,
+                                          Handle<Relation> top_level_job,
+                                          Relater& rt );
+
+  std::shared_ptr<IRuntime> locate(
+    SharedMutex<std::vector<std::weak_ptr<IRuntime>>>& remotes,
+    std::shared_ptr<IRuntime> local,
+    Handle<Relation> job,
+    Relater& rt,
+    std::unordered_map<Handle<Relation>, std::shared_ptr<IRuntime>> dependency_locations = {} );
+
+public:
+  virtual void schedule( SharedMutex<std::vector<std::weak_ptr<IRuntime>>>& remotes,
+                         std::shared_ptr<IRuntime> local,
+                         SharedMutex<DependencyGraph>& graph,
+                         std::vector<Handle<Relation>>& leaf_jobs,
+                         Handle<Relation> top_level_job,
+                         Relater& rt ) override;
+};

@@ -285,8 +285,12 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
   }
 
   auto works = relate( name );
-  scheduler_->schedule( remotes_, local_, graph_, works, name, *this );
-  return {};
+  if ( !works.empty() ) {
+    scheduler_->schedule( remotes_, local_, graph_, works, name, *this );
+    return {};
+  } else {
+    return storage_.get( name );
+  }
 }
 
 void Relater::put( Handle<Named> name, BlobData data )

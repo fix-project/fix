@@ -4,6 +4,9 @@
 #include "handle_util.hh"
 #include "object.hh"
 #include "overload.hh"
+#include <functional>
+#include <glog/logging.h>
+#include <unordered_set>
 
 /**
  * A basic Runtime environment, capable of loading/storing Fix data and (if parallelism != 0) discovering new Fix
@@ -102,6 +105,36 @@ public:
   virtual bool contains( [[maybe_unused]] const std::string_view label ) { return false; };
 
   virtual ~IRuntime() {}
+
+  // Visit from a root (skip Encode or Thunk)
+  template<FixType T>
+  void visit_minrepo( Handle<T> handle,
+                      std::function<void( Handle<AnyDataType> )> visitor,
+                      std::unordered_set<Handle<Fix>> visited = {} )
+  {
+    if ( visited.contains( handle ) )
+      return;
+    if constexpr ( std::same_as<T, Literal> )
+      return;
+
+    if constexpr ( Handle<T>::is_fix_sum_type ) {
+      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
+                          or std::same_as<T, ObjectTreeRef> ) )
+        std::visit( [&]( const auto x ) { visit_minrepo( x, visitor, visited ); }, handle.get() );
+
+    } else {
+      if constexpr ( FixTreeType<T> ) {
+        // Having the handle means that the data presents in storage
+        auto tree = get( handle );
+        for ( const auto& element : tree.value()->span() ) {
+          visit_minrepo( element, visitor, visited );
+        }
+      }
+      VLOG( 2 ) << "visiting " << handle;
+      visitor( handle );
+      visited.insert( handle );
+    }
+  }
 };
 
 class MultiWorkerRuntime : public IRuntime
