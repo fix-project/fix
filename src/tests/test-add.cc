@@ -11,7 +11,7 @@ auto rt = make_shared<Relater>();
 uint32_t fix_add( uint32_t a, uint32_t b, Handle<Fix> add_elf )
 {
   auto combination = tree( *rt,
-                           blob( *rt, "" ).into<Fix>(),
+                           limits( *rt, 1024 * 1024, 1024, 1 ).into<Fix>(),
                            add_elf,
                            Handle<Literal>( a ).into<Fix>(),
                            Handle<Literal>( b ).into<Fix>() )

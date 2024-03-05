@@ -130,7 +130,9 @@ public:
           .value_or( 0 );
 
     VLOG( 1 ) << handle << " requested " << resource_limits::available_bytes << " bytes";
-    return program.execute( handle );
+    auto result = program.execute( handle );
+    VLOG( 2 ) << handle << " -> " << result;
+    return result;
   }
 
 private:

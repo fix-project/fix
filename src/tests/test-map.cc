@@ -11,7 +11,7 @@ void test( void )
 {
   auto t = Handle<Application>( handle::upcast(
     tree( *rt,
-          blob( *rt, "unused" ),
+          limits( *rt, 1024 * 1024, 1024, 1 ),
           compile( *rt, file( *rt, "applications-prefix/src/applications-build/map/add_2_map.wasm" ) ),
           Handle<Literal>( 0 ) ) ) );
 
