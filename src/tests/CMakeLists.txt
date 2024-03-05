@@ -31,6 +31,9 @@ target_link_libraries(test-fib runtime)
 add_executable(test-trap test-trap.cc main.cc)
 target_link_libraries(test-trap runtime)
 
+add_executable(test-resource-limits test-resource-limits.cc main.cc)
+target_link_libraries(test-resource-limits runtime)
+
 add_executable(test-map test-map.cc main.cc)
 target_link_libraries(test-map runtime)
 

@@ -5,6 +5,7 @@
 
 namespace tester {
 auto rt = std::make_shared<Relater>();
+auto Limits = []() { return limits( *rt, 1024 * 1024, 1024, 1 ); };
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
@@ -45,7 +46,7 @@ Handle<Fix> fs()
 int run_flatware( const string& name, Handle<Fix> elf, Handle<Fix> home )
 {
   printf( "### TEST %s\n", name.c_str() );
-  auto exe = Handle<Application>( tester::Tree( tester::Blob( "unused" ), elf, tester::Tree(), home ) );
+  auto exe = Handle<Application>( tester::Tree( tester::Limits(), elf, tester::Tree(), home ) );
   auto result = tester::rt->get( tester::rt->execute( Handle<Eval>( exe ) ).try_into<ValueTree>().value() ).value();
   uint32_t code = -1;
   memcpy( &code, handle::extract<Literal>( result->at( 0 ) ).value().data(), sizeof( uint32_t ) );
