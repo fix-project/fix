@@ -8,6 +8,39 @@
 
 using namespace std;
 
+bool is_local( shared_ptr<IRuntime> rt )
+{
+  return rt->get_info()->link_speed == numeric_limits<double>::max();
+}
+
+void get( shared_ptr<IRuntime> worker, Handle<Relation> job, Relater& rt )
+{
+  if ( is_local( worker ) ) {
+    worker->get( job );
+  } else {
+    // Send visit( job ) before sending the job itself
+    auto send = [&]( Handle<AnyDataType> h ) {
+      h.visit<void>( overload { []( Handle<Literal> ) {},
+                                []( Handle<Relation> ) {},
+                                [&]( auto x ) { worker->put( x, rt.get( x ).value() ); } } );
+    };
+
+    rt.visit( job.visit<Handle<Fix>>( overload { []( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
+                                                 []( Handle<Eval> e ) {
+                                                   auto obj = e.unwrap<Object>();
+                                                   return handle::extract<Thunk>( obj )
+                                                     .transform( []( auto obj ) -> Handle<Fix> {
+                                                       return Handle<Strict>( obj );
+                                                     } )
+                                                     .or_else( [&]() -> optional<Handle<Fix>> { return obj; } )
+                                                     .value();
+                                                 } } ),
+              send );
+
+    worker->get( job );
+  }
+}
+
 void LocalFirstScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& remotes,
                                     shared_ptr<IRuntime> local,
                                     [[maybe_unused]] SharedMutex<DependencyGraph>& graph,
@@ -17,7 +50,7 @@ void LocalFirstScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& rem
 {
   if ( local->get_info()->parallelism > 0 ) {
     for ( const auto& leaf_job : leaf_jobs ) {
-      local->get( leaf_job );
+      get( local, leaf_job, rt );
     }
     return;
   }
@@ -27,35 +60,13 @@ void LocalFirstScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& rem
     for ( const auto& remote : locked_remotes.get() ) {
       auto locked_remote = remote.lock();
       if ( locked_remote ) {
-        auto send = [&]( Handle<AnyDataType> h ) {
-          h.visit<void>( overload { []( Handle<Literal> ) {},
-                                    []( Handle<Relation> ) {},
-                                    [&]( auto x ) { locked_remote->put( x, rt.get( x ).value() ); } } );
-        };
-
-        rt.visit( top_level_job.visit<Handle<Fix>>(
-                    overload { []( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-                               []( Handle<Eval> e ) {
-                                 auto obj = e.unwrap<Object>();
-                                 return handle::extract<Thunk>( obj )
-                                   .transform( []( auto obj ) -> Handle<Fix> { return Handle<Strict>( obj ); } )
-                                   .or_else( [&]() -> optional<Handle<Fix>> { return obj; } )
-                                   .value();
-                               } } ),
-                  send );
-
-        locked_remote->get( top_level_job );
+        get( locked_remote, top_level_job, rt );
         return;
       }
     }
   }
 
   throw HandleNotFound( top_level_job );
-}
-
-bool is_local( shared_ptr<IRuntime> rt )
-{
-  return rt->get_info()->link_speed == numeric_limits<double>::max();
 }
 
 void OnePassScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& remotes,
@@ -73,7 +84,7 @@ void OnePassScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& remote
 
   auto location = schedule_rec( remotes, local, graph, top_level_job, rt );
   if ( !is_local( location ) ) {
-    location->get( top_level_job );
+    get( location, top_level_job, rt );
   }
 }
 
@@ -115,7 +126,7 @@ shared_ptr<IRuntime> OnePassScheduler::schedule_rec( SharedMutex<vector<weak_ptr
             // Get any non-local child work
             for ( const auto& [d, dloc] : dependency_locations ) {
               if ( !is_local( dloc ) ) {
-                dloc->get( d );
+                get( dloc, d, rt );
               }
             }
           };
@@ -146,9 +157,9 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
                    .value();
                } } );
 
-  unordered_map<shared_ptr<IRuntime>, size_t> available_data;
+  unordered_map<shared_ptr<IRuntime>, size_t> absent_data;
 
-  // Calculate available data size on each remote
+  // For a remote, absent_sizes is the sum of absent Blob/Tree + absent load + absent apply result size
   for ( const auto& remote : remotes.read().get() ) {
     auto locked_remote = remote.lock();
     // If remote already contains the result
@@ -157,44 +168,52 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
     }
 
     if ( locked_remote->get_info()->parallelism > 0 ) {
-      size_t contained_size = 0;
-      rt.visit_minrepo( root, [&]( Handle<AnyDataType> handle ) {
-        contained_size += handle.visit<size_t>( []( auto h ) { return handle::size( h ); } );
+      size_t absent_size = 0;
+      rt.early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
+        auto contained = handle.visit<bool>( overload { [&]( Handle<Literal> ) { return true; },
+                                                        [&]( auto h ) { return locked_remote->contains( h ); } } );
+
+        if ( !contained ) {
+          absent_size += handle::size( handle );
+        }
+
+        return contained;
       } );
-      available_data.insert( { locked_remote, contained_size } );
+
+      for ( auto& [task, location] : dependency_locations ) {
+        if ( locked_remote != location ) {
+          auto dependency_size = const_cast<Handle<Relation>&>( task ).visit<size_t>(
+            overload { [&]( Handle<Apply> ) {
+                        // TODO: estimate apply output size
+                        return 0;
+                      },
+                       [&]( Handle<Eval> e ) -> size_t {
+                         return handle::extract<Identification>( e.unwrap<Object>() )
+                           .transform( []( auto h ) -> size_t { return handle::size( h ); } )
+                           .or_else( []() -> optional<size_t> { return 0; } )
+                           .value();
+                       } } );
+
+          absent_size += dependency_size;
+        }
+      }
+
+      absent_data.insert( { locked_remote, absent_size } );
     }
   }
 
-  // Calculate dependency data size on each remote
-  for ( auto& [task, location] : dependency_locations ) {
-    auto dependency_size = const_cast<Handle<Relation>&>( task ).visit<size_t>(
-      overload { [&]( Handle<Apply> ) {
-                  // TODO: estimate apply output size
-                  return 0;
-                },
-                 [&]( Handle<Eval> e ) -> size_t {
-                   return handle::extract<Identification>( e.unwrap<Object>() )
-                     .transform( []( auto h ) -> size_t { return handle::size( h ); } )
-                     .or_else( []() -> optional<size_t> { return 0; } )
-                     .value();
-                 } } );
-
-    if ( available_data.contains( location ) ) {
-      available_data.at( location ) += dependency_size;
-    }
-  }
-
-  // Choose the remote with largest available data
-  size_t max_available_size = 0;
+  // Choose the remote with the most parallelism among ones with smallest absent data
+  size_t min_absent_size = numeric_limits<size_t>::max();
   size_t max_parallelism = 0;
+
   shared_ptr<IRuntime> chosen_remote;
 
-  for ( const auto& [location, available_size] : available_data ) {
-    if ( available_size > max_available_size ) {
-      max_available_size = available_size;
+  for ( const auto& [location, absent_size] : absent_data ) {
+    if ( absent_size < min_absent_size ) {
+      min_absent_size = absent_size;
       max_parallelism = location->get_info()->parallelism;
       chosen_remote = location;
-    } else if ( available_size == max_available_size && location->get_info()->parallelism > max_parallelism ) {
+    } else if ( absent_size == min_absent_size && location->get_info()->parallelism > max_parallelism ) {
       max_parallelism = location->get_info()->parallelism;
       chosen_remote = location;
     }
