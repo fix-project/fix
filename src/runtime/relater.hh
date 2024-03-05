@@ -11,12 +11,16 @@ inline thread_local std::optional<Handle<Relation>> current_;
 
 class Executor;
 class Scheduler;
+class OnePassScheduler;
+class LocalFirstScheduler;
 
 class Relater
   : public MultiWorkerRuntime
   , FixRuntime
 {
   friend class Executor;
+  friend class OnePassScheduler;
+  friend class LocalFirstScheduler;
 
 private:
   SharedMutex<DependencyGraph> graph_ {};

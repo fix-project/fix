@@ -41,26 +41,22 @@ void get( shared_ptr<IRuntime> worker, Handle<Relation> job, Relater& rt )
   }
 }
 
-void LocalFirstScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& remotes,
-                                    shared_ptr<IRuntime> local,
-                                    [[maybe_unused]] SharedMutex<DependencyGraph>& graph,
-                                    vector<Handle<Relation>>& leaf_jobs,
-                                    Handle<Relation> top_level_job,
-                                    Relater& rt )
+void LocalFirstScheduler::schedule( vector<Handle<Relation>>& leaf_jobs, Handle<Relation> top_level_job )
 {
+  auto local = relater_.value().get().local_;
   if ( local->get_info()->parallelism > 0 ) {
     for ( const auto& leaf_job : leaf_jobs ) {
-      get( local, leaf_job, rt );
+      get( local, leaf_job, relater_->get() );
     }
     return;
   }
 
-  auto locked_remotes = remotes.read();
+  auto locked_remotes = relater_->get().remotes_.read();
   if ( locked_remotes->size() > 0 ) {
     for ( const auto& remote : locked_remotes.get() ) {
       auto locked_remote = remote.lock();
       if ( locked_remote ) {
-        get( locked_remote, top_level_job, rt );
+        get( locked_remote, top_level_job, relater_->get() );
         return;
       }
     }
@@ -69,12 +65,7 @@ void LocalFirstScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& rem
   throw HandleNotFound( top_level_job );
 }
 
-void OnePassScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& remotes,
-                                 shared_ptr<IRuntime> local,
-                                 SharedMutex<DependencyGraph>& graph,
-                                 vector<Handle<Relation>>& leaf_jobs,
-                                 Handle<Relation> top_level_job,
-                                 Relater& rt )
+void OnePassScheduler::schedule( vector<Handle<Relation>>& leaf_jobs, Handle<Relation> top_level_job )
 {
   // If all dependencies are resolved, the job should have been completed
   if ( leaf_jobs.empty() ) {
@@ -82,22 +73,18 @@ void OnePassScheduler::schedule( SharedMutex<vector<weak_ptr<IRuntime>>>& remote
     return;
   }
 
-  auto location = schedule_rec( remotes, local, graph, top_level_job, rt );
+  auto location = schedule_rec( top_level_job );
   if ( !is_local( location ) ) {
-    get( location, top_level_job, rt );
+    get( location, top_level_job, relater_->get() );
   }
 }
 
-shared_ptr<IRuntime> OnePassScheduler::schedule_rec( SharedMutex<vector<weak_ptr<IRuntime>>>& remotes,
-                                                     shared_ptr<IRuntime> local,
-                                                     SharedMutex<DependencyGraph>& graph,
-                                                     Handle<Relation> top_level_job,
-                                                     Relater& rt )
+shared_ptr<IRuntime> OnePassScheduler::schedule_rec( Handle<Relation> top_level_job )
 {
   return top_level_job.visit<shared_ptr<IRuntime>>( overload {
     [&]( Handle<Apply> a ) {
       // Base case: Apply
-      auto loc = locate( remotes, local, a, rt );
+      auto loc = locate( a );
       if ( is_local( loc ) ) {
         loc->get( a );
       }
@@ -107,7 +94,7 @@ shared_ptr<IRuntime> OnePassScheduler::schedule_rec( SharedMutex<vector<weak_ptr
       return handle::extract<Identification>( e.unwrap<Object>() )
         .transform( [&]( auto ) {
           // Base case: Eval( Identification )
-          auto loc = locate( remotes, local, e, rt );
+          auto loc = locate( e );
           if ( is_local( loc ) ) {
             loc->get( e );
           }
@@ -115,18 +102,18 @@ shared_ptr<IRuntime> OnePassScheduler::schedule_rec( SharedMutex<vector<weak_ptr
         } )
         .or_else( [&]() -> optional<shared_ptr<IRuntime>> {
           // Recursive case
-          auto dependencies = graph.read()->get_forward_dependencies( top_level_job );
+          auto dependencies = relater_->get().graph_.read()->get_forward_dependencies( top_level_job );
           unordered_map<Handle<Relation>, shared_ptr<IRuntime>> dependency_locations;
           for ( const auto& dependency : dependencies ) {
-            dependency_locations.insert( { dependency, schedule_rec( remotes, local, graph, dependency, rt ) } );
+            dependency_locations.insert( { dependency, schedule_rec( dependency ) } );
           }
-          auto location = locate( remotes, local, top_level_job, rt, dependency_locations );
+          auto location = locate( top_level_job, dependency_locations );
 
           if ( is_local( location ) ) {
             // Get any non-local child work
             for ( const auto& [d, dloc] : dependency_locations ) {
               if ( !is_local( dloc ) ) {
-                get( dloc, d, rt );
+                get( dloc, d, relater_->get() );
               }
             }
           };
@@ -138,12 +125,10 @@ shared_ptr<IRuntime> OnePassScheduler::schedule_rec( SharedMutex<vector<weak_ptr
 }
 
 shared_ptr<IRuntime> OnePassScheduler::locate(
-  SharedMutex<vector<weak_ptr<IRuntime>>>& remotes,
-  shared_ptr<IRuntime> local,
   Handle<Relation> top_level_job,
-  Relater& rt,
   unordered_map<Handle<Relation>, shared_ptr<IRuntime>> dependency_locations )
 {
+  auto local = relater_.value().get().local_;
   if ( local->get_info()->parallelism > 0 ) {
     return local;
   }
@@ -160,7 +145,7 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
   unordered_map<shared_ptr<IRuntime>, size_t> absent_data;
 
   // For a remote, absent_sizes is the sum of absent Blob/Tree + absent load + absent apply result size
-  for ( const auto& remote : remotes.read().get() ) {
+  for ( const auto& remote : relater_->get().remotes_.read().get() ) {
     auto locked_remote = remote.lock();
     // If remote already contains the result
     if ( locked_remote->contains( top_level_job ) ) {
@@ -169,7 +154,7 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
 
     if ( locked_remote->get_info()->parallelism > 0 ) {
       size_t absent_size = 0;
-      rt.early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
+      relater_->get().early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
         auto contained = handle.visit<bool>( overload { [&]( Handle<Literal> ) { return true; },
                                                         [&]( auto h ) { return locked_remote->contains( h ); } } );
 
