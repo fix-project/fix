@@ -75,7 +75,7 @@ void test_add_simple()
 
 void test_add_as_encode()
 {
-  auto curried = curry( tester::Tree( tester::Blob( "unused" ), add_simple_compiled ), Handle<Literal>( 2 ) );
+  auto curried = curry( tester::Tree( tester::Limits(), add_simple_compiled ), Handle<Literal>( 2 ) );
 
   auto curried_result = apply_args( curried, { Handle<Literal>( 1 ), Handle<Literal>( 3 ) } );
 
