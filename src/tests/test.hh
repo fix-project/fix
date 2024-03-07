@@ -2,7 +2,19 @@
 
 #include "interface.hh"
 
+#include <glog/logging.h>
+
 #pragma GCC diagnostic ignored "-Wunused-function"
+
+static Handle<ValueTree> limits( IRuntime& rt, uint64_t memory, uint64_t output_size, uint64_t output_fanout )
+{
+  auto tree = OwnedMutTree::allocate( 3 );
+  tree.at( 0 ) = Handle<Literal>( memory );
+  tree.at( 1 ) = Handle<Literal>( output_size );
+  tree.at( 2 ) = Handle<Literal>( output_fanout );
+  auto created = rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) );
+  return handle::extract<ValueTree>( created ).value();
+}
 
 static Handle<Fix> make_identification( Handle<Fix> name )
 {
@@ -21,8 +33,12 @@ static Handle<Strict> compile( IRuntime& rt, Handle<Fix> wasm )
 {
   auto compiler = rt.labeled( "compile-encode" );
 
+  auto kibi = 1024;
+  auto mebi = 1024 * kibi;
+  auto gibi = 1024 * mebi;
+
   auto tree = OwnedMutTree::allocate( 3 );
-  tree.at( 0 ) = Handle<Literal>( "unused" );
+  tree.at( 0 ) = limits( rt, gibi, mebi, 1 );
   tree.at( 1 ) = Handle<Strict>( handle::extract<Identification>( make_identification( compiler ) ).value() );
   tree.at( 2 ) = wasm;
   return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) ).visit<Handle<Strict>>( []( auto x ) {

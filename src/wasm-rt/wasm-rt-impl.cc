@@ -15,6 +15,7 @@
  */
 
 #include "wasm-rt-impl.hh"
+#include "resource_limits.hh"
 
 #include <assert.h>
 #include <cstddef>
@@ -332,6 +333,10 @@ void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
   }
 
   uint64_t byte_length = initial_pages * WASM_RT_PAGE_SIZE;
+  if ( byte_length > resource_limits::available_bytes ) {
+    throw resource_limits::violation();
+  }
+  resource_limits::available_bytes -= byte_length * WASM_RT_PAGE_SIZE;
   if ( hw_checked ) {
     /* Reserve 8GiB. */
     assert( !is64 && "memory64 is not yet compatible with WASM_RT_MEMCHECK_SIGNAL_HANDLER" );
@@ -376,6 +381,10 @@ uint64_t wasm_rt_grow_memory_helper( wasm_rt_memory_t* memory, uint64_t delta, b
   if ( new_pages == 0 ) {
     return 0;
   }
+  if ( resource_limits::available_bytes < ( delta * WASM_RT_PAGE_SIZE ) ) {
+    return (uint64_t)-1;
+  }
+  resource_limits::available_bytes -= delta * WASM_RT_PAGE_SIZE;
   if ( new_pages < old_pages || new_pages > memory->max_pages ) {
     return (uint64_t)-1;
   }
@@ -448,6 +457,10 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
     table->size = elements;                                                                                        \
     table->max_size = max_elements;                                                                                \
     table->data = NULL;                                                                                            \
+    if ( table->size * sizeof( wasm_rt_##type##_t ) > resource_limits::available_bytes ) {                         \
+      throw resource_limits::violation();                                                                          \
+    }                                                                                                              \
+    resource_limits::available_bytes -= table->size * sizeof( wasm_rt_##type##_t );                                \
     if ( table->size != 0 ) {                                                                                      \
       void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), table->size * sizeof( wasm_rt_##type##_t ) );      \
       table->data = static_cast<wasm_rt_##type##_t*>( ptr );                                                       \
@@ -470,6 +483,10 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
     if ( new_elems == 0 ) {                                                                                        \
       return 0;                                                                                                    \
     }                                                                                                              \
+    if ( resource_limits::available_bytes < ( delta * sizeof( wasm_rt_##type##_t ) ) ) {                           \
+      return (uint32_t)-1;                                                                                         \
+    }                                                                                                              \
+    resource_limits::available_bytes -= delta * sizeof( wasm_rt_##type##_t );                                      \
     if ( ( new_elems < old_elems ) || ( new_elems > table->max_size ) ) {                                          \
       return (uint32_t)-1;                                                                                         \
     }                                                                                                              \

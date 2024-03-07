@@ -12,7 +12,7 @@ uint32_t fix_fib( uint32_t x )
   static auto addblob = compile( *rt, file( *rt, "testing/wasm-examples/addblob.wasm" ) );
   static auto fib = compile( *rt, file( *rt, "testing/wasm-examples/fib.wasm" ) );
   auto thunk = Handle<Application>(
-    handle::upcast( tree( *rt, blob( *rt, "unused" ), fib, Handle<Literal>( x ), addblob ) ) );
+    handle::upcast( tree( *rt, limits( *rt, 1024 * 1024, 1024, 1 ), fib, Handle<Literal>( x ), addblob ) ) );
   auto result = rt->execute( Handle<Eval>( thunk ) );
   uint32_t y = -1;
 

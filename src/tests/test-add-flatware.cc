@@ -6,6 +6,7 @@
 
 namespace tester {
 auto rt = std::make_shared<Relater>();
+auto Limits = []() { return limits( *rt, 1024 * 1024, 1024, 1 ); };
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
@@ -17,7 +18,7 @@ using namespace std;
 uint32_t fix_add( char a, char b, Handle<Fix> add_elf )
 {
   auto add = Handle<Application>(
-    tester::Tree( tester::Blob( "unused" ),
+    tester::Tree( tester::Limits(),
                   add_elf,
                   tester::Tree( tester::Blob( "add" ), tester::Blob( { &a, 1 } ), tester::Blob( { &b, 1 } ) ) ) );
   (void)a, (void)b;

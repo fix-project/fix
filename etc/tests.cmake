@@ -21,6 +21,7 @@ add_test(NAME u_dependency_graph COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/t
 add_test(NAME t_add COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add)
 add_test(NAME t_fib COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib)
 add_test(NAME t_trap COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh)
+add_test(NAME t_resource_limits COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-resource-limits.sh)
 add_test(NAME t_map COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-map)
 add_test(NAME t_curry COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-curry)
 add_test(NAME t_self_host WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-self-host)

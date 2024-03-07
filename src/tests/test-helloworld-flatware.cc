@@ -5,7 +5,7 @@
 
 namespace tester {
 auto rt = std::make_shared<Relater>();
-auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
+auto Limits = []() { return limits( *rt, 1024 * 1024, 1024, 1 ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
 auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
@@ -16,7 +16,7 @@ using namespace std;
 void test( void )
 {
   auto res = tester::rt->execute( Handle<Eval>( Handle<Application>(
-    tester::Tree( tester::Blob( "unused" ),
+    tester::Tree( tester::Limits(),
                   tester::Compile( tester::File( "applications-prefix/src/applications-build/flatware/examples/"
                                                  "helloworld/helloworld-fixpoint.wasm" ) ) ) ) ) );
 
