@@ -164,7 +164,7 @@ public:
         // Having the handle means that the data presents in storage
         auto tree = get( handle );
         for ( const auto& element : tree.value()->span() ) {
-          visit_minrepo( element, visitor, visited );
+          early_stop_visit_minrepo( element, visitor, visited );
         }
       }
     }

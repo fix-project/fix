@@ -39,7 +39,7 @@ class OnePassScheduler : public Scheduler
 
   std::shared_ptr<IRuntime> locate(
     Handle<Relation> job,
-    std::unordered_map<Handle<Relation>, std::shared_ptr<IRuntime>> dependency_locations = {} );
+    const std::unordered_map<Handle<Relation>, std::shared_ptr<IRuntime>>& dependency_locations );
 
 public:
   virtual void schedule( std::vector<Handle<Relation>>& leaf_jobs, Handle<Relation> top_level_job ) override;

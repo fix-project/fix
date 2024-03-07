@@ -81,58 +81,98 @@ void OnePassScheduler::schedule( vector<Handle<Relation>>& leaf_jobs, Handle<Rel
 
 shared_ptr<IRuntime> OnePassScheduler::schedule_rec( Handle<Relation> top_level_job )
 {
-  return top_level_job.visit<shared_ptr<IRuntime>>( overload {
-    [&]( Handle<Apply> a ) {
-      // Base case: Apply
-      auto loc = locate( a );
-      if ( is_local( loc ) ) {
-        loc->get( a );
-      }
-      return loc;
-    },
-    [&]( Handle<Eval> e ) {
-      return handle::extract<Identification>( e.unwrap<Object>() )
-        .transform( [&]( auto ) {
-          // Base case: Eval( Identification )
-          auto loc = locate( e );
-          if ( is_local( loc ) ) {
-            loc->get( e );
-          }
-          return loc;
-        } )
-        .or_else( [&]() -> optional<shared_ptr<IRuntime>> {
-          // Recursive case
-          auto dependencies = relater_->get().graph_.read()->get_forward_dependencies( top_level_job );
-          unordered_map<Handle<Relation>, shared_ptr<IRuntime>> dependency_locations;
-          for ( const auto& dependency : dependencies ) {
-            dependency_locations.insert( { dependency, schedule_rec( dependency ) } );
-          }
-          auto location = locate( top_level_job, dependency_locations );
+  return top_level_job.visit<shared_ptr<IRuntime>>(
+    overload { [&]( Handle<Apply> a ) {
+                // Base case: Apply
+                auto loc = locate( a, {} );
+                if ( is_local( loc ) ) {
+                  loc->get( a );
+                }
+                return loc;
+              },
+               [&]( Handle<Eval> e ) {
+                 return handle::extract<Identification>( e.unwrap<Object>() )
+                   .transform( [&]( auto ) {
+                     // Base case: Eval( Identification )
+                     auto loc = locate( e, {} );
+                     if ( is_local( loc ) ) {
+                       loc->get( e );
+                     }
+                     return loc;
+                   } )
+                   .or_else( [&]() -> optional<shared_ptr<IRuntime>> {
+                     // Recursive case
+                     auto dependencies = relater_->get().graph_.read()->get_forward_dependencies( top_level_job );
+                     unordered_map<Handle<Relation>, shared_ptr<IRuntime>> dependency_locations;
+                     for ( const auto& dependency : dependencies ) {
+                       dependency_locations.insert( { dependency, schedule_rec( dependency ) } );
+                     }
+                     auto location = locate( top_level_job, dependency_locations );
 
-          if ( is_local( location ) ) {
-            // Get any non-local child work
-            for ( const auto& [d, dloc] : dependency_locations ) {
-              if ( !is_local( dloc ) ) {
-                get( dloc, d, relater_->get() );
-              }
-            }
-          };
+                     if ( is_local( location ) ) {
+                       // Get any non-local child work
+                       for ( const auto& [d, dloc] : dependency_locations ) {
+                         if ( !is_local( dloc ) ) {
+                           get( dloc, d, relater_->get() );
+                         }
+                       }
+                     };
 
-          return location;
-        } )
-        .value();
-    } } );
+                     return location;
+                   } )
+                   .value();
+               } } );
+}
+
+// Calculate absent size from a root assuming that rt contains the whole object
+size_t absent_size( Relater& rt, shared_ptr<IRuntime> worker, Handle<Fix> root )
+{
+  size_t absent_size = 0;
+  rt.early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
+    auto contained = handle.visit<bool>(
+      overload { [&]( Handle<Literal> ) { return true; }, [&]( auto h ) { return worker->contains( h ); } } );
+    if ( !contained ) {
+      absent_size += handle::size( handle );
+    }
+
+    return contained;
+  } );
+  return absent_size;
+}
+
+// Calculate a "score" for a worker, the lower the better
+size_t score( Relater& rt,
+              shared_ptr<IRuntime> worker,
+              Handle<Fix> root,
+              const unordered_map<Handle<Relation>, shared_ptr<IRuntime>>& dependency_locations )
+{
+  size_t score = absent_size( rt, worker, root );
+
+  for ( auto& [task, location] : dependency_locations ) {
+    if ( worker != location ) {
+      auto dependency_size = const_cast<Handle<Relation>&>( task ).visit<size_t>( overload {
+        [&]( Handle<Apply> ) {
+          // TODO: estimate apply output size
+          return 0;
+        },
+        [&]( Handle<Eval> e ) -> size_t {
+          return handle::extract<Identification>( e.unwrap<Object>() )
+            .transform( [&]( auto h ) -> size_t { return absent_size( rt, worker, h.template unwrap<Value>() ); } )
+            .or_else( []() -> optional<size_t> { return 0; } )
+            .value();
+        } } );
+
+      score += dependency_size;
+    }
+  }
+
+  return score;
 }
 
 shared_ptr<IRuntime> OnePassScheduler::locate(
   Handle<Relation> top_level_job,
-  unordered_map<Handle<Relation>, shared_ptr<IRuntime>> dependency_locations )
+  const unordered_map<Handle<Relation>, shared_ptr<IRuntime>>& dependency_locations )
 {
-  auto local = relater_.value().get().local_;
-  if ( local->get_info()->parallelism > 0 ) {
-    return local;
-  }
-
   Handle<Fix> root = top_level_job.visit<Handle<Fix>>(
     overload { [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
                [&]( Handle<Eval> e ) {
@@ -144,7 +184,11 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
 
   unordered_map<shared_ptr<IRuntime>, size_t> absent_data;
 
-  // For a remote, absent_sizes is the sum of absent Blob/Tree + absent load + absent apply result size
+  auto local = relater_.value().get().local_;
+  if ( local->get_info()->parallelism > 0 ) {
+    absent_data.insert( { local, score( relater_->get(), local, root, dependency_locations ) } );
+  }
+
   for ( const auto& remote : relater_->get().remotes_.read().get() ) {
     auto locked_remote = remote.lock();
     // If remote already contains the result
@@ -153,37 +197,7 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
     }
 
     if ( locked_remote->get_info()->parallelism > 0 ) {
-      size_t absent_size = 0;
-      relater_->get().early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
-        auto contained = handle.visit<bool>( overload { [&]( Handle<Literal> ) { return true; },
-                                                        [&]( auto h ) { return locked_remote->contains( h ); } } );
-
-        if ( !contained ) {
-          absent_size += handle::size( handle );
-        }
-
-        return contained;
-      } );
-
-      for ( auto& [task, location] : dependency_locations ) {
-        if ( locked_remote != location ) {
-          auto dependency_size = const_cast<Handle<Relation>&>( task ).visit<size_t>(
-            overload { [&]( Handle<Apply> ) {
-                        // TODO: estimate apply output size
-                        return 0;
-                      },
-                       [&]( Handle<Eval> e ) -> size_t {
-                         return handle::extract<Identification>( e.unwrap<Object>() )
-                           .transform( []( auto h ) -> size_t { return handle::size( h ); } )
-                           .or_else( []() -> optional<size_t> { return 0; } )
-                           .value();
-                       } } );
-
-          absent_size += dependency_size;
-        }
-      }
-
-      absent_data.insert( { locked_remote, absent_size } );
+      absent_data.insert( { locked_remote, score( relater_->get(), locked_remote, root, dependency_locations ) } );
     }
   }
 

@@ -22,6 +22,9 @@ target_link_libraries(test-distributed runtime)
 add_executable(test-dependency-graph test-dependency-graph.cc main.cc)
 target_link_libraries(test-dependency-graph runtime)
 
+add_executable(test-scheduler test-scheduler.cc main.cc)
+target_link_libraries(test-scheduler runtime)
+
 add_executable(test-add test-add.cc main.cc)
 target_link_libraries(test-add runtime)
 
