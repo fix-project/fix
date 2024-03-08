@@ -80,4 +80,9 @@ public:
       backward_dependencies_.erase( task );
     }
   }
+
+  absl::flat_hash_set<Task> get_forward_dependencies( Task blocked ) const
+  {
+    return forward_dependencies_.at( blocked );
+  }
 };

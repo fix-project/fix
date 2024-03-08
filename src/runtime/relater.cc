@@ -63,6 +63,7 @@ Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<
   : evaluator_( *this )
   , scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<LocalFirstScheduler>() )
 {
+  scheduler_->set_relater( *this );
   local_ = make_shared<Executor>( *this, threads, runner );
 }
 
@@ -285,8 +286,12 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
   }
 
   auto works = relate( name );
-  scheduler_->schedule( remotes_, local_, graph_, works, name, *this );
-  return {};
+  if ( !works.empty() ) {
+    scheduler_->schedule( works, name );
+    return {};
+  } else {
+    return storage_.get( name );
+  }
 }
 
 void Relater::put( Handle<Named> name, BlobData data )
