@@ -3,6 +3,7 @@
 #include "handle_post.hh"
 #include "storage_exception.hh"
 #include "types.hh"
+#include <cmath>
 #include <limits>
 #include <optional>
 
@@ -143,17 +144,30 @@ size_t absent_size( Relater& rt, shared_ptr<IRuntime> worker, Handle<Fix> root )
 // Calculate a "score" for a worker, the lower the better
 size_t score( Relater& rt,
               shared_ptr<IRuntime> worker,
-              Handle<Fix> root,
+              Handle<Relation> top_level_job,
               const unordered_map<Handle<Relation>, shared_ptr<IRuntime>>& dependency_locations )
 {
+  Handle<Fix> root = top_level_job.visit<Handle<Fix>>(
+    overload { [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
+               [&]( Handle<Eval> e ) {
+                 return handle::extract<Identification>( e.unwrap<Object>() )
+                   .transform( []( auto h ) -> Handle<Fix> { return h.template unwrap<Value>(); } )
+                   .or_else( [&]() -> optional<Handle<Fix>> { return e.unwrap<Object>(); } )
+                   .value();
+               } } );
+
   size_t score = absent_size( rt, worker, root );
 
   for ( auto& [task, location] : dependency_locations ) {
     if ( worker != location ) {
       auto dependency_size = const_cast<Handle<Relation>&>( task ).visit<size_t>( overload {
-        [&]( Handle<Apply> ) {
-          // TODO: estimate apply output size
-          return 0;
+        [&]( Handle<Apply> a ) {
+          auto rlimits = rt.get( a.unwrap<ObjectTree>() ).value()->at( 0 );
+          auto limits = rt.get( handle::extract<ValueTree>( rlimits ).value() ).value();
+          auto output_size = handle::extract<Literal>( limits->at( 1 ) )
+                               .transform( [&]( auto x ) { return uint64_t( x ); } )
+                               .value_or( 0 );
+          return output_size;
         },
         [&]( Handle<Eval> e ) -> size_t {
           return handle::extract<Identification>( e.unwrap<Object>() )
@@ -166,6 +180,20 @@ size_t score( Relater& rt,
     }
   }
 
+  top_level_job.visit<void>(
+    overload { [&]( Handle<Apply> a ) {
+                auto rlimits = rt.get( a.unwrap<ObjectTree>() ).value()->at( 0 );
+                auto limits = rt.get( handle::extract<ValueTree>( rlimits ).value() ).value();
+                auto output_fan_out = handle::extract<Literal>( limits->at( 2 ) )
+                                        .transform( [&]( auto x ) { return uint64_t( x ); } )
+                                        .value_or( 0 );
+
+                if ( worker->get_info()->parallelism < output_fan_out ) {
+                  score = score * ( ceil( 1.0 * output_fan_out / worker->get_info()->parallelism ) );
+                }
+              },
+               [&]( Handle<Eval> ) {} } );
+
   return score;
 }
 
@@ -173,20 +201,11 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
   Handle<Relation> top_level_job,
   const unordered_map<Handle<Relation>, shared_ptr<IRuntime>>& dependency_locations )
 {
-  Handle<Fix> root = top_level_job.visit<Handle<Fix>>(
-    overload { [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-               [&]( Handle<Eval> e ) {
-                 return handle::extract<Identification>( e.unwrap<Object>() )
-                   .transform( []( auto h ) -> Handle<Fix> { return h.template unwrap<Value>(); } )
-                   .or_else( [&]() -> optional<Handle<Fix>> { return e.unwrap<Object>(); } )
-                   .value();
-               } } );
-
-  unordered_map<shared_ptr<IRuntime>, size_t> absent_data;
+  unordered_map<shared_ptr<IRuntime>, size_t> scores;
 
   auto local = relater_.value().get().local_;
-  if ( local->get_info()->parallelism > 0 ) {
-    absent_data.insert( { local, score( relater_->get(), local, root, dependency_locations ) } );
+  if ( local->get_info().has_value() and local->get_info()->parallelism > 0 ) {
+    scores.insert( { local, score( relater_->get(), local, top_level_job, dependency_locations ) } );
   }
 
   for ( const auto& remote : relater_->get().remotes_.read().get() ) {
@@ -196,18 +215,19 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
       return locked_remote;
     }
 
-    if ( locked_remote->get_info()->parallelism > 0 ) {
-      absent_data.insert( { locked_remote, score( relater_->get(), locked_remote, root, dependency_locations ) } );
+    if ( locked_remote->get_info().has_value() and locked_remote->get_info()->parallelism > 0 ) {
+      scores.insert(
+        { locked_remote, score( relater_->get(), locked_remote, top_level_job, dependency_locations ) } );
     }
   }
 
-  // Choose the remote with the most parallelism among ones with smallest absent data
+  // Choose the remote with the most parallelism among ones with smallest score
   size_t min_absent_size = numeric_limits<size_t>::max();
   size_t max_parallelism = 0;
 
   shared_ptr<IRuntime> chosen_remote;
 
-  for ( const auto& [location, absent_size] : absent_data ) {
+  for ( const auto& [location, absent_size] : scores ) {
     if ( absent_size < min_absent_size ) {
       min_absent_size = absent_size;
       max_parallelism = location->get_info()->parallelism;
