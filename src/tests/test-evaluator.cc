@@ -29,7 +29,7 @@ public:
   Handle<Value> eval( Handle<Fix> target ) { return evaluator_.eval( target ).value(); }
 
 private:
-  virtual Result<Value> load( Handle<Value> value ) { return value; }
+  virtual Result<Fix> load( Handle<AnyDataType> value ) { return handle::fix( value ); }
 
   virtual Result<Object> apply( Handle<ObjectTree> combination )
   {

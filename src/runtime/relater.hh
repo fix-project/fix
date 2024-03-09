@@ -6,7 +6,7 @@
 #include "repository.hh"
 #include "runner.hh"
 
-inline thread_local std::vector<Handle<Relation>> works_;
+inline thread_local std::vector<Handle<AnyDataType>> works_;
 inline thread_local std::optional<Handle<Relation>> current_;
 
 class Executor;
@@ -36,7 +36,10 @@ private:
   Result<Object> get_or_block( Handle<Relation> goal );
   // Return the list of doable works. After the function returns, graph_ is modified such that
   // finishing all the doable works would recursivly finish the top level relation.
-  std::vector<Handle<Relation>> relate( Handle<Relation> );
+  std::vector<Handle<AnyDataType>> relate( Handle<Relation> );
+
+  template<FixType T>
+  void get_from_repository( Handle<T> handle );
 
 public:
   Relater( size_t threads = std::thread::hardware_concurrency(),
@@ -46,7 +49,7 @@ public:
   virtual void add_worker( std::shared_ptr<IRuntime> ) override;
   Handle<Value> execute( Handle<Relation> x );
 
-  virtual Result<Value> load( Handle<Value> value ) override;
+  virtual Result<Fix> load( Handle<AnyDataType> value ) override;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
   virtual Result<Value> evalStrict( Handle<Object> expression ) override;
   virtual Result<Object> evalShallow( Handle<Object> expression ) override;

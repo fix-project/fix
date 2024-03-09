@@ -20,7 +20,7 @@ public:
    * @param leaf_jobs      List of leaf jobs for this @p top_level_job
    * @param top_level_job  The job to be scheduled
    */
-  virtual void schedule( std::vector<Handle<Relation>>& leaf_jobs, Handle<Relation> top_level_job ) = 0;
+  virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) = 0;
 
   virtual void set_relater( std::reference_wrapper<Relater> relater ) { relater_ = relater; }
 
@@ -30,17 +30,17 @@ public:
 class LocalFirstScheduler : public Scheduler
 {
 public:
-  virtual void schedule( std::vector<Handle<Relation>>& leaf_jobs, Handle<Relation> top_level_job ) override;
+  virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) override;
 };
 
 class OnePassScheduler : public Scheduler
 {
-  std::shared_ptr<IRuntime> schedule_rec( Handle<Relation> top_level_job );
+  std::shared_ptr<IRuntime> schedule_rec( Handle<AnyDataType> top_level_job );
 
   std::shared_ptr<IRuntime> locate(
-    Handle<Relation> job,
-    const std::unordered_map<Handle<Relation>, std::shared_ptr<IRuntime>>& dependency_locations );
+    Handle<AnyDataType> job,
+    const std::unordered_map<Handle<AnyDataType>, std::shared_ptr<IRuntime>>& dependency_locations );
 
 public:
-  virtual void schedule( std::vector<Handle<Relation>>& leaf_jobs, Handle<Relation> top_level_job ) override;
+  virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) override;
 };

@@ -16,7 +16,7 @@
 class Executor : public IRuntime
 {
   std::vector<std::thread> threads_ {};
-  Channel<Handle<Relation>> todo_ {};
+  Channel<Handle<AnyDataType>> todo_ {};
   Relater& parent_;
   std::shared_ptr<Runner> runner_ {};
 
@@ -37,7 +37,7 @@ public:
     }
 
     VLOG( 1 ) << "Relation does not exit " << x.content;
-    todo_ << x;
+    todo_.move_push( x );
     Handle<Object> current = parent_.storage_.wait( x );
     while ( not current.contains<Value>() ) {
       current = parent_.storage_.wait( Handle<Eval>( current ) );
@@ -50,13 +50,13 @@ private:
   using Result = FixEvaluator::Result<T>;
 
   void run();
-  void progress( Handle<Relation> relation );
+  void progress( Handle<AnyDataType> runnable_or_loadable );
 
   /** @defgroup Implementation of FixRuntime
    * @{
    */
 
-  Result<Value> load( Handle<Value> value );
+  Result<Fix> load( Handle<AnyDataType> handle );
   Result<Object> apply( Handle<ObjectTree> combination );
 
 public:

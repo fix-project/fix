@@ -7,54 +7,47 @@
 #include "storage_exception.hh"
 #include "types.hh"
 #include <memory>
+#include <stdexcept>
 
 using namespace std;
 
 template<FixType T>
-void get_from_repository( Handle<T> handle, Repository& rp, RuntimeStorage& rs )
+void Relater::get_from_repository( Handle<T> handle )
 {
   if constexpr ( std::same_as<T, Literal> )
     return;
 
   if constexpr ( Handle<T>::is_fix_sum_type ) {
-    if constexpr ( std::same_as<T, Encode> ) {
-      Handle<Thunk> thunk
-        = handle.template visit<Handle<Thunk>>( []( auto s ) { return s.template unwrap<Thunk>(); } );
-      thunk.visit<void>(
-        overload { [&]( Handle<Application> a ) { get_from_repository( a.unwrap<ExpressionTree>(), rp, rs ); },
-                   []( auto ) {} } );
-    }
-
     if constexpr ( std::same_as<T, Relation> ) {
-      auto rhs = rp.get( handle ).value();
-      get_from_repository( rhs, rp, rs );
-      rs.create( rp.get( handle ).value(), handle );
+      auto rhs = repository_.get( handle ).value();
+      get_from_repository( rhs );
+      put( handle, rhs );
       return;
     }
 
     if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
                         or std::same_as<T, ObjectTreeRef> ) )
-      std::visit( [&]( const auto x ) { get_from_repository( x, rp, rs ); }, handle.get() );
+      std::visit( [&]( const auto x ) { get_from_repository( x ); }, handle.get() );
 
   } else {
     if constexpr ( FixTreeType<T> ) {
       // Having the handle means that the data presents in storage
-      if ( rs.contains( handle ) ) {
+      if ( storage_.contains( handle ) ) {
         return;
       }
 
-      auto tree = rp.get( handle );
+      auto tree = repository_.get( handle );
       for ( const auto& element : tree.value()->span() ) {
-        get_from_repository( element, rp, rs );
+        get_from_repository( element );
       }
-      rs.create( tree.value(), handle );
+      put( handle, tree.value() );
     } else {
       auto named = handle::extract<Named>( handle ).value();
-      if ( rs.contains( named ) ) {
+      if ( storage_.contains( named ) ) {
         return;
       }
 
-      rs.create( rp.get( named ).value(), named );
+      put( named, repository_.get( named ).value() );
     }
   }
 }
@@ -67,14 +60,25 @@ Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<
   local_ = make_shared<Executor>( *this, threads, runner );
 }
 
-Relater::Result<Value> Relater::load( Handle<Value> value )
+Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
 {
-  auto eval = Handle<Relation>( Handle<Eval>( Handle<Identification>( value ) ) );
-  if ( eval != current_ ) {
-    graph_.write()->add_dependency( current_.value(), eval );
+  auto contained = handle.visit<bool>(
+    overload { [&]( Handle<Literal> ) { return true; }, [&]( auto h ) { return storage_.contains( h ); } } );
+
+  if ( contained ) {
+    return handle::fix( handle );
+  } else {
+    handle.visit<void>( overload {
+      []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
+      [&]( Handle<AnyTree> t ) {
+        t.visit<void>( [&]( auto h ) { graph_.write()->add_dependency( current_.value(), h ); } );
+      },
+      [&]( Handle<Named> n ) { graph_.write()->add_dependency( current_.value(), n ); },
+      [&]( Handle<Relation> r ) { graph_.write()->add_dependency( current_.value(), r ); },
+    } );
+    works_.push_back( handle );
+    return {};
   }
-  works_.push_back( Handle<Eval>( Handle<Identification>( value ) ) );
-  return {};
 }
 
 Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
@@ -220,7 +224,7 @@ Relater::Result<ValueTree> Relater::mapLift( Handle<ValueTree> tree )
   }
 }
 
-vector<Handle<Relation>> Relater::relate( Handle<Relation> goal )
+vector<Handle<AnyDataType>> Relater::relate( Handle<Relation> goal )
 {
   works_ = {};
   get_or_block( goal );
@@ -247,13 +251,8 @@ optional<BlobData> Relater::get( Handle<Named> name )
   if ( storage_.contains( name ) ) {
     return storage_.get( name );
   } else if ( repository_.contains( name ) ) {
-    get_from_repository( name, repository_, storage_ );
+    get_from_repository( name );
     return storage_.get( name );
-  } else if ( remotes_.read()->size() > 0 ) {
-    auto remote = remotes_.read()->front().lock();
-    if ( remote ) {
-      return remote->get( name );
-    }
   }
 
   throw HandleNotFound( name );
@@ -264,13 +263,8 @@ optional<TreeData> Relater::get( Handle<AnyTree> name )
   if ( storage_.contains( name ) ) {
     return storage_.get( name );
   } else if ( repository_.contains( name ) ) {
-    get_from_repository( name, repository_, storage_ );
+    get_from_repository( name );
     return storage_.get( name );
-  } else if ( remotes_.read()->size() > 0 ) {
-    auto remote = remotes_.read()->front().lock();
-    if ( remote ) {
-      return remote->get( name );
-    }
   }
 
   throw HandleNotFound( handle::fix( name ) );
@@ -281,7 +275,7 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
   if ( storage_.contains( name ) ) {
     return storage_.get( name );
   } else if ( repository_.contains( name ) ) {
-    get_from_repository( name, repository_, storage_ );
+    get_from_repository( name );
     return storage_.get( name );
   }
 
@@ -296,13 +290,45 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
 
 void Relater::put( Handle<Named> name, BlobData data )
 {
-  if ( !storage_.contains( name ) )
+  if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
+    absl::flat_hash_set<Handle<Relation>> unblocked;
+    {
+      auto graph = graph_.write();
+      graph->finish( name, unblocked );
+    }
+    for ( auto x : unblocked ) {
+      local_->get( x );
+    }
+    // for ( auto& remote : remotes_.read().get() ) {
+    //   VLOG( 1 ) << "Putting to relater name to remote " << name;
+    //   auto locked = remote.lock();
+    //   if ( locked ) {
+    //     locked->put( name, data );
+    //   }
+    // }
+  }
 }
 void Relater::put( Handle<AnyTree> name, TreeData data )
 {
-  if ( !storage_.contains( name ) )
+  if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
+    absl::flat_hash_set<Handle<Relation>> unblocked;
+    {
+      auto graph = graph_.write();
+      name.visit<void>( [&]( auto h ) { graph->finish( h, unblocked ); } );
+    }
+    for ( auto x : unblocked ) {
+      local_->get( x );
+    }
+    // for ( auto& remote : remotes_.read().get() ) {
+    //   VLOG( 1 ) << "Putting to relater name to remote " << name;
+    //   auto locked = remote.lock();
+    //   if ( locked ) {
+    //     locked->put( name, data );
+    //   }
+    // }
+  }
 }
 void Relater::put( Handle<Relation> name, Handle<Object> data )
 {

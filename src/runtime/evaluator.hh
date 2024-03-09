@@ -9,7 +9,7 @@ public:
   template<typename T>
   using Result = std::optional<Handle<T>>;
 
-  virtual Result<Value> load( Handle<Value> value ) = 0;
+  virtual Result<Fix> load( Handle<AnyDataType> value ) = 0;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) = 0;
   virtual Result<Value> evalStrict( Handle<Object> expression ) = 0;
   virtual Result<Object> evalShallow( Handle<Object> expression ) = 0;

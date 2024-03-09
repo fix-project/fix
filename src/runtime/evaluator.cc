@@ -40,8 +40,21 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
   auto load = [&]( auto x ) { return rt_.load( x ); };
 
   return x.visit<Result<Object>>( overload {
-    [&]( Handle<Identification> x ) { return load( x.unwrap<Value>() ); },
-    [&]( Handle<Application> x ) { return mapReduce( x.unwrap<ExpressionTree>() ).and_then( apply ); },
+    [&]( Handle<Identification> x ) {
+      return x.unwrap<Value>()
+        .visit<Result<Fix>>(
+          overload { [&]( Handle<Blob> y ) { return y.visit<Result<Fix>>( [&]( auto z ) { return load( z ); } ); },
+                     [&]( Handle<ValueTree> y ) { return rt_.load( y ); },
+                     [&]( Handle<BlobRef> y ) { return y; },
+                     [&]( Handle<ValueTreeRef> y ) { return y; } } )
+        .and_then( []( auto h ) -> Result<Object> { return handle::extract<Object>( h ); } );
+    },
+    [&]( Handle<Application> x ) {
+      return load( x.unwrap<ExpressionTree>() )
+        .and_then( []( auto h ) { return handle::extract<ExpressionTree>( h ); } )
+        .and_then( mapReduce )
+        .and_then( apply );
+    },
     [&]( Handle<Selection> ) -> Handle<Object> { throw std::runtime_error( "unimplemented" ); },
   } );
 }
@@ -74,7 +87,7 @@ Result<Value> FixEvaluator::lift( Handle<Value> x )
     [&]( Handle<ValueTree> x ) -> Result<ValueTree> { return mapLift( x ); },
     [&]( Handle<BlobRef> x ) -> Result<Blob> {
       auto blob = x.unwrap<Blob>();
-      if ( load( blob ) )
+      if ( blob.visit<Result<Fix>>( [&]( auto h ) { return load( h ); } ) )
         return blob;
       return {};
     },

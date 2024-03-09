@@ -1,11 +1,13 @@
 #include "scheduler.hh"
 #include "handle.hh"
 #include "handle_post.hh"
+#include "overload.hh"
 #include "storage_exception.hh"
 #include "types.hh"
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 
 using namespace std;
 
@@ -14,10 +16,15 @@ bool is_local( shared_ptr<IRuntime> rt )
   return rt->get_info()->link_speed == numeric_limits<double>::max();
 }
 
-void get( shared_ptr<IRuntime> worker, Handle<Relation> job, Relater& rt )
+void get( shared_ptr<IRuntime> worker, Handle<AnyDataType> job, Relater& rt )
 {
   if ( is_local( worker ) ) {
-    worker->get( job );
+    job.visit<void>( overload {
+      [&]( Handle<Literal> ) {},
+      [&]( Handle<Named> h ) { worker->get( h ); },
+      [&]( Handle<AnyTree> h ) { worker->get( h ); },
+      [&]( Handle<Relation> h ) { worker->get( h ); },
+    } );
   } else {
     // Send visit( job ) before sending the job itself
     auto send = [&]( Handle<AnyDataType> h ) {
@@ -26,23 +33,28 @@ void get( shared_ptr<IRuntime> worker, Handle<Relation> job, Relater& rt )
                                 [&]( auto x ) { worker->put( x, rt.get( x ).value() ); } } );
     };
 
-    rt.visit( job.visit<Handle<Fix>>( overload { []( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-                                                 []( Handle<Eval> e ) {
-                                                   auto obj = e.unwrap<Object>();
-                                                   return handle::extract<Thunk>( obj )
-                                                     .transform( []( auto obj ) -> Handle<Fix> {
-                                                       return Handle<Strict>( obj );
-                                                     } )
-                                                     .or_else( [&]() -> optional<Handle<Fix>> { return obj; } )
-                                                     .value();
-                                                 } } ),
-              send );
+    job.visit<void>( overload {
+      [&]( Handle<Relation> r ) {
+        rt.visit( r.visit<Handle<Fix>>( overload { []( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
+                                                   []( Handle<Eval> e ) {
+                                                     auto obj = e.unwrap<Object>();
+                                                     return handle::extract<Thunk>( obj )
+                                                       .transform( []( auto obj ) -> Handle<Fix> {
+                                                         return Handle<Strict>( obj );
+                                                       } )
+                                                       .or_else( [&]() -> optional<Handle<Fix>> { return obj; } )
+                                                       .value();
+                                                   } } ),
+                  send );
+      },
+      []( auto ) {} } );
 
-    worker->get( job );
+    job.visit<void>( overload { []( Handle<Literal> ) { throw runtime_error( "Unreachable" ); },
+                                [&]( auto h ) { worker->get( h ); } } );
   }
 }
 
-void LocalFirstScheduler::schedule( vector<Handle<Relation>>& leaf_jobs, Handle<Relation> top_level_job )
+void LocalFirstScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
 {
   auto local = relater_.value().get().local_;
   if ( local->get_info()->parallelism > 0 ) {
@@ -66,7 +78,7 @@ void LocalFirstScheduler::schedule( vector<Handle<Relation>>& leaf_jobs, Handle<
   throw HandleNotFound( top_level_job );
 }
 
-void OnePassScheduler::schedule( vector<Handle<Relation>>& leaf_jobs, Handle<Relation> top_level_job )
+void OnePassScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
 {
   // If all dependencies are resolved, the job should have been completed
   if ( leaf_jobs.empty() ) {
@@ -80,48 +92,48 @@ void OnePassScheduler::schedule( vector<Handle<Relation>>& leaf_jobs, Handle<Rel
   }
 }
 
-shared_ptr<IRuntime> OnePassScheduler::schedule_rec( Handle<Relation> top_level_job )
+shared_ptr<IRuntime> OnePassScheduler::schedule_rec( Handle<AnyDataType> top_level_job )
 {
   return top_level_job.visit<shared_ptr<IRuntime>>(
-    overload { [&]( Handle<Apply> a ) {
-                // Base case: Apply
-                auto loc = locate( a, {} );
-                if ( is_local( loc ) ) {
-                  loc->get( a );
-                }
-                return loc;
+    overload { [&]( Handle<Relation> r ) {
+                return r.visit<shared_ptr<IRuntime>>(
+                  overload { [&]( Handle<Apply> a ) {
+                              // Leaf job: apply
+                              auto loc = locate( a, {} );
+                              if ( is_local( loc ) ) {
+                                loc->get( a );
+                              }
+                              return loc;
+                            },
+                             [&]( Handle<Eval> e ) {
+                               // Recursive case
+                               auto dependencies = relater_->get().graph_.read()->get_forward_dependencies( e );
+                               unordered_map<Handle<AnyDataType>, shared_ptr<IRuntime>> dependency_locations;
+                               for ( const auto& dependency : dependencies ) {
+                                 dependency_locations.insert( { dependency, schedule_rec( dependency ) } );
+                               }
+                               auto location = locate( top_level_job, dependency_locations );
+
+                               if ( is_local( location ) ) {
+                                 // Get any non-local child work
+                                 for ( const auto& [d, dloc] : dependency_locations ) {
+                                   if ( !is_local( dloc ) ) {
+                                     get( dloc, d, relater_->get() );
+                                   }
+                                 }
+                               };
+
+                               return location;
+                             } } );
               },
-               [&]( Handle<Eval> e ) {
-                 return handle::extract<Identification>( e.unwrap<Object>() )
-                   .transform( [&]( auto ) {
-                     // Base case: Eval( Identification )
-                     auto loc = locate( e, {} );
-                     if ( is_local( loc ) ) {
-                       loc->get( e );
-                     }
-                     return loc;
-                   } )
-                   .or_else( [&]() -> optional<shared_ptr<IRuntime>> {
-                     // Recursive case
-                     auto dependencies = relater_->get().graph_.read()->get_forward_dependencies( top_level_job );
-                     unordered_map<Handle<Relation>, shared_ptr<IRuntime>> dependency_locations;
-                     for ( const auto& dependency : dependencies ) {
-                       dependency_locations.insert( { dependency, schedule_rec( dependency ) } );
-                     }
-                     auto location = locate( top_level_job, dependency_locations );
-
-                     if ( is_local( location ) ) {
-                       // Get any non-local child work
-                       for ( const auto& [d, dloc] : dependency_locations ) {
-                         if ( !is_local( dloc ) ) {
-                           get( dloc, d, relater_->get() );
-                         }
-                       }
-                     };
-
-                     return location;
-                   } )
-                   .value();
+               []( Handle<Literal> ) -> shared_ptr<IRuntime> { throw std::runtime_error( "Unreachable" ); },
+               [&]( auto h ) {
+                 // Leaf job: data
+                 auto loc = locate( h, {} );
+                 if ( is_local( loc ) ) {
+                   loc->get( h );
+                 }
+                 return loc;
                } } );
 }
 
@@ -144,62 +156,78 @@ size_t absent_size( Relater& rt, shared_ptr<IRuntime> worker, Handle<Fix> root )
 // Calculate a "score" for a worker, the lower the better
 size_t score( Relater& rt,
               shared_ptr<IRuntime> worker,
-              Handle<Relation> top_level_job,
-              const unordered_map<Handle<Relation>, shared_ptr<IRuntime>>& dependency_locations )
+              Handle<AnyDataType> top_level_job,
+              const unordered_map<Handle<AnyDataType>, shared_ptr<IRuntime>>& dependency_locations )
 {
   Handle<Fix> root = top_level_job.visit<Handle<Fix>>(
-    overload { [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-               [&]( Handle<Eval> e ) {
-                 return handle::extract<Identification>( e.unwrap<Object>() )
-                   .transform( []( auto h ) -> Handle<Fix> { return h.template unwrap<Value>(); } )
-                   .or_else( [&]() -> optional<Handle<Fix>> { return e.unwrap<Object>(); } )
-                   .value();
-               } } );
+    overload { [&]( Handle<Relation> r ) {
+                return r.visit<Handle<Fix>>( overload {
+
+                  [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
+                  [&]( Handle<Eval> e ) {
+                    return handle::extract<Identification>( e.unwrap<Object>() )
+                      .transform( []( auto h ) -> Handle<Fix> { return h.template unwrap<Value>(); } )
+                      .or_else( [&]() -> optional<Handle<Fix>> { return e.unwrap<Object>(); } )
+                      .value();
+                  } } );
+              },
+               [&]( Handle<AnyTree> h ) { return handle::fix( h ); },
+               [&]( auto h ) { return h; } } );
 
   size_t score = absent_size( rt, worker, root );
 
   for ( auto& [task, location] : dependency_locations ) {
     if ( worker != location ) {
-      auto dependency_size = const_cast<Handle<Relation>&>( task ).visit<size_t>( overload {
-        [&]( Handle<Apply> a ) {
-          auto rlimits = rt.get( a.unwrap<ObjectTree>() ).value()->at( 0 );
-          auto limits = rt.get( handle::extract<ValueTree>( rlimits ).value() ).value();
-          auto output_size = handle::extract<Literal>( limits->at( 1 ) )
-                               .transform( [&]( auto x ) { return uint64_t( x ); } )
-                               .value_or( 0 );
-          return output_size;
-        },
-        [&]( Handle<Eval> e ) -> size_t {
-          return handle::extract<Identification>( e.unwrap<Object>() )
-            .transform( [&]( auto h ) -> size_t { return absent_size( rt, worker, h.template unwrap<Value>() ); } )
-            .or_else( []() -> optional<size_t> { return 0; } )
-            .value();
-        } } );
+      auto dependency_size = const_cast<Handle<AnyDataType>&>( task ).visit<size_t>(
+        overload { [&]( Handle<Relation> r ) -> size_t {
+                    return r.visit<size_t>(
+                      overload { [&]( Handle<Apply> a ) {
+                                  auto rlimits = rt.get( a.unwrap<ObjectTree>() ).value()->at( 0 );
+                                  auto limits = rt.get( handle::extract<ValueTree>( rlimits ).value() ).value();
+                                  auto output_size = handle::extract<Literal>( limits->at( 1 ) )
+                                                       .transform( [&]( auto x ) { return uint64_t( x ); } )
+                                                       .value_or( 0 );
+                                  return output_size;
+                                },
+                                 [&]( Handle<Eval> e ) -> size_t {
+                                   return handle::extract<Identification>( e.unwrap<Object>() )
+                                     .transform( [&]( auto h ) -> size_t {
+                                       return absent_size( rt, worker, h.template unwrap<Value>() );
+                                     } )
+                                     .or_else( []() -> optional<size_t> { return 0; } )
+                                     .value();
+                                 } } );
+                  },
+                   [&]( auto h ) { return absent_size( rt, worker, h ); } } );
 
       score += dependency_size;
     }
   }
 
   top_level_job.visit<void>(
-    overload { [&]( Handle<Apply> a ) {
-                auto rlimits = rt.get( a.unwrap<ObjectTree>() ).value()->at( 0 );
-                auto limits = rt.get( handle::extract<ValueTree>( rlimits ).value() ).value();
-                auto output_fan_out = handle::extract<Literal>( limits->at( 2 ) )
-                                        .transform( [&]( auto x ) { return uint64_t( x ); } )
-                                        .value_or( 0 );
+    overload { [&]( Handle<Relation> r ) {
+                return r.visit<void>(
+                  overload { [&]( Handle<Apply> a ) {
+                              auto rlimits = rt.get( a.unwrap<ObjectTree>() ).value()->at( 0 );
+                              auto limits = rt.get( handle::extract<ValueTree>( rlimits ).value() ).value();
+                              auto output_fan_out = handle::extract<Literal>( limits->at( 2 ) )
+                                                      .transform( [&]( auto x ) { return uint64_t( x ); } )
+                                                      .value_or( 0 );
 
-                if ( worker->get_info()->parallelism < output_fan_out ) {
-                  score = score * ( ceil( 1.0 * output_fan_out / worker->get_info()->parallelism ) );
-                }
+                              if ( worker->get_info()->parallelism < output_fan_out ) {
+                                score = score * ( ceil( 1.0 * output_fan_out / worker->get_info()->parallelism ) );
+                              }
+                            },
+                             [&]( Handle<Eval> ) {} } );
               },
-               [&]( Handle<Eval> ) {} } );
+               []( auto ) {} } );
 
   return score;
 }
 
 shared_ptr<IRuntime> OnePassScheduler::locate(
-  Handle<Relation> top_level_job,
-  const unordered_map<Handle<Relation>, shared_ptr<IRuntime>>& dependency_locations )
+  Handle<AnyDataType> top_level_job,
+  const unordered_map<Handle<AnyDataType>, shared_ptr<IRuntime>>& dependency_locations )
 {
   unordered_map<shared_ptr<IRuntime>, size_t> scores;
 
@@ -211,7 +239,11 @@ shared_ptr<IRuntime> OnePassScheduler::locate(
   for ( const auto& remote : relater_->get().remotes_.read().get() ) {
     auto locked_remote = remote.lock();
     // If remote already contains the result
-    if ( locked_remote->contains( top_level_job ) ) {
+    auto contained = top_level_job.visit<bool>(
+      overload { []( Handle<Literal> ) -> bool { throw std::runtime_error( "Unreachable" ); },
+                 [&]( auto h ) { return locked_remote->contains( h ); } } );
+
+    if ( contained ) {
       return locked_remote;
     }
 
