@@ -39,7 +39,7 @@ void Executor::run()
 {
   static std::mutex error_mutex;
   try {
-    Handle<Relation> next;
+    Handle<AnyDataType> next;
     while ( true ) {
       todo_ >> next;
       progress( next );
@@ -77,60 +77,49 @@ void Executor::run()
   }
 }
 
-void Executor::progress( Handle<Relation> relation )
+void Executor::progress( Handle<AnyDataType> runnable_or_loadable )
 {
-  if ( parent_.contains( relation ) ) {
+  VLOG( 2 ) << "Progressing " << runnable_or_loadable;
+  // Load from repository if contains
+  auto loaded = load( runnable_or_loadable );
+  if ( loaded.has_value() )
     return;
-  }
 
-  relation.visit<void>( overload { [&]( Handle<Apply> a ) { apply( a.unwrap<ObjectTree>() ); },
-                                   [&]( Handle<Eval> e ) {
-                                     handle::extract<Identification>( e.unwrap<Object>() )
-                                       .transform( [&]( auto i ) {
-                                         auto res = load( i.template unwrap<Value>() );
-                                         put( e, res.value() );
-                                         return e;
-                                       } )
-                                       .or_else( [&]() -> optional<Handle<Eval>> {
-                                         parent_.get( relation );
-                                         return e;
-                                       } );
-                                   } } );
+  runnable_or_loadable.visit<void>(
+    overload { [&]( Handle<Relation> r ) {
+                r.visit<void>( overload { [&]( Handle<Apply> a ) { apply( a.unwrap<ObjectTree>() ); },
+                                          [&]( Handle<Eval> e ) { parent_.get( e ); } } );
+              },
+               [&]( Handle<AnyTree> h ) { throw HandleNotFound( handle::upcast( h ) ); },
+               [&]( auto h ) { throw HandleNotFound( h ); } } );
 }
 
-Result<Value> Executor::load( Handle<Value> value )
+optional<Handle<Fix>> Executor::load( Handle<AnyDataType> handle )
 {
-  VLOG( 2 ) << "Loading " << value;
-  return value.visit<Result<Value>>( overload {
-    [&]( Handle<Blob> x ) -> Result<Blob> {
-      if ( x.contains<Literal>() )
-        return x;
-
-      if ( parent_.storage_.contains( x.unwrap<Named>() ) )
-        return x;
-
-      return get( x.unwrap<Named>() ).transform( [&]( auto ) { return x; } );
-    },
-    [&]( Handle<ValueTree> x ) -> Result<Value> {
-      if ( parent_.storage_.contains( x ) )
-        return x;
-
-      return get( x ).and_then( [&]( auto t ) -> Result<Value> {
-        bool all_loaded = true;
-        for ( const auto& handle : t->span() ) {
-          all_loaded
-            = all_loaded
-              && handle::extract<Value>( handle ).and_then( [&]( auto h ) { return load( h ); } ).has_value();
-        }
-        if ( all_loaded ) {
-          return x;
-        } else {
-          return {};
-        }
-      } );
-    },
-    [&]( auto x ) { return x; },
-  } );
+  VLOG( 2 ) << "Loading " << handle;
+  return handle.visit<Result<Fix>>( overload { [&]( Handle<Literal> l ) { return l; },
+                                               [&]( Handle<AnyTree> t ) -> optional<Handle<Fix>> {
+                                                 if ( parent_.contains( t ) ) {
+                                                   parent_.get( t );
+                                                   return handle::fix( t );
+                                                 }
+                                                 throw HandleNotFound( handle::fix( t ) );
+                                               },
+                                               [&]( Handle<Named> n ) -> optional<Handle<Fix>> {
+                                                 if ( parent_.contains( n ) ) {
+                                                   parent_.get( n );
+                                                   return n;
+                                                 }
+                                                 throw HandleNotFound( n );
+                                               },
+                                               [&]( Handle<Relation> r ) -> optional<Handle<Fix>> {
+                                                 if ( parent_.contains( r ) ) {
+                                                   return parent_.get( r );
+                                                 }
+                                                 // Relation does not exist, return nullopt to trigger relation
+                                                 // handling
+                                                 return {};
+                                               } } );
 }
 
 Result<Object> Executor::apply( Handle<ObjectTree> combination )
@@ -147,20 +136,20 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
 
 std::optional<BlobData> Executor::get( Handle<Named> name )
 {
-  auto res = parent_.get( name );
-  if ( res.has_value() )
-    return res;
-
-  throw HandleNotFound( name );
+  if ( threads_.size() == 0 ) {
+    throw HandleNotFound( name );
+  }
+  todo_.move_push( Handle<AnyDataType>( name ) );
+  return {};
 };
 
 std::optional<TreeData> Executor::get( Handle<AnyTree> name )
 {
-  auto res = parent_.get( name );
-  if ( res.has_value() )
-    return res;
-
-  throw HandleNotFound( handle::fix( name ) );
+  if ( threads_.size() == 0 ) {
+    throw HandleNotFound( handle::upcast( name ) );
+  }
+  todo_.move_push( name.visit<Handle<AnyDataType>>( []( auto h ) { return h; } ) );
+  return {};
 };
 
 std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
@@ -170,7 +159,7 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   }
   auto graph = parent_.graph_.write();
   if ( graph->start( name ) )
-    todo_ << name;
+    todo_.move_push( Handle<AnyDataType>( name ) );
   return {};
 }
 
