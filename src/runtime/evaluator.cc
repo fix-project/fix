@@ -44,7 +44,7 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
       return x.unwrap<Value>()
         .visit<Result<Fix>>(
           overload { [&]( Handle<Blob> y ) { return y.visit<Result<Fix>>( [&]( auto z ) { return load( z ); } ); },
-                     [&]( Handle<ValueTree> y ) { return rt_.load( y ); },
+                     [&]( Handle<ValueTree> y ) { return load( y ); },
                      [&]( Handle<BlobRef> y ) { return y; },
                      [&]( Handle<ValueTreeRef> y ) { return y; } } )
         .and_then( []( auto h ) -> Result<Object> { return handle::extract<Object>( h ); } );

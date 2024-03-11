@@ -56,7 +56,7 @@ private:
    * @{
    */
 
-  Result<Fix> load( Handle<AnyDataType> handle );
+  std::optional<Handle<Fix>> load( Handle<AnyDataType> handle );
   Result<Object> apply( Handle<ObjectTree> combination );
 
 public:

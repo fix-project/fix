@@ -94,32 +94,31 @@ void Executor::progress( Handle<AnyDataType> runnable_or_loadable )
                [&]( auto h ) { throw HandleNotFound( h ); } } );
 }
 
-Result<Fix> Executor::load( Handle<AnyDataType> handle )
+optional<Handle<Fix>> Executor::load( Handle<AnyDataType> handle )
 {
   VLOG( 2 ) << "Loading " << handle;
   return handle.visit<Result<Fix>>( overload { [&]( Handle<Literal> l ) { return l; },
-                                               [&]( Handle<AnyTree> t ) -> Result<Fix> {
+                                               [&]( Handle<AnyTree> t ) -> optional<Handle<Fix>> {
                                                  if ( parent_.contains( t ) ) {
                                                    parent_.get( t );
-                                                   return handle::upcast( t );
-                                                 } else {
-                                                   return {};
+                                                   return handle::fix( t );
                                                  }
+                                                 throw HandleNotFound( handle::fix( t ) );
                                                },
-                                               [&]( Handle<Named> n ) -> Result<Fix> {
+                                               [&]( Handle<Named> n ) -> optional<Handle<Fix>> {
                                                  if ( parent_.contains( n ) ) {
                                                    parent_.get( n );
                                                    return n;
-                                                 } else {
-                                                   return {};
                                                  }
+                                                 throw HandleNotFound( n );
                                                },
-                                               [&]( Handle<Relation> r ) -> Result<Fix> {
+                                               [&]( Handle<Relation> r ) -> optional<Handle<Fix>> {
                                                  if ( parent_.contains( r ) ) {
                                                    return parent_.get( r );
-                                                 } else {
-                                                   return {};
                                                  }
+                                                 // Relation does not exist, return nullopt to trigger relation
+                                                 // handling
+                                                 return {};
                                                } } );
 }
 

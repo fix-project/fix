@@ -21,9 +21,7 @@ void get( shared_ptr<IRuntime> worker, Handle<AnyDataType> job, Relater& rt )
   if ( is_local( worker ) ) {
     job.visit<void>( overload {
       [&]( Handle<Literal> ) {},
-      [&]( Handle<Named> h ) { worker->get( h ); },
-      [&]( Handle<AnyTree> h ) { worker->get( h ); },
-      [&]( Handle<Relation> h ) { worker->get( h ); },
+      [&]( auto h ) { worker->get( h ); },
     } );
   } else {
     // Send visit( job ) before sending the job itself
