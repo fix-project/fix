@@ -31,8 +31,6 @@ jobs:
         run: sudo add-apt-repository 'ppa:ubuntu-toolchain-r/test' && sudo apt update && sudo apt-get install gcc-13 g++-13 -y
       - name: install gh
         run: sudo apt install gh -y
-      - name: install python3
-        run: sudo apt install python3 -y
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - if: matrix.sanitizer == 'asan'
@@ -50,6 +48,8 @@ jobs:
       - if: matrix.type == 'release'
         name: configure release build
         run: echo "configure_flags=-DCMAKE_BUILD_TYPE=Release" >> "$GITHUB_ENV"
+      - name: file generation
+        run: ./etc/generate_files.sh
       - name: cmake
         run: cmake -S . -B out ${configure_flags} ${sanitize_flags} -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13
       - name: compile
