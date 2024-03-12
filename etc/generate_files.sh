@@ -1,10 +1,9 @@
 #!/bin/bash
 
 # Generate files
-SCRIPTS="applications/flatware/generate.py"
+SCRIPTS=("applications/flatware/generate.py applications/flatware" )
 
-for SCRIPT in $SCRIPTS; do
+for SCRIPT in "${SCRIPTS[@]}"; do
     echo "Running $SCRIPT"
-    python $SCRIPT
+    python3 $SCRIPT
 done
-```
