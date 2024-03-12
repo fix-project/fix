@@ -22,6 +22,9 @@ target_link_libraries(test-distributed runtime)
 add_executable(test-dependency-graph test-dependency-graph.cc main.cc)
 target_link_libraries(test-dependency-graph runtime)
 
+add_executable(test-scheduler test-scheduler.cc main.cc)
+target_link_libraries(test-scheduler runtime)
+
 add_executable(test-add test-add.cc main.cc)
 target_link_libraries(test-add runtime)
 
@@ -30,6 +33,9 @@ target_link_libraries(test-fib runtime)
 
 add_executable(test-trap test-trap.cc main.cc)
 target_link_libraries(test-trap runtime)
+
+add_executable(test-resource-limits test-resource-limits.cc main.cc)
+target_link_libraries(test-resource-limits runtime)
 
 add_executable(test-map test-map.cc main.cc)
 target_link_libraries(test-map runtime)

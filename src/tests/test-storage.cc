@@ -56,7 +56,7 @@ void test( void )
   // TODO: reimplement visiting and add tests here
   Handle<Apply> apply( storage.construct_tree<ObjectTree>( virgil ) );
   Handle<Object> target( caesar );
-  storage.create( apply, target );
+  storage.create( target, apply );
   CHECK( storage.contains( apply ) );
   CHECK_EQ( storage.get( apply ), target );
 }

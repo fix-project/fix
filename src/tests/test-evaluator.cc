@@ -29,7 +29,7 @@ public:
   Handle<Value> eval( Handle<Fix> target ) { return evaluator_.eval( target ).value(); }
 
 private:
-  virtual Result<Value> load( Handle<Value> value ) { return value; }
+  virtual Result<Fix> load( Handle<AnyDataType> value ) { return handle::fix( value ); }
 
   virtual Result<Object> apply( Handle<ObjectTree> combination )
   {
@@ -47,7 +47,7 @@ private:
       = function.try_into<Blob>().and_then( []( const Handle<Blob> x ) { return x.try_into<Literal>(); } ).value();
     auto f = ( Handle<Object>( * )( Handle<Object> ) )(uint64_t)literal;
     auto result = f( combination );
-    storage.create( apply, result );
+    storage.create( result, apply );
     return result;
   };
 
@@ -58,7 +58,7 @@ private:
       return storage.get_relation( eval );
     }
     auto result = evaluator_.evalStrict( obj ).value();
-    storage.create( eval, result );
+    storage.create( result, eval );
     return result;
   }
   virtual Result<Object> evalShallow( Handle<Object> obj ) { return evaluator_.evalShallow( obj ); };

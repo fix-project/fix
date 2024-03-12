@@ -1,12 +1,12 @@
 #pragma once
 
 #include <memory>
-#include <span>
 #include <string>
 
 #include "handle.hh"
 #include "wasm-rt.h"
 
+#include "resource_limits.hh"
 #include "timer.hh"
 #include "wasm-rt-impl.hh"
 
@@ -62,13 +62,6 @@ public:
     if ( instance_context_size_ % alignof( __m256i ) != 0 ) {
       instance_context_size_ = ( instance_context_size_ / alignof( __m256i ) + 1 ) * alignof( __m256i );
     }
-  }
-
-  void populate_instance_and_context( std::span<char> instance ) const
-  {
-    void ( *init_func )( void* );
-    init_func = reinterpret_cast<void ( * )( void* )>( code_.get() + init_entry_ );
-    init_func( instance.data() );
   }
 
   size_t get_instance_and_context_size() const { return instance_context_size_; }

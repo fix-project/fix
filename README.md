@@ -46,13 +46,12 @@ can be found at `.fix/refs/compile-encode`.
 evaluates to the corresponding ELF in the required format. You can evaluate it directly in
 fix:
 ```
-./build/src/tester/fix eval application: tree:3 string:none label:compile-encode file:{path to the Wasm module}
+./build/src/tester/fix eval application: tree:3 tree:3 uint64:1000000000 uint64:1 uint64:1 label:compile-encode file:{path to the Wasm module}
 ```
 or, equivalently:
 ```
-./build/src/tester/fix eval application: tree:3 string:none name:{contents of (readlink .fix/labels/compile-encode)} file:{path to the Wasm module}
+./build/src/tester/fix eval application: tree:3 tree:3 uint64:1000000000 uint64:1 uint64:1 name:{contents of (readlink .fix/labels/compile-encode)} file:{path to the Wasm module}
 ```
-or replace the procedure of an ENCODE with the specification to run an ENCODE.
 
 ## Using `fix eval`
 To run wasm files, the command is `./build/src/tester/fix eval` followed by an Object.
@@ -68,11 +67,17 @@ or an Application Thunk, e.g.
 ```
 application:
 ├─ tree:4
-|  ├─ string:"0"
+|  ├─ tree:3
+|  |  ├─ uint64:$ALLOWED_MEMORY
+|  |  ├─ uint64:$ESTIMATED_OUTPUT_SIZE
+|  |  ├─ uint64:$ESTIMATED_FANOUT
 |  ├─ strict:
 |  |  ├─ application:
 |  |  |  ├─ tree:3
-|  |  |  |  ├─ string:unused
+|  |  |  |  ├─ tree:3
+|  |  |  |  |  ├─ uint64:$ALLOWED_MEMORY
+|  |  |  |  |  ├─ uint64:$ESTIMATED_OUTPUT_SIZE
+|  |  |  |  |  ├─ uint64:$ESTIMATED_FANOUT
 |  |  |  |  ├─ name:$COMPILE_NAME
 |  |  |  |  ├─ file:$PATH_TO_WASM_FILE
 |  ├─ $ARGUMENT_1
@@ -88,7 +93,10 @@ This Application Thunk can be simplified as:
 ```
 application:
 ├─ tree:4
-|  ├─ string:"0"
+|  ├─ tree:3
+|  |  ├─ uint64:$ALLOWED_MEMORY
+|  |  ├─ uint64:$ESTIMATED_OUTPUT_SIZE
+|  |  ├─ uint64:$ESTIMATED_FANOUT
 |  ├─ compile:$PATH_TO_WASM_FILE
 |  ├─ $ARGUMENT_1
 |  ├─ $ARGUMENT_2
@@ -97,15 +105,15 @@ application:
 ### Running Wasm Examples:
 1. without arguments
 ```
-./build/src/tester/fix eval application: tree:2 string:unused compile:build/applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm
+./build/src/tester/fix eval application: tree:2 tree:1 uint64:1000000 compile:build/applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm
 ```
 2. with reading from a directory using `SERIALIZED_HOME_DIRECTORY=$(cat build/file.txt)`
 ```
-./build/src/tester/fix eval application: tree:4 string:unused compile:build/applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm string:unused name:$SERIALIZED_HOME_DIRECTORY
+./build/src/tester/fix eval application: tree:4 tree:1 uint64:1000000 compile:build/applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm string:unused name:$SERIALIZED_HOME_DIRECTORY
 ```
 3. with arguments
 ```
-./build/src/tester/fix eval application: tree:4 string:unused compile:build/testing/wasm-examples/add-simple.wasm uint32:9 uint32:7
+./build/src/tester/fix eval application: tree:4 tree:1 uint64:1000000 compile:build/testing/wasm-examples/add-simple.wasm uint32:9 uint32:7
 ```
 
 # Fix Repo Structure

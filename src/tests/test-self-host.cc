@@ -1,10 +1,11 @@
 #include <string>
 
+#include "relater.hh"
 #include "test.hh"
 
 using namespace std;
 
-auto rt = ReadOnlyRT::init();
+auto rt = make_shared<Relater>();
 
 void test( void )
 {

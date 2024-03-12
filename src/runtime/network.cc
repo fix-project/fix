@@ -111,6 +111,7 @@ void Remote::put( Handle<AnyTree> name, TreeData data )
 
 void Remote::put( Handle<Relation> name, Handle<Object> data )
 {
+  VLOG( 1 ) << "Putting result to remote " << name;
   unique_lock lock( mutex_ );
   if ( reply_to_.contains( name ) ) {
     if ( !contains( name ) ) {
@@ -153,7 +154,7 @@ Remote::Remote( EventLoop& events,
                 TCPSocket socket,
                 size_t index,
                 MessageQueue& msg_q,
-                weak_ptr<IRuntime> parent )
+                optional<reference_wrapper<MultiWorkerRuntime>> parent )
   : socket_( move( socket ) )
   , msg_q_( msg_q )
   , parent_( parent )
@@ -197,9 +198,10 @@ Remote::Remote( EventLoop& events,
 
 void Remote::process_incoming_message( IncomingMessage&& msg )
 {
-  auto parent = parent_.lock();
-  if ( !parent )
+  if ( !parent_.has_value() )
     return;
+
+  auto& parent = parent_.value().get();
 
   VLOG( 1 ) << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
 
@@ -212,7 +214,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
         reply_to_.insert( task );
       }
 
-      auto res = parent->get( payload.task );
+      auto res = parent.get( payload.task );
       if ( res.has_value() ) {
         bool need_send = erase_reply_to( task );
 
@@ -227,12 +229,12 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::RESULT: {
       auto payload = parse<ResultPayload>( std::get<string>( msg.payload() ) );
       pending_result_.erase( payload.task );
-      parent->put( payload.task, payload.result );
+      parent.put( payload.task, payload.result );
       break;
     }
 
     case Opcode::REQUESTINFO: {
-      InfoPayload payload { parent->get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } ) };
+      InfoPayload payload { parent.get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } ) };
       push_message( OutgoingMessage::to_message( move( payload ) ) );
       break;
     }
@@ -245,7 +247,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::REQUESTTREE: {
       auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
-      auto tree = parent->get( payload.handle );
+      auto tree = parent.get( payload.handle );
       if ( tree )
         send_tree( *tree );
       break;
@@ -253,19 +255,19 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::REQUESTBLOB: {
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
-      auto blob = parent->get( payload.handle );
+      auto blob = parent.get( payload.handle );
       if ( blob )
         send_blob( blob.value() );
       break;
     }
 
     case Opcode::BLOBDATA: {
-      parent->create( msg.get_blob() );
+      parent.create( msg.get_blob() );
       break;
     }
 
     case Opcode::TREEDATA: {
-      parent->create( msg.get_tree() );
+      parent.create( msg.get_tree() );
       break;
     }
 
@@ -278,11 +280,19 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
         // Any handle proposed by the remote are considered "existing" on remote
         auto contained = std::visit( overload { [&]( Handle<Named> h ) {
                                                  blobs_view_.write()->insert( h );
-                                                 return parent->contains( h );
+
+                                                 if ( parent.contains( h ) ) {
+                                                   parent.get( h );
+                                                 }
+                                                 return parent.contains( h );
                                                },
                                                 [&]( Handle<AnyTree> t ) {
                                                   trees_view_.write()->insert( handle::upcast( t ) );
-                                                  return parent->contains( t );
+
+                                                  if ( parent.contains( t ) ) {
+                                                    parent.get( t );
+                                                  }
+                                                  return parent.contains( t );
                                                 },
                                                 [&]( Handle<Literal> ) { return true; },
                                                 [&]( Handle<Relation> ) { return true; } },
@@ -368,12 +378,11 @@ Remote::~Remote()
     handle.cancel();
   }
 
-  auto parent = parent_.lock();
   // Forward pending tasks
-  if ( parent ) {
+  if ( parent_.has_value() ) {
     for ( auto it = pending_result_.begin(); it != pending_result_.end(); ) {
       auto task = pending_result_.extract( it++ );
-      parent->get( task.value() );
+      parent_->get().get( task.value() );
     }
   }
 }
@@ -382,11 +391,10 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
 {
   if ( !connections_.read()->contains( remote_idx ) ) {
     if ( holds_alternative<RunPayload>( payload ) ) {
-      auto parent = parent_.lock();
-      if ( !parent )
+      if ( !parent_.has_value() )
         return;
 
-      parent->get( move( std::get<RunPayload>( payload ).task ) );
+      parent_->get().get( move( std::get<RunPayload>( payload ).task ) );
     }
   } else {
     Remote& connection = *connections_.read()->at( remote_idx );
@@ -471,6 +479,10 @@ void NetworkWorker::run_loop()
         VLOG( 1 ) << "New connection from "
                   << connections_.read()->at( next_connection_id_ )->peer_address().to_string();
 
+        if ( parent_.has_value() ) {
+          parent_.value().get().add_worker( connections_.read()->at( next_connection_id_ ) );
+        }
+
         next_connection_id_++;
       } );
     },
@@ -491,6 +503,11 @@ void NetworkWorker::run_loop()
 
       VLOG( 1 ) << "New connection to "
                 << connections_.read()->at( next_connection_id_ )->peer_address().to_string();
+
+      if ( parent_.has_value() ) {
+        parent_.value().get().add_worker( connections_.read()->at( next_connection_id_ ) );
+      }
+
       next_connection_id_++;
     },
     [&] { return connecting_sockets_.size_approx() > 0; } );

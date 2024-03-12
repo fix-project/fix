@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <glog/logging.h>
 
 #include "dependency_graph.hh"
@@ -28,9 +27,11 @@ void test( void )
 
   CHECK( graph.start( apply( otree ) ) );
   CHECK( not graph.start( apply( otree ) ) );
-  CHECK( graph.add_dependency( apply( otree ), eval( foo ) ) );
-  CHECK( graph.add_dependency( apply( otree ), eval( bar ) ) );
-  CHECK( not graph.add_dependency( apply( otree ), eval( bar ) ) );
+  graph.add_dependency( apply( otree ), eval( foo ) );
+  CHECK( graph.start( eval( foo ) ) );
+  graph.add_dependency( apply( otree ), eval( bar ) );
+  CHECK( graph.start( eval( bar ) ) );
+  graph.add_dependency( apply( otree ), eval( bar ) );
   CHECK( not graph.start( eval( bar ) ) );
   graph.finish( eval( bar ), ready );
   CHECK( ready.empty() );

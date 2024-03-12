@@ -1,11 +1,13 @@
+#include <memory>
 #include <stdio.h>
 
-#include "handle_post.hh"
+#include "relater.hh"
 #include "test.hh"
 #include "types.hh"
 
 namespace tester {
-auto rt = ReadOnlyRT::init();
+auto rt = std::make_shared<Relater>();
+auto Limits = []() { return limits( *rt, 1024 * 1024, 1024, 1 ); };
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
@@ -19,15 +21,15 @@ static Handle<Fix> add_simple_compiled;
 
 Handle<Value> curry( Handle<Fix> program, Handle<Fix> num_args )
 {
-  return tester::rt->execute( Handle<Eval>(
-    Handle<Application>( tester::Tree( tester::Blob( "unused" ), curry_compiled, program, num_args ) ) ) );
+  return tester::rt->execute(
+    Handle<Eval>( Handle<Application>( tester::Tree( tester::Limits(), curry_compiled, program, num_args ) ) ) );
 }
 
 Handle<Value> apply_args( Handle<Value> curried, const initializer_list<Handle<Fix>>& elements )
 {
   for ( auto& e : elements ) {
-    curried = tester::rt->execute(
-      Handle<Eval>( Handle<Application>( tester::Tree( tester::Blob( "unused" ), curried, e ) ) ) );
+    curried
+      = tester::rt->execute( Handle<Eval>( Handle<Application>( tester::Tree( tester::Limits(), curried, e ) ) ) );
   }
   return curried;
 }
@@ -73,7 +75,7 @@ void test_add_simple()
 
 void test_add_as_encode()
 {
-  auto curried = curry( tester::Tree( tester::Blob( "unused" ), add_simple_compiled ), Handle<Literal>( 2 ) );
+  auto curried = curry( tester::Tree( tester::Limits(), add_simple_compiled ), Handle<Literal>( 2 ) );
 
   auto curried_result = apply_args( curried, { Handle<Literal>( 1 ), Handle<Literal>( 3 ) } );
 

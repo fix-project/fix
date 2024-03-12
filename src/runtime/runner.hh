@@ -7,6 +7,7 @@
 #include "object.hh"
 #include "overload.hh"
 #include "program.hh"
+#include "resource_limits.hh"
 #include "runtimestorage.hh"
 #include "types.hh"
 
@@ -45,6 +46,7 @@ public:
 
     std::optional<Handle<AnyTree>> function_tag {};
 
+    auto rlimits = combination->at( 0 );
     while ( true ) {
       function_tag = handle::extract<ObjectTree>( combination->at( 1 ) )
                        .transform( []( auto h ) -> Handle<AnyTree> { return h; } )
@@ -113,7 +115,24 @@ public:
 
     const Program& program = programs_.read()->at( function_name );
     fixpoint::current_procedure = function_name;
-    return program.execute( handle );
+
+    VLOG( 2 ) << handle << " rlimits are " << rlimits;
+    // invalid resource limits are interpreted as 0
+    auto limits = rlimits.try_into<Expression>()
+                    .and_then( [&]( auto x ) { return x.template try_into<Object>(); } )
+                    .and_then( [&]( auto x ) { return x.template try_into<Value>(); } )
+                    .and_then( [&]( auto x ) { return x.template try_into<ValueTree>(); } )
+                    .transform( [&]( auto x ) { return fixpoint::storage->get( x ); } );
+
+    resource_limits::available_bytes
+      = limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 0 ) ); } )
+          .transform( [&]( auto x ) { return uint64_t( x ); } )
+          .value_or( 0 );
+
+    VLOG( 1 ) << handle << " requested " << resource_limits::available_bytes << " bytes";
+    auto result = program.execute( handle );
+    VLOG( 2 ) << handle << " -> " << result;
+    return result;
   }
 
 private:

@@ -1,9 +1,11 @@
 #include <stdio.h>
 
+#include "relater.hh"
 #include "test.hh"
 
 namespace tester {
-auto rt = ReadOnlyRT::init();
+auto rt = std::make_shared<Relater>();
+auto Limits = []() { return limits( *rt, 1024 * 1024, 1024, 1 ); };
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };

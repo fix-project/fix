@@ -30,7 +30,7 @@ void program_body( std::span<char*> args )
   }
 
   // make the combination from the given arguments
-  auto handle = parse_args( *client, args );
+  auto handle = parse_args( client->get_rt(), args );
 
   if ( not args.empty() ) {
     throw runtime_error( "unexpected argument: "s + args[0] );

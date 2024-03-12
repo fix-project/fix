@@ -350,7 +350,7 @@ void eval( int argc, char* argv[] )
 
   auto rt = ReadWriteRT::init();
   span<char*> args = { argv + 1, static_cast<size_t>( argc ) - 1 };
-  auto handle = parse_args( *rt, args );
+  auto handle = parse_args( rt->get_rt(), args );
 
   if ( !handle::extract<Object>( handle ).has_value() ) {
     cerr << "Handle is not an Object";

@@ -1,8 +1,20 @@
 #pragma once
 
-#include "runtimes.hh"
+#include "interface.hh"
+
+#include <glog/logging.h>
 
 #pragma GCC diagnostic ignored "-Wunused-function"
+
+static Handle<ValueTree> limits( IRuntime& rt, uint64_t memory, uint64_t output_size, uint64_t output_fanout )
+{
+  auto tree = OwnedMutTree::allocate( 3 );
+  tree.at( 0 ) = Handle<Literal>( memory );
+  tree.at( 1 ) = Handle<Literal>( output_size );
+  tree.at( 2 ) = Handle<Literal>( output_fanout );
+  auto created = rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) );
+  return handle::extract<ValueTree>( created ).value();
+}
 
 static Handle<Fix> make_identification( Handle<Fix> name )
 {
@@ -17,12 +29,16 @@ static Handle<Fix> make_identification( Handle<Fix> name )
     .value();
 }
 
-static Handle<Strict> compile( FrontendRT& rt, Handle<Fix> wasm )
+static Handle<Strict> compile( IRuntime& rt, Handle<Fix> wasm )
 {
   auto compiler = rt.labeled( "compile-encode" );
 
+  auto kibi = 1024;
+  auto mebi = 1024 * kibi;
+  auto gibi = 1024 * mebi;
+
   auto tree = OwnedMutTree::allocate( 3 );
-  tree.at( 0 ) = Handle<Literal>( "unused" );
+  tree.at( 0 ) = limits( rt, gibi, mebi, 1 );
   tree.at( 1 ) = Handle<Strict>( handle::extract<Identification>( make_identification( compiler ) ).value() );
   tree.at( 2 ) = wasm;
   return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) ).visit<Handle<Strict>>( []( auto x ) {
@@ -31,7 +47,7 @@ static Handle<Strict> compile( FrontendRT& rt, Handle<Fix> wasm )
 }
 
 template<FixHandle... Args>
-Handle<AnyTree> tree( FrontendRT& rt, Args... args )
+Handle<AnyTree> tree( IRuntime& rt, Args... args )
 {
   OwnedMutTree tree = OwnedMutTree::allocate( sizeof...( args ) );
   size_t i = 0;
@@ -46,14 +62,14 @@ Handle<AnyTree> tree( FrontendRT& rt, Args... args )
   return rt.create( std::make_shared<OwnedTree>( std::move( tree ) ) );
 }
 
-static Handle<Blob> blob( FrontendRT& rt, std::string_view contents )
+static Handle<Blob> blob( IRuntime& rt, std::string_view contents )
 {
   auto blob = OwnedMutBlob::allocate( contents.size() );
   memcpy( blob.data(), contents.data(), contents.size() );
   return rt.create( std::make_shared<OwnedBlob>( std::move( blob ) ) );
 }
 
-static Handle<Blob> file( FrontendRT& rt, std::filesystem::path path )
+static Handle<Blob> file( IRuntime& rt, std::filesystem::path path )
 {
   return rt.create( std::make_shared<OwnedBlob>( path ) );
 }

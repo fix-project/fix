@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 
 #include "handle.hh"
+#include "overload.hh"
 
 /**
  * Serves the purpose of a "blocked queue" in a conventional OS; since we know computations are deterministic, we
@@ -20,8 +21,8 @@ public:
 
 private:
   absl::flat_hash_set<Task> running_ {};
-  absl::flat_hash_map<Task, absl::flat_hash_set<Task>> forward_dependencies_ {};
-  absl::flat_hash_map<Task, absl::flat_hash_set<Task>> backward_dependencies_ {};
+  absl::flat_hash_map<Task, absl::flat_hash_set<Handle<AnyDataType>>> forward_dependencies_ {};
+  absl::flat_hash_map<Handle<AnyDataType>, absl::flat_hash_set<Task>> backward_dependencies_ {};
 
 public:
   DependencyGraph() {}
@@ -44,41 +45,45 @@ public:
   }
 
   /**
-   * Marks a Task as depending upon another.  Returns whether the dependee is new.
+   * Marks a Task as depending upon another.
    *
    * @p blocked   The Task to mark as blocked on @p runnable.
-   * @p runnable  The Task to mark as runnable, blocking @p blocked.
-   * @return      If the @p runnable should actually be started.
+   * @p runnable_or_loadable  The Task to mark as runnable or The Handle<Fix> to be loaded, blocking @p blocked
    */
-  bool add_dependency( Task blocked, Task runnable )
+  void add_dependency( Task blocked, Handle<AnyDataType> runnable_or_loadable )
   {
-    VLOG( 1 ) << "adding dependency from " << blocked << " to " << runnable;
-    forward_dependencies_[blocked].insert( runnable );
-    backward_dependencies_[runnable].insert( blocked );
-    return start( runnable );
+    VLOG( 1 ) << "adding dependency from " << blocked << " to " << runnable_or_loadable << " without running";
+    forward_dependencies_[blocked].insert( runnable_or_loadable );
+    backward_dependencies_[runnable_or_loadable].insert( blocked );
+    running_.erase( blocked );
   }
 
   /**
    * Marks a Task as complete, and determines which other Tasks are now ready to be run.
    *
-   * @p[in]   task        The Task to mark as complete.
+   * @p[in]   task_or_object        The Task to mark as complete or The Object loaded.
    * @p[out]  unblocked   The set of Tasks which can now be started.
    */
-  void finish( Task task, absl::flat_hash_set<Task>& unblocked )
+  void finish( Handle<AnyDataType> task_or_object, absl::flat_hash_set<Task>& unblocked )
   {
-    VLOG( 1 ) << "finished " << task;
-    running_.erase( task );
-    if ( backward_dependencies_.contains( task ) ) {
-      for ( const auto dependent : backward_dependencies_[task] ) {
+    VLOG( 1 ) << "finished " << task_or_object;
+    task_or_object.visit<void>( overload { [&]( Handle<Relation> r ) { running_.erase( r ); }, [&]( auto ) {} } );
+    if ( backward_dependencies_.contains( task_or_object ) ) {
+      for ( const auto dependent : backward_dependencies_[task_or_object] ) {
         auto& target = forward_dependencies_[dependent];
-        target.erase( task );
+        target.erase( task_or_object );
         if ( target.empty() ) {
           VLOG( 2 ) << "resuming " << dependent;
           unblocked.insert( dependent );
           forward_dependencies_.erase( dependent );
         }
       }
-      backward_dependencies_.erase( task );
+      backward_dependencies_.erase( task_or_object );
     }
+  }
+
+  absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Task blocked ) const
+  {
+    return forward_dependencies_.at( blocked );
   }
 };

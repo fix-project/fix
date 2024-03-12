@@ -52,7 +52,7 @@ public:
   Handle<AnyTree> create( TreeData tree, std::optional<Handle<AnyTree>> name = {} );
 
   // Construct a Relation
-  void create( Handle<Relation> relation, Handle<Object> result );
+  void create( Handle<Object> result, Handle<Relation> relation );
 
   template<FixTreeType T>
   Handle<T> create_tree( TreeData tree, std::optional<Handle<AnyTree>> name = {} );
