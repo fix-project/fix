@@ -199,7 +199,8 @@ def write_header(path):
 
 if __name__ == "__main__":
     path = sys.argv[1]    
-
+    print(f'Generating {MODULE} in {path}')
     write_wat(path)
     write_c(path)
     write_header(path)
+    print(f'Generated {MODULE} in {path}')

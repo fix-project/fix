@@ -31,6 +31,8 @@ jobs:
         run: sudo add-apt-repository 'ppa:ubuntu-toolchain-r/test' && sudo apt update && sudo apt-get install gcc-13 g++-13 -y
       - name: install gh
         run: sudo apt install gh -y
+      - name: install python3
+        run: sudo apt install python3 -y
       - shell: bash
         run: 'echo HOME=/home | sudo tee -a $GITHUB_ENV'
       - if: matrix.sanitizer == 'asan'
