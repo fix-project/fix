@@ -258,6 +258,32 @@ void labels( int argc, char* argv[] )
   }
 }
 
+void gc_visit( Repository& repo, Handle<Fix> root, unordered_set<Handle<Fix>>& reachable )
+{
+  reachable.insert( root );
+  auto data = handle::data( root );
+  handle::data( data ).visit<void>( overload {
+    [&]( Handle<Relation> relation ) {
+      auto rhs = relation.visit<Handle<Object>>(
+        [&]( auto x ) { return std::visit( []( auto x ) { return x; }, x.get() ); } );
+      auto lhs = repo.get( relation ).value();
+      gc_visit( repo, rhs, reachable );
+      gc_visit( repo, lhs, reachable );
+    },
+    [&]( Handle<AnyTree> tree ) {
+      auto data = repo.get( tree ).value();
+      for ( const auto& x : data->span() ) {
+        gc_visit( repo, x, reachable );
+      }
+    },
+    [&]( Handle<Blob> ) {},
+  } );
+  auto pins = repo.pinned( root );
+  for ( const auto& p : pins ) {
+    gc_visit( repo, p, reachable );
+  }
+}
+
 void gc( int argc, char* argv[] )
 {
   OptionParser parser( "gc", commands["gc"].second );
@@ -278,20 +304,13 @@ void gc( int argc, char* argv[] )
   for ( const auto& datum : std::filesystem::directory_iterator( storage.path() / "data" ) ) {
     data.insert( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) );
   }
+  for ( const auto& relation : std::filesystem::directory_iterator( storage.path() / "relations" ) ) {
+    data.insert( Handle<Fix>::forge( base16::decode( relation.path().filename().string() ) ) );
+  }
 
   unordered_set<Handle<Fix>> needed;
   for ( const auto root : roots ) {
-    if ( root.contains<Relation>() ) {
-      needed.insert(
-        handle::data( storage.get( root.unwrap<Relation>() ).value() ).visit<Handle<Fix>>( []( const auto x ) {
-          return x;
-        } ) );
-    }
-    needed.insert( handle::data( root ).visit<Handle<Fix>>( []( const auto x ) { return x; } ) );
-    auto pins = storage.pinned( root );
-    for ( const auto& p : pins ) {
-      needed.insert( handle::data( p ).visit<Handle<Fix>>( []( const auto x ) { return x; } ) );
-    }
+    gc_visit( storage, root, needed );
   }
 
   unordered_set<Handle<Fix>> unneeded;
@@ -303,21 +322,41 @@ void gc( int argc, char* argv[] )
   size_t total_size = 0;
   for ( const auto x : unneeded ) {
     std::visit( overload {
-                  []( const Handle<Relation> ) {},
-                  [&]( const auto x ) { total_size += handle::size( x ) * sizeof( Handle<Fix> ); },
+                  [&]( const Handle<Relation> ) { total_size += sizeof( Handle<Fix> ); },
+                  [&]( const Handle<Named> x ) { total_size += handle::size( x ); },
+                  [&]( const Handle<Literal> ) { total_size += 0; },
+                  [&]( const Handle<AnyTree> x ) { total_size += handle::size( x ) * sizeof( Handle<Fix> ); },
                 },
                 handle::data( x ).get() );
   }
 
   if ( dry_run ) {
     for ( const auto x : unneeded ) {
-      cout << x.content << "\n";
+      cout << x.content << " (";
+      cout << std::visit<std::string>( overload {
+                                         [&]( const Handle<Relation> ) { return "Relation"; },
+                                         [&]( const Handle<Named> ) { return "Blob"; },
+                                         [&]( const Handle<Literal> ) { return "Blob"; },
+                                         [&]( const Handle<AnyTree> ) { return "Tree"; },
+                                       },
+                                       handle::data( x ).get() );
+      cout << ", ";
+      cout << std::visit<size_t>(
+        overload {
+          [&]( const Handle<Relation> ) { return sizeof( Handle<Fix> ); },
+          [&]( const Handle<Named> x ) { return handle::size( x ); },
+          [&]( const Handle<Literal> ) { return 0; },
+          [&]( const Handle<AnyTree> x ) { return handle::size( x ) * sizeof( Handle<Fix> ); },
+        },
+        handle::data( x ).get() );
+      cout << " bytes)\n";
     }
     cout << "Would have deleted " << total_size << " bytes.\n";
   } else {
     for ( const auto x : unneeded ) {
       auto name = x.content;
       std::filesystem::remove( storage.path() / "data" / base16::encode( name ) );
+      std::filesystem::remove( storage.path() / "relations" / base16::encode( name ) );
     }
     cout << "Deleted " << total_size << " bytes.\n";
   }
@@ -436,6 +475,7 @@ void help( ostream& os = cout )
     os << std::format( "    {:{}}    {}\n", command.first, length, command.second.second );
   }
 }
+
 void help( int, char*[] )
 {
   help();
