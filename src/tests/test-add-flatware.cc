@@ -19,6 +19,7 @@ uint32_t fix_add( char a, char b, Handle<Fix> add_elf )
 {
   Handle add
     = flatware_input( *tester::rt,
+                      tester::Limits(),
                       add_elf,
                       tester::Tree(),
                       tester::Tree( tester::Blob( "add" ), tester::Blob( { &a, 1 } ), tester::Blob( { &b, 1 } ) ) );

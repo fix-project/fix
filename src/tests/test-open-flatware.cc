@@ -49,7 +49,7 @@ Handle<Fix> fs()
 int run_flatware( const string& name, Handle<Fix> elf, Handle<Fix> home )
 {
   printf( "### TEST %s\n", name.c_str() );
-  auto exe = flatware_input( *tester::rt, elf, home );
+  auto exe = flatware_input( *tester::rt, tester::Limits(), elf, home );
   auto result = tester::rt->get( tester::rt->execute( exe ).try_into<ValueTree>().value() ).value();
   uint32_t code = -1;
   memcpy( &code, handle::extract<Literal>( result->at( 0 ) ).value().data(), sizeof( uint32_t ) );

@@ -17,6 +17,7 @@ void test( void )
 {
   auto res = tester::rt->execute( flatware_input(
     *tester::rt,
+    tester::Limits(),
     tester::Compile( tester::File(
       "applications-prefix/src/applications-build/flatware/examples/return3/return3-fixpoint.wasm" ) ) ) );
   auto result_tree = tester::rt->get( res.try_into<ValueTree>().value() ).value();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "interface.hh"
+#include "runtimes.hh"
 
 #include <glog/logging.h>
 
@@ -74,7 +75,8 @@ static Handle<Blob> file( IRuntime& rt, std::filesystem::path path )
   return rt.create( std::make_shared<OwnedBlob>( path ) );
 }
 
-static Handle<Eval> flatware_input( FrontendRT& rt,
+static Handle<Eval> flatware_input( IRuntime& rt,
+                                    Handle<ValueTree> limits,
                                     Handle<Fix> program,
                                     std::optional<Handle<Fix>> filesystem = std::nullopt,
                                     std::optional<Handle<Fix>> args = std::nullopt,
@@ -82,7 +84,7 @@ static Handle<Eval> flatware_input( FrontendRT& rt,
                                     std::optional<Handle<Fix>> env = std::nullopt )
 {
   auto input_tree = tree( rt,
-                          Handle<Literal>( "unused" ),
+                          limits,
                           program,
                           filesystem.value_or( handle::upcast( tree( rt ) ) ),
                           args.value_or( handle::upcast( tree( rt ) ) ),

@@ -17,6 +17,7 @@ void test( void )
 {
   auto input = flatware_input(
     *tester::rt,
+    tester::Limits(),
     tester::Compile( tester::File(
       "applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm" ) ) );
   auto result_handle = tester::rt->execute( input );
