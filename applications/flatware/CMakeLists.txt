@@ -14,24 +14,13 @@ set(CMAKE_C_COMPILER_TARGET "wasm32")
 
 add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
 
-add_custom_command(
-        OUTPUT "asm-flatware.c asm-flatware.h asm-flatware.wat"
-        DEPENDS generate-flatware
-)
-
-add_custom_target(
-        generate-flatware
-        COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/generate.py ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Generating flatware"
+execute_process(
+  COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/generate.py ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 add_library(filesys_obj OBJECT "filesys.c")
 add_library(c_flatware_obj OBJECT "c-flatware.c")
 add_library(asm_flatware_obj OBJECT "asm-flatware.c")
-
-add_dependencies(filesys_obj generate-flatware)
-add_dependencies(c_flatware_obj generate-flatware)
-add_dependencies(asm_flatware_obj generate-flatware)
 
 add_custom_command(
   OUTPUT  "c-flatware.wasm"
