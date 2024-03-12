@@ -63,10 +63,12 @@ int run_flatware( const string& name, Handle<Fix> elf, Handle<Fix> home )
 
 void test( void )
 {
+  // Attempts to open and read from a simple file
   run_flatware( "open",
                 tester::Compile( tester::File(
                   "applications-prefix/src/applications-build/flatware/examples/open/open-fixpoint.wasm" ) ),
                 fs() );
+  // Attempts to open multiple nested existing and non-existing files as described in open-deep.c
   run_flatware( "open-deep",
                 tester::Compile( tester::File(
                   "applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm" ) ),
