@@ -1,43 +1,46 @@
 # Fixpoint Flatware
 
-The Fixpoint flatware is an implementation of POSIX APIs that allows
-regular POSIX-compliant programs to be run on in Fixpoint. Flatware
-programs use an extension of the Encode tree format as their input.
+The Fixpoint flatware is an implementation of POSIX APIs that allows regular 
+POSIX-compliant programs to be run on in Fixpoint. Flatware programs use an 
+extension of the combination tree format as their input.
 
-## Flatware Encode
+## Flatware combination format
 
-The Flatware Encode format is an extension of the Fixpoint encode. It describes 
-the application of a Flatware program to inputs, producing an Object as output.
-The first entry specifies the metadata, possibly including resource limits at runtime 
-(e.g. maximum pages of mutable memory), and the format of the Encode. An Encode's format 
-is either "apply" or "lift" (not yet implemented).
+The Flatware combination format is an extension of the Fixpoint combination. It
+describes the application of a Flatware program to inputs, producing an Object 
+as output. The first entry specifies the metadata, possibly including resource 
+limits at runtime (e.g. maximum pages of mutable memory), and the format of the
+combination. A combination format is either "apply" or "lift" (not yet 
+implemented).
 
-An "apply" Encode may nest another Encode within itself, thus allowing for
-nested argument capture. 
+An "apply" combination may nest another combination within itself, thus allowing
+for nested argument capture. 
 
-For an "apply" Encode, the second entry in the tree specifies the procedure,
-which is either:
+For an "apply" combination, the second entry in the tree specifies the 
+procedure, which is either:
   1. A Tag that the first entry is a Blob, the second entry is a trusted 
   compilation toolchain, and the third entry is "Runnable" or
-  2. An Encode
+  2. A combination
 
-For a "lift" Encode, the second entry is the Handle to the Object to be lifted.
+For a "lift" combination, the second entry is the Handle to the Object to be 
+lifted.
 
 The third entry contains the filesystem to be used by the program. See the
 Flatware Filesystem section for more details.
 
 The fourth entry is the entry arguments to the program. The arguments are
-specified as a tree of null-terminated strings. The first entry is the
-program name, and the remaining entries are the arguments to the program.
+specified as a tree of null-terminated strings. The first entry is the program
+name, and the remaining entries are the arguments to the program.
 
-The fifth entry is STDIN. It is specified as a single null-terminated string blob.
+The fifth entry is STDIN. It is specified as a single null-terminated string 
+blob.
 
 The sixth entry is the environment variables. It is specified as a tree of
 null-terminated strings. Each entry is of the form "NAME=VALUE".
 
 
 ```
-"apply" Encode example
+"apply" combination example
 tree:5
 ├─ string:unused
 ├─ tree:4
@@ -73,12 +76,12 @@ The dirent contents can be another dirent or file contents as a blob.
 
 ## Flatware Output
 
-The result of a full apply on the Flatware Encode is a tree. The first entry
-is the exit code of the program. The second entry is the modified filesystem 
-after the program has run. The third entry is the STDOUT of the program. 
-The fourth entry is the STDERR of the program.
+The result of a full apply on the Flatware combination is a tree. The first
+entry is the exit code of the program. The second entry is the modified 
+filesystem after the program has run. The third entry is the STDOUT of the 
+program. The fourth entry is the STDERR of the program.
 
-The fifth entry is an optional trace of the program, based on compile-time
+The fifth entry is an optional trace of the program, based on compile-time 
 flags. The trace is a serialized list of all syscalls made by the program.
 
 ```
