@@ -23,7 +23,7 @@ add_custom_command(
 
 add_custom_target(
         generate_flatware
-        COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/generate.py
+        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate.py
         COMMENT "Generating flatware"
 )
 
