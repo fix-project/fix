@@ -1,4 +1,5 @@
 """ Generates a wat file that defines the ro/rw memory operations to and from fixpoint program memory. """
+import os
 import sys
 
 MEM_SIZES = {
@@ -172,8 +173,7 @@ def write_header(path):
         f.write(f'//{C_DESCRIPTION}\n')
 
         # includes
-        f.write('#include "../util/fixpoint_util.h"\n')
-        f.write('#include "api.h"\n')
+        f.write('#include <stdint.h>\n')
 
         # gets / sets
         for mem_type in OTHER_MEM_TYPES:
@@ -198,7 +198,7 @@ def write_header(path):
 
 
 if __name__ == "__main__":
-    path = sys.argv[1]    
+    path = os.getcwd()
     print(f'Generating {MODULE} in {path}')
     write_wat(path)
     write_c(path)

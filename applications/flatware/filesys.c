@@ -1,4 +1,6 @@
 #include "filesys.h"
+#include "../util/fixpoint_util.h"
+#include "api.h"
 #include "asm-flatware.h"
 #include "flatware-decs.h"
 #include <stdlib.h>
