@@ -81,6 +81,47 @@ Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
   }
 }
 
+Relater::Result<AnyTree> Relater::load( Handle<AnyTreeRef> handle )
+{
+  auto h = contains( handle ).or_else( [&]() -> optional<Handle<AnyTree>> {
+    for ( auto& remote : remotes_.read().get() ) {
+      auto locked_remote = remote.lock();
+      if ( auto h = locked_remote->contains( handle ); h.has_value() ) {
+        return h;
+      }
+    }
+    return {};
+  } );
+
+  if ( !h.has_value() ) {
+    throw HandleNotFound( handle::fix( handle ) );
+  }
+
+  if ( storage_.contains( h.value() ) ) {
+    return h.value();
+  } else {
+    auto d = h.value().visit<Handle<AnyDataType>>( []( auto h ) { return h; } );
+    graph_.write()->add_dependency( current_.value(), d );
+    works_.push_back( d );
+    return {};
+  }
+}
+
+Handle<AnyTreeRef> Relater::ref( Handle<AnyTree> tree )
+{
+  if ( !storage_.contains( tree ) ) {
+    throw HandleNotFound( handle::fix( tree ) );
+  }
+
+  return tree.visit<Handle<AnyTreeRef>>( overload {
+    [&]( Handle<ValueTree> t ) { return t.into<ValueTreeRef>( storage_.get( tree )->size() ); },
+    [&]( Handle<ObjectTree> t ) { return t.into<ObjectTreeRef>( storage_.get( tree )->size() ); },
+    [&]( Handle<ExpressionTree> ) -> Handle<AnyTreeRef> {
+      throw runtime_error( "ExpressionTree cannot be reffed" );
+    },
+  } );
+}
+
 Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
 {
   auto apply = Handle<Relation>( Handle<Apply>( combination ) );
@@ -366,6 +407,11 @@ bool Relater::contains( Handle<AnyTree> handle )
 bool Relater::contains( Handle<Relation> handle )
 {
   return storage_.contains( handle ) || repository_.contains( handle );
+}
+
+std::optional<Handle<AnyTree>> Relater::contains( Handle<AnyTreeRef> )
+{
+  throw runtime_error( "Unimplemented" );
 }
 
 bool Relater::contains( const std::string_view label )

@@ -126,6 +126,7 @@ public:
   bool contains( Handle<Named> handle );
   bool contains( Handle<AnyTree> handle );
   bool contains( Handle<Relation> handle );
+  std::optional<AnyTree> contains( Handle<AnyTreeRef> handle );
 
   /**
    * Call @p visitor for every Handle in the "minimum repo" of @p root, i.e., the set of Handles which are needed

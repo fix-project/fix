@@ -100,6 +100,12 @@ public:
     return Handle<A>( *this );
   }
 
+  template<typename A>
+  inline Handle<A> into( size_t size ) const requires std::constructible_from<Handle<A>, Handle<Tree<T>>, size_t>
+  {
+    return Handle<A>( *this, size );
+  }
+
   template<typename A, typename B, typename... Ts>
   inline auto into() const requires std::constructible_from<Handle<A>, Handle<Tree<T>>>
   {

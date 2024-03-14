@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include "evaluator.hh"
+#include "overload.hh"
 #include "runtimestorage.hh"
 
 using namespace std;
@@ -30,6 +31,15 @@ public:
 
 private:
   virtual Result<Fix> load( Handle<AnyDataType> value ) { return handle::fix( value ); }
+  virtual Result<AnyTree> load( Handle<AnyTreeRef> ) { return {}; }
+  virtual Handle<AnyTreeRef> ref( Handle<AnyTree> t )
+  {
+    return t.visit<Handle<AnyTreeRef>>( overload {
+      []( Handle<ExpressionTree> ) -> Handle<AnyTreeRef> { throw runtime_error( "Not reffable" ); },
+      []( Handle<ObjectTree> t ) { return t.into<ObjectTreeRef>( 0 ); },
+      []( Handle<ValueTree> t ) { return t.into<ValueTreeRef>( 0 ); },
+    } );
+  }
 
   virtual Result<Object> apply( Handle<ObjectTree> combination )
   {

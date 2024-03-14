@@ -238,6 +238,11 @@ bool Repository::contains( Handle<Relation> handle )
   }
 }
 
+std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> )
+{
+  throw runtime_error( "Unimplemented" );
+}
+
 #if 0
 bool Repository::contains( Handle<Fix> handle )
 {
