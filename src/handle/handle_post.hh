@@ -1,4 +1,5 @@
 #pragma once
+#include <concepts>
 #include <variant>
 
 #include "handle.hh"
@@ -70,6 +71,20 @@ static inline size_t size( Handle<T> handle )
     return handle.size();
   } else {
     return std::visit( []( const auto x ) { return size( x ); }, handle.get() );
+  }
+}
+
+template<typename T>
+static inline size_t byte_size( Handle<T> handle )
+{
+  if constexpr ( std::same_as<T, Relation> ) {
+    return sizeof( Handle<Fix> );
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+    return 0;
+  } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
+    return handle.size();
+  } else {
+    return std::visit( []( const auto x ) { return byte_size( x ); }, handle.get() );
   }
 }
 

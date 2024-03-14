@@ -59,4 +59,5 @@ void test( void )
   storage.create( target, apply );
   CHECK( storage.contains( apply ) );
   CHECK_EQ( storage.get( apply ), target );
+  CHECK_EQ( apply.unwrap<ObjectTree>().size(), sizeof( Handle<Fix> ) + virgil.unwrap<Named>().size() );
 }
