@@ -35,9 +35,12 @@ add_dependencies(filesys_obj generate_flatware)
 add_dependencies(c_flatware_obj generate_flatware)
 add_dependencies(asm_flatware_obj generate_flatware)
 
-target_include_directories(filesys_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(c_flatware_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(asm_flatware_obj PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(filesys_obj PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(c_flatware_obj PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(asm_flatware_obj PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+target_link_libraries(filesys_obj PUBLIC fixpoint_storage)
+target_link_libraries(c_flatware_obj PUBLIC fixpoint_storage)
 
 add_custom_command(
   OUTPUT  "c-flatware.wasm"
