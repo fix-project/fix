@@ -344,6 +344,7 @@ body:
 
   if ( type->tree_ref ) {
     printf( "\n\tinline size_t size() const { return ( (u64x4)content )[3] & 0xffffffffffff; }\n" );
+    printf( "\n\tinline bool is_tag() const { return ( content[30] >> 6 ) & 1; }\n" );
   }
 
   printf( "};\n\n" );

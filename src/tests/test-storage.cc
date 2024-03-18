@@ -60,4 +60,10 @@ void test( void )
   CHECK( storage.contains( apply ) );
   CHECK_EQ( storage.get( apply ), target );
   CHECK_EQ( apply.unwrap<ObjectTree>().size(), sizeof( Handle<Fix> ) + virgil.unwrap<Named>().size() );
+
+  auto ref = storage.ref( apply.unwrap<ObjectTree>() );
+  CHECK_EQ( ref.unwrap<ObjectTreeRef>().size(), 1 );
+  auto unref = storage.contains( ref );
+  CHECK( unref.has_value() );
+  CHECK_EQ( unref.value().unwrap<ObjectTree>(), apply.unwrap<ObjectTree>() );
 }

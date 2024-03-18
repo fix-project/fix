@@ -6,6 +6,7 @@
 #include "handle.hh"
 #include "handle_post.hh"
 #include "object.hh"
+#include "types.hh"
 
 namespace handle {
 static inline Handle<Blob> create( const BlobData& blob )
@@ -53,4 +54,19 @@ static inline Handle<AnyTree> create( const TreeData& data )
   }
   __builtin_unreachable();
 }
+
+struct tree_equal
+{
+  constexpr bool operator()( const Handle<ExpressionTree>& lhs, const Handle<ExpressionTree>& rhs ) const
+  {
+    static constexpr u64x4 mask
+      = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffff000000000000 };
+    u64x4 pxor = (u64x4)( lhs.content ^ rhs.content ) & mask;
+#ifdef __AVX__
+    return _mm256_testz_si256( (__m256i)pxor, (__m256i)pxor );
+#else
+    return ( xored[0] | xored[1] | xored[2] | xored[3] ) == 0;
+#endif
+  }
 };
+}

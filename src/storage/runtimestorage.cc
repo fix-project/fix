@@ -332,6 +332,40 @@ bool RuntimeStorage::contains( Handle<Relation> handle )
   return relations_.read()->contains( handle );
 }
 
+optional<Handle<AnyTree>> RuntimeStorage::contains( Handle<AnyTreeRef> handle )
+{
+  auto tmp_tree = handle.visit<Handle<AnyTree>>(
+    overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0 ); },
+               []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0 ); } } );
+
+  auto trees = trees_.read();
+  auto entry = trees->find( handle::upcast( tmp_tree ) );
+
+  if ( entry == trees->end() ) {
+    return {};
+  }
+
+  auto et = entry->first;
+
+  // Cast to same kind as Handle<AnyTreeRef>
+  auto res_tree = handle.visit<Handle<AnyTree>>( overload {
+    [&]( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( et.content, et.size(), r.is_tag() ); },
+    [&]( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( et.content, et.size(), r.is_tag() ); } } );
+
+  return res_tree;
+}
+
+Handle<AnyTreeRef> RuntimeStorage::ref( Handle<AnyTree> handle )
+{
+  return handle.visit<Handle<AnyTreeRef>>( overload {
+    [&]( Handle<ValueTree> t ) { return t.into<ValueTreeRef>( get( handle )->size() ); },
+    [&]( Handle<ObjectTree> t ) { return t.into<ObjectTreeRef>( get( handle )->size() ); },
+    [&]( Handle<ExpressionTree> ) -> Handle<AnyTreeRef> {
+      throw runtime_error( "ExpressionTree cannot be reffed" );
+    },
+  } );
+}
+
 #if 0
 bool RuntimeStorage::contains( Handle<Fix> handle )
 {

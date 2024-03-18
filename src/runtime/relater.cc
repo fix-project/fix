@@ -112,14 +112,7 @@ Handle<AnyTreeRef> Relater::ref( Handle<AnyTree> tree )
   if ( !storage_.contains( tree ) ) {
     throw HandleNotFound( handle::fix( tree ) );
   }
-
-  return tree.visit<Handle<AnyTreeRef>>( overload {
-    [&]( Handle<ValueTree> t ) { return t.into<ValueTreeRef>( storage_.get( tree )->size() ); },
-    [&]( Handle<ObjectTree> t ) { return t.into<ObjectTreeRef>( storage_.get( tree )->size() ); },
-    [&]( Handle<ExpressionTree> ) -> Handle<AnyTreeRef> {
-      throw runtime_error( "ExpressionTree cannot be reffed" );
-    },
-  } );
+  return storage_.ref( tree );
 }
 
 Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
@@ -409,9 +402,9 @@ bool Relater::contains( Handle<Relation> handle )
   return storage_.contains( handle ) || repository_.contains( handle );
 }
 
-std::optional<Handle<AnyTree>> Relater::contains( Handle<AnyTreeRef> )
+std::optional<Handle<AnyTree>> Relater::contains( Handle<AnyTreeRef> handle )
 {
-  throw runtime_error( "Unimplemented" );
+  return storage_.contains( handle ).or_else( [&]() { return repository_.contains( handle ); } );
 }
 
 bool Relater::contains( const std::string_view label )
