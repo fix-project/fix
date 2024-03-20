@@ -293,6 +293,7 @@ body:
     serialize_enum( type, offset, tag_bits );
   }
   serialize_constructors( type, offset );
+
   serialize_unwrap( type );
   serialize_try_into( type );
 
@@ -303,6 +304,13 @@ body:
           "std::constructible_from<Handle<A>, Handle<%s>> {\n",
           type->name );
   printf( "\t\treturn Handle<A>(*this);\n" );
+  printf( "\t}\n\n" );
+
+  printf( "\ttemplate<FixType A>\n" );
+  printf( "\tinline Handle<A> into(size_t size) const requires "
+          "std::constructible_from<Handle<A>, Handle<%s>, size_t> {\n",
+          type->name );
+  printf( "\t\treturn Handle<A>(*this,size);\n" );
   printf( "\t}\n" );
 
   printf( "};\n\n" );
@@ -343,8 +351,8 @@ int main( int argc, char** argv )
   const Type* otree = make_terminal( "ObjectTree", 240 + 1 + 1 );     // hash + tag + is_local
   const Type* etree = make_terminal( "ExpressionTree", 240 + 1 + 1 ); // hash + tag + is_local
 
-  const Type* vref = make_wrapper( "ValueTreeRef", vtree );
-  const Type* oref = make_wrapper( "ObjectTreeRef", otree );
+  const Type* vref = make_terminal( "ValueTreeRef", 240 + 1 + 1 );
+  const Type* oref = make_terminal( "ObjectTreeRef", 240 + 1 + 1 );
 
   const Type* literal = make_terminal( "Literal", 240 + 5 ); // hash + size
   const Type* named = make_terminal( "Named", 240 + 1 );     // hash + is_local

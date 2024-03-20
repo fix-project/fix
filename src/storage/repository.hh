@@ -36,6 +36,7 @@ public:
   virtual bool contains( Handle<Named> name ) override;
   virtual bool contains( Handle<AnyTree> name ) override;
   virtual bool contains( Handle<Relation> name ) override;
+  virtual std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> name ) override;
 
   bool contains( const std::string_view label ) override;
 

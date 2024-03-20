@@ -94,6 +94,8 @@ public:
   virtual bool contains( Handle<Relation> handle ) = 0;
   ///}@
 
+  virtual std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> ) { return {}; }
+
   /**
    * Gets metadata about this IDataLoader.
    *
@@ -118,10 +120,11 @@ public:
       return;
 
     if constexpr ( Handle<T>::is_fix_sum_type ) {
-      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
-                          or std::same_as<T, ObjectTreeRef> ) )
+      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
         std::visit( [&]( const auto x ) { visit_minrepo( x, visitor, visited ); }, handle.get() );
 
+    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+      return;
     } else {
       if constexpr ( FixTreeType<T> ) {
         // Having the handle means that the data presents in storage
@@ -148,10 +151,11 @@ public:
       return;
 
     if constexpr ( Handle<T>::is_fix_sum_type ) {
-      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
-                          or std::same_as<T, ObjectTreeRef> ) )
+      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
         std::visit( [&]( const auto x ) { early_stop_visit_minrepo( x, visitor, visited ); }, handle.get() );
 
+    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+      return;
     } else {
       VLOG( 2 ) << "visiting " << handle;
       auto res = visitor( handle );

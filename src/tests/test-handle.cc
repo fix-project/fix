@@ -62,12 +62,11 @@ void test_int_literal( void )
 void test_ref( void )
 {
   const auto nil = Handle<ValueTree>::nil();
-  const auto ref = nil.into<ValueTreeRef>();
+  const auto ref = nil.into<ValueTreeRef>( 10 );
   CHECK_NE( Handle<Fix>( ref ), Handle<Fix>( nil ) );
   CHECK_EQ( nil.size(), 0 );
   CHECK( not nil.is_local() );
-  CHECK_EQ( ref.unwrap<ValueTree>().size(), 0 );
-  CHECK( not ref.unwrap<ValueTree>().is_local() );
+  CHECK_EQ( handle::size( ref ), 10 );
 }
 
 void test_tag( void )

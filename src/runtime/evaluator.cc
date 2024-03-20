@@ -12,23 +12,27 @@ Result<Value> FixEvaluator::evalStrict( Handle<Object> x )
 {
   auto mapEval = [&]( auto x ) { return rt_.mapEval( x ); };
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
+  auto load = [&]( auto x ) { return rt_.load( x ); };
 
   return x.visit<Result<Value>>( overload {
     [&]( Handle<Value> x ) { return lift( x ); },
     [&]( Handle<Thunk> x ) { return force( x ).and_then( evalStrict ); },
     [&]( Handle<ObjectTree> x ) { return mapEval( x ); },
-    [&]( Handle<ObjectTreeRef> x ) { return mapEval( x.unwrap<ObjectTree>() ); },
+    [&]( Handle<ObjectTreeRef> x ) {
+      return load( x ).transform( []( auto h ) { return h.template unwrap<ObjectTree>(); } ).and_then( mapEval );
+    },
   } );
 }
 
 Result<Object> FixEvaluator::evalShallow( Handle<Object> x )
 {
   auto evalShallow = [&]( auto x ) { return rt_.evalShallow( x ); };
+  auto ref = [&]( auto x ) { return rt_.ref( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Value> x ) { return lower( x ); },
     [&]( Handle<Thunk> x ) { return force( x ).and_then( evalShallow ); },
-    [&]( Handle<ObjectTree> x ) { return Handle<ObjectTreeRef>( x ); },
+    [&]( Handle<ObjectTree> x ) { return ref( x ).unwrap<ObjectTreeRef>(); },
     [&]( Handle<ObjectTreeRef> x ) { return x; },
   } );
 }
@@ -44,9 +48,13 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
       return x.unwrap<Value>()
         .visit<Result<Fix>>(
           overload { [&]( Handle<Blob> y ) { return y.visit<Result<Fix>>( [&]( auto z ) { return load( z ); } ); },
+                     [&]( Handle<BlobRef> y ) {
+                       return y.template unwrap<Blob>().visit<Result<Fix>>( [&]( auto z ) { return load( z ); } );
+                     },
                      [&]( Handle<ValueTree> y ) { return load( y ); },
-                     [&]( Handle<BlobRef> y ) { return y; },
-                     [&]( Handle<ValueTreeRef> y ) { return y; } } )
+                     [&]( Handle<ValueTreeRef> y ) {
+                       return load( y ).transform( []( auto h ) { return h.template unwrap<ValueTree>(); } );
+                     } } )
         .and_then( []( auto h ) -> Result<Object> { return handle::extract<Object>( h ); } );
     },
     [&]( Handle<Application> x ) {
@@ -92,9 +100,8 @@ Result<Value> FixEvaluator::lift( Handle<Value> x )
       return {};
     },
     [&]( Handle<ValueTreeRef> x ) -> Result<ValueTree> {
-      auto tree = x.unwrap<ValueTree>();
-      if ( load( tree ) )
-        return mapLift( tree );
+      if ( auto h = load( x ); h.has_value() )
+        return mapLift( h.value().unwrap<ValueTree>() );
       return {};
     },
   } );
@@ -102,9 +109,11 @@ Result<Value> FixEvaluator::lift( Handle<Value> x )
 
 Result<Value> FixEvaluator::lower( Handle<Value> x )
 {
+  auto ref = [&]( auto x ) { return rt_.ref( x ); };
+
   return x.visit<Result<Value>>( overload {
     [&]( Handle<Blob> x ) { return Handle<BlobRef>( x ); },
-    [&]( Handle<ValueTree> x ) { return Handle<ValueTreeRef>( x ); },
+    [&]( Handle<ValueTree> x ) { return ref( x ).unwrap<ValueTreeRef>(); },
     [&]( Handle<BlobRef> x ) { return x; },
     [&]( Handle<ValueTreeRef> x ) { return x; },
   } );

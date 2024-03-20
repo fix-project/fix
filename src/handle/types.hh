@@ -15,6 +15,11 @@ struct Handle;
 template<typename T>
 struct Tree;
 
+template<typename T>
+struct TreeRef;
+
 using ValueTree = Tree<Value>;
 using ObjectTree = Tree<Object>;
 using ExpressionTree = Tree<Expression>;
+using ValueTreeRef = TreeRef<Value>;
+using ObjectTreeRef = TreeRef<Object>;

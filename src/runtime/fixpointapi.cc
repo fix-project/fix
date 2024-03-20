@@ -179,7 +179,14 @@ u8x32 create_selection_thunk( u8x32 handle )
 
 uint32_t get_length( u8x32 handle )
 {
-  return handle::size( Handle<Fix>::forge( handle ) );
+  auto fix = Handle<Fix>::forge( handle );
+  return handle::extract<ExpressionTree>( fix )
+    .transform( []( auto h ) -> Handle<AnyTree> { return h; } )
+    .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ObjectTree>( fix ); } )
+    .or_else( [&]() -> optional<Handle<AnyTree>> { return handle::extract<ValueTree>( fix ); } )
+    .transform( [&]( auto h ) { return storage->get( h )->size(); } )
+    .or_else( [&]() -> optional<size_t> { return handle::size( fix ); } )
+    .value();
 }
 
 u8x32 create_strict_encode( u8x32 handle )
