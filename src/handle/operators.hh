@@ -94,6 +94,25 @@ inline std::ostream& operator<<( std::ostream& os, const Handle<Tree<T>>& h )
   return os;
 }
 
+template<typename T>
+inline std::ostream& operator<<( std::ostream& os, const Handle<TreeRef<T>>& h )
+{
+  if constexpr ( std::same_as<T, Value> ) {
+    os << "Value";
+  } else if constexpr ( std::same_as<T, Object> ) {
+    os << "Object";
+  } else if constexpr ( std::same_as<T, Expression> ) {
+    os << "Expression";
+  }
+  os << "TreeRef " << h.size() << " ";
+  if ( h.is_local() ) {
+    os << "(Local " << h.local_name() << ")";
+  } else {
+    os << "(Canonical " << h.hash() << ")";
+  }
+  return os;
+}
+
 namespace std {
 template<typename T>
 struct hash<Handle<T>>

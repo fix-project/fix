@@ -11,7 +11,6 @@ typedef struct Type
   const char* name;
   size_t bits;
   bool fix;
-  bool tree_ref;
   size_t num_options;
   struct Type* options[];
 } Type;
@@ -55,13 +54,6 @@ Type* make_sum( const char* name, size_t n, ... )
 Type* make_wrapper( const char* name, const Type* type )
 {
   return make_sum( name, 1, type );
-}
-
-Type* make_tree_ref( const char* name, const Type* type )
-{
-  Type* res = make_sum( name, 1, type );
-  res->tree_ref = true;
-  return res;
 }
 
 void print_type( const Type* type )
@@ -131,20 +123,10 @@ void serialize_constructors( const Type* type, const unsigned offset )
 
   if ( type->num_options == 1 ) {
     const Type* option = type->options[0];
-    if ( type->tree_ref ) {
-      printf( "\tinline Handle<%s>(const Handle<%s> &base, size_t size) : "
-              "content(base.content) {\n"
-              "\t\tassert( ( size & 0xffff000000000000 ) == 0 );\n"
-              "\t\t( *(u64x4*)&content )[3] = ( ( *(u64x4*)&content )[3] & 0xffff000000000000 ) | size;\n"
-              "\t}\n",
-              type->name,
-              option->name );
-    } else {
-      printf( "\tinline Handle<%s>(const Handle<%s> &base) : "
-              "content(base.content) {}\n\n",
-              type->name,
-              option->name );
-    }
+    printf( "\tinline Handle<%s>(const Handle<%s> &base) : "
+            "content(base.content) {}\n\n",
+            type->name,
+            option->name );
   } else {
     for ( unsigned i = 0; i < type->num_options; i++ ) {
       const Type* option = type->options[i];
@@ -162,21 +144,12 @@ void serialize_constructors( const Type* type, const unsigned offset )
     // wrapper types cause ambiguous implicit conversions, so we don't allow it
     if ( option->num_options != 1 ) {
       printf( "\ttemplate<FixType T>\n" );
-      if ( type->tree_ref ) {
-        printf( "\tinline Handle<%s>(const Handle<T> &base, size_t size) requires std::convertible_to<Handle<T>, "
-                "Handle<%s>>: "
-                "Handle(Handle<%s>(base), size) {}\n\n",
-                type->name,
-                option->name,
-                option->name );
-      } else {
-        printf( "\tinline Handle<%s>(const Handle<T> &base) requires std::convertible_to<Handle<T>, "
-                "Handle<%s>>: "
-                "Handle(Handle<%s>(base)) {}\n\n",
-                type->name,
-                option->name,
-                option->name );
-      }
+      printf( "\tinline Handle<%s>(const Handle<T> &base) requires std::convertible_to<Handle<T>, "
+              "Handle<%s>>: "
+              "Handle(Handle<%s>(base)) {}\n\n",
+              type->name,
+              option->name,
+              option->name );
     }
   }
 }
@@ -309,7 +282,7 @@ body:
   printf( "template<>\n" );
   printf( "struct Handle<%s> {\n", type->name );
   printf( "\tconstexpr static bool is_fix_data_type = true;\n" );
-  printf( "\tconstexpr static bool is_fix_sum_type = %s;\n", type->tree_ref ? "false" : "true" );
+  printf( "\tconstexpr static bool is_fix_sum_type = true;\n" );
   printf( "\tconstexpr static bool is_fix_wrapper = %s;\n", wrapper ? "true" : "false" );
   if ( !wrapper ) {
     serialize_mask( offset, tag_bits );
@@ -321,12 +294,10 @@ body:
   }
   serialize_constructors( type, offset );
 
-  if ( !type->tree_ref ) {
-    serialize_unwrap( type );
-    serialize_try_into( type );
+  serialize_unwrap( type );
+  serialize_try_into( type );
 
-    serialize_get( type );
-  }
+  serialize_get( type );
 
   printf( "\ttemplate<FixType A>\n" );
   printf( "\tinline Handle<A> into() const requires "
@@ -342,20 +313,11 @@ body:
   printf( "\t\treturn Handle<A>(*this,size);\n" );
   printf( "\t}\n" );
 
-  if ( type->tree_ref ) {
-    printf( "\n\tinline size_t size() const { return ( (u64x4)content )[3] & 0xffffffffffff; }\n" );
-    printf( "\n\tinline bool is_tag() const { return ( content[30] >> 6 ) & 1; }\n" );
-  }
-
   printf( "};\n\n" );
 
   printf( "static inline std::ostream& operator<<(std::ostream& os, const Handle<%s>& h) {\n", type->name );
   printf( "\tos << \"%s (\";\n", type->name );
-  if ( type->tree_ref ) {
-    printf( "\tos << h.content;\n" );
-  } else {
-    printf( "\tstd::visit([&](auto x) {os << x;}, h.get());\n" );
-  }
+  printf( "\tstd::visit([&](auto x) {os << x;}, h.get());\n" );
   printf( "\tos << \")\";\n" );
   printf( "\treturn os;\n" );
   printf( "}\n\n" );
@@ -389,8 +351,8 @@ int main( int argc, char** argv )
   const Type* otree = make_terminal( "ObjectTree", 240 + 1 + 1 );     // hash + tag + is_local
   const Type* etree = make_terminal( "ExpressionTree", 240 + 1 + 1 ); // hash + tag + is_local
 
-  const Type* vref = make_tree_ref( "ValueTreeRef", vtree );
-  const Type* oref = make_tree_ref( "ObjectTreeRef", otree );
+  const Type* vref = make_terminal( "ValueTreeRef", 240 + 1 + 1 );
+  const Type* oref = make_terminal( "ObjectTreeRef", 240 + 1 + 1 );
 
   const Type* literal = make_terminal( "Literal", 240 + 5 ); // hash + size
   const Type* named = make_terminal( "Named", 240 + 1 );     // hash + is_local
