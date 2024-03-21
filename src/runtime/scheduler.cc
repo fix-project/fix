@@ -135,20 +135,20 @@ shared_ptr<IRuntime> OnePassScheduler::schedule_rec( Handle<AnyDataType> top_lev
                } } );
 }
 
-// Calculate absent size from a root assuming that rt contains the whole object
+// Calculate absent size from a root
 size_t absent_size( Relater& rt, shared_ptr<IRuntime> worker, Handle<Fix> root )
 {
-  size_t absent_size = 0;
+  size_t contained_size = 0;
   rt.early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
     auto contained = handle.visit<bool>(
       overload { [&]( Handle<Literal> ) { return true; }, [&]( auto h ) { return worker->contains( h ); } } );
-    if ( !contained ) {
-      absent_size += handle::size( handle );
+    if ( contained ) {
+      contained_size += handle::size( handle );
     }
 
     return contained;
   } );
-  return absent_size;
+  return handle::size( root ) - contained_size;
 }
 
 // Calculate a "score" for a worker, the lower the better

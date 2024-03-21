@@ -165,10 +165,11 @@ public:
         return;
 
       if constexpr ( FixTreeType<T> ) {
-        // Having the handle means that the data presents in storage
-        auto tree = get( handle );
-        for ( const auto& element : tree.value()->span() ) {
-          early_stop_visit_minrepo( element, visitor, visited );
+        if ( contains( handle ) ) {
+          auto tree = get( handle );
+          for ( const auto& element : tree.value()->span() ) {
+            early_stop_visit_minrepo( element, visitor, visited );
+          }
         }
       }
     }

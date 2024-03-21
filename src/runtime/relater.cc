@@ -159,10 +159,19 @@ Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
     return get( goal )->unwrap<Value>();
   }
 
+  auto prev_current = current_;
+  current_ = goal;
+
   auto result = evaluator_.evalStrict( expression );
   if ( result.has_value() ) {
     this->put( goal, result.value() );
+  } else {
+    if ( prev_current.has_value() and prev_current.value() != Handle<Relation>( goal ) ) {
+      graph_.write()->add_dependency( prev_current.value(), goal );
+    }
   }
+
+  current_ = prev_current;
   return result;
 }
 
@@ -177,7 +186,7 @@ Relater::Result<ValueTree> Relater::mapEval( Handle<ObjectTree> tree )
   auto data = storage_.get( tree );
   for ( const auto& x : data->span() ) {
     auto obj = x.unwrap<Expression>().unwrap<Object>();
-    auto result = get_or_block( Handle<Eval>( obj ) );
+    auto result = evalStrict( obj );
     if ( not result ) {
       ready = false;
     }

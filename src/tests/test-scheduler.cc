@@ -150,8 +150,11 @@ void case_three( void )
   rt->get( task );
 
   if ( fake_worker->todos_.size() != 1
-       or fake_worker->todos_.front() != Handle<AnyDataType>( handle.unwrap<Named>() ) ) {
+       or fake_worker->todos_.front()
+            != Handle<AnyDataType>( Handle<Relation>(
+              Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
+    cout << fake_worker->todos_.front() << endl;
     fprintf( stderr, "Case 3: Wrong post condition" );
     exit( 1 );
   }
