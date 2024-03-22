@@ -26,28 +26,31 @@ Handle<Fix> fs()
   static auto e = dirent(
     ".",
     d,
-    tester::Tree( dirent(
-      "a",
-      d,
-      tester::Tree(
-        dirent( "a_1.txt", f, tester::Blob( "Hello, this is a_1.txt!" ) ),
-        dirent( "a_2.txt", f, tester::Blob( "Hello, this is a_2.txt!" ) ),
-        dirent(
-          "b",
-          d,
-          tester::Tree(
-            dirent( "b_1.txt", f, tester::Blob( "this is b_1.txt!" ) ),
-            dirent(
-              "hello", d, tester::Tree( dirent( "greeter.txt", f, tester::Blob( "Hi, I am greeter.txt" ) ) ) ),
-            dirent( "c", d, tester::Tree( dirent( "fixpoint", f, tester::Blob( "Hello, World!" ) ) ) ) ) ) ) ) ) );
+    tester::Tree(
+      dirent(
+        "a",
+        d,
+        tester::Tree(
+          dirent( "a_1.txt", f, tester::Blob( "Hello, this is a_1.txt!" ) ),
+          dirent( "a_2.txt", f, tester::Blob( "Hello, this is a_2.txt!" ) ),
+          dirent(
+            "b",
+            d,
+            tester::Tree(
+              dirent( "b_1.txt", f, tester::Blob( "this is b_1.txt!" ) ),
+              dirent(
+                "hello", d, tester::Tree( dirent( "greeter.txt", f, tester::Blob( "Hi, I am greeter.txt" ) ) ) ),
+              dirent( "c", d, tester::Tree( dirent( "fixpoint", f, tester::Blob( "Hello, World!" ) ) ) ) ) ) ) ),
+      dirent( "fixpoint", f, tester::Blob( "Hello, World!" ) ) ) );
+
   return e;
 }
 
 int run_flatware( const string& name, Handle<Fix> elf, Handle<Fix> home )
 {
   printf( "### TEST %s\n", name.c_str() );
-  auto exe = Handle<Application>( tester::Tree( tester::Limits(), elf, tester::Tree(), home ) );
-  auto result = tester::rt->get( tester::rt->execute( Handle<Eval>( exe ) ).try_into<ValueTree>().value() ).value();
+  auto exe = flatware_input( *tester::rt, tester::Limits(), elf, home );
+  auto result = tester::rt->get( tester::rt->execute( exe ).try_into<ValueTree>().value() ).value();
   uint32_t code = -1;
   memcpy( &code, handle::extract<Literal>( result->at( 0 ) ).value().data(), sizeof( uint32_t ) );
   printf( "%s returned %d\n", name.c_str(), code );
@@ -60,10 +63,12 @@ int run_flatware( const string& name, Handle<Fix> elf, Handle<Fix> home )
 
 void test( void )
 {
+  // Attempts to open and read from a simple file
   run_flatware( "open",
                 tester::Compile( tester::File(
                   "applications-prefix/src/applications-build/flatware/examples/open/open-fixpoint.wasm" ) ),
                 fs() );
+  // Attempts to open multiple nested existing and non-existing files as described in open-deep.c
   run_flatware( "open-deep",
                 tester::Compile( tester::File(
                   "applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm" ) ),

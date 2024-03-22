@@ -9,6 +9,7 @@ set(CMAKE_CXX_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang++)
 add_link_options( -Wl,--no-entry -Wl,--allow-undefined, -Wl, -Werror, -Wunused-parameter, -fno-exceptions)
 
 add_library(add_2_obj OBJECT "add_2.cc")
+target_link_libraries(add_2_obj PUBLIC fixpoint_storage)
 
 link_libc("${CMAKE_BINARY_DIR}/map/CMakeFiles/add_2_obj.dir/add_2.cc.o" add_2_obj add_2.wasm) # outputs add_2.wasm
 

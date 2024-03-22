@@ -11,8 +11,13 @@ int main()
 
   int fd = open( "fixpoint", O_RDONLY );
 
+  if ( fd < 0 ) {
+    return -1;
+  }
+
   readv( fd, iovs, 2 );
 
   printf( "Read %s and %s", buf1, buf2 );
+  
   return 0;
 }
