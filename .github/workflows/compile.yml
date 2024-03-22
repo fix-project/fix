@@ -16,7 +16,9 @@ jobs:
   ci:
       if: (github.event_name == 'push') || (github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository))
       runs-on: ubuntu-latest
-      container: ghcr.io/fix-project/wasm_toolchain_docker:latest
+      container:
+         image: ghcr.io/fix-project/wasm_toolchain_docker:latest
+         options: '--privileged'
       strategy:
         matrix:
           sanitizer: [normal, asan, ubsan, tsan]
@@ -25,6 +27,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+      - name: limit ASLR for sanitizers
+        run: sudo sysctl -w vm.mmap_rnd_bits=28 # https://github.com/actions/runner/issues/3207 / https://github.com/google/sanitizers/issues/1614
       - name: install deps
         run: sudo apt update && sudo apt-get install libboost-all-dev libgoogle-glog-dev software-properties-common -y
       - name: install g++ 13
