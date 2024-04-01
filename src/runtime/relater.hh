@@ -12,7 +12,11 @@ inline thread_local std::optional<Handle<Relation>> current_;
 class Executor;
 class Scheduler;
 class OnePassScheduler;
+class TwoPassScheduler;
 class LocalFirstScheduler;
+class Pass;
+class BasePass;
+class PrunedSelectionPass;
 
 class Relater
   : public MultiWorkerRuntime
@@ -20,7 +24,11 @@ class Relater
 {
   friend class Executor;
   friend class OnePassScheduler;
+  friend class TwoPassScheduler;
   friend class LocalFirstScheduler;
+  friend class Pass;
+  friend class BasePass;
+  friend class PrunedSelectionPass;
 
 private:
   SharedMutex<DependencyGraph> graph_ {};

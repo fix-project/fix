@@ -83,6 +83,10 @@ void case_one( void )
 
   if ( fake_worker->todos_.size() != 1
        or fake_worker->todos_.front() != Handle<AnyDataType>( Handle<Relation>( task ) ) ) {
+    fprintf( stderr, "Todo size %zu", fake_worker->todos_.size() );
+    for ( const auto& todo : fake_worker->todos_ ) {
+      cout << "Todo " << todo << endl;
+    }
     fprintf( stderr, "Case 1: Wrong post condition" );
     exit( 1 );
   }
@@ -154,7 +158,9 @@ void case_three( void )
             != Handle<AnyDataType>( Handle<Relation>(
               Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
-    cout << fake_worker->todos_.front() << endl;
+    for ( const auto& todo : fake_worker->todos_ ) {
+      cout << "Todo " << todo << endl;
+    }
     fprintf( stderr, "Case 3: Wrong post condition" );
     exit( 1 );
   }

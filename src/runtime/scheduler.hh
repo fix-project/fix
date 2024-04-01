@@ -35,12 +35,12 @@ public:
 
 class OnePassScheduler : public Scheduler
 {
-  std::shared_ptr<IRuntime> schedule_rec( Handle<AnyDataType> top_level_job );
+public:
+  virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) override;
+};
 
-  std::shared_ptr<IRuntime> locate(
-    Handle<AnyDataType> job,
-    const std::unordered_map<Handle<AnyDataType>, std::shared_ptr<IRuntime>>& dependency_locations );
-
+class TwoPassScheduler : public OnePassScheduler
+{
 public:
   virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) override;
 };
