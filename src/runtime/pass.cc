@@ -1,5 +1,6 @@
 #include "pass.hh"
 #include "handle.hh"
+#include "overload.hh"
 #include <stdexcept>
 
 using namespace std;
@@ -204,6 +205,12 @@ void BasePass::independent( Handle<AnyDataType> job )
 
     if ( locked_remote->get_info().has_value() and locked_remote->get_info()->parallelism > 0 ) {
       tasks_info_[job].absent_size.insert( { locked_remote, absent_size( locked_remote, job ) } );
+      job.visit<void>( overload { [&]( Handle<Relation> r ) {
+                                   if ( locked_remote->contains( r ) ) {
+                                     tasks_info_[job].contains.insert( locked_remote );
+                                   }
+                                 },
+                                  []( auto ) {} } );
     }
   }
 }
@@ -230,88 +237,125 @@ PrunedSelectionPass::PrunedSelectionPass( std::reference_wrapper<BasePass> base,
 
 void MinAbsentMaxParallelism::leaf( Handle<AnyDataType> job )
 {
-  const auto& absent_size = base_.get().get_absent_size( job );
+  optional<shared_ptr<IRuntime>> chosen_remote;
 
-  size_t min_absent_size = numeric_limits<size_t>::max();
-  size_t max_parallelism = 0;
+  job.visit<void>( overload { [&]( Handle<Relation> r ) {
+                               const auto& contains = base_.get().get_contains( r );
+                               if ( !contains.empty() ) {
+                                 chosen_remote = *contains.begin();
+                               }
+                             },
+                              []( auto ) {} } );
 
-  shared_ptr<IRuntime> chosen_remote;
+  if ( !chosen_remote.has_value() ) {
+    const auto& absent_size = base_.get().get_absent_size( job );
 
-  for ( const auto& [r, s] : absent_size ) {
-    if ( s < min_absent_size ) {
-      min_absent_size = s;
-      max_parallelism = r->get_info()->parallelism;
-      chosen_remote = r;
-    } else if ( s == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
-      max_parallelism = r->get_info()->parallelism;
-      chosen_remote = r;
+    size_t min_absent_size = numeric_limits<size_t>::max();
+    size_t max_parallelism = 0;
+
+    for ( const auto& [r, s] : absent_size ) {
+      if ( s < min_absent_size ) {
+        min_absent_size = s;
+        max_parallelism = r->get_info()->parallelism;
+        chosen_remote = r;
+      } else if ( s == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
+        max_parallelism = r->get_info()->parallelism;
+        chosen_remote = r;
+      }
     }
   }
 
-  chosen_remotes_.insert( { job, chosen_remote } );
+  chosen_remotes_.insert( { job, chosen_remote.value() } );
 }
 
 void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
                                     const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
-  absl::flat_hash_map<shared_ptr<IRuntime>, size_t> present_output;
+  optional<shared_ptr<IRuntime>> chosen_remote;
 
-  for ( const auto& d : dependencies ) {
-    present_output[chosen_remotes_.at( d )] += base_.get().get_in_out_size( d ).second;
-    // TODO: handle data and load differently
-  }
+  job.visit<void>( overload { [&]( Handle<Relation> r ) {
+                               const auto& contains = base_.get().get_contains( r );
+                               if ( !contains.empty() ) {
+                                 chosen_remote = *contains.begin();
+                               }
+                             },
+                              []( auto ) {} } );
 
-  const auto& absent_size = base_.get().get_absent_size( job );
+  if ( !chosen_remote.has_value() ) {
+    absl::flat_hash_map<shared_ptr<IRuntime>, size_t> present_output;
 
-  int64_t min_absent_size = numeric_limits<int64_t>::max();
-  size_t max_parallelism = 0;
+    for ( const auto& d : dependencies ) {
+      present_output[chosen_remotes_.at( d )] += base_.get().get_in_out_size( d ).second;
+      // TODO: handle data and load differently
+    }
 
-  shared_ptr<IRuntime> chosen_remote;
+    const auto& absent_size = base_.get().get_absent_size( job );
 
-  for ( const auto& [r, s] : absent_size ) {
-    int64_t sum_size = s - present_output[r];
-    if ( sum_size < min_absent_size ) {
-      min_absent_size = sum_size;
-      max_parallelism = r->get_info()->parallelism;
-      chosen_remote = r;
-    } else if ( sum_size == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
-      max_parallelism = r->get_info()->parallelism;
-      chosen_remote = r;
+    int64_t min_absent_size = numeric_limits<int64_t>::max();
+    size_t max_parallelism = 0;
+
+    for ( const auto& [r, s] : absent_size ) {
+      int64_t sum_size = s - present_output[r];
+      if ( sum_size < min_absent_size ) {
+        min_absent_size = sum_size;
+        max_parallelism = r->get_info()->parallelism;
+        chosen_remote = r;
+      } else if ( sum_size == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
+        max_parallelism = r->get_info()->parallelism;
+        chosen_remote = r;
+      }
     }
   }
 
-  chosen_remotes_.insert( { job, chosen_remote } );
+  chosen_remotes_.insert( { job, chosen_remote.value() } );
 }
 
 void ChildBackProp::independent( Handle<AnyDataType> job )
 {
   auto dependee = dependees_.at( job );
 
-  absl::flat_hash_set<shared_ptr<IRuntime>> move_output;
+  unordered_set<shared_ptr<IRuntime>> move_output;
   for ( const auto& d : dependee ) {
     move_output.insert( chosen_remotes_.at( d ) );
   }
 
-  const auto& absent_size = base_.get().get_absent_size( job );
+  optional<shared_ptr<IRuntime>> chosen_remote;
 
-  size_t min_absent_size = numeric_limits<int64_t>::max();
-  size_t max_parallelism = 0;
+  job.visit<void>( overload { [&]( Handle<Relation> r ) {
+                               const auto& contains = base_.get().get_contains( r );
+                               if ( !contains.empty() ) {
+                                 for ( const auto& c : contains ) {
+                                   if ( move_output.contains( c ) ) {
+                                     chosen_remote = c;
+                                     return;
+                                   }
+                                 }
+                                 chosen_remote = *contains.begin();
+                               }
+                             },
+                              []( auto ) {} } );
 
-  shared_ptr<IRuntime> chosen_remote;
+  if ( !chosen_remote.has_value() ) {
 
-  for ( const auto& [r, s] : absent_size ) {
-    size_t sum_size = s + ( move_output.contains( r ) ? base_.get().get_in_out_size( job ).second : 0 );
-    if ( sum_size < min_absent_size ) {
-      min_absent_size = sum_size;
-      max_parallelism = r->get_info()->parallelism;
-      chosen_remote = r;
-    } else if ( sum_size == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
-      max_parallelism = r->get_info()->parallelism;
-      chosen_remote = r;
+    const auto& absent_size = base_.get().get_absent_size( job );
+
+    size_t min_absent_size = numeric_limits<int64_t>::max();
+    size_t max_parallelism = 0;
+
+    for ( const auto& [r, s] : absent_size ) {
+      size_t sum_size = s + ( move_output.contains( r ) ? base_.get().get_in_out_size( job ).second : 0 );
+      if ( sum_size < min_absent_size ) {
+        min_absent_size = sum_size;
+        max_parallelism = r->get_info()->parallelism;
+        chosen_remote = r;
+      } else if ( sum_size == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
+        max_parallelism = r->get_info()->parallelism;
+        chosen_remote = r;
+      }
     }
   }
 
-  chosen_remotes_.insert( { job, chosen_remote } );
+  chosen_remotes_.insert( { job, chosen_remote.value() } );
 }
 
 void ChildBackProp::pre( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
@@ -325,9 +369,15 @@ void Parallelize::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<Any
 {
   unordered_map<shared_ptr<IRuntime>, size_t> assigned_parallelism;
 
-  for ( const auto& d : dependencies ) {
+  for ( auto d : dependencies ) {
     auto chosen = chosen_remotes_.at( d );
     auto& assigned = assigned_parallelism[chosen_remotes_.at( d )];
+
+    auto contained = d.visit<bool>(
+      overload { []( Handle<Literal> ) { return true; }, [&]( auto h ) { return chosen->contains( h ); } } );
+    if ( contained )
+      continue;
+
     if ( assigned >= chosen->get_info()->parallelism ) {
       // Choose a different remote for this dependency
       // XXX: calculate score by queue length and data movement cost
@@ -353,7 +403,6 @@ void Parallelize::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<Any
         }
       }
       chosen_remotes_.insert( { d, chosen_remote } );
-
     } else {
       assigned += base_.get().get_fan_out( d );
     }
