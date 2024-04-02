@@ -55,12 +55,20 @@ Server::~Server()
   network_worker_->stop();
 }
 
-shared_ptr<Server> Server::init( const Address& address )
+shared_ptr<Server> Server::init( const Address& address, vector<Address> peer_servers )
 {
   auto runtime = std::make_shared<Server>();
   runtime->network_worker_.emplace( runtime->relater_ );
   runtime->network_worker_->start();
+
+  for ( const auto& p : peer_servers ) {
+    if ( p == address ) {
+      break;
+    }
+    runtime->network_worker_->connect( p );
+  }
   runtime->network_worker_->start_server( address );
+  
   return runtime;
 }
 
