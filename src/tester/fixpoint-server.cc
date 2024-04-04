@@ -23,32 +23,37 @@ void split( const string_view str, const char ch_to_find, vector<string_view>& r
 
 int main( int argc, char* argv[] )
 {
-  OptionParser parser ( "fixpoint-server", "Run a fixpoint server" );
+  OptionParser parser( "fixpoint-server", "Run a fixpoint server" );
   uint16_t port;
   optional<const char*> local;
   optional<const char*> peerfile;
   parser.AddArgument(
-      "listening-port", OptionParser::ArgumentCount::One, [&]( const char* argument ) { port = stoi( argument ); } );
+    "listening-port", OptionParser::ArgumentCount::One, [&]( const char* argument ) { port = stoi( argument ); } );
+  parser.AddOption( 'a',
+                    "address",
+                    "address",
+                    "Address of this server. This address does not change the listening address, and is used "
+                    "solely for distinguish this server from the list of peer servers.",
+                    [&]( const char* argument ) { local = argument; } );
   parser.AddOption(
-      'a', "address", "address", "Address of this server. This address does not change the listening address, and is used solely for distinguish this server from the list of peer servers.", [&]( const char* argument ) { local = argument; }
-      );
-  parser.AddOption(
-      'p', "peers", "peers", "Path to a file that contains a list of all servers.", [&]( const char* argument ) { peerfile = argument; }
-      );
+    'p', "peers", "peers", "Path to a file that contains a list of all servers.", [&]( const char* argument ) {
+      peerfile = argument;
+    } );
   parser.Parse( argc, argv );
 
   Address listen_address( "0.0.0.0", port );
   vector<Address> peer_address;
 
   if ( local.has_value() and peerfile.has_value() ) {
-    Address local_address ( local.value(), port );
+    Address local_address( local.value(), port );
 
-    ReadOnlyFile peers ( peerfile.value() );
+    ReadOnlyFile peers( peerfile.value() );
     vector<string_view> ret;
     split( peers, '\n', ret );
 
     for ( const auto p : ret ) {
-      if ( p.empty() ) continue;
+      if ( p.empty() )
+        continue;
       if ( p.find( ':' ) == string::npos ) {
         throw runtime_error( "Invalid peer address " + string( p ) );
       }

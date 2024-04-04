@@ -68,7 +68,7 @@ shared_ptr<Server> Server::init( const Address& address, vector<Address> peer_se
     runtime->network_worker_->connect( p );
   }
   runtime->network_worker_->start_server( address );
-  
+
   return runtime;
 }
 
