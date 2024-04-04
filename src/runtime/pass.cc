@@ -128,7 +128,7 @@ void BasePass::leaf( Handle<AnyDataType> job )
                                                            .transform( [&]( auto x ) { return uint64_t( x ); } )
                                                            .value_or( 1 );
 
-                                   tasks_info_[job].in_out_size = { sizeof( Handle<Fix> ), output_size };
+                                   tasks_info_[job].output_size = output_size;
                                    tasks_info_[job].output_fan_out = output_fan_out;
                                  },
                                  [&]( Handle<Eval> ) {},
@@ -136,7 +136,7 @@ void BasePass::leaf( Handle<AnyDataType> job )
                              },
                               []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
                               [&]( auto h ) {
-                                tasks_info_[job].in_out_size = { sizeof( Handle<Fix> ), handle::size( h ) };
+                                tasks_info_[job].output_size = handle::size( h );
                                 tasks_info_[job].output_fan_out = 0;
                               } } );
 }
@@ -144,16 +144,42 @@ void BasePass::leaf( Handle<AnyDataType> job )
 void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
   // Output size = input_size + replacing every dependent's input with output
+  Handle<Object> obj = job.unwrap<Relation>().unwrap<Eval>().unwrap<Object>();
+  auto input_size = handle::size( obj );
+
+  auto output_size = obj.visit<size_t>(
+    overload { [&]( Handle<Thunk> t ) {
+                return t.visit<size_t>( overload {
+                  [&]( Handle<Application> a ) {
+                    auto rlimits = relater_.get().get( a.unwrap<ObjectTree>() ).value()->at( 0 );
+                    auto limits = relater_.get().get( handle::extract<ValueTree>( rlimits ).value() ).value();
+                    return handle::extract<Literal>( limits->at( 1 ) )
+                      .transform( [&]( auto x ) { return uint64_t( x ); } )
+                      .value_or( 0 );
+                  },
+                  [&]( Handle<Identification> ) {
+                    auto out = tasks_info_.at( *dependencies.begin() ).output_size;
+                    return out;
+                  },
+                  [&]( Handle<Selection> ) { throw std::runtime_error( "Unimplemented" ); } } );
+              },
+               [&]( auto ) {
+                 // Output size = input_size + replacing every dependent's input with output
+                 size_t res = input_size;
+                 for ( const auto& dependency : dependencies ) {
+                   auto out = tasks_info_.at( dependency ).output_size;
+                   res += out;
+                 }
+                 return res;
+               } } );
+
   // Output fan out = sum( dependents' fan out )
-  auto input_size = handle::size( job );
-  auto output_size = input_size;
   size_t output_fan_out = 0;
   for ( const auto& dependency : dependencies ) {
-    auto [in, out] = tasks_info_.at( dependency ).in_out_size;
-    output_size = output_size - in + out;
     output_fan_out += tasks_info_.at( dependency ).output_fan_out;
   }
-  tasks_info_[job].in_out_size = { input_size, output_size };
+
+  tasks_info_[job].output_size = output_size;
   tasks_info_[job].output_fan_out = output_fan_out;
 }
 
@@ -285,7 +311,7 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
     absl::flat_hash_map<shared_ptr<IRuntime>, size_t> present_output;
 
     for ( const auto& d : dependencies ) {
-      present_output[chosen_remotes_.at( d )] += base_.get().get_in_out_size( d ).second;
+      present_output[chosen_remotes_.at( d )] += base_.get().get_output_size( d );
       // TODO: handle data and load differently
     }
 
@@ -343,7 +369,7 @@ void ChildBackProp::independent( Handle<AnyDataType> job )
     size_t max_parallelism = 0;
 
     for ( const auto& [r, s] : absent_size ) {
-      size_t sum_size = s + ( move_output.contains( r ) ? base_.get().get_in_out_size( job ).second : 0 );
+      size_t sum_size = s + ( move_output.contains( r ) ? base_.get().get_output_size( job ) : 0 );
       if ( sum_size < min_absent_size ) {
         min_absent_size = sum_size;
         max_parallelism = r->get_info()->parallelism;

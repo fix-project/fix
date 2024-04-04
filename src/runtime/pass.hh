@@ -39,7 +39,7 @@ private:
   {
     std::unordered_map<std::shared_ptr<IRuntime>, size_t> absent_size {};
     std::unordered_set<std::shared_ptr<IRuntime>> contains {};
-    std::pair<size_t, size_t> in_out_size {};
+    size_t output_size {};
     size_t output_fan_out {};
   };
 
@@ -68,10 +68,7 @@ public:
     return tasks_info_.at( task ).contains;
   }
 
-  std::pair<size_t, size_t> get_in_out_size( const Handle<AnyDataType> task ) const
-  {
-    return tasks_info_.at( task ).in_out_size;
-  }
+  size_t get_output_size( const Handle<AnyDataType> task ) const { return tasks_info_.at( task ).output_size; }
 
   size_t get_fan_out( const Handle<AnyDataType> task ) const { return tasks_info_.at( task ).output_fan_out; }
 };
