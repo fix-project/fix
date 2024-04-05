@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "handle.hh"
+#include "handle_util.hh"
 #include "mutex.hh"
 #include "object.hh"
 
@@ -31,7 +32,7 @@ class RuntimeStorage
 private:
   friend class RuntimeWorker;
   using BlobMap = absl::flat_hash_map<Handle<Named>, BlobData, AbslHash>;
-  using TreeMap = absl::flat_hash_map<Handle<ExpressionTree>, TreeData, AbslHash>;
+  using TreeMap = absl::flat_hash_map<Handle<ExpressionTree>, TreeData, AbslHash, handle::tree_equal>;
   using RelationMap = absl::flat_hash_map<Handle<Fix>, Handle<Object>, AbslHash>;
   using PinMap = absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash>;
   using LabelMap = absl::flat_hash_map<std::string, Handle<Fix>>;
@@ -126,6 +127,10 @@ public:
   bool contains( Handle<Named> handle );
   bool contains( Handle<AnyTree> handle );
   bool contains( Handle<Relation> handle );
+
+  // return the reffed Handle<AnyTree> if known
+  std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle );
+  Handle<AnyTreeRef> ref( Handle<AnyTree> tree );
 
   /**
    * Call @p visitor for every Handle in the "minimum repo" of @p root, i.e., the set of Handles which are needed

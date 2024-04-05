@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "base16.hh"
+#include "handle_post.hh"
 #include "repository.hh"
 #include "storage_exception.hh"
 
@@ -84,13 +85,27 @@ std::optional<BlobData> Repository::get( Handle<Named> name )
 
 std::optional<TreeData> Repository::get( Handle<AnyTree> name )
 {
-  auto fix = name.visit<Handle<Fix>>( []( auto x ) { return x; } );
+  auto vtree = name.visit<Handle<Fix>>( []( auto h ) -> Handle<ValueTree> {
+    return { h.content, h.size(), h.is_tag() };
+  } );
+  auto otree = name.visit<Handle<Fix>>( []( auto h ) -> Handle<ObjectTree> {
+    return { h.content, h.size(), h.is_tag() };
+  } );
+  auto etree = name.visit<Handle<Fix>>( []( auto h ) -> Handle<ExpressionTree> {
+    return { h.content, h.size(), h.is_tag() };
+  } );
   try {
-    VLOG( 1 ) << "loading " << fix.content << " from disk";
-    assert( not handle::is_local( fix ) );
-    return make_shared<OwnedTree>( repo_ / "data" / base16::encode( fix.content ) );
+    VLOG( 1 ) << "loading " << handle::fix( name ).content << " from disk";
+    assert( not handle::is_local( name ) );
+    if ( fs::exists( repo_ / "data" / base16::encode( vtree.content ) ) ) {
+      return make_shared<OwnedTree>( repo_ / "data" / base16::encode( vtree.content ) );
+    } else if ( fs::exists( repo_ / "data" / base16::encode( otree.content ) ) ) {
+      return make_shared<OwnedTree>( repo_ / "data" / base16::encode( otree.content ) );
+    } else {
+      return make_shared<OwnedTree>( repo_ / "data" / base16::encode( etree.content ) );
+    }
   } catch ( std::filesystem::filesystem_error& ) {
-    throw HandleNotFound( fix );
+    throw HandleNotFound( handle::fix( name ) );
   }
 }
 
@@ -223,7 +238,18 @@ bool Repository::contains( Handle<Named> handle )
 bool Repository::contains( Handle<AnyTree> handle )
 {
   try {
-    return fs::exists( repo_ / "data" / base16::encode( handle::fix( handle ).content ) );
+    auto vtree = handle.visit<Handle<ValueTree>>( []( auto h ) -> Handle<ValueTree> {
+      return { h.content, h.size(), h.is_tag() };
+    } );
+    auto otree = handle.visit<Handle<ObjectTree>>( []( auto h ) -> Handle<ObjectTree> {
+      return { h.content, h.size(), h.is_tag() };
+    } );
+    auto etree = handle.visit<Handle<ExpressionTree>>( []( auto h ) -> Handle<ExpressionTree> {
+      return { h.content, h.size(), h.is_tag() };
+    } );
+    return fs::exists( repo_ / "data" / base16::encode( Handle<Fix>( vtree ).content ) )
+           || fs::exists( repo_ / "data" / base16::encode( Handle<Fix>( otree ).content ) )
+           || fs::exists( repo_ / "data" / base16::encode( Handle<Fix>( etree ).content ) );
   } catch ( fs::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
@@ -236,6 +262,35 @@ bool Repository::contains( Handle<Relation> handle )
   } catch ( fs::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
+}
+
+std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
+{
+  auto content_hash = base16::encode( handle::fix( handle ).content ).erase( 192 );
+  optional<Handle<Fix>> res {};
+  for ( const auto& dir_entry : fs::directory_iterator( repo_ / "data" ) ) {
+    if ( dir_entry.path().filename().string().find( content_hash ) == 0 ) {
+      res = Handle<Fix>::forge( base16::decode( dir_entry.path().filename().string() ) );
+      break;
+    }
+  }
+
+  auto etree
+    = res.and_then( []( auto h ) -> optional<Handle<AnyTree>> { return handle::extract<ExpressionTree>( h ); } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> {
+          return res.and_then( []( auto h ) { return handle::extract<ObjectTree>( h ); } );
+        } )
+        .or_else( [&]() -> optional<Handle<AnyTree>> {
+          return res.and_then( []( auto h ) { return handle::extract<ValueTree>( h ); } );
+        } )
+        .transform( []( auto h ) -> Handle<ExpressionTree> { return handle::upcast( h ); } );
+
+  return etree.transform( [&]( auto h ) {
+    return handle.visit<Handle<AnyTree>>( overload {
+      [&]( Handle<ValueTreeRef> v ) { return Handle<ValueTree>( h.content, h.size(), v.is_tag() ); },
+      [&]( Handle<ObjectTreeRef> o ) { return Handle<ObjectTree>( h.content, h.size(), o.is_tag() ); },
+    } );
+  } );
 }
 
 #if 0

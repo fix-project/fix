@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 
 #include "evaluator.hh"
+#include "overload.hh"
 #include "runtimestorage.hh"
 
 using namespace std;
@@ -30,6 +31,15 @@ public:
 
 private:
   virtual Result<Fix> load( Handle<AnyDataType> value ) { return handle::fix( value ); }
+  virtual Result<AnyTree> load( Handle<AnyTreeRef> ) { return {}; }
+  virtual Handle<AnyTreeRef> ref( Handle<AnyTree> t )
+  {
+    return t.visit<Handle<AnyTreeRef>>( overload {
+      []( Handle<ExpressionTree> ) -> Handle<AnyTreeRef> { throw runtime_error( "Not reffable" ); },
+      []( Handle<ObjectTree> t ) { return t.into<ObjectTreeRef>( 0 ); },
+      []( Handle<ValueTree> t ) { return t.into<ValueTreeRef>( 0 ); },
+    } );
+  }
 
   virtual Result<Object> apply( Handle<ObjectTree> combination )
   {
@@ -65,8 +75,8 @@ private:
   virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree )
   {
     auto objs = storage.get( tree );
-    auto vals = OwnedMutTree::allocate( tree.size() );
-    for ( size_t i = 0; i < tree.size(); i++ ) {
+    auto vals = OwnedMutTree::allocate( objs->size() );
+    for ( size_t i = 0; i < objs->size(); i++ ) {
       vals[i] = evalStrict( objs->at( i ).unwrap<Expression>().unwrap<Object>() ).value();
     }
     return storage.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>();
@@ -75,8 +85,8 @@ private:
   virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree )
   {
     auto exprs = storage.get( tree );
-    auto objs = OwnedMutTree::allocate( tree.size() );
-    for ( size_t i = 0; i < tree.size(); i++ ) {
+    auto objs = OwnedMutTree::allocate( exprs->size() );
+    for ( size_t i = 0; i < exprs->size(); i++ ) {
       objs[i] = evaluator_.reduce( exprs->at( i ).unwrap<Expression>() ).value();
     }
     return storage.create_tree<ObjectTree>( std::make_shared<OwnedTree>( std::move( objs ) ) );
@@ -85,8 +95,8 @@ private:
   virtual Result<ValueTree> mapLift( Handle<ValueTree> tree )
   {
     auto vals = storage.get( tree );
-    auto new_vals = OwnedMutTree::allocate( tree.size() );
-    for ( size_t i = 0; i < tree.size(); i++ ) {
+    auto new_vals = OwnedMutTree::allocate( vals->size() );
+    for ( size_t i = 0; i < vals->size(); i++ ) {
       new_vals[i] = evaluator_.lift( vals->at( i ).unwrap<Expression>().unwrap<Object>().unwrap<Value>() ).value();
     }
     return storage.create( std::make_shared<OwnedTree>( std::move( new_vals ) ) ).unwrap<ValueTree>();

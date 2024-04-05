@@ -50,6 +50,8 @@ public:
   Handle<Value> execute( Handle<Relation> x );
 
   virtual Result<Fix> load( Handle<AnyDataType> value ) override;
+  virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
+  virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
   virtual Result<Value> evalStrict( Handle<Object> expression ) override;
   virtual Result<Object> evalShallow( Handle<Object> expression ) override;
@@ -66,6 +68,7 @@ public:
   virtual bool contains( Handle<Named> handle ) override;
   virtual bool contains( Handle<AnyTree> handle ) override;
   virtual bool contains( Handle<Relation> handle ) override;
+  virtual std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle ) override;
   virtual bool contains( const std::string_view label ) override;
   virtual Handle<Fix> labeled( const std::string_view label ) override;
 
@@ -88,10 +91,11 @@ public:
                      []( auto ) {} } );
       }
 
-      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
-                          or std::same_as<T, ObjectTreeRef> ) )
+      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
         std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
 
+    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+      return;
     } else {
       if constexpr ( FixTreeType<T> ) {
         // Having the handle means that the data presents in storage
@@ -117,9 +121,6 @@ public:
       return;
 
     if constexpr ( Handle<T>::is_fix_sum_type ) {
-      if ( not( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) ) {
-        std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, handle.get() );
-      }
       if constexpr ( std::same_as<T, Relation> ) {
         auto target = get( handle );
         std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, target->get() );
@@ -134,6 +135,8 @@ public:
         visited.insert( handle );
       }
 
+    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+      return;
     } else {
       if constexpr ( FixTreeType<T> ) {
         auto tree = get( handle );
