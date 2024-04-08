@@ -80,6 +80,7 @@ void LocalFirstScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Hand
 
 void OnePassScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
 {
+  VLOG( 1 ) << "OnePassScheduler input: " << top_level_job << endl;
   // If all dependencies are resolved, the job should have been completed
   if ( leaf_jobs.empty() ) {
     throw runtime_error( "Invalid schedule() invocation." );
@@ -89,8 +90,9 @@ void OnePassScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<
   PassRunner::run( relater_.value(), top_level_job, { PassRunner::PassType::MinAbsentMaxParallelism } );
 }
 
-void TwoPassScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
+void HintScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
 {
+  VLOG( 1 ) << "HintScheduler input: " << top_level_job << endl;
   // If all dependencies are resolved, the job should have been completed
   if ( leaf_jobs.empty() ) {
     throw runtime_error( "Invalid schedule() invocation." );
@@ -102,4 +104,15 @@ void TwoPassScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<
                    { PassRunner::PassType::MinAbsentMaxParallelism,
                      PassRunner::PassType::ChildPackProp,
                      PassRunner::PassType::Parallelize } );
+}
+
+void RandomScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
+{
+  // If all dependencies are resolved, the job should have been completed
+  if ( leaf_jobs.empty() ) {
+    throw runtime_error( "Invalid schedule() invocation." );
+    return;
+  }
+
+  PassRunner::run( relater_.value(), top_level_job, { PassRunner::PassType::Random } );
 }

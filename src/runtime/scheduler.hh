@@ -1,6 +1,5 @@
 #pragma once
 
-#include "interface.hh"
 #include "relater.hh"
 #include <functional>
 
@@ -39,7 +38,13 @@ public:
   virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) override;
 };
 
-class TwoPassScheduler : public OnePassScheduler
+class HintScheduler : public Scheduler
+{
+public:
+  virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) override;
+};
+
+class RandomScheduler : public Scheduler
 {
 public:
   virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) override;

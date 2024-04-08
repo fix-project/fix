@@ -33,7 +33,7 @@ int main( int argc, char* argv[] )
                     "address",
                     "address",
                     "Address of this server. This address does not change the listening address, and is used "
-                    "solely for distinguish this server from the list of peer servers.",
+                    "solely for distinguishing this server from the list of peer servers.",
                     [&]( const char* argument ) { local = argument; } );
   parser.AddOption(
     'p', "peers", "peers", "Path to a file that contains a list of all servers.", [&]( const char* argument ) {

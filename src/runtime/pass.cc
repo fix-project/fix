@@ -1,6 +1,8 @@
 #include "pass.hh"
 #include "handle.hh"
+#include "handle_post.hh"
 #include "overload.hh"
+#include "scheduler.hh"
 #include <stdexcept>
 
 using namespace std;
@@ -151,9 +153,12 @@ void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<A
     overload { [&]( Handle<Thunk> t ) {
                 return t.visit<size_t>( overload {
                   [&]( Handle<Application> a ) {
-                    auto rlimits = relater_.get().get( a.unwrap<ObjectTree>() ).value()->at( 0 );
-                    auto limits = relater_.get().get( handle::extract<ValueTree>( rlimits ).value() ).value();
-                    return handle::extract<Literal>( limits->at( 1 ) )
+                    auto rlimits = relater_.get().get( a.unwrap<ExpressionTree>() ).value()->at( 0 );
+                    cout << "Rlimits " << rlimits << endl;
+                    auto limits = handle::extract<ValueTree>( rlimits ).transform(
+                      [&]( auto x ) { return fixpoint::storage->get( x ); } );
+
+                    return limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 1 ) ); } )
                       .transform( [&]( auto x ) { return uint64_t( x ); } )
                       .value_or( 0 );
                   },
@@ -161,7 +166,7 @@ void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<A
                     auto out = tasks_info_.at( *dependencies.begin() ).output_size;
                     return out;
                   },
-                  [&]( Handle<Selection> ) { throw std::runtime_error( "Unimplemented" ); } } );
+                  [&]( Handle<Selection> ) -> size_t { throw std::runtime_error( "Unimplemented" ); } } );
               },
                [&]( auto ) {
                  // Output size = input_size + replacing every dependent's input with output
@@ -435,8 +440,25 @@ void Parallelize::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<Any
   }
 }
 
+void RandomSelection::independent( Handle<AnyDataType> job )
+{
+  const auto& absent_size = base_.get().get_absent_size( job );
+  size_t rand_idx = rand() % absent_size.size();
+
+  size_t i = 0;
+  for ( const auto& [r, _] : absent_size ) {
+    if ( i == rand_idx ) {
+      chosen_remotes_.insert( { job, r } );
+      break;
+    }
+
+    i++;
+  }
+}
+
 void FinalPass::leaf( Handle<AnyDataType> job )
 {
+  VLOG( 1 ) << "Job run locally " << job << endl;
   get( chosen_remotes_.at( job ), job, relater_.get() );
 }
 
@@ -490,6 +512,12 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
         } else {
           throw runtime_error( "Invalid pass sequence." );
         }
+        selection.value()->run( top_level_job );
+        break;
+      }
+
+      case PassType::Random: {
+        selection = make_unique<RandomSelection>( base, rt );
         selection.value()->run( top_level_job );
         break;
       }

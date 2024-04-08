@@ -159,6 +159,20 @@ public:
   {}
 };
 
+class RandomSelection : public SelectionPass
+{
+  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void leaf( Handle<AnyDataType> ) override {}
+  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+
+  virtual void independent( Handle<AnyDataType> ) override;
+
+public:
+  RandomSelection( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater )
+    : SelectionPass( base, relater )
+  {}
+};
+
 class FinalPass : public PrunedSelectionPass
 {
   virtual void leaf( Handle<AnyDataType> ) override;
@@ -182,7 +196,8 @@ public:
   {
     MinAbsentMaxParallelism,
     ChildPackProp,
-    Parallelize
+    Parallelize,
+    Random
   };
 
   static void run( std::reference_wrapper<Relater> rt,
