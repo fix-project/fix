@@ -31,7 +31,8 @@ externref tagged_output( externref value, bool succeeded )
  * @param resource_limits   The current resource limits.
  * @param joined_encode     Tree containing (in order) initial resource_limits, current program, program to run,
  *                          number of required arguments, and arguments.
- * @return externref        The thunk to the full apply tagged as success, or the curried function tagged as a failure.
+ * @return externref        The thunk to the full apply tagged as success, or the curried function tagged as a
+ * failure.
  */
 externref run( externref resource_limits, externref joined_encode )
 {
@@ -53,15 +54,15 @@ externref run( externref resource_limits, externref joined_encode )
     set_rw_table_0( i + 2, get_ro_table_0( i + 4 ) );
   }
 
-  return tagged_output( create_application_thunk( create_tree_rw_table_0( num_args + 2 ) ), true );
+  return create_application_thunk( create_tree_rw_table_0( num_args + 2 ) );
 }
 
 /**
  * @brief Applies the provided arguments to a curried function
  *
  * @param encode      The program being run, with a sub_encode as the second argument.
- * @return externref  The curried function as a tree if a partial apply tagged as successful if the arguments are applied, 
- *                    or a thunk if a full apply tagged successful.
+ * @return externref  The curried function as a tree if a partial apply tagged as successful if the arguments are
+ * applied, or a thunk if a full apply tagged successful.
  */
 externref apply( externref encode )
 {
