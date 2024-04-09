@@ -13,11 +13,34 @@ set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
 set(CMAKE_C_COMPILER_TARGET "wasm32")
 
 add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
-# add_executable(c-flatware.wasm "c-flatware.c" "filesys.c")
+
+set_source_files_properties("asm-flatware.c" "asm-flatware.h" "asm-flatware.wat" PROPERTIES GENERATED TRUE)
+
+add_custom_command(
+        OUTPUT "asm-flatware.c asm-flatware.h asm-flatware.wat"
+        DEPENDS generate_flatware
+)
+
+add_custom_target(
+        generate_flatware
+        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate.py
+        COMMENT "Generating flatware"
+)
 
 add_library(filesys_obj OBJECT "filesys.c")
 add_library(c_flatware_obj OBJECT "c-flatware.c")
 add_library(asm_flatware_obj OBJECT "asm-flatware.c")
+
+add_dependencies(filesys_obj generate_flatware)
+add_dependencies(c_flatware_obj generate_flatware)
+add_dependencies(asm_flatware_obj generate_flatware)
+
+target_include_directories(filesys_obj PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(c_flatware_obj PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(asm_flatware_obj PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+target_link_libraries(filesys_obj PUBLIC fixpoint_storage)
+target_link_libraries(c_flatware_obj PUBLIC fixpoint_storage)
 
 add_custom_command(
   OUTPUT  "c-flatware.wasm"
@@ -35,11 +58,11 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT "asm-flatware.wasm"
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/asm-flatware.wat
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/asm-flatware.wat
   COMMAND $ENV{HOME}/wasm-toolchain/wabt/build/wat2wasm
           --enable-multi-memory
 	        --enable-exceptions
-          ${CMAKE_CURRENT_SOURCE_DIR}/asm-flatware.wat
+          ${CMAKE_CURRENT_BINARY_DIR}/asm-flatware.wat
           -o asm-flatware.wasm
 )
 

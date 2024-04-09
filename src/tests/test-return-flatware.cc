@@ -15,13 +15,12 @@ auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); 
 
 void test( void )
 {
-  auto res = tester::rt->execute( Handle<Eval>( Handle<Application>( tester::Tree(
+  auto res = tester::rt->execute( flatware_input(
+    *tester::rt,
     tester::Limits(),
     tester::Compile( tester::File(
-      "applications-prefix/src/applications-build/flatware/examples/return3/return3-fixpoint.wasm" ) ) ) ) ) );
-
+      "applications-prefix/src/applications-build/flatware/examples/return3/return3-fixpoint.wasm" ) ) ) );
   auto result_tree = tester::rt->get( res.try_into<ValueTree>().value() ).value();
-
   auto blob = handle::extract<Literal>( result_tree->at( 0 ) ).value();
   CHECK( blob.size() == 4 );
   uint32_t x = *( reinterpret_cast<const uint32_t*>( blob.data() ) );

@@ -8,6 +8,7 @@ set(CMAKE_CXX_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang++)
 add_link_options( -Wl,--no-entry -Wl,--allow-undefined, -Wl, -Werror, -Wunused-parameter, -fno-exceptions)
 
 add_library(curry_obj OBJECT "curry.cc")
+target_link_libraries(curry_obj PUBLIC fixpoint_storage)
 
 link_libc("${CMAKE_BINARY_DIR}/curry/CMakeFiles/curry_obj.dir/curry.cc.o" curry_obj curry_unlinked.wasm) # outputs curry_unlinked.wasm
 

@@ -31,6 +31,9 @@ int main()
   if ( fd_2 < 0 ) {
     return -1;
   }
+  readv( fd_2, iovs, 2 );
+
+  printf( "Read %s and %s\n", buf1, buf2 );
 
   // open a directory (not a file)
 
