@@ -2,6 +2,7 @@
 #include "handle.hh"
 #include "overload.hh"
 #include "types.hh"
+#include <thread>
 
 using namespace std;
 
@@ -60,14 +61,15 @@ shared_ptr<Server> Server::init( const Address& address, vector<Address> peer_se
   auto runtime = std::make_shared<Server>();
   runtime->network_worker_.emplace( runtime->relater_ );
   runtime->network_worker_->start();
+  runtime->network_worker_->start_server( address );
 
   for ( const auto& p : peer_servers ) {
     if ( p == address ) {
       break;
     }
+    this_thread::sleep_for( 100ms );
     runtime->network_worker_->connect( p );
   }
-  runtime->network_worker_->start_server( address );
 
   return runtime;
 }
