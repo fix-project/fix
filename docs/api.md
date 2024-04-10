@@ -125,9 +125,9 @@ Given a Value, creates a corresponding Identification Thunk as a Handle.
 Not yet implemented.
 
 ```rust
-fn create_selection_thunk(handle: &ObjectTree) -> &Selection;
+fn create_selection_thunk(handle: &ObjectTree, index_in_tree: i32) -> &Selection;
 ```
-Given an ObjectTree, creates a corresponding Selection Thunk as a Handle.
+Given an ObjectTree, creates a corresponding Selection Thunk as a Handle. Traps if index is OOB.
 
 Not yet implemented.
 

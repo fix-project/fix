@@ -76,6 +76,14 @@ public:
   virtual bool contains( const std::string_view label ) override;
   virtual Handle<Fix> labeled( const std::string_view label ) override;
 
+  virtual std::optional<Info> get_info() override
+  {
+    // Info to be exposed to other nodes
+    auto info = local_->get_info();
+    info->link_speed = 7.5;
+    return info;
+  }
+
   template<FixType T>
   void visit( Handle<T> handle,
               std::function<void( Handle<AnyDataType> )> visitor,
@@ -151,6 +159,42 @@ public:
       VLOG( 2 ) << "visiting " << handle;
       visitor( handle );
       visited.insert( handle );
+    }
+  }
+
+  // Stop visiting recursively if visitor( Tree ) returns true
+  template<FixType T>
+  void early_stop_visit_minrepo( Handle<T> handle,
+                                 std::function<bool( Handle<AnyDataType> )> visitor,
+                                 std::unordered_set<Handle<Fix>> visited = {} )
+  {
+    if ( visited.contains( handle ) )
+      return;
+    if constexpr ( std::same_as<T, Literal> )
+      return;
+
+    if constexpr ( Handle<T>::is_fix_sum_type ) {
+      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
+        std::visit( [&]( const auto x ) { early_stop_visit_minrepo( x, visitor, visited ); }, handle.get() );
+
+    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+      return;
+    } else {
+      VLOG( 2 ) << "visiting " << handle;
+      auto res = visitor( handle );
+      visited.insert( handle );
+
+      if ( res )
+        return;
+
+      if constexpr ( FixTreeType<T> ) {
+        if ( storage_.contains( handle ) ) {
+          auto tree = get( handle );
+          for ( const auto& element : tree.value()->span() ) {
+            early_stop_visit_minrepo( element, visitor, visited );
+          }
+        }
+      }
     }
   }
 

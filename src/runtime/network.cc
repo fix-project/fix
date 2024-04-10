@@ -111,7 +111,7 @@ void Remote::put( Handle<AnyTree> name, TreeData data )
 
 void Remote::put( Handle<Relation> name, Handle<Object> data )
 {
-  VLOG( 1 ) << "Putting result to remote " << name;
+  VLOG( 2 ) << "Putting result to remote " << name;
   unique_lock lock( mutex_ );
   if ( reply_to_.contains( name ) ) {
     if ( !contains( name ) ) {
@@ -320,7 +320,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
       VLOG( 1 ) << "Sending " << handles.size() << " objects.";
       for ( const auto& h : handles ) {
-        VLOG( 1 ) << "Sending " << handle::fix( h );
+        VLOG( 2 ) << "Sending " << handle::fix( h );
         std::visit(
           overload {
             [&]( Handle<Named> ) {

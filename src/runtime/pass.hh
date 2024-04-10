@@ -63,7 +63,7 @@ public:
     return tasks_info_.at( task ).absent_size;
   }
 
-  const std::unordered_set<std::shared_ptr<IRuntime>>& get_contains( const Handle<Relation> task ) const
+  const std::unordered_set<std::shared_ptr<IRuntime>>& get_contains( const Handle<AnyDataType> task ) const
   {
     return tasks_info_.at( task ).contains;
   }
@@ -77,16 +77,16 @@ class SelectionPass : public Pass
 {
 protected:
   std::reference_wrapper<BasePass> base_;
-  absl::flat_hash_map<Handle<AnyDataType>, std::shared_ptr<IRuntime>> chosen_remotes_;
+  absl::flat_hash_map<Handle<AnyDataType>, std::pair<std::shared_ptr<IRuntime>, int64_t>> chosen_remotes_;
 
 public:
   SelectionPass( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater );
 
   SelectionPass( std::reference_wrapper<BasePass> base,
                  std::reference_wrapper<Relater> relater,
-                 SelectionPass& prev );
+                 std::unique_ptr<SelectionPass> prev );
 
-  absl::flat_hash_map<Handle<AnyDataType>, std::shared_ptr<IRuntime>>&& release()
+  absl::flat_hash_map<Handle<AnyDataType>, std::pair<std::shared_ptr<IRuntime>, int64_t>>&& release()
   {
     return std::move( chosen_remotes_ );
   };
@@ -98,7 +98,7 @@ class PrunedSelectionPass : public SelectionPass
 public:
   PrunedSelectionPass( std::reference_wrapper<BasePass> base,
                        std::reference_wrapper<Relater> relater,
-                       SelectionPass& prev );
+                       std::unique_ptr<SelectionPass> prev );
 
   void run( Handle<AnyDataType> );
 };
@@ -118,8 +118,8 @@ public:
 
   MinAbsentMaxParallelism( std::reference_wrapper<BasePass> base,
                            std::reference_wrapper<Relater> relater,
-                           SelectionPass& prev )
-    : SelectionPass( base, relater, prev )
+                           std::unique_ptr<SelectionPass> prev )
+    : SelectionPass( base, relater, move( prev ) )
   {}
 };
 
@@ -140,12 +140,12 @@ public:
 
   ChildBackProp( std::reference_wrapper<BasePass> base,
                  std::reference_wrapper<Relater> relater,
-                 SelectionPass& prev )
-    : SelectionPass( base, relater, prev )
+                 std::unique_ptr<SelectionPass> prev )
+    : SelectionPass( base, relater, move( prev ) )
   {}
 };
 
-class Parallelize : public PrunedSelectionPass
+class OutSource : public PrunedSelectionPass
 {
   virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
 
@@ -154,8 +154,10 @@ class Parallelize : public PrunedSelectionPass
   virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
 public:
-  Parallelize( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater, SelectionPass& prev )
-    : PrunedSelectionPass( base, relater, prev )
+  OutSource( std::reference_wrapper<BasePass> base,
+             std::reference_wrapper<Relater> relater,
+             std::unique_ptr<SelectionPass> prev )
+    : PrunedSelectionPass( base, relater, move( prev ) )
   {}
 };
 
@@ -182,8 +184,10 @@ class FinalPass : public PrunedSelectionPass
   virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
 public:
-  FinalPass( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater, SelectionPass& prev )
-    : PrunedSelectionPass( base, relater, prev )
+  FinalPass( std::reference_wrapper<BasePass> base,
+             std::reference_wrapper<Relater> relater,
+             std::unique_ptr<SelectionPass> prev )
+    : PrunedSelectionPass( base, relater, move( prev ) )
   {}
 };
 
@@ -195,8 +199,8 @@ public:
   enum class PassType : uint8_t
   {
     MinAbsentMaxParallelism,
-    ChildPackProp,
-    Parallelize,
+    ChildBackProp,
+    OutSource,
     Random
   };
 

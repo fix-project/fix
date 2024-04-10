@@ -102,8 +102,8 @@ void HintScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Rel
   PassRunner::run( relater_.value(),
                    top_level_job,
                    { PassRunner::PassType::MinAbsentMaxParallelism,
-                     PassRunner::PassType::ChildPackProp,
-                     PassRunner::PassType::Parallelize } );
+                     PassRunner::PassType::ChildBackProp,
+                     PassRunner::PassType::OutSource } );
 }
 
 void RandomScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )

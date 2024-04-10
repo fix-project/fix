@@ -375,7 +375,6 @@ void Relater::put( Handle<AnyTree> name, TreeData data )
 }
 void Relater::put( Handle<Relation> name, Handle<Object> data )
 {
-  VLOG( 1 ) << "Putting to relater name " << name;
   if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
     absl::flat_hash_set<Handle<Relation>> unblocked;
@@ -387,7 +386,6 @@ void Relater::put( Handle<Relation> name, Handle<Object> data )
       local_->get( x );
     }
     for ( auto& remote : remotes_.read().get() ) {
-      VLOG( 1 ) << "Putting to relater name to remote " << name;
       auto locked = remote.lock();
       if ( locked ) {
         locked->put( name, data );

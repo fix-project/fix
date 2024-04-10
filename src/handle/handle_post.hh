@@ -81,6 +81,8 @@ static inline size_t byte_size( Handle<T> handle )
     return sizeof( Handle<Fix> );
   } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
     return 0;
+  } else if constexpr ( std::same_as<T, Thunk> ) {
+    return sizeof( Handle<Fix> );
   } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
     return handle.size();
   } else {
