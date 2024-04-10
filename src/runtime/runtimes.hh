@@ -54,12 +54,16 @@ public:
 class Server
 {
 protected:
-  Relater relater_ {};
+  Relater relater_;
   std::optional<NetworkWorker> network_worker_ {};
 
 public:
-  Server() {}
+  Server( std::shared_ptr<Scheduler> scheduler )
+    : relater_( std::thread::hardware_concurrency(), {}, scheduler )
+  {}
 
-  static std::shared_ptr<Server> init( const Address& address, const std::vector<Address> peer_servers = {} );
+  static std::shared_ptr<Server> init( const Address& address,
+                                       std::shared_ptr<Scheduler> scheduler,
+                                       const std::vector<Address> peer_servers = {} );
   ~Server();
 };

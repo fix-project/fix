@@ -3,10 +3,12 @@
 extern "C" {
 #include <sys/resource.h>
 }
+#include <memory>
 
 #include "mmap.hh"
 #include "option-parser.hh"
 #include "runtimes.hh"
+#include "scheduler.hh"
 
 using namespace std;
 
@@ -44,6 +46,7 @@ int main( int argc, char* argv[] )
   uint16_t port;
   optional<const char*> local;
   optional<const char*> peerfile;
+  optional<string> sche_opt;
   parser.AddArgument(
     "listening-port", OptionParser::ArgumentCount::One, [&]( const char* argument ) { port = stoi( argument ); } );
   parser.AddOption( 'a',
@@ -55,6 +58,13 @@ int main( int argc, char* argv[] )
   parser.AddOption(
     'p', "peers", "peers", "Path to a file that contains a list of all servers.", [&]( const char* argument ) {
       peerfile = argument;
+    } );
+  parser.AddOption(
+    's', "scheduler", "scheduler", "Scheduler to use [local, onepass, hint, random]", [&]( const char* argument ) {
+      sche_opt = argument;
+      if ( not( *sche_opt == "local" or *sche_opt == "onepass" or *sche_opt == "hint" or *sche_opt == "random" ) ) {
+        throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
+      }
     } );
   parser.Parse( argc, argv );
 
@@ -85,7 +95,18 @@ int main( int argc, char* argv[] )
     }
   }
 
-  auto server = Server::init( listen_address, peer_address );
+  shared_ptr<Scheduler> scheduler = make_shared<LocalFirstScheduler>();
+  if ( sche_opt.has_value() ) {
+    if ( *sche_opt == "onepass" ) {
+      scheduler = make_shared<OnePassScheduler>();
+    } else if ( *sche_opt == "hint" ) {
+      scheduler = make_shared<HintScheduler>();
+    } else if ( *sche_opt == "random" ) {
+      scheduler = make_shared<RandomScheduler>();
+    }
+  }
+
+  auto server = Server::init( listen_address, scheduler, peer_address );
   cout << "Server initialized" << endl;
 
   while ( true )
