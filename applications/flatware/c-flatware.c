@@ -925,6 +925,32 @@ int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
   return 0;
 }
 
+int32_t sock_recv( int32_t fd,
+                   int32_t ri_data,
+                   int32_t ri_data_len,
+                   int32_t ri_flags,
+                   int32_t retptr0,
+                   int32_t retptr1 )
+{
+  FUNC_TRACE( T32, fd, T32, ri_data, T32, ri_data_len, T32, ri_flags, T32, retptr0, T32, retptr1, TEND );
+
+  return 0;
+}
+
+int32_t sock_send( int32_t fd, int32_t si_data, int32_t si_data_len, int32_t si_flags, int32_t retptr0 )
+{
+  FUNC_TRACE( T32, fd, T32, si_data, T32, si_data_len, T32, si_flags, T32, retptr0, TEND );
+
+  return 0;
+}
+
+int32_t sock_shutdown( int32_t fd, int32_t how )
+{
+  FUNC_TRACE( T32, fd, T32, how, TEND );
+
+  return 0;
+}
+
 static bool bitset_get( unsigned int* bitset, uint32_t index )
 {
   return ( bitset[index / sizeof( unsigned int )] >> ( index % sizeof( unsigned int ) ) ) & 1;
