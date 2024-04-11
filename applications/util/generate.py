@@ -4,10 +4,10 @@
 import os
 
 
-NUM_RO_MEM = 32
-NUM_RO_TABLE = 32
-NUM_RW_MEM = 32
-NUM_RW_TABLE = 32
+NUM_RO_MEM = 8
+NUM_RO_TABLE = 8
+NUM_RW_MEM = 8
+NUM_RW_TABLE = 8
 
 PATH = './'
 MODULE = 'fixpoint_storage'

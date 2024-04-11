@@ -12,8 +12,8 @@
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
 
 #define DO_TRACE 1
-#define N_FDS 32
-#define N_FILES 32
+#define N_FDS 8
+#define N_FILES 8
 
 typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 
