@@ -10,20 +10,15 @@ The Flatware combination format is an extension of the Fixpoint combination. It
 describes the application of a Flatware program to inputs, producing an Object 
 as output. The first entry specifies the metadata, possibly including resource 
 limits at runtime (e.g. maximum pages of mutable memory), and the format of the
-combination. A combination format is either "apply" or "lift" (not yet 
-implemented).
+combination.
 
-An "apply" combination may nest another combination within itself, thus allowing
-for nested argument capture. 
+A combination may nest another combination within itself, allowing
+for nested argument capture.
 
-For an "apply" combination, the second entry in the tree specifies the 
-procedure, which is either:
+The second entry in the combination specifies the procedure, which is either:
   1. A Tag that the first entry is a Blob, the second entry is a trusted 
   compilation toolchain, and the third entry is "Runnable" or
   2. A combination
-
-For a "lift" combination, the second entry is the Handle to the Object to be 
-lifted.
 
 The third entry contains the filesystem to be used by the program. See the
 Flatware Filesystem section for more details.
