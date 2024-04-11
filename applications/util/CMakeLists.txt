@@ -12,6 +12,25 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-
 set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
 set(CMAKE_C_COMPILER_TARGET "wasm32")
 
+set_source_files_properties("fixpoint_storage.h" "fixpoint_storage.wat" PROPERTIES GENERATED TRUE)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
+add_custom_command(
+        OUTPUT fixpoint_storage.h fixpoint_storage.wat
+        DEPENDS generate_fixpoint_storage
+)
+
+add_custom_target(
+        generate_fixpoint_storage
+        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate.py
+        COMMENT "Generating fixpoint_torage"
+)
+
+add_library(fixpoint_storage INTERFACE)
+target_include_directories(fixpoint_storage INTERFACE .)
+target_include_directories(fixpoint_storage INTERFACE "${CMAKE_CURRENT_BINARY_DIR}")
+add_dependencies(fixpoint_storage generate_fixpoint_storage)
+
 add_custom_command(
   OUTPUT "wasi_snapshot_preview1.wasm"
   COMMAND $ENV{HOME}/wasm-toolchain/wabt/build/wat2wasm
@@ -23,15 +42,17 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT "fixpoint_storage.wasm"
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/fixpoint_storage.wat
+  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/fixpoint_storage.wat
   COMMAND $ENV{HOME}/wasm-toolchain/wabt/build/wat2wasm
           --enable-multi-memory
 	        --enable-exceptions
-          ${CMAKE_CURRENT_SOURCE_DIR}/fixpoint_storage.wat
+          ${CMAKE_CURRENT_BINARY_DIR}/fixpoint_storage.wat
           -o fixpoint_storage.wasm
 )
 
 add_library(fixpoint_util_obj OBJECT "fixpoint_util.c")
+add_dependencies(fixpoint_util_obj generate_fixpoint_storage)
+target_include_directories(fixpoint_util_obj PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 add_custom_target(
               applications-util ALL

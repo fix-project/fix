@@ -17,13 +17,15 @@ using namespace std;
 
 uint32_t fix_add( char a, char b, Handle<Fix> add_elf )
 {
-  auto add = Handle<Application>(
-    tester::Tree( tester::Limits(),
-                  add_elf,
-                  tester::Tree( tester::Blob( "add" ), tester::Blob( { &a, 1 } ), tester::Blob( { &b, 1 } ) ) ) );
+  Handle add
+    = flatware_input( *tester::rt,
+                      tester::Limits(),
+                      add_elf,
+                      tester::Tree(),
+                      tester::Tree( tester::Blob( "add" ), tester::Blob( { &a, 1 } ), tester::Blob( { &b, 1 } ) ) );
   (void)a, (void)b;
 
-  auto result = tester::rt->execute( Handle<Eval>( add ) );
+  auto result = tester::rt->execute( add );
   auto tree = tester::rt->get( result.try_into<ValueTree>().value() ).value();
   auto sum = tree->at( 0 );
   uint32_t x = -1;

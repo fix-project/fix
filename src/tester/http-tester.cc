@@ -28,7 +28,7 @@ static constexpr size_t mebi = 1024 * 1024;
 /**
  * Supported endpoints:
  * - explanations(handle): returns tasks which produced this object, or tags that point to this object. uses the
- *fixpoint api.
+ *   fixpoint api.
  * - relation(handle, op): returns the result of applying this op to this object if it has already been calculated.
  * - tree_contents(handle): returns the contents of this object if it is a tree.
  **/
