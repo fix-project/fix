@@ -159,10 +159,19 @@ Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
     return get( goal )->unwrap<Value>();
   }
 
+  auto prev_current = current_;
+  current_ = goal;
+
   auto result = evaluator_.evalStrict( expression );
   if ( result.has_value() ) {
     this->put( goal, result.value() );
+  } else {
+    if ( prev_current.has_value() and prev_current.value() != Handle<Relation>( goal ) ) {
+      graph_.write()->add_dependency( prev_current.value(), goal );
+    }
   }
+
+  current_ = prev_current;
   return result;
 }
 
@@ -177,7 +186,7 @@ Relater::Result<ValueTree> Relater::mapEval( Handle<ObjectTree> tree )
   auto data = storage_.get( tree );
   for ( const auto& x : data->span() ) {
     auto obj = x.unwrap<Expression>().unwrap<Object>();
-    auto result = get_or_block( Handle<Eval>( obj ) );
+    auto result = evalStrict( obj );
     if ( not result ) {
       ready = false;
     }
@@ -366,7 +375,6 @@ void Relater::put( Handle<AnyTree> name, TreeData data )
 }
 void Relater::put( Handle<Relation> name, Handle<Object> data )
 {
-  VLOG( 1 ) << "Putting to relater name " << name;
   if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
     absl::flat_hash_set<Handle<Relation>> unblocked;
@@ -378,7 +386,6 @@ void Relater::put( Handle<Relation> name, Handle<Object> data )
       local_->get( x );
     }
     for ( auto& remote : remotes_.read().get() ) {
-      VLOG( 1 ) << "Putting to relater name to remote " << name;
       auto locked = remote.lock();
       if ( locked ) {
         locked->put( name, data );

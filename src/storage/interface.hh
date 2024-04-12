@@ -138,41 +138,6 @@ public:
       visited.insert( handle );
     }
   }
-
-  // Stop visiting recursively if visitor( Tree ) returns true
-  template<FixType T>
-  void early_stop_visit_minrepo( Handle<T> handle,
-                                 std::function<bool( Handle<AnyDataType> )> visitor,
-                                 std::unordered_set<Handle<Fix>> visited = {} )
-  {
-    if ( visited.contains( handle ) )
-      return;
-    if constexpr ( std::same_as<T, Literal> )
-      return;
-
-    if constexpr ( Handle<T>::is_fix_sum_type ) {
-      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
-        std::visit( [&]( const auto x ) { early_stop_visit_minrepo( x, visitor, visited ); }, handle.get() );
-
-    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
-      return;
-    } else {
-      VLOG( 2 ) << "visiting " << handle;
-      auto res = visitor( handle );
-      visited.insert( handle );
-
-      if ( res )
-        return;
-
-      if constexpr ( FixTreeType<T> ) {
-        // Having the handle means that the data presents in storage
-        auto tree = get( handle );
-        for ( const auto& element : tree.value()->span() ) {
-          early_stop_visit_minrepo( element, visitor, visited );
-        }
-      }
-    }
-  }
 };
 
 class MultiWorkerRuntime : public IRuntime

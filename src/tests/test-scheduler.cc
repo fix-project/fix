@@ -83,6 +83,10 @@ void case_one( void )
 
   if ( fake_worker->todos_.size() != 1
        or fake_worker->todos_.front() != Handle<AnyDataType>( Handle<Relation>( task ) ) ) {
+    fprintf( stderr, "Todo size %zu", fake_worker->todos_.size() );
+    for ( const auto& todo : fake_worker->todos_ ) {
+      cout << "Todo " << todo << endl;
+    }
     fprintf( stderr, "Case 1: Wrong post condition" );
     exit( 1 );
   }
@@ -150,11 +154,146 @@ void case_three( void )
   rt->get( task );
 
   if ( fake_worker->todos_.size() != 1
-       or fake_worker->todos_.front() != Handle<AnyDataType>( handle.unwrap<Named>() ) ) {
+       or fake_worker->todos_.front()
+            != Handle<AnyDataType>( Handle<Relation>(
+              Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
+    for ( const auto& todo : fake_worker->todos_ ) {
+      cout << "Todo " << todo << endl;
+    }
     fprintf( stderr, "Case 3: Wrong post condition" );
     exit( 1 );
   }
+}
+
+// Work: Handle<Eval>( Handle<Application>( Handle<ExpressionTree>( Handle<Strict>( Handle<Identification>( Blob 0
+// ), Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) ) )
+// Machine 0: 10 parallelism + Blob 0
+// Machine 1: 10 parallelism + Blob 1 (Blob 0 > Blob 1)
+// Expected outcome: get( Blob 1 ) is assigned to machine 1
+void case_four( void )
+{
+  shared_ptr<Relater> rt = make_shared<Relater>( 10, make_shared<PointerRunner>(), make_shared<HintScheduler>() );
+  shared_ptr<FakeRuntime> fake_worker = make_shared<FakeRuntime>();
+  fake_worker->parallelism_ = 10;
+
+  auto handle = fake_worker->storage_.create( de_bello_gallico );
+  rt->add_worker( fake_worker );
+
+  auto task = Handle<Eval>( Handle<Application>( handle::upcast(
+    tree( *rt,
+          Handle<Strict>(
+            handle::extract<Identification>( make_identification( rt->labeled( "c-to-elf-fix-wasm" ) ) ).value() ),
+          Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) );
+  rt->get( task );
+
+  if ( fake_worker->todos_.size() != 1
+       or fake_worker->todos_.front()
+            != Handle<AnyDataType>( Handle<Relation>(
+              Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) ) ) {
+    cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
+    for ( const auto& todo : fake_worker->todos_ ) {
+      cout << "Todo " << todo << endl;
+    }
+    fprintf( stderr, "Case 4: Wrong post condition" );
+    exit( 1 );
+  }
+}
+
+// Work: Handle<Eval>( Handle<Application>( {1, 1, 1}, Handle<ExpressionTree>
+//   ( Handle<Strict>( Handle<Identification>( Blob 0 ) ),
+//     Handle<Strict>( Handle<Application>( { 1, 3000, 1 }, Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) )
+//   ) ) )
+// Machine 0: 10 parallelism + Blob 0 (very big)
+// Machine 1: 10 parallelism + Blob 1 (1269)
+// Expected outcome: get( Blob 1 ) or (Blob 1) is assigned to machine 1 but Handle<Application>( { 1, 3000, 1 } ) is
+// not
+void case_five( void )
+{
+  shared_ptr<Relater> rt = make_shared<Relater>( 10, make_shared<PointerRunner>(), make_shared<HintScheduler>() );
+  shared_ptr<FakeRuntime> fake_worker = make_shared<FakeRuntime>();
+  fake_worker->parallelism_ = 10;
+
+  auto handle = fake_worker->storage_.create( de_bello_gallico );
+  rt->add_worker( fake_worker );
+
+  auto task = Handle<Eval>( Handle<Application>( handle::upcast(
+    tree( *rt,
+          limits( *rt, 1024, 1, 1 ),
+          Handle<Strict>(
+            handle::extract<Identification>( make_identification( rt->labeled( "c-to-elf-fix-wasm" ) ) ).value() ),
+          Handle<Strict>( Handle<Application>( handle::upcast( tree(
+            *rt, limits( *rt, 1, 3000, 1 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
+
+  rt->get( task );
+
+  if ( fake_worker->todos_.size() != 1
+       or ( fake_worker->todos_.front()
+              != Handle<AnyDataType>( Handle<Relation>(
+                Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
+            and fake_worker->todos_.front() != Handle<AnyDataType>( handle.unwrap<Named>() ) ) ) {
+    cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
+    for ( const auto& todo : fake_worker->todos_ ) {
+      cout << "Todo " << todo << endl;
+    }
+    fprintf( stderr, "Case 5: Wrong post condition" );
+    exit( 1 );
+  }
+}
+
+// Work: Handle<Eval>( Handle<Application>( { 1024, 1, 1}, Handle<ExpressionTree>
+//   ( Handle<Strict>( Handle<Application>( { 1, 4000, 10 }, Handle<Strict>( Handle<Identification>( Blob 0 ) ),
+//   Handle<Strict>( Handle<Identification>( Blob 1 )> ) ) ),
+//     Handle<Strict>( Handle<Application>( { 1, 3000, 10 }, Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) )
+//   ) ) )
+// Machine 0: 5 parallelism + Blob 0 (very big)
+// Machine 1: 5 parallelism + Blob 1 (1269)
+// Expected outcome: Handle<Strict>( Handle<Application>( { 1, 3000, 10 }, Handle<Strict>( Handle<Identification>(
+// Blob 1 ) ) ) )
+//                   and get( Blob 1 ) is assigned to remote
+void case_six( void )
+{
+  shared_ptr<Relater> rt = make_shared<Relater>( 5, make_shared<PointerRunner>(), make_shared<HintScheduler>() );
+  shared_ptr<FakeRuntime> fake_worker = make_shared<FakeRuntime>();
+  fake_worker->parallelism_ = 5;
+
+  auto handle = fake_worker->storage_.create( de_bello_gallico );
+  rt->add_worker( fake_worker );
+
+  auto task = Handle<Eval>( Handle<Application>( handle::upcast( tree(
+    *rt,
+    limits( *rt, 1024, 1, 1 ),
+    Handle<Strict>( Handle<Application>( handle::upcast( tree(
+      *rt,
+      limits( *rt, 1, 4000, 10 ),
+      Handle<Strict>(
+        handle::extract<Identification>( make_identification( rt->labeled( "c-to-elf-fix-wasm" ) ) ).value() ),
+      Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ),
+    Handle<Strict>( Handle<Application>( handle::upcast(
+      tree( *rt, limits( *rt, 1, 3000, 10 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
+
+  rt->get( task );
+
+  if ( fake_worker->todos_.size() == 2 ) {
+    // get( Blob 1 )
+    auto job0 = Handle<AnyDataType>(
+      Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) );
+    // Handle<Application( { 1, 3000, 10 }, Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) )
+    auto job1 = Handle<AnyDataType>(
+      Handle<Relation>( Handle<Eval>( Handle<Object>( Handle<Thunk>( Handle<Application>( handle::upcast(
+        tree( *rt, limits( *rt, 1, 3000, 10 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
+    if ( ( fake_worker->todos_[0] == job0 and fake_worker->todos_[1] == job1 )
+         or ( fake_worker->todos_[1] == job0 and fake_worker->todos_[0] == job1 ) ) {
+      return;
+    }
+  }
+
+  cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
+  for ( const auto& todo : fake_worker->todos_ ) {
+    cout << "Todo " << todo << endl;
+  }
+  fprintf( stderr, "Case 6: Wrong post condition" );
+  exit( 1 );
 }
 
 void test( void )
@@ -162,4 +301,7 @@ void test( void )
   case_one();
   case_two();
   case_three();
+  case_four();
+  case_five();
+  case_six();
 }
