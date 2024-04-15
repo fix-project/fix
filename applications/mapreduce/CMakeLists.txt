@@ -8,6 +8,7 @@ set(CMAKE_CXX_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang++)
 add_link_options( -Wl,--no-entry -Wl,--allow-undefined, -Wl, -Werror, -Wunused-parameter, -fno-exceptions)
 
 add_library(mapreduce_obj OBJECT "mapreduce.cc")
+target_link_libraries(mapreduce_obj PUBLIC fixpoint_storage)
 
 link_libc("${CMAKE_BINARY_DIR}/mapreduce/CMakeFiles/mapreduce_obj.dir/mapreduce.cc.o" mapreduce_obj mapreduce_unlinked.wasm) # outputs curry_unlinked.wasm
 
