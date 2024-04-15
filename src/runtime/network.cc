@@ -111,10 +111,10 @@ void Remote::put( Handle<AnyTree> name, TreeData data )
 
 void Remote::put( Handle<Relation> name, Handle<Object> data )
 {
-  VLOG( 2 ) << "Putting result to remote " << name;
   unique_lock lock( mutex_ );
   if ( reply_to_.contains( name ) ) {
     if ( !contains( name ) ) {
+      VLOG( 2 ) << "Putting result to remote " << name;
       ResultPayload payload { .task = name, .result = data };
       msg_q_.enqueue( make_pair( index_, move( payload ) ) );
     }

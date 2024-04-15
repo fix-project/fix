@@ -117,7 +117,13 @@ Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args )
 
   if ( str.starts_with( "compile:" ) ) {
     args = args.subspan( 1 );
+    bool prev_consumed = consumed;
+
+    consumed = true;
     auto name = parse_args( rt, args );
+
+    consumed = prev_consumed;
+
     if ( consumed ) {
       return Handle<Strict>( make_compile( rt, name ) );
     } else {

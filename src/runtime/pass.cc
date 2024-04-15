@@ -124,7 +124,7 @@ void BasePass::leaf( Handle<AnyDataType> job )
                                      = relater_.get().get( handle::extract<ValueTree>( rlimits ).value() ).value();
                                    auto output_size = handle::extract<Literal>( limits->at( 1 ) )
                                                         .transform( [&]( auto x ) { return uint64_t( x ); } )
-                                                        .value_or( 0 );
+                                                        .value_or( 1 );
                                    auto output_fan_out = handle::extract<Literal>( limits->at( 2 ) )
                                                            .transform( [&]( auto x ) { return uint64_t( x ); } )
                                                            .value_or( 1 );
@@ -168,9 +168,10 @@ void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<A
             return { limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 1 ) ); } )
                        .transform( [&]( auto x ) { return uint64_t( x ); } )
                        .value_or( output_size ),
-                     limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 2 ) ); } )
-                       .transform( [&]( auto x ) { return uint64_t( x ); } )
-                       .value_or( output_fan_out ) };
+                     max( limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 2 ) ); } )
+                            .transform( [&]( auto x ) { return uint64_t( x ); } )
+                            .value_or( output_fan_out ),
+                          output_fan_out ) };
           } else {
             return { output_size, output_fan_out };
           }
@@ -197,10 +198,16 @@ Handle<Fix> get_root( Handle<AnyDataType> job )
 
                   [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
                   [&]( Handle<Eval> e ) {
-                    return handle::extract<Identification>( e.unwrap<Object>() )
-                      .transform( []( auto h ) -> Handle<Fix> { return h.template unwrap<Value>(); } )
-                      .or_else( [&]() -> optional<Handle<Fix>> { return e.unwrap<Object>(); } )
-                      .value();
+                    return e.unwrap<Object>().visit<Handle<Fix>>( overload {
+                      []( Handle<Thunk> t ) {
+                        return t.visit<Handle<Fix>>( overload {
+                          []( Handle<Application> a ) { return a.unwrap<ExpressionTree>(); },
+                          []( Handle<Identification> i ) { return i.unwrap<Value>(); },
+                          []( Handle<Selection> ) -> Handle<Fix> { throw runtime_error( "Unimplemented" ); } } );
+                      },
+                      []( auto h ) { return h; }
+
+                    } );
                   } } );
               },
                [&]( Handle<AnyTree> h ) { return handle::fix( h ); },
@@ -294,6 +301,8 @@ void MinAbsentMaxParallelism::leaf( Handle<AnyDataType> job )
       } else if ( s == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
         max_parallelism = r->get_info()->parallelism;
         chosen_remote = r;
+      } else if ( s == min_absent_size && r->get_info()->parallelism == max_parallelism && is_local( r ) ) {
+        chosen_remote = r;
       }
     }
     VLOG( 2 ) << "MinAbsent::leaf " << job << " "
@@ -340,6 +349,8 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
         chosen_remote = r;
       } else if ( sum_size == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
         max_parallelism = r->get_info()->parallelism;
+        chosen_remote = r;
+      } else if ( sum_size == min_absent_size && r->get_info()->parallelism == max_parallelism && is_local( r ) ) {
         chosen_remote = r;
       }
     }
@@ -404,6 +415,9 @@ void ChildBackProp::independent( Handle<AnyDataType> job )
           } else if ( sum_size == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
             max_parallelism = r->get_info()->parallelism;
             chosen_remote = r;
+          } else if ( sum_size == min_absent_size && r->get_info()->parallelism == max_parallelism
+                      && is_local( r ) ) {
+            chosen_remote = r;
           }
         }
       }
@@ -431,7 +445,7 @@ void ChildBackProp::pre( Handle<AnyDataType> job, const absl::flat_hash_set<Hand
 void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
   size_t assigned = 0;
-  map<int64_t, Handle<AnyDataType>, greater<int64_t>> scores;
+  multimap<int64_t, Handle<AnyDataType>, greater<int64_t>> scores;
   optional<shared_ptr<IRuntime>> local;
 
   for ( auto d : dependencies ) {
@@ -470,6 +484,8 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
           chosen_remote = r;
         } else if ( s == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
           max_parallelism = r->get_info()->parallelism;
+          chosen_remote = r;
+        } else if ( s == min_absent_size && r->get_info()->parallelism == max_parallelism && is_local( r ) ) {
           chosen_remote = r;
         }
       }

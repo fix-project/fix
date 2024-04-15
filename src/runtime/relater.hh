@@ -116,7 +116,7 @@ public:
           visit( element, visitor, visited );
         }
       }
-      VLOG( 2 ) << "visiting " << handle;
+      VLOG( 3 ) << "visiting " << handle;
       visitor( handle );
       visited.insert( handle );
     }
@@ -142,7 +142,7 @@ public:
                      []( Handle<Eval> h ) { return h.unwrap<Object>(); } } );
         std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, lhs.get() );
 
-        VLOG( 2 ) << "visiting " << handle;
+        VLOG( 3 ) << "visiting " << handle;
         visitor( handle );
         visited.insert( handle );
       }
@@ -156,7 +156,7 @@ public:
           visit_full( element, visitor, visited );
         }
       }
-      VLOG( 2 ) << "visiting " << handle;
+      VLOG( 3 ) << "visiting " << handle;
       visitor( handle );
       visited.insert( handle );
     }
@@ -180,7 +180,7 @@ public:
     } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
       return;
     } else {
-      VLOG( 2 ) << "visiting " << handle;
+      VLOG( 3 ) << "visiting " << handle;
       auto res = visitor( handle );
       visited.insert( handle );
 
