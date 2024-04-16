@@ -85,44 +85,6 @@ public:
   }
 
   template<FixType T>
-  void visit( Handle<T> handle,
-              std::function<void( Handle<AnyDataType> )> visitor,
-              std::unordered_set<Handle<Fix>> visited = {} )
-  {
-    if ( visited.contains( handle ) )
-      return;
-    if constexpr ( std::same_as<T, Literal> )
-      return;
-
-    if constexpr ( Handle<T>::is_fix_sum_type ) {
-      if constexpr ( std::same_as<T, Encode> ) {
-        Handle<Thunk> thunk
-          = handle.template visit<Handle<Thunk>>( []( auto s ) { return s.template unwrap<Thunk>(); } );
-        thunk.visit<void>(
-          overload { [&]( Handle<Application> a ) { visit( a.unwrap<ExpressionTree>(), visitor, visited ); },
-                     []( auto ) {} } );
-      }
-
-      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
-        std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
-
-    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
-      return;
-    } else {
-      if constexpr ( FixTreeType<T> ) {
-        // Having the handle means that the data presents in storage
-        auto tree = get( handle );
-        for ( const auto& element : tree.value()->span() ) {
-          visit( element, visitor, visited );
-        }
-      }
-      VLOG( 3 ) << "visiting " << handle;
-      visitor( handle );
-      visited.insert( handle );
-    }
-  }
-
-  template<FixType T>
   void visit_full( Handle<T> handle,
                    std::function<void( Handle<AnyDataType> )> visitor,
                    std::unordered_set<Handle<Fix>> visited = {} )

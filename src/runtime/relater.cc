@@ -199,7 +199,7 @@ Relater::Result<ValueTree> Relater::mapEval( Handle<ObjectTree> tree )
   for ( size_t i = 0; i < data->size(); i++ ) {
     auto x = data->at( i );
     auto obj = x.unwrap<Expression>().unwrap<Object>();
-    values[i] = evaluator_.evalStrict( obj ).value();
+    values[i] = evalStrict( obj ).value();
   }
 
   if ( tree.is_tag() ) {

@@ -11,42 +11,6 @@ bool is_local( shared_ptr<IRuntime> rt )
   return rt->get_info()->link_speed == numeric_limits<double>::max();
 }
 
-void get( shared_ptr<IRuntime> worker, Handle<AnyDataType> job, Relater& rt )
-{
-  if ( is_local( worker ) ) {
-    job.visit<void>( overload {
-      [&]( Handle<Literal> ) {},
-      [&]( auto h ) { worker->get( h ); },
-    } );
-  } else {
-    // Send visit( job ) before sending the job itself
-    auto send = [&]( Handle<AnyDataType> h ) {
-      h.visit<void>( overload { []( Handle<Literal> ) {},
-                                []( Handle<Relation> ) {},
-                                [&]( auto x ) { worker->put( x, rt.get( x ).value() ); } } );
-    };
-
-    job.visit<void>( overload {
-      [&]( Handle<Relation> r ) {
-        rt.visit( r.visit<Handle<Fix>>( overload { []( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-                                                   []( Handle<Eval> e ) {
-                                                     auto obj = e.unwrap<Object>();
-                                                     return handle::extract<Thunk>( obj )
-                                                       .transform( []( auto obj ) -> Handle<Fix> {
-                                                         return Handle<Strict>( obj );
-                                                       } )
-                                                       .or_else( [&]() -> optional<Handle<Fix>> { return obj; } )
-                                                       .value();
-                                                   } } ),
-                  send );
-      },
-      []( auto ) {} } );
-
-    job.visit<void>( overload { []( Handle<Literal> ) { throw runtime_error( "Unreachable" ); },
-                                [&]( auto h ) { worker->get( h ); } } );
-  }
-}
-
 Pass::Pass( reference_wrapper<Relater> relater )
   : relater_( relater )
 {}
@@ -190,33 +154,9 @@ void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<A
   tasks_info_[job].output_fan_out = outs.second;
 }
 
-Handle<Fix> get_root( Handle<AnyDataType> job )
-{
-  return job.visit<Handle<Fix>>(
-    overload { [&]( Handle<Relation> r ) {
-                return r.visit<Handle<Fix>>( overload {
-
-                  [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-                  [&]( Handle<Eval> e ) {
-                    return e.unwrap<Object>().visit<Handle<Fix>>( overload {
-                      []( Handle<Thunk> t ) {
-                        return t.visit<Handle<Fix>>( overload {
-                          []( Handle<Application> a ) { return a.unwrap<ExpressionTree>(); },
-                          []( Handle<Identification> i ) { return i.unwrap<Value>(); },
-                          []( Handle<Selection> ) -> Handle<Fix> { throw runtime_error( "Unimplemented" ); } } );
-                      },
-                      []( auto h ) { return h; }
-
-                    } );
-                  } } );
-              },
-               [&]( Handle<AnyTree> h ) { return handle::fix( h ); },
-               [&]( auto h ) { return h; } } );
-}
-
 size_t BasePass::absent_size( std::shared_ptr<IRuntime> worker, Handle<AnyDataType> job )
 {
-  auto root = get_root( job );
+  auto root = job::get_root( job );
   size_t contained_size = 0;
   relater_.get().early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
     auto contained = handle.visit<bool>(
@@ -523,23 +463,26 @@ void FinalPass::leaf( Handle<AnyDataType> job )
 {
   VLOG( 1 ) << "Run job " << ( is_local( chosen_remotes_.at( job ).first ) ? "locally " : "remotely " ) << job
             << endl;
-  get( chosen_remotes_.at( job ).first, job, relater_.get() );
+  job.visit<void>(
+    overload { []( Handle<Literal> ) {}, [&]( auto h ) { chosen_remotes_.at( job ).first->get( h ); } } );
 }
 
 void FinalPass::independent( Handle<AnyDataType> job )
 {
   if ( !is_local( chosen_remotes_.at( job ).first ) ) {
     VLOG( 1 ) << "Run job remotely " << job << endl;
-    get( chosen_remotes_.at( job ).first, job, relater_.get() );
+    job.visit<void>(
+      overload { []( Handle<Literal> ) {}, [&]( auto h ) { chosen_remotes_.at( job ).first->get( h ); } } );
   }
 }
 
 void FinalPass::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
-  for ( const auto& d : dependencies ) {
+  for ( auto d : dependencies ) {
     if ( !is_local( chosen_remotes_.at( d ).first ) ) {
       VLOG( 1 ) << "Run job remotely " << d << endl;
-      get( chosen_remotes_.at( d ).first, d, relater_.get() );
+      d.visit<void>(
+        overload { []( Handle<Literal> ) {}, [&]( auto h ) { chosen_remotes_.at( d ).first->get( h ); } } );
     }
   }
 }
