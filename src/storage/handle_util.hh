@@ -13,7 +13,7 @@
 namespace handle {
 static inline Handle<Blob> create( const BlobData& blob )
 {
-  if ( blob->size() < Handle<Literal>::MAXIMUM_LENGTH ) {
+  if ( blob->size() <= Handle<Literal>::MAXIMUM_LENGTH ) {
     return Handle<Literal>( { blob->span().data(), blob->size() } );
   }
   u8x32 hash = blake3::encode( std::as_bytes( blob->span() ) );
