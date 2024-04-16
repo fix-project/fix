@@ -399,6 +399,7 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
   }
 
   if ( local.has_value() and assigned > local.value()->get_info()->parallelism ) {
+    unordered_map<shared_ptr<IRuntime>, size_t> assigned_tasks;
     for ( const auto& [_, d] : scores ) {
       // XXX: We may want to oursource less
       if ( assigned - base_.get().get_fan_out( d ) < local.value()->get_info()->parallelism ) {
@@ -410,7 +411,6 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
       const auto& absent_size = base_.get().get_absent_size( d );
 
       size_t min_absent_size = numeric_limits<size_t>::max();
-      size_t max_parallelism = 0;
 
       optional<shared_ptr<IRuntime>> chosen_remote;
 
@@ -420,12 +420,8 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
 
         if ( s < min_absent_size ) {
           min_absent_size = s;
-          max_parallelism = r->get_info()->parallelism;
           chosen_remote = r;
-        } else if ( s == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
-          max_parallelism = r->get_info()->parallelism;
-          chosen_remote = r;
-        } else if ( s == min_absent_size && r->get_info()->parallelism == max_parallelism && is_local( r ) ) {
+        } else if ( s == min_absent_size && chosen_remote.has_value() && assigned_tasks[ r ] < assigned_tasks[ chosen_remote.value() ] ) {
           chosen_remote = r;
         }
       }
@@ -434,6 +430,7 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
         VLOG( 2 ) << "Outsource moved " << d << ( is_local( chosen_remote.value() ) ? " locally" : " remotely" );
         chosen_remotes_.insert_or_assign( d, { chosen_remote.value(), min_absent_size } );
         assigned -= base_.get().get_fan_out( d );
+        assigned_tasks[chosen_remote.value()] += base_.get().get_fan_out( d );
       } else {
         // No outsourcable locatons
         break;
