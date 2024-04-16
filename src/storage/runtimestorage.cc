@@ -62,7 +62,7 @@ template Handle<Tree<Expression>> RuntimeStorage::create_tree( TreeData, std::op
 
 BlobData RuntimeStorage::get( Handle<Named> handle )
 {
-  VLOG( 2 ) << "get " << handle;
+  VLOG( 3 ) << "get " << handle;
   auto blobs = blobs_.read();
   if ( blobs->contains( handle ) ) {
     return blobs->at( handle );
@@ -72,7 +72,7 @@ BlobData RuntimeStorage::get( Handle<Named> handle )
 
 TreeData RuntimeStorage::get( Handle<AnyTree> handle )
 {
-  VLOG( 2 ) << "get " << handle;
+  VLOG( 3 ) << "get " << handle;
   auto trees = trees_.read();
   auto generic = handle::upcast( handle ).untag();
   if ( trees->contains( generic ) ) {
@@ -118,7 +118,7 @@ void RuntimeStorage::visit( Handle<T> handle,
         visit( element, visitor, visited );
       }
     }
-    VLOG( 2 ) << "visiting " << handle;
+    VLOG( 3 ) << "visiting " << handle;
     visitor( handle );
     visited.insert( handle );
   }
@@ -148,7 +148,7 @@ void RuntimeStorage::visit_full(
         visit_full( element, visitor, pin_visitor, visited );
       }
     }
-    VLOG( 2 ) << "full-visiting " << handle;
+    VLOG( 3 ) << "full-visiting " << handle;
     visitor( handle );
     visited.insert( handle );
   }

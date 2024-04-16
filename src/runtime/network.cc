@@ -89,6 +89,16 @@ optional<TreeData> Remote::get( Handle<AnyTree> name )
 
 optional<Handle<Object>> Remote::get( Handle<Relation> name )
 {
+  if ( !contains( name ) ) {
+    parent_.value().get().visit( job::get_root( name ), [&]( Handle<AnyDataType> h ) {
+      h.visit<void>( overload { []( Handle<Literal> ) {},
+                                []( Handle<Relation> ) {},
+                                [&]( auto x ) {
+                                  msg_q_.enqueue(
+                                    make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                } } );
+    } );
+  }
   RunPayload payload { .task = name };
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
@@ -102,19 +112,36 @@ void Remote::put( Handle<Named> name, BlobData data )
   }
 }
 
-void Remote::put( Handle<AnyTree> name, TreeData data )
+void Remote::put( Handle<AnyTree> name, TreeData )
 {
   if ( !contains( name ) ) {
-    msg_q_.enqueue( make_pair( index_, make_pair( name, data ) ) );
+    parent_.value().get().visit( handle::upcast( name ), [&]( Handle<AnyDataType> h ) {
+      h.visit<void>( overload { []( Handle<Literal> ) {},
+                                []( Handle<Relation> ) {},
+                                [&]( auto x ) {
+                                  msg_q_.enqueue(
+                                    make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                } } );
+    } );
   }
 }
 
 void Remote::put( Handle<Relation> name, Handle<Object> data )
 {
-  VLOG( 2 ) << "Putting result to remote " << name;
   unique_lock lock( mutex_ );
   if ( reply_to_.contains( name ) ) {
     if ( !contains( name ) ) {
+      // Send the result of the relation first
+      parent_.value().get().visit( data, [&]( Handle<AnyDataType> h ) {
+        h.visit<void>( overload { []( Handle<Literal> ) {},
+                                  []( Handle<Relation> ) {},
+                                  [&]( auto x ) {
+                                    msg_q_.enqueue(
+                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  } } );
+      } );
+
+      VLOG( 2 ) << "Putting result to remote " << name;
       ResultPayload payload { .task = name, .result = data };
       msg_q_.enqueue( make_pair( index_, move( payload ) ) );
     }
@@ -216,12 +243,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
       auto res = parent.get( payload.task );
       if ( res.has_value() ) {
-        bool need_send = erase_reply_to( task );
-
-        if ( need_send ) {
-          ResultPayload payload { .task = task, .result = *res };
-          push_message( OutgoingMessage::to_message( move( payload ) ) );
-        }
+        this->put( payload.task, res.value() );
       }
       break;
     }
@@ -249,7 +271,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
       auto tree = parent.get( payload.handle );
       if ( tree )
-        send_tree( *tree );
+        this->put( payload.handle, tree.value() );
       break;
     }
 
@@ -257,7 +279,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
       auto blob = parent.get( payload.handle );
       if ( blob )
-        send_blob( blob.value() );
+        this->put( payload.handle, blob.value() );
       break;
     }
 
