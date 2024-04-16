@@ -107,8 +107,9 @@ public:
         VLOG( 3 ) << "visiting " << handle;
         visitor( handle );
         visited.insert( handle );
+      } else {
+        std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, handle.get() );
       }
-
     } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
       return;
     } else {

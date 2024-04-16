@@ -17,7 +17,7 @@ add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
 set_source_files_properties("asm-flatware.c" "asm-flatware.h" "asm-flatware.wat" PROPERTIES GENERATED TRUE)
 
 add_custom_command(
-        OUTPUT "asm-flatware.c asm-flatware.h asm-flatware.wat"
+        OUTPUT "asm-flatware.c" "asm-flatware.h" "asm-flatware.wat"
         DEPENDS generate_flatware
 )
 
@@ -44,7 +44,7 @@ target_link_libraries(c_flatware_obj PUBLIC fixpoint_storage)
 
 add_custom_command(
   OUTPUT  "c-flatware.wasm"
-  DEPENDS filesys_obj c_flatware_obj asm_flatware_obj util/fixpoint_util_obj filesys.c c-flatware.c asm-flatware.c
+  DEPENDS filesys_obj c_flatware_obj asm_flatware_obj util/fixpoint_util_obj filesys.c c-flatware.c
   COMMAND $ENV{HOME}/wasm-toolchain/sysroot/bin/wasm-ld
           ${CMAKE_BINARY_DIR}/flatware/CMakeFiles/filesys_obj.dir/filesys.c.o
           ${CMAKE_BINARY_DIR}/util/CMakeFiles/fixpoint_util_obj.dir/fixpoint_util.c.o
