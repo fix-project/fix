@@ -1,5 +1,6 @@
 #pragma once
 #include <cwchar>
+#include <iostream>
 #include <string_view>
 
 #include "blake3.hh"

@@ -6,6 +6,7 @@ project(applications)
 add_subdirectory(util)
 add_subdirectory(curry)
 add_subdirectory(map)
+add_subdirectory(mapreduce)
 add_subdirectory(flatware)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
