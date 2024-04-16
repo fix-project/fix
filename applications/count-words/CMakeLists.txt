@@ -2,8 +2,8 @@
 include(../util/cmake_helper_functions.cmake)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -mreference-types -I ~/wasm-toolchain/wasix/include -fno-exceptions")
-set(CMAKE_CXX_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang++)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os -mreference-types -I ~/wasm-toolchain/wasix/include -fno-exceptions")
+set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
 
 add_link_options( -Wl,--no-entry -Wl,--allow-undefined, -Wl, -Werror, -Wunused-parameter, -fno-exceptions)
 
@@ -17,10 +17,10 @@ add_custom_command(
           -o support.wasm
 )
 
-add_library(count_words_obj OBJECT "count_words.cc")
+add_library(count_words_obj OBJECT "count_words.c")
 target_link_libraries(count_words_obj PUBLIC fixpoint_storage)
 
-link_libc("${CMAKE_BINARY_DIR}/count-words/CMakeFiles/count_words_obj.dir/count_words.cc.o" count_words_obj count_words_unlinked.wasm)
+link_libc("${CMAKE_BINARY_DIR}/count-words/CMakeFiles/count_words_obj.dir/count_words.c.o" count_words_obj count_words_unlinked.wasm)
 
 # link fixpoint_storage, which defines wat tables and memories
 add_custom_command(
@@ -55,10 +55,10 @@ add_custom_target(
         DEPENDS count_words.wasm
         )
 
-add_library(merge_counts_obj OBJECT "merge_counts.cc")
+add_library(merge_counts_obj OBJECT "merge_counts.c")
 target_link_libraries(merge_counts_obj PUBLIC fixpoint_storage)
 
-link_libc("${CMAKE_BINARY_DIR}/count-words/CMakeFiles/merge_counts_obj.dir/merge_counts.cc.o" merge_counts_obj merge_counts_unlinked.wasm)
+link_libc("${CMAKE_BINARY_DIR}/count-words/CMakeFiles/merge_counts_obj.dir/merge_counts.c.o" merge_counts_obj merge_counts_unlinked.wasm)
 
 # link fixpoint_storage, which defines wat tables and memories
 add_custom_command(

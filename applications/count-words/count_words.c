@@ -1,12 +1,8 @@
-extern "C" {
 #include "fixpoint_util.h"
 #include "support.h"
-}
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 
-using namespace std;
+#include <stdlib.h>
+#include <string.h>
 
 int compare( const void* a, const void* b )
 {
@@ -22,16 +18,16 @@ int compare( const void* a, const void* b )
 __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply( externref combination )
 
 {
-  auto nil = create_blob_rw_mem_0( 0 );
+  externref nil = create_blob_rw_mem_0( 0 );
 
   attach_tree_ro_table_0( combination );
 
   /* auto rlimits = get_ro_table_0( 0 ); */
   /* auto self = get_ro_table_0( 1 ); */
-  auto input = get_ro_table_0( 2 );
+  externref input = get_ro_table_0( 2 );
 
   attach_blob_ro_mem_0( input );
-  auto size = get_length( input );
+  size_t size = get_length( input );
   char* file = (char*)malloc( size );
   ro_mem_0_to_program_mem( file, 0, size );
   const char* delim = " \n\t,.!?;";

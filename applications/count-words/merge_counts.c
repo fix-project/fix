@@ -1,10 +1,8 @@
-extern "C" {
 #include "fixpoint_util.h"
 #include "support.h"
-}
-#include <cassert>
-#include <cstdlib>
-#include <cstring>
+
+#include <stdlib.h>
+#include <string.h>
 
 char decode( char x )
 {
@@ -26,19 +24,19 @@ char decode( char x )
  */
 __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply( externref combination )
 {
-  auto nil = create_blob_rw_mem_0( 0 );
+  externref nil = create_blob_rw_mem_0( 0 );
 
   attach_tree_ro_table_0( combination );
 
   /* auto rlimits = get_ro_table_0( 0 ); */
   /* auto self = get_ro_table_0( 1 ); */
-  auto X = get_ro_table_0( 2 );
-  auto Y = get_ro_table_0( 3 );
+  externref X = get_ro_table_0( 2 );
+  externref Y = get_ro_table_0( 3 );
 
   attach_blob_ro_mem_0( X );
   attach_blob_ro_mem_1( Y );
-  auto sX = get_length( X );
-  auto sY = get_length( Y );
+  size_t sX = get_length( X );
+  size_t sY = get_length( Y );
 
   char* fX = (char*)malloc( sX );
   char* fY = (char*)malloc( sY );
