@@ -397,7 +397,7 @@ void eval( int argc, char* argv[] )
   }
 
   auto res = rt->execute( Handle<Eval>( handle::extract<Object>( handle ).value() ) );
-  cout << res << endl;
+  cout << res.content << endl;
 }
 
 void init( int, char*[] )
