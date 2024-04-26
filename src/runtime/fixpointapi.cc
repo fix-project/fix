@@ -106,7 +106,6 @@ void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
   for ( int i = index; i < index + length; i++ ) {
     cout << mem->data[i];
   }
-  cout << endl;
   flush( cout );
 }
 

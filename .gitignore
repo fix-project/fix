@@ -1,5 +1,5 @@
 /build
 /.ccls-cache
-.fix/
+.fix
 /.cache
 cmake-build-debug

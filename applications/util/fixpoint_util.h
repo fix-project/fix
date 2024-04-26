@@ -16,7 +16,7 @@ extern externref create_tag( externref object, externref blob )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_tag" ) ) );
 
 extern void fixpoint_unsafe_io( const char* s, int32_t size )
-  __attribute__( ( import_module( "fixpoint" ), import_name( "unsafe_io" ) ) );
+  __attribute__( ( import_module( "fixpoint" ), import_name( "memory_unsafe_io" ) ) );
 
 extern bool fixpoint_is_equal( externref x, externref y )
   __attribute__( ( import_module( "fixpoint" ), import_name( "is_equal" ) ) );

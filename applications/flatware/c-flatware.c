@@ -44,9 +44,9 @@ enum fd_
 };
 
 static filedesc fds[N_FDS] = {
-  { .open = true, .size = -1, .offset = 0, .file_id = 0 }, // STDIN
-  { .open = true, .size = -1, .offset = 0, .file_id = 1 }, // STDOUT
-  { .open = true, .size = -1, .offset = 0, .file_id = 2 }, // STDERR
+  { .open = true, .size = 0, .offset = 0, .file_id = 0 }, // STDIN
+  { .open = true, .size = 0, .offset = 0, .file_id = 1 }, // STDOUT
+  { .open = true, .size = 0, .offset = 0, .file_id = 2 }, // STDERR
   { .open = true, .size = -1, .offset = 0, .file_id = 4 }, // WORKING DIRECTORY
 };
 
@@ -97,6 +97,7 @@ static void write_trace( const char* str, int32_t len )
   }
   flatware_mem_to_rw_mem( StdTraceRWMem, trace_offset, (int32_t)str, len );
   trace_offset += len;
+  // flatware_mem_unsafe_io( str, len );
 }
 
 static void write_uint( uint64_t val )
@@ -975,6 +976,9 @@ externref fixpoint_apply( externref encode )
 
   attach_tree_ro_table( FileSystemBaseROTable, get_ro_table( InputROTable, INPUT_FILESYSTEM ) );
   attach_tree_ro_table( ArgsROTable, get_ro_table( InputROTable, INPUT_ARGS ) );
+  attach_blob_ro_mem( StdInROMem, get_ro_table( InputROTable, INPUT_STDIN ) );
+  fds[STDIN].size = byte_size_ro_mem( StdInROMem );
+
   attach_tree_ro_table( EnvROTable, get_ro_table( InputROTable, INPUT_ENV ) );
 
   grow_rw_table( OutputRWTable, 5, create_blob_i32( 0 ) );
