@@ -11,16 +11,20 @@ inline thread_local std::optional<Handle<Relation>> current_;
 
 class Executor;
 class Scheduler;
-class OnePassScheduler;
 class LocalFirstScheduler;
+class Pass;
+class BasePass;
+class PrunedSelectionPass;
 
 class Relater
   : public MultiWorkerRuntime
   , FixRuntime
 {
   friend class Executor;
-  friend class OnePassScheduler;
   friend class LocalFirstScheduler;
+  friend class Pass;
+  friend class BasePass;
+  friend class PrunedSelectionPass;
 
 private:
   SharedMutex<DependencyGraph> graph_ {};
@@ -72,42 +76,12 @@ public:
   virtual bool contains( const std::string_view label ) override;
   virtual Handle<Fix> labeled( const std::string_view label ) override;
 
-  template<FixType T>
-  void visit( Handle<T> handle,
-              std::function<void( Handle<AnyDataType> )> visitor,
-              std::unordered_set<Handle<Fix>> visited = {} )
+  virtual std::optional<Info> get_info() override
   {
-    if ( visited.contains( handle ) )
-      return;
-    if constexpr ( std::same_as<T, Literal> )
-      return;
-
-    if constexpr ( Handle<T>::is_fix_sum_type ) {
-      if constexpr ( std::same_as<T, Encode> ) {
-        Handle<Thunk> thunk
-          = handle.template visit<Handle<Thunk>>( []( auto s ) { return s.template unwrap<Thunk>(); } );
-        thunk.visit<void>(
-          overload { [&]( Handle<Application> a ) { visit( a.unwrap<ExpressionTree>(), visitor, visited ); },
-                     []( auto ) {} } );
-      }
-
-      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
-        std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
-
-    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
-      return;
-    } else {
-      if constexpr ( FixTreeType<T> ) {
-        // Having the handle means that the data presents in storage
-        auto tree = get( handle );
-        for ( const auto& element : tree.value()->span() ) {
-          visit( element, visitor, visited );
-        }
-      }
-      VLOG( 2 ) << "visiting " << handle;
-      visitor( handle );
-      visited.insert( handle );
-    }
+    // Info to be exposed to other nodes
+    auto info = local_->get_info();
+    info->link_speed = 7.5;
+    return info;
   }
 
   template<FixType T>
@@ -130,11 +104,12 @@ public:
                      []( Handle<Eval> h ) { return h.unwrap<Object>(); } } );
         std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, lhs.get() );
 
-        VLOG( 2 ) << "visiting " << handle;
+        VLOG( 3 ) << "visiting " << handle;
         visitor( handle );
         visited.insert( handle );
+      } else {
+        std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, handle.get() );
       }
-
     } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
       return;
     } else {
@@ -144,9 +119,45 @@ public:
           visit_full( element, visitor, visited );
         }
       }
-      VLOG( 2 ) << "visiting " << handle;
+      VLOG( 3 ) << "visiting " << handle;
       visitor( handle );
       visited.insert( handle );
+    }
+  }
+
+  // Stop visiting recursively if visitor( Tree ) returns true
+  template<FixType T>
+  void early_stop_visit_minrepo( Handle<T> handle,
+                                 std::function<bool( Handle<AnyDataType> )> visitor,
+                                 std::unordered_set<Handle<Fix>> visited = {} )
+  {
+    if ( visited.contains( handle ) )
+      return;
+    if constexpr ( std::same_as<T, Literal> )
+      return;
+
+    if constexpr ( Handle<T>::is_fix_sum_type ) {
+      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
+        std::visit( [&]( const auto x ) { early_stop_visit_minrepo( x, visitor, visited ); }, handle.get() );
+
+    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+      return;
+    } else {
+      VLOG( 3 ) << "visiting " << handle;
+      auto res = visitor( handle );
+      visited.insert( handle );
+
+      if ( res )
+        return;
+
+      if constexpr ( FixTreeType<T> ) {
+        if ( storage_.contains( handle ) ) {
+          auto tree = get( handle );
+          for ( const auto& element : tree.value()->span() ) {
+            early_stop_visit_minrepo( element, visitor, visited );
+          }
+        }
+      }
     }
   }
 

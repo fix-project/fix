@@ -43,6 +43,12 @@ target_link_libraries(test-map runtime)
 add_executable(test-curry test-curry.cc main.cc)
 target_link_libraries(test-curry runtime)
 
+add_executable(test-mapreduce test-mapreduce.cc main.cc)
+target_link_libraries(test-mapreduce runtime)
+
+add_executable(test-countwords test-countwords.cc main.cc)
+target_link_libraries(test-countwords runtime)
+
 add_executable(test-self-host test-self-host.cc main.cc)
 target_link_libraries(test-self-host runtime)
 

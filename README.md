@@ -97,7 +97,10 @@ application:
 |  |  ├─ uint64:$ALLOWED_MEMORY
 |  |  ├─ uint64:$ESTIMATED_OUTPUT_SIZE
 |  |  ├─ uint64:$ESTIMATED_FANOUT
-|  ├─ compile:$PATH_TO_WASM_FILE
+|  ├─ compile:
+|  |  ├─ file:$PATH_TO_WASM_FILE
+|  |  ├─ (or) name:$NAME_OF_WASM_BLOB
+|  |  ├─ (or) label:$LABEL_OF_WASM_BLOB
 |  ├─ $ARGUMENT_1
 |  ├─ $ARGUMENT_2
 ```
@@ -105,15 +108,15 @@ application:
 ### Running Wasm Examples:
 1. without arguments
 ```
-./build/src/tester/fix eval application: tree:2 tree:1 uint64:1000000 compile:build/applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm
+./build/src/tester/fix eval application: tree:2 tree:1 uint64:1000000 compile: file:build/applications-prefix/src/applications-build/flatware/examples/helloworld/helloworld-fixpoint.wasm
 ```
 2. with reading from a directory using `SERIALIZED_HOME_DIRECTORY=$(cat build/file.txt)`
 ```
-./build/src/tester/fix eval application: tree:4 tree:1 uint64:1000000 compile:build/applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm string:unused name:$SERIALIZED_HOME_DIRECTORY
+./build/src/tester/fix eval application: tree:4 tree:1 uint64:1000000 compile: file:build/applications-prefix/src/applications-build/flatware/examples/open/open-deep-fixpoint.wasm string:unused name:$SERIALIZED_HOME_DIRECTORY
 ```
 3. with arguments
 ```
-./build/src/tester/fix eval application: tree:4 tree:1 uint64:1000000 compile:build/testing/wasm-examples/add-simple.wasm uint32:9 uint32:7
+./build/src/tester/fix eval application: tree:4 tree:1 uint64:1000000 compile: file:build/testing/wasm-examples/add-simple.wasm uint32:9 uint32:7
 ```
 
 # Fix Repo Structure

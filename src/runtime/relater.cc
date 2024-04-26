@@ -62,6 +62,8 @@ Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<
 
 Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
 {
+  auto graph = graph_.write();
+
   auto contained = handle.visit<bool>(
     overload { [&]( Handle<Literal> ) { return true; }, [&]( auto h ) { return storage_.contains( h ); } } );
 
@@ -71,10 +73,10 @@ Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
     handle.visit<void>( overload {
       []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
       [&]( Handle<AnyTree> t ) {
-        t.visit<void>( [&]( auto h ) { graph_.write()->add_dependency( current_.value(), h ); } );
+        t.visit<void>( [&]( auto h ) { graph->add_dependency( current_.value(), h ); } );
       },
-      [&]( Handle<Named> n ) { graph_.write()->add_dependency( current_.value(), n ); },
-      [&]( Handle<Relation> r ) { graph_.write()->add_dependency( current_.value(), r ); },
+      [&]( Handle<Named> n ) { graph->add_dependency( current_.value(), n ); },
+      [&]( Handle<Relation> r ) { graph->add_dependency( current_.value(), r ); },
     } );
     works_.push_back( handle );
     return {};
@@ -127,8 +129,13 @@ Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
     return get( apply );
   }
 
-  if ( apply != current_ ) {
-    graph_.write()->add_dependency( current_.value(), apply );
+  {
+    auto graph = graph_.write();
+    if ( apply != current_ and !storage_.contains( apply ) ) {
+      graph->add_dependency( current_.value(), apply );
+    } else if ( storage_.contains( apply ) ) {
+      return storage_.get( apply );
+    }
   }
   works_.push_back( Handle<Apply>( combination ) );
   return {};
@@ -159,10 +166,23 @@ Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
     return get( goal )->unwrap<Value>();
   }
 
+  auto prev_current = current_;
+  current_ = goal;
+
   auto result = evaluator_.evalStrict( expression );
   if ( result.has_value() ) {
     this->put( goal, result.value() );
+  } else {
+    auto graph = graph_.write();
+    if ( prev_current.has_value() and prev_current.value() != Handle<Relation>( goal )
+         and !storage_.contains( goal ) ) {
+      graph->add_dependency( prev_current.value(), goal );
+    } else if ( storage_.contains( goal ) ) {
+      return storage_.get( goal ).unwrap<Value>();
+    }
   }
+
+  current_ = prev_current;
   return result;
 }
 
@@ -177,7 +197,7 @@ Relater::Result<ValueTree> Relater::mapEval( Handle<ObjectTree> tree )
   auto data = storage_.get( tree );
   for ( const auto& x : data->span() ) {
     auto obj = x.unwrap<Expression>().unwrap<Object>();
-    auto result = get_or_block( Handle<Eval>( obj ) );
+    auto result = evalStrict( obj );
     if ( not result ) {
       ready = false;
     }
@@ -190,7 +210,7 @@ Relater::Result<ValueTree> Relater::mapEval( Handle<ObjectTree> tree )
   for ( size_t i = 0; i < data->size(); i++ ) {
     auto x = data->at( i );
     auto obj = x.unwrap<Expression>().unwrap<Object>();
-    values[i] = evaluator_.evalStrict( obj ).value();
+    values[i] = evalStrict( obj ).value();
   }
 
   if ( tree.is_tag() ) {
@@ -334,13 +354,6 @@ void Relater::put( Handle<Named> name, BlobData data )
     for ( auto x : unblocked ) {
       local_->get( x );
     }
-    // for ( auto& remote : remotes_.read().get() ) {
-    //   VLOG( 1 ) << "Putting to relater name to remote " << name;
-    //   auto locked = remote.lock();
-    //   if ( locked ) {
-    //     locked->put( name, data );
-    //   }
-    // }
   }
 }
 void Relater::put( Handle<AnyTree> name, TreeData data )
@@ -355,18 +368,10 @@ void Relater::put( Handle<AnyTree> name, TreeData data )
     for ( auto x : unblocked ) {
       local_->get( x );
     }
-    // for ( auto& remote : remotes_.read().get() ) {
-    //   VLOG( 1 ) << "Putting to relater name to remote " << name;
-    //   auto locked = remote.lock();
-    //   if ( locked ) {
-    //     locked->put( name, data );
-    //   }
-    // }
   }
 }
 void Relater::put( Handle<Relation> name, Handle<Object> data )
 {
-  VLOG( 1 ) << "Putting to relater name " << name;
   if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
     absl::flat_hash_set<Handle<Relation>> unblocked;
@@ -378,7 +383,6 @@ void Relater::put( Handle<Relation> name, Handle<Object> data )
       local_->get( x );
     }
     for ( auto& remote : remotes_.read().get() ) {
-      VLOG( 1 ) << "Putting to relater name to remote " << name;
       auto locked = remote.lock();
       if ( locked ) {
         locked->put( name, data );

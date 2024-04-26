@@ -60,6 +60,6 @@ protected:
 public:
   Server() {}
 
-  static std::shared_ptr<Server> init( const Address& address );
+  static std::shared_ptr<Server> init( const Address& address, const std::vector<Address> peer_servers = {} );
   ~Server();
 };

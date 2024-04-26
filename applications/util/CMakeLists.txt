@@ -23,7 +23,7 @@ add_custom_command(
 add_custom_target(
         generate_fixpoint_storage
         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/generate.py
-        COMMENT "Generating fixpoint_torage"
+        COMMENT "Generating fixpoint_storage"
 )
 
 add_library(fixpoint_storage INTERFACE)

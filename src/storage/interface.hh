@@ -139,11 +139,11 @@ public:
     }
   }
 
-  // Stop visiting recursively if visitor( Tree ) returns true
+  // Visit from a root (include Handle<Strict>( Handle<Application>( Handle<ExrpessionTree> ) ) )
   template<FixType T>
-  void early_stop_visit_minrepo( Handle<T> handle,
-                                 std::function<bool( Handle<AnyDataType> )> visitor,
-                                 std::unordered_set<Handle<Fix>> visited = {} )
+  void visit( Handle<T> handle,
+              std::function<void( Handle<AnyDataType> )> visitor,
+              std::unordered_set<Handle<Fix>> visited = {} )
   {
     if ( visited.contains( handle ) )
       return;
@@ -151,26 +151,30 @@ public:
       return;
 
     if constexpr ( Handle<T>::is_fix_sum_type ) {
+      if constexpr ( std::same_as<T, Encode> ) {
+        Handle<Thunk> thunk
+          = handle.template visit<Handle<Thunk>>( []( auto s ) { return s.template unwrap<Thunk>(); } );
+        thunk.visit<void>(
+          overload { [&]( Handle<Application> a ) { visit( a.unwrap<ExpressionTree>(), visitor, visited ); },
+                     []( auto ) {} } );
+      }
+
       if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
-        std::visit( [&]( const auto x ) { early_stop_visit_minrepo( x, visitor, visited ); }, handle.get() );
+        std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
 
     } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
       return;
     } else {
-      VLOG( 2 ) << "visiting " << handle;
-      auto res = visitor( handle );
-      visited.insert( handle );
-
-      if ( res )
-        return;
-
       if constexpr ( FixTreeType<T> ) {
         // Having the handle means that the data presents in storage
         auto tree = get( handle );
         for ( const auto& element : tree.value()->span() ) {
-          early_stop_visit_minrepo( element, visitor, visited );
+          visit( element, visitor, visited );
         }
       }
+      VLOG( 3 ) << "visiting " << handle;
+      visitor( handle );
+      visited.insert( handle );
     }
   }
 };

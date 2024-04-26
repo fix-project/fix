@@ -116,12 +116,18 @@ Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args )
   }
 
   if ( str.starts_with( "compile:" ) ) {
-    std::filesystem::path file( string( str.substr( 8 ) ) );
     args = args.subspan( 1 );
+    bool prev_consumed = consumed;
+
+    consumed = true;
+    auto name = parse_args( rt, args );
+
+    consumed = prev_consumed;
+
     if ( consumed ) {
-      return Handle<Strict>( make_compile( rt, make_blob( rt, file ) ) );
+      return Handle<Strict>( make_compile( rt, name ) );
     } else {
-      return make_compile( rt, make_blob( rt, file ) );
+      return make_compile( rt, name );
     }
   }
 
@@ -276,6 +282,6 @@ void parser_usage_message()
   cerr << "            | tree:<n> (followed by <n> entries)\n";
   cerr << "            | application: (followed by tree:<n>)\n";
   cerr << "            | strict: (followed by application:)\n";
-  cerr << "            | compile:<filename>\n";
+  cerr << "            | compile: (followed by the wasm to compile)\n";
   cerr << "            | label:<ref>\n";
 }
