@@ -143,7 +143,7 @@ C_COPY_SOURCE_TO_RW_MEM_FUNC = 'void {src}_mem_to_rw_mem( int32_t rw_mem_id, int
 
 # unsafe io
 C_MEM_UNSAFE_IO = 'extern void {type}_mem_unsafe_io( const char* s, int32_t size )\n\
-    __attribute__( ( import_module( "fixpoint" ), import_name( "{type}_mem_unsafe_io" ) ) );'
+    __attribute__( ( import_module( "fixpoint" ), import_name( "{type}_mem_unsafe_io" ) ) );\n'
 
 # code generation
 def write_c(path):

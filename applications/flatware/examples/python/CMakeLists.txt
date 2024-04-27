@@ -1,8 +1,8 @@
-configure_file(rustpython.wasm rustpython.wasm COPYONLY)
+configure_file(python.wasm python.wasm COPYONLY)
 
 add_custom_command(
   OUTPUT "python-fixpoint.wasm"
-  DEPENDS rustpython.wasm
+  DEPENDS python.wasm
           ../../c-flatware.c
           ../../filesys.c
           ../../asm-flatware.wat
@@ -11,7 +11,7 @@ add_custom_command(
   COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
           --enable-multi-memory
           --enable-exceptions
-          rustpython.wasm
+          python.wasm
           ../../wasi_snapshot_preview1.wasm
           -m wasi_command
           -n wasi_snapshot_preview1

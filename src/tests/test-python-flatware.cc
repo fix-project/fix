@@ -24,7 +24,7 @@ Handle<Fix> fs()
   static string d = "040000";
   static string f = "100644";
   static auto e
-    = dirent( ".", d, tester::Tree( dirent( "main.py", f, tester::Blob( "print('Hello, World!')" ) ) ) );
+    = dirent( ".", d, tester::Tree( dirent( "main.py", f, tester::Blob( "print(2 + 2)" ) ) ) );
   return e;
 }
 
@@ -53,8 +53,8 @@ void test( void )
     exit( 1 );
   }
   auto out_string = std::string_view( out.value().data(), out.value().size() );
-  if ( out_string != "Hello, World!\n" ) {
-    fprintf( stderr, "Output failed, returned %s != Hello, World!\n", out_string.data() );
+  if ( out_string != "4\n" ) {
+    fprintf( stderr, "Output failed, returned %s != 4\n", out_string.data() );
     exit( 1 );
   }
 }
