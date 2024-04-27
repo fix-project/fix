@@ -23,8 +23,7 @@ Handle<Fix> fs()
 {
   static string d = "040000";
   static string f = "100644";
-  static auto e
-    = dirent( ".", d, tester::Tree( dirent( "main.py", f, tester::Blob( "print(2 + 2)" ) ) ) );
+  static auto e = dirent( ".", d, tester::Tree( dirent( "main.py", f, tester::Blob( "print(2 + 2)" ) ) ) );
   return e;
 }
 
