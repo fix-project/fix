@@ -50,4 +50,4 @@ struct Elf_Info
 };
 
 Elf_Info load_program( std::span<const char> program_content );
-Program link_program( std::span<const char> program_content );
+std::shared_ptr<Program> link_program( std::span<const char> program_content );

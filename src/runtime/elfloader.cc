@@ -1,5 +1,6 @@
 #include <cmath>
 #include <iostream>
+#include <memory>
 
 #include "elfloader.hh"
 #include "fixpointapi.hh"
@@ -165,7 +166,7 @@ Elf_Info load_program( std::span<const char> program_content )
   return res;
 }
 
-Program link_program( span<const char> program_content )
+shared_ptr<Program> link_program( span<const char> program_content )
 {
   Elf_Info elf_info = load_program( program_content );
 
@@ -256,5 +257,5 @@ Program link_program( span<const char> program_content )
   uint64_t main_entry = elf_info.func_map.at( "w2c_function_0x5Ffixpoint_apply" );
   uint64_t cleanup_entry = elf_info.func_map.at( "wasm2c_function_free" );
   uint64_t instance_size_entry = elf_info.func_map.at( "get_instance_size" );
-  return Program( code, init_entry, main_entry, cleanup_entry, instance_size_entry );
+  return make_shared<Program>( code, init_entry, main_entry, cleanup_entry, instance_size_entry );
 }
