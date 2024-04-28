@@ -106,14 +106,15 @@ public:
 
     auto function_name = handle::extract<Blob>( tag->at( 1 ) ).value();
 
-    if ( !programs_.read()->contains( function_name ) ) {
-      auto program = function_name.visit<Program>(
+    bool program_linked = programs_.read()->contains( function_name );
+    if ( !program_linked ) {
+      auto program = function_name.visit<std::shared_ptr<Program>>(
         overload { [&]( Handle<Literal> f ) { return link_program( f.view() ); },
                    [&]( Handle<Named> f ) { return link_program( fixpoint::storage->get( f )->span() ); } } );
-      programs_.write()->emplace( function_name, std::move( program ) );
+      programs_.write()->emplace( function_name, program );
     }
 
-    const Program& program = programs_.read()->at( function_name );
+    auto program = programs_.read()->at( function_name );
     fixpoint::current_procedure = function_name;
 
     VLOG( 2 ) << handle << " rlimits are " << rlimits;
@@ -130,13 +131,13 @@ public:
           .value_or( 0 );
 
     VLOG( 1 ) << handle << " requested " << resource_limits::available_bytes << " bytes";
-    auto result = program.execute( handle );
+    auto result = program->execute( handle );
     VLOG( 2 ) << handle << " -> " << result;
     return result;
   }
 
 private:
-  SharedMutex<absl::flat_hash_map<Handle<Blob>, Program>> programs_ {};
+  SharedMutex<absl::flat_hash_map<Handle<Blob>, std::shared_ptr<Program>>> programs_ {};
   Handle<Fix> trusted_compiler_;
 };
 

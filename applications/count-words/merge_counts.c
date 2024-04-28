@@ -90,7 +90,7 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
     }
     valsX[i] = x;
   }
-  for ( size_t i = 0; i < NX; i++ ) {
+  for ( size_t i = 0; i < NY; i++ ) {
     char* s = valsYstr[i];
     uint32_t x = 0;
     for ( size_t j = 0; j < 8; j++ ) {
