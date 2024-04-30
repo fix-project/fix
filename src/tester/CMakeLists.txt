@@ -10,5 +10,8 @@ target_link_libraries(fixpoint-server runtime)
 add_executable(fixpoint-client "fixpoint-client.cc" "main.cc" "tester-utils.cc")
 target_link_libraries(fixpoint-client runtime)
 
+add_executable(fixpoint-client-self-host "fixpoint-client-self-host.cc" "tester-utils.cc")
+target_link_libraries(fixpoint-client-self-host runtime)
+
 # add_executable(http-tester "http-tester.cc" "main.cc" "tester-utils.cc")
 # target_link_libraries(http-tester runtime http)

@@ -90,6 +90,35 @@ optional<TreeData> Remote::get( Handle<AnyTree> name )
 optional<Handle<Object>> Remote::get( Handle<Relation> name )
 {
   if ( !contains( name ) ) {
+
+    vector<Handle<Fix>> extra;
+
+    name.visit<void>( overload { [&]( Handle<Apply> ) { return; },
+                                 [&]( Handle<Eval> e ) {
+                                   e.unwrap<Object>().visit<void>(
+                                     overload { [&]( Handle<ObjectTree> tree ) {
+                                                 auto treedata = parent_.value().get().get( tree ).value()->span();
+                                                 for ( const auto& subtask : treedata ) {
+                                                   extra.push_back( job::get_root( Handle<Eval>(
+                                                     subtask.unwrap<Expression>().unwrap<Object>() ) ) );
+                                                 }
+                                               },
+                                                []( auto ) { return; } } );
+                                 } } );
+
+    for ( const auto& e : extra ) {
+      VLOG( 2 ) << "Sending extra root " << e;
+      std::cout << e << std::endl;
+      parent_.value().get().visit( e, [&]( Handle<AnyDataType> h ) {
+        h.visit<void>( overload { []( Handle<Literal> ) {},
+                                  []( Handle<Relation> ) {},
+                                  [&]( auto x ) {
+                                    msg_q_.enqueue(
+                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  } } );
+      } );
+    }
+
     parent_.value().get().visit( job::get_root( name ), [&]( Handle<AnyDataType> h ) {
       h.visit<void>( overload { []( Handle<Literal> ) {},
                                 []( Handle<Relation> ) {},
@@ -99,6 +128,7 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
                                 } } );
     } );
   }
+
   RunPayload payload { .task = name };
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
