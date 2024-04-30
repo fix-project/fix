@@ -445,6 +445,41 @@ void decode( int argc, char* argv[] )
   }
 }
 
+void ref_( int argc, char* argv[] )
+{
+  OptionParser parser( "ref", commands["ref"].second );
+  const char* handle = NULL;
+  parser.AddArgument(
+    "handle", OptionParser::ArgumentCount::One, [&]( const char* argument ) { handle = argument; } );
+  parser.Parse( argc, argv );
+  if ( !handle )
+    exit( EXIT_FAILURE );
+
+  try {
+    auto result = base16::decode( handle );
+    auto handle = Handle<Fix>::forge( result );
+    auto ref = handle::data( handle ).visit<Handle<Fix>>( overload {
+      []( Handle<Literal> x ) { return Handle<Fix>( Handle<BlobRef>( x ) ); },
+      []( Handle<Named> x ) { return Handle<Fix>( Handle<BlobRef>( x ) ); },
+      []( Handle<ValueTree> x ) {
+        Repository storage;
+        auto result = storage.get( x ).value();
+        return Handle<Fix>( Handle<ValueTreeRef>( x, result->size() ) );
+      },
+      []( Handle<ObjectTree> x ) {
+        Repository storage;
+        auto result = storage.get( x ).value();
+        return Handle<Fix>( Handle<ObjectTreeRef>( x, result->size() ) );
+      },
+      []( auto ) -> Handle<Fix> { throw std::runtime_error( "cannot make Ref" ); },
+    } );
+    cout << ref.content << "\n";
+  } catch ( std::runtime_error& e ) {
+    cerr << "Error: " << e.what() << "\n";
+    exit( EXIT_FAILURE );
+  }
+}
+
 map<string, pair<function<void( int, char*[] )>, const char*>> commands = {
   { "add", { blob::add, "Add a file to the Fix repository as a Blob." } },
   { "add-blob", { blob::add, "Add a file to the Fix repository as a Blob." } },
@@ -460,6 +495,7 @@ map<string, pair<function<void( int, char*[] )>, const char*>> commands = {
   { "labels", { labels, "List all available labels." } },
   { "ls", { tree::ls, "List the contents of a Tree." } },
   { "ls-tree", { tree::ls, "List the contents of a Tree." } },
+  { "ref", { ref_, "Produce a Ref version of a Handle." } },
   { "eval", { eval, "Eval" } },
 };
 
