@@ -59,7 +59,7 @@ protected:
 
 public:
   Server( std::shared_ptr<Scheduler> scheduler )
-    : relater_( std::thread::hardware_concurrency(), {}, scheduler )
+    : relater_( std::thread::hardware_concurrency() - 1, {}, scheduler )
   {}
 
   static std::shared_ptr<Server> init( const Address& address,
