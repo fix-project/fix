@@ -232,9 +232,11 @@ void MinAbsentMaxParallelism::leaf( Handle<AnyDataType> job )
 
     size_t max_parallelism = 0;
     size_t min_absent_size = numeric_limits<size_t>::max();
+    int64_t min_absent_size_diff = 0;
 
     for ( const auto& [r, s] : absent_size ) {
       if ( s < min_absent_size ) {
+        min_absent_size_diff = s - min_absent_size;
         min_absent_size = s;
         max_parallelism = r->get_info()->parallelism;
         chosen_remote = r;
@@ -247,7 +249,7 @@ void MinAbsentMaxParallelism::leaf( Handle<AnyDataType> job )
     }
     VLOG( 2 ) << "MinAbsent::leaf " << job << " "
               << ( is_local( chosen_remote.value() ) ? " locally" : " remotely" );
-    chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), min_absent_size } );
+    chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), min_absent_size_diff } );
   } else {
     VLOG( 2 ) << "MinAbsent::leaf " << job << " "
               << ( is_local( chosen_remote.value() ) ? " locally" : " remotely" );
@@ -280,10 +282,12 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
 
     int64_t min_absent_size = numeric_limits<int64_t>::max();
     size_t max_parallelism = 0;
+    int64_t min_absent_size_diff = 0;
 
     for ( const auto& [r, s] : absent_size ) {
       int64_t sum_size = s - present_output[r];
       if ( sum_size < min_absent_size ) {
+        min_absent_size_diff = sum_size - min_absent_size;
         min_absent_size = sum_size;
         max_parallelism = r->get_info()->parallelism;
         chosen_remote = r;
@@ -296,7 +300,7 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
     }
     VLOG( 2 ) << "MinAbsent::post " << job << " "
               << ( is_local( chosen_remote.value() ) ? " locally" : " remotely" );
-    chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), min_absent_size } );
+    chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), min_absent_size_diff } );
   } else {
     VLOG( 2 ) << "MinAbsent::post " << job << " "
               << ( is_local( chosen_remote.value() ) ? " locally" : " remotely" );
@@ -344,11 +348,17 @@ void ChildBackProp::independent( Handle<AnyDataType> job )
 
       int64_t min_absent_size = numeric_limits<int64_t>::max();
       size_t max_parallelism = 0;
+      int64_t min_absent_size_diff = 0;
 
       for ( const auto& [r, s] : absent_size ) {
+        if ( r == chosen_remotes_.at( job ).first ) {
+          continue;
+        }
+
         int64_t sum_size = s - ( move_output_to.contains( r ) ? base_.get().get_output_size( job ) : 0 );
         if ( sum_size < prev ) {
           if ( sum_size < min_absent_size ) {
+            min_absent_size_diff = sum_size - min_absent_size;
             min_absent_size = sum_size;
             max_parallelism = r->get_info()->parallelism;
             chosen_remote = r;
@@ -365,7 +375,7 @@ void ChildBackProp::independent( Handle<AnyDataType> job )
       if ( chosen_remote.has_value() ) {
         VLOG( 2 ) << "ChildBackProp::independent move " << job << " to "
                   << ( is_local( chosen_remote.value() ) ? "local" : "remote" );
-        chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), min_absent_size } );
+        chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), min_absent_size_diff } );
       }
     } else {
       VLOG( 2 ) << "ChildBackProp::independent move " << job << " to "
