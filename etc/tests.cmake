@@ -8,7 +8,10 @@ add_custom_target (fixpoint-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-fai
 )
 add_custom_target (all-fixpoint-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^t_" COMMENT "Testing Fix...")
 
-add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" COMMENT "Testing Flatware...")
+add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" -E "f_python_flatware"
+  COMMENT "Testing Flatware..."
+)
+add_custom_target (all-flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" COMMENT "Testing Flatware...")
 
 add_test(NAME u_handle COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-handle)
 add_test(NAME u_storage COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-storage)
