@@ -1,8 +1,8 @@
-configure_file(python.wasm python.wasm COPYONLY)
+configure_file(python-wasm/python.wasm python.wasm COPYONLY)
 
 add_custom_command(
   OUTPUT "python-fixpoint.wasm"
-  DEPENDS python.wasm
+  DEPENDS python-wasm/python.wasm
           ../../c-flatware.c
           ../../filesys.c
           ../../asm-flatware.wat
