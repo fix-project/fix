@@ -162,4 +162,5 @@ public:
   }
 
   Repository& get_repository() { return repository_; }
+  virtual std::unordered_set<Handle<AnyDataType>> data() const override { return repository_.data(); }
 };

@@ -286,14 +286,32 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::REQUESTINFO: {
-      InfoPayload payload { parent.get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } ) };
+      auto parent_info = parent.get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } );
+      InfoPayload payload { .parallelism = parent_info.parallelism, .link_speed = parent_info.link_speed, .data = parent.data() };
       push_message( OutgoingMessage::to_message( move( payload ) ) );
       break;
     }
 
     case Opcode::INFO: {
-      unique_lock lock( mutex_ );
-      info_ = parse<InfoPayload>( std::get<string>( msg.payload() ) );
+      auto payload = parse<InfoPayload>( std::get<string>( msg.payload() ) );
+      {
+        unique_lock lock( mutex_ );
+        info_ = { .parallelism = payload.parallelism, .link_speed = payload.link_speed };
+      }
+
+      for ( auto handle : payload.data ) {
+        handle.visit<void>( overload { 
+            [&]( Handle<Named> h ) {
+               blobs_view_.write()->insert( h );
+            },
+            [&]( Handle<AnyTree> t ) {
+               trees_view_.write()->insert( handle::upcast( t ) );
+            },
+            []( Handle<Literal> ) {},
+            []( Handle<Relation> ) {} 
+        } );
+      }
+      
       break;
     }
 

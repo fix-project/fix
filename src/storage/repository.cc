@@ -29,12 +29,12 @@ std::filesystem::path Repository::find( std::filesystem::path directory )
   return current_directory / ".fix";
 }
 
-std::unordered_set<Handle<Fix>> Repository::data() const
+std::unordered_set<Handle<AnyDataType>> Repository::data() const
 {
   try {
-    std::unordered_set<Handle<Fix>> result;
+    std::unordered_set<Handle<AnyDataType>> result;
     for ( const auto& datum : fs::directory_iterator( repo_ / "data" ) ) {
-      result.insert( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) );
+      result.insert( handle::data( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) ) );
     }
     return result;
   } catch ( std::filesystem::filesystem_error& ) {
@@ -388,7 +388,7 @@ Handle<Fix> Repository::lookup( const std::string_view ref )
     return labeled( ref );
   } catch ( LabelNotFound& ) {}
 
-  std::optional<Handle<Fix>> candidate;
+  std::optional<Handle<AnyDataType>> candidate;
   for ( const auto& handle : data() ) {
     std::string name = base16::encode( handle.content );
     if ( name.rfind( ref, 0 ) == 0 ) {
@@ -398,7 +398,7 @@ Handle<Fix> Repository::lookup( const std::string_view ref )
     }
   }
   if ( candidate )
-    return *candidate;
+    return handle::fix( *candidate );
 
   if ( fs::exists( ref ) ) {
     try {

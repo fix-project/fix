@@ -177,6 +177,9 @@ public:
       visited.insert( handle );
     }
   }
+
+  // Return the list of data presening in .fix repository
+  virtual std::unordered_set<Handle<AnyDataType>> data() const { return {}; };
 };
 
 class MultiWorkerRuntime : public IRuntime

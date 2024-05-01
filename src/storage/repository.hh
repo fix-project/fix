@@ -15,7 +15,7 @@ public:
   Repository( std::filesystem::path directory = std::filesystem::current_path() );
   static std::filesystem::path find( std::filesystem::path directory = std::filesystem::current_path() );
 
-  std::unordered_set<Handle<Fix>> data() const;
+  std::unordered_set<Handle<AnyDataType>> data() const override;
   std::unordered_set<std::string> labels() const;
   std::unordered_map<Handle<Fix>, std::unordered_set<Handle<Fix>>> pins() const;
 

@@ -101,13 +101,17 @@ struct RequestTreePayload
   size_t payload_length() const { return sizeof( u8x32 ); }
 };
 
-struct InfoPayload : public IRuntime::Info
+struct InfoPayload
 {
+  uint32_t parallelism {};
+  double link_speed {};
+  std::unordered_set<Handle<AnyDataType>> data {};
+
   static InfoPayload parse( Parser& parser );
   void serialize( Serializer& serializer ) const;
 
   constexpr static Message::Opcode OPCODE = Message::Opcode::INFO;
-  size_t payload_length() const { return sizeof( uint32_t ) + sizeof( double ); }
+  size_t payload_length() const { return sizeof( uint32_t ) + sizeof( double ) + sizeof( size_t ) + data.size() * sizeof( u8x32 ) ; }
 };
 
 template<Message::Opcode O>

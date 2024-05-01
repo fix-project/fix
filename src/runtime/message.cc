@@ -257,13 +257,31 @@ InfoPayload InfoPayload::parse( Parser& parser )
     throw runtime_error( "Failed to parse link speed." );
   }
 
-  return { { .parallelism = parallelism, .link_speed = link_speed } };
+  size_t data_entries {};
+  parser.integer<size_t>( data_entries );
+  if ( parser.error() ) {
+    throw runtime_error( "Failed to parse number of entries in data." );
+  }
+
+  InfoPayload payload;
+  payload.parallelism = parallelism;
+  payload.link_speed = link_speed;
+  payload.data.reserve( data_entries );
+
+  for ( size_t i = 0; i < data_entries; i++ ) {
+    payload.data.insert( parse_handle<AnyDataType>( parser ));
+  }
+  return payload;
 }
 
 void InfoPayload::serialize( Serializer& serializer ) const
 {
   serializer.integer( parallelism );
   serializer.integer( link_speed );
+  serializer.integer( data.size() );
+  for ( const auto& h : data ) {
+    serializer.integer( h.content );
+  }
 }
 
 template<Message::Opcode O>
