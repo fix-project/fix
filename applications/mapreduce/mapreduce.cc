@@ -3,6 +3,9 @@ extern "C" {
 }
 #include <cassert>
 
+extern externref create_identification_thunk( externref pointer )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_identification_thunk" ) ) );
+
 externref mapreduce( externref mapper, externref reducer, externref rlimits, int start, int end )
 {
   auto nil = create_blob_rw_mem_0( 0 );
@@ -10,7 +13,7 @@ externref mapreduce( externref mapper, externref reducer, externref rlimits, int
     grow_rw_table_0( 3, nil );
     set_rw_table_0( 0, rlimits );
     set_rw_table_0( 1, mapper );
-    set_rw_table_0( 2, get_ro_table_0( start ) );
+    set_rw_table_0( 2, create_strict_encode( create_identification_thunk( get_ro_table_0( start ) ) ) );
     return create_application_thunk( create_tree_rw_table_0( 3 ) );
   } else {
     auto split = start + ( end - start ) / 2;

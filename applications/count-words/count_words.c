@@ -89,7 +89,10 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
   }
 
   size_t pages = output_bytes / 4096 + 1;
-  grow_rw_mem_0_pages( pages );
+  if (grow_rw_mem_0_pages( pages )) {
+    char *s = "count words: grow error";
+    fixpoint_unsafe_io(s, strlen(s));
+  }
   program_mem_to_rw_mem_0( 0, output, output_bytes );
 
   return create_blob_rw_mem_0( output_bytes );

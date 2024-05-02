@@ -21,9 +21,7 @@ for i in $(seq 0 $(($M-1)))
 do
   target=${NODES[$i]}
   echo "Sending template fix directory to $target."
-  rsync -a repo-template/ $target/.fix/
-  echo "Erasing relations not from bootstrap on $target."
-  rsync -a --delete repo-template/relations $target/.fix/relations
+  rsync -a --delete repo-template/ $target/.fix/
 done
 
 for i in $(seq 0 $(($M-1)))

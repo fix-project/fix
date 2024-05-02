@@ -14,8 +14,10 @@ int main( int argc, char* argv[] )
 {
   std::shared_ptr<Client> client;
 
-  if ( argc != 2 )
+  if ( argc != 2 ) {
     cerr << "Usage: +[address]:[port]" << endl;
+    exit( 1 );
+  }
 
   if ( argv[1][0] == '+' ) {
     string addr( &argv[1][1] );

@@ -18,6 +18,12 @@ char decode( char x )
   return 0;
 }
 
+size_t mystrlen(char *s) {
+  size_t i = 0;
+  while (*s++) i++;
+  return i;
+}
+
 /**
  * @brief Merges two wordcount CSVs into a single larger one.
  * @return externref  A wordcount CSV.
@@ -57,26 +63,36 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
   char** valsYstr = (char**)malloc( sizeof( char* ) * nY );
 
   size_t NX = 0;
-  char* p = strtok( fX, "," );
-  do {
-    char* q = strtok( NULL, "\n" );
-    if ( !q )
-      break;
-    keysX[NX] = p;
-    valsXstr[NX] = q;
+  char *p = fX;
+  for (size_t i = 0; i < nX; i++) {
+    char *key = p;
+    while (*p != ',') {p++;}
+    *p = 0;
+    p++;
+    char *value = p;
+    while (*p != '\n') {p++;}
+    *p = 0;
+    p++;
+    keysX[i] = key;
+    valsXstr[i] = value;
     NX++;
-  } while ( ( p = strtok( NULL, "," ) ) );
+  }
 
   size_t NY = 0;
-  p = strtok( fY, "," );
-  do {
-    char* q = strtok( NULL, "\n" );
-    if ( !q )
-      break;
-    keysY[NY] = p;
-    valsYstr[NY] = q;
+  p = fY;
+  for (size_t i = 0; i < nY; i++) {
+    char *key = p;
+    while (*p != ',') {p++;}
+    *p = 0;
+    p++;
+    char *value = p;
+    while (*p != '\n') {p++;}
+    *p = 0;
+    p++;
+    keysY[i] = key;
+    valsYstr[i] = value;
     NY++;
-  } while ( ( p = strtok( NULL, "," ) ) );
+  }
 
   size_t* valsX = (size_t*)malloc( sizeof( size_t ) * NX );
   size_t* valsY = (size_t*)malloc( sizeof( size_t ) * NY );
@@ -152,18 +168,22 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
 
   size_t output_bytes = char_count + n * ( 1 + 10 + 1 );
   char* output = (char*)malloc( output_bytes );
+  if (!output) {
+    char *s = "merge counts: grow error";
+    fixpoint_unsafe_io(s, strlen(s));
+  }
 
   char* cursor = output;
   for ( size_t i = 0; i < n; i++ ) {
     size_t m = strlen( keys[i] );
-    strcpy( cursor, keys[i] );
+    strncpy( cursor, keys[i], m );
     cursor += m;
     *cursor++ = ',';
     *cursor++ = '0';
     *cursor++ = 'x';
     for ( size_t j = 0; j < 32; j += 4 ) {
       size_t shift = ( 28 - j );
-      int x = vals[i] >> shift;
+      int x = (vals[i] >> shift) & 0xf;
       char y = "0123456789abcdef"[x];
       *cursor++ = y;
     }
@@ -171,7 +191,10 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
   }
 
   size_t pages = output_bytes / 4096 + 1;
-  grow_rw_mem_0_pages( pages );
+  if (grow_rw_mem_0_pages( pages )) {
+    char *s = "merge counts: grow error";
+    fixpoint_unsafe_io(s, strlen(s));
+  }
   program_mem_to_rw_mem_0( 0, output, output_bytes );
 
   return create_blob_rw_mem_0( output_bytes );
