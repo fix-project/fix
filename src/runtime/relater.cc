@@ -333,12 +333,25 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
     return storage_.get( name );
   }
 
-  auto works = relate( name );
-  if ( !works.empty() ) {
-    scheduler_->schedule( works, name );
+  if ( local_->get_info()->parallelism == 0 ) {
+    auto locked_remotes = remotes_.read();
+    if ( locked_remotes->size() > 0 ) {
+      for ( const auto& remote : locked_remotes.get() ) {
+        auto locked_remote = remote.lock();
+        if ( locked_remote ) {
+          locked_remote->get( name );
+        }
+      }
+    }
     return {};
   } else {
-    return storage_.get( name );
+    auto works = relate( name );
+    if ( !works.empty() ) {
+      scheduler_->schedule( works, name );
+      return {};
+    } else {
+      return storage_.get( name );
+    }
   }
 }
 
