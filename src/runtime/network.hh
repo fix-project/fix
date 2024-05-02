@@ -126,7 +126,7 @@ private:
   void process_incoming_message( IncomingMessage&& msg );
 
   void send_blob( BlobData blob );
-  void send_tree( TreeData tree );
+  void send_tree( Handle<AnyTree>, TreeData tree );
 
   void clean_up();
 

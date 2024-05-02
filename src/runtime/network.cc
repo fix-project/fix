@@ -56,9 +56,18 @@ void Remote::send_blob( BlobData blob )
   push_message( { Opcode::BLOBDATA, blob } );
 }
 
-void Remote::send_tree( TreeData tree )
+void Remote::send_tree( Handle<AnyTree> handle, TreeData )
 {
-  push_message( { Opcode::TREEDATA, tree } );
+  parent_.value().get().visit( handle::upcast( handle ), [&]( Handle<AnyDataType> h ) {
+    h.visit<void>( overload { []( Handle<Literal> ) {},
+                              []( Handle<Relation> ) {},
+                              [&]( Handle<AnyTree> t ) {
+                                push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } );
+                              },
+                              [&]( Handle<Named> b ) {
+                                push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
+                              } } );
+  } );
 }
 
 void Remote::push_message( OutgoingMessage&& msg )
@@ -306,16 +315,20 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::REQUESTTREE: {
       auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
       auto tree = parent.get( payload.handle );
-      if ( tree )
-        this->put( payload.handle, tree.value() );
+      if ( tree ) {
+        send_tree( payload.handle, tree.value() );
+        trees_view_.write()->insert( handle::upcast( payload.handle ) );
+      }
       break;
     }
 
     case Opcode::REQUESTBLOB: {
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
       auto blob = parent.get( payload.handle );
-      if ( blob )
-        this->put( payload.handle, blob.value() );
+      if ( blob ) {
+        send_blob( blob.value() );
+        blobs_view_.write()->insert( payload.handle );
+      }
       break;
     }
 
