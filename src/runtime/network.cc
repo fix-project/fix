@@ -58,16 +58,16 @@ void Remote::send_blob( BlobData blob )
 
 void Remote::send_tree( Handle<AnyTree> handle, TreeData )
 {
-    parent_.value().get().visit( handle::upcast( handle ), [&]( Handle<AnyDataType> h ) {
-      h.visit<void>( overload { []( Handle<Literal> ) {},
-                                []( Handle<Relation> ) {},
-                                [&]( Handle<AnyTree> t ) {
-                                   push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } );
-                                },
-                                [&]( Handle<Named> b ) {
-                                   push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
-                                } } );
-    } );
+  parent_.value().get().visit( handle::upcast( handle ), [&]( Handle<AnyDataType> h ) {
+    h.visit<void>( overload { []( Handle<Literal> ) {},
+                              []( Handle<Relation> ) {},
+                              [&]( Handle<AnyTree> t ) {
+                                push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } );
+                              },
+                              [&]( Handle<Named> b ) {
+                                push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
+                              } } );
+  } );
 }
 
 void Remote::push_message( OutgoingMessage&& msg )
@@ -296,7 +296,8 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::REQUESTINFO: {
       auto parent_info = parent.get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } );
-      InfoPayload payload { .parallelism = parent_info.parallelism, .link_speed = parent_info.link_speed, .data = parent.data() };
+      InfoPayload payload {
+        .parallelism = parent_info.parallelism, .link_speed = parent_info.link_speed, .data = parent.data() };
       push_message( OutgoingMessage::to_message( move( payload ) ) );
       break;
     }
@@ -309,18 +310,13 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       }
 
       for ( auto handle : payload.data ) {
-        handle.visit<void>( overload { 
-            [&]( Handle<Named> h ) {
-               blobs_view_.write()->insert( h );
-            },
-            [&]( Handle<AnyTree> t ) {
-               trees_view_.write()->insert( handle::upcast( t ) );
-            },
-            []( Handle<Literal> ) {},
-            []( Handle<Relation> ) {} 
-        } );
+        handle.visit<void>(
+          overload { [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
+                     [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
+                     []( Handle<Literal> ) {},
+                     []( Handle<Relation> ) {} } );
       }
-      
+
       break;
     }
 

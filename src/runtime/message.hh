@@ -111,7 +111,10 @@ struct InfoPayload
   void serialize( Serializer& serializer ) const;
 
   constexpr static Message::Opcode OPCODE = Message::Opcode::INFO;
-  size_t payload_length() const { return sizeof( uint32_t ) + sizeof( double ) + sizeof( size_t ) + data.size() * sizeof( u8x32 ) ; }
+  size_t payload_length() const
+  {
+    return sizeof( uint32_t ) + sizeof( double ) + sizeof( size_t ) + data.size() * sizeof( u8x32 );
+  }
 };
 
 template<Message::Opcode O>

@@ -269,7 +269,7 @@ InfoPayload InfoPayload::parse( Parser& parser )
   payload.data.reserve( data_entries );
 
   for ( size_t i = 0; i < data_entries; i++ ) {
-    payload.data.insert( parse_handle<AnyDataType>( parser ));
+    payload.data.insert( parse_handle<AnyDataType>( parser ) );
   }
   return payload;
 }

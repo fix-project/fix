@@ -51,7 +51,7 @@ const static map<string, uint64_t> library_func_map
       { "fixpoint_create_blob_i64", (uint64_t)fixpoint::create_blob_i64 },
       { "fixpoint_create_blob_string", (uint64_t)fixpoint::create_blob_string },
       { "fixpoint_create_application_thunk", (uint64_t)fixpoint::create_application_thunk },
-      // { "fixpoint_create_identity_thunk", (uint64_t)fixpoint::create_identity_thunk },
+      { "fixpoint_create_identification_thunk", (uint64_t)fixpoint::create_identification_thunk },
       // { "fixpoint_create_selection_thunk", (uint64_t)fixpoint::create_selection_thunk },
       { "fixpoint_get_length", (uint64_t)fixpoint::get_length },
       { "fixpoint_create_strict_encode", (uint64_t)fixpoint::create_strict_encode },

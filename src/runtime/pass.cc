@@ -431,7 +431,8 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
         if ( s < min_absent_size ) {
           min_absent_size = s;
           chosen_remote = r;
-        } else if ( s == min_absent_size && chosen_remote.has_value() && assigned_tasks[ r ] < assigned_tasks[ chosen_remote.value() ] ) {
+        } else if ( s == min_absent_size && chosen_remote.has_value()
+                    && assigned_tasks[r] < assigned_tasks[chosen_remote.value()] ) {
           chosen_remote = r;
         }
       }

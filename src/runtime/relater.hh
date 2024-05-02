@@ -137,7 +137,7 @@ public:
       return;
 
     if constexpr ( Handle<T>::is_fix_sum_type ) {
-      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> ) )
+      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, BlobRef> ) )
         std::visit( [&]( const auto x ) { early_stop_visit_minrepo( x, visitor, visited ); }, handle.get() );
 
     } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {

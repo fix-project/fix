@@ -266,7 +266,7 @@ bool Repository::contains( Handle<Relation> handle )
 
 std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
 {
-  auto content_hash = base16::encode( handle::fix( handle ).content ).erase( 192 );
+  auto content_hash = base16::encode( handle::fix( handle ).content ).erase( 48 );
   optional<Handle<Fix>> res {};
   for ( const auto& dir_entry : fs::directory_iterator( repo_ / "data" ) ) {
     if ( dir_entry.path().filename().string().find( content_hash ) == 0 ) {
