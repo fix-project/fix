@@ -25,10 +25,11 @@ void Relater::get_from_repository( Handle<T> handle )
       return;
     }
 
-    if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
-                        or std::same_as<T, ObjectTreeRef> ) )
+    if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, BlobRef> ) )
       std::visit( [&]( const auto x ) { get_from_repository( x ); }, handle.get() );
 
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+    return;
   } else {
     if constexpr ( FixTreeType<T> ) {
       // Having the handle means that the data presents in storage

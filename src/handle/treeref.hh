@@ -60,11 +60,8 @@ public:
   static inline Handle<TreeRef<T>> forge( u8x32 content ) { return { content }; }
 
   inline Handle( const Handle<Tree<T>>& base, size_t size )
-    : content( base.hash() )
-  {
-    assert( ( size & 0xffff000000000000 ) == 0 );
-    ( *(u64x4*)&content )[3] = size;
-  }
+    : Handle( base.hash(), size, base.is_tag() )
+  {}
 
   template<typename A>
   requires Handle<A>::is_fix_data_type

@@ -272,8 +272,8 @@ bool Repository::contains( Handle<Relation> handle )
 std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
 {
   auto tmp_tree = handle.visit<Handle<AnyTree>>(
-    overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0 ); },
-               []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0 ); } } );
+    overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
+               []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); } } );
 
   auto trees = trees_.read();
   auto entry = trees->find( tmp_tree );

@@ -19,7 +19,8 @@ inline std::optional<Handle<S>> extract( Handle<T> original )
 {
   if constexpr ( std::same_as<S, T> ) {
     return original;
-  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef>
+                        or std::same_as<T, BlobRef> ) {
     return {};
   } else if constexpr ( Handle<T>::is_fix_sum_type ) {
     return std::visit( []( const auto x ) { return extract<S>( x ); }, original.get() );
@@ -33,7 +34,8 @@ static inline Handle<AnyDataType> data( Handle<T> handle )
 {
   if constexpr ( std::same_as<T, Relation> ) {
     return handle;
-  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef>
+                        or std::same_as<T, BlobRef> ) {
     __builtin_unreachable();
   } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
     return handle;

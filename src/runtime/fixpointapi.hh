@@ -39,7 +39,7 @@ u8x32 create_blob_string( uint32_t index, uint32_t length, wasm_rt_memory_t* mem
 u8x32 create_application_thunk( u8x32 handle );
 
 // Return Handle<Identification>, traps if handle is not Handle<Value>
-u8x32 create_identity_thunk( u8x32 handle );
+u8x32 create_identification_thunk( u8x32 handle );
 
 // Return Handle<Selection>, traps if handle is not Handle<ObjectTree>
 u8x32 create_selection_thunk( u8x32 handle, uint32_t idx );
