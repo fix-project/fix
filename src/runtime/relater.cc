@@ -26,7 +26,7 @@ void Relater::get_from_repository( Handle<T> handle )
     }
 
     if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
-                        or std::same_as<T, ObjectTreeRef> ) )
+                        or std::same_as<T, ObjectTreeRef> or std::same_as<T, BlobRef> ) )
       std::visit( [&]( const auto x ) { get_from_repository( x ); }, handle.get() );
 
   } else {

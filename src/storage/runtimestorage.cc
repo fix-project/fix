@@ -101,7 +101,7 @@ void RuntimeStorage::visit( Handle<T> handle,
     return;
 
   if constexpr ( Handle<T>::is_fix_sum_type ) {
-    if ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+    if ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> or std::same_as<T, BlobRef> ) {
       return;
     }
     if ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) ) {
