@@ -449,13 +449,17 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       for ( const auto& h : handles ) {
         VLOG( 2 ) << "Sending " << handle::fix( h );
         std::visit( overload {
-                      [&]( Handle<Named> ) {
-                        push_message(
-                          { Opcode::BLOBDATA, std::get<BlobData>( proposed_proposals_.front().second->at( h ) ) } );
+                      [&]( Handle<Named> n ) {
+                        if ( !contains( n ) ) {
+                          push_message( { Opcode::BLOBDATA,
+                                          std::get<BlobData>( proposed_proposals_.front().second->at( h ) ) } );
+                        }
                       },
-                      [&]( Handle<AnyTree> ) {
-                        push_message(
-                          { Opcode::TREEDATA, std::get<TreeData>( proposed_proposals_.front().second->at( h ) ) } );
+                      [&]( Handle<AnyTree> t ) {
+                        if ( !contains( t ) ) {
+                          push_message( { Opcode::TREEDATA,
+                                          std::get<TreeData>( proposed_proposals_.front().second->at( h ) ) } );
+                        }
                       },
                       []( Handle<Literal> ) {},
                       []( Handle<Relation> ) {},
@@ -548,15 +552,19 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
 
     visit( overload {
              [&]( BlobDataPayload b ) {
-               VLOG( 2 ) << "Adding " << b.first << " to proposal";
-               connection.incomplete_proposal_->emplace( b.first, b.second );
-               connection.proposal_size_ += b.second->size();
+               if ( !connection.contains( b.first ) ) {
+                 VLOG( 2 ) << "Adding " << b.first << " to proposal";
+                 connection.incomplete_proposal_->emplace( b.first, b.second );
+                 connection.proposal_size_ += b.second->size();
+               }
              },
              [&]( TreeDataPayload t ) {
-               VLOG( 2 ) << "Adding " << t.first << " to proposal";
-               connection.incomplete_proposal_->emplace(
-                 visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
-               connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
+               if ( !connection.contains( t.first ) ) {
+                 VLOG( 2 ) << "Adding " << t.first << " to proposal";
+                 connection.incomplete_proposal_->emplace(
+                   visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
+                 connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
+               }
              },
              [&]( RunPayload r ) {
                if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
