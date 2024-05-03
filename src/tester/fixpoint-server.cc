@@ -1,6 +1,9 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+extern "C" {
+#include <sys/resource.h>
+}
 
 #include "mmap.hh"
 #include "option-parser.hh"
@@ -26,6 +29,19 @@ void split( const string_view str, const char ch_to_find, vector<string_view>& r
 
 int main( int argc, char* argv[] )
 {
+  const rlim_t stack_size = 4u * 1024 * 1024 * 1024;
+  struct rlimit rlimit;
+  if ( getrlimit( RLIMIT_STACK, &rlimit ) ) {
+    cerr << "Could not get stack size." << endl;
+    exit( 1 );
+  }
+  rlimit.rlim_cur = std::min( stack_size, rlimit.rlim_max );
+  if ( setrlimit( RLIMIT_STACK, &rlimit ) ) {
+    cerr << "Could not increase stack size to " << stack_size << " bytes." << endl;
+    exit( 1 );
+  }
+  VLOG( 1 ) << "Stack size set to " << rlimit.rlim_cur << " bytes" << endl;
+
   OptionParser parser( "fixpoint-server", "Run a fixpoint server" );
   uint16_t port;
   optional<const char*> local;

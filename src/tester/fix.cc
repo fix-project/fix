@@ -6,6 +6,9 @@
 #include <set>
 #include <string>
 #include <utility>
+extern "C" {
+#include <sys/resource.h>
+}
 
 #include <glog/logging.h>
 
@@ -531,6 +534,19 @@ int main( int argc, char* argv[] )
     help();
     exit( EXIT_FAILURE );
   }
+
+  const rlim_t stack_size = 4u * 1024 * 1024 * 1024;
+  struct rlimit rlimit;
+  if ( getrlimit( RLIMIT_STACK, &rlimit ) ) {
+    cerr << "Could not get stack size." << endl;
+    exit( 1 );
+  }
+  rlimit.rlim_cur = std::min( stack_size, rlimit.rlim_max );
+  if ( setrlimit( RLIMIT_STACK, &rlimit ) ) {
+    cerr << "Could not increase stack size to " << stack_size << " bytes." << endl;
+    exit( 1 );
+  }
+  VLOG( 1 ) << "Stack size set to " << rlimit.rlim_cur << " bytes" << endl;
 
   for ( const auto& command : commands ) {
     if ( command.first == argv[1] ) {

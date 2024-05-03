@@ -191,7 +191,7 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
   }
 
   size_t pages = output_bytes / 4096 + 1;
-  if (grow_rw_mem_0_pages( pages )) {
+  if (grow_rw_mem_0_pages( pages ) == -1) {
     char *s = "merge counts: grow error";
     fixpoint_unsafe_io(s, strlen(s));
   }
