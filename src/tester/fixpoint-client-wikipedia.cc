@@ -52,13 +52,13 @@ int main( int argc, char* argv[] )
   cerr << "Result:\n" << res << endl;
   cerr << "Result:\n" << res.content << endl;
 
-  /* auto named = res.unwrap<Blob>().unwrap<Named>(); */
-  /* auto result = client->get_rt().get( named ).value(); */
+  auto named = res.unwrap<Blob>().unwrap<Named>();
+  auto result = client->get_rt().get( named ).value();
 
-  /* if ( std::filesystem::exists( "wikipedia.out" ) ) { */
-  /*   std::filesystem::remove( "wikipedia.out" ); */
-  /* } */
-  /* result->to_file( "wikipedia.out" ); */
+  if ( std::filesystem::exists( "wikipedia.out" ) ) {
+    std::filesystem::remove( "wikipedia.out" );
+  }
+  result->to_file( "wikipedia.out" );
 
   return 0;
 }
