@@ -4,6 +4,7 @@
 #include "handle_util.hh"
 #include "object.hh"
 #include "overload.hh"
+#include <absl/container/flat_hash_set.h>
 #include <functional>
 #include <glog/logging.h>
 #include <unordered_set>
@@ -184,6 +185,8 @@ public:
 
   // Return the list of data presening in .fix repository
   virtual std::unordered_set<Handle<AnyDataType>> data() const { return {}; };
+  // Return the list of forward dependencies
+  virtual absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Handle<Relation> ) { return {}; }
 };
 
 class MultiWorkerRuntime : public IRuntime

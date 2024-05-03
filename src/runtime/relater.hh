@@ -163,4 +163,8 @@ public:
 
   Repository& get_repository() { return repository_; }
   virtual std::unordered_set<Handle<AnyDataType>> data() const override { return repository_.data(); }
+  virtual absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Handle<Relation> blocked ) override
+  {
+    return graph_.read()->get_forward_dependencies( blocked );
+  }
 };
