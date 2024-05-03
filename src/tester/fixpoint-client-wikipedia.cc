@@ -36,12 +36,13 @@ int main( int argc, char* argv[] )
   auto reducer = rt.labeled( "merge-counts" ).unwrap<Expression>().unwrap<Object>().unwrap<Value>();
   auto wikipedia = rt.labeled( "wikipedia" ).unwrap<Expression>().unwrap<Object>().unwrap<Value>();
 
-  auto application = OwnedMutTree::allocate( 5 );
-  application[0] = make_limits( rt, 3u * 1024 * 1024 * 1024, 1024 * 1024, 1 );
+  auto application = OwnedMutTree::allocate( 6 );
+  application[0] = make_limits( rt, 1024 * 1024 * 1024, 1024 * 1024, 1 );
   application[1] = mapreduce;
   application[2] = mapper;
   application[3] = reducer;
   application[4] = wikipedia;
+  application[5] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1 );
 
   auto handle = rt.create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ValueTree>();
   auto res = client->execute( Handle<Eval>( Handle<Object>( Handle<Application>( handle::upcast( handle ) ) ) ) );

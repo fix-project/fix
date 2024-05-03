@@ -28,11 +28,20 @@ externref mapreduce( externref mapper, externref reducer, externref rlimits, int
   }
 }
 
+struct rlimits
+{
+  uint64_t memory;
+  uint64_t output_size;
+  uint64_t output_fanout;
+};
+static_assert( sizeof( rlimits ) == 24 );
+
 /**
  * @brief Applies a mapper and a reducer to a Tree, producing a single combined output.
  * @details The mapper is the second argument.
  *          The reducer is the third argument.
  *          The target is the fourth argument.
+ *          The rlimits to use is the fifth argument.
  * @return externref  A Thunk that evaluates to the result of the MapReduce operation.
  */
 __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply( externref encode )
@@ -41,11 +50,12 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
 
   attach_tree_ro_table_0( encode );
 
-  auto rlimits = get_ro_table_0( 0 );
+  /* auto rlimits = get_ro_table_0( 0 ); */
   /* auto self = get_ro_table_0(1); */
   auto mapper = get_ro_table_0( 2 );
   auto reducer = get_ro_table_0( 3 );
   auto target = get_ro_table_0( 4 );
+  auto rlimits = get_ro_table_0( 5 );
 
   attach_tree_ro_table_0( target );
   auto N = get_length( target );
