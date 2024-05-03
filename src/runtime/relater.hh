@@ -95,6 +95,9 @@ public:
       return;
 
     if constexpr ( Handle<T>::is_fix_sum_type ) {
+      if ( std::same_as<T, BlobRef> ) {
+        return;
+      }
       if constexpr ( std::same_as<T, Relation> ) {
         auto target = get( handle );
         std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, target->get() );
@@ -167,7 +170,8 @@ public:
   {
     return graph_.read()->get_forward_dependencies( blocked );
   }
-  virtual void erase_backward_dependencies ( Handle<Relation> blocked ) override {
+  virtual void erase_backward_dependencies( Handle<Relation> blocked ) override
+  {
     graph_.write()->erase_backward_dependencies( blocked );
   }
 

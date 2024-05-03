@@ -157,7 +157,6 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
   RunPayload payload { .task = name };
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
-
   return {};
 }
 
@@ -339,6 +338,14 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       auto parent_info = parent.get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } );
       InfoPayload payload {
         .parallelism = parent_info.parallelism, .link_speed = parent_info.link_speed, .data = parent.data() };
+      // TODO: there was a bug here where we'd assume that the handle being in the view means it's in
+      // RuntimeStorage, but this only means it's in Repository; this is an inefficient fix
+      for ( auto x : parent.data() ) {
+        x.visit<void>( overload {
+          []( Handle<Literal> ) {},
+          [&]( auto x ) { parent.get( x ); },
+        } );
+      }
       push_message( OutgoingMessage::to_message( move( payload ) ) );
       break;
     }
@@ -550,103 +557,108 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
   } else {
     Remote& connection = *connections_.read()->at( remote_idx );
 
-    visit( overload {
-             [&]( BlobDataPayload b ) {
-               if ( !connection.contains( b.first ) ) {
-                 VLOG( 2 ) << "Adding " << b.first << " to proposal";
-                 connection.incomplete_proposal_->emplace( b.first, b.second );
-                 connection.proposal_size_ += b.second->size();
-               }
-             },
-             [&]( TreeDataPayload t ) {
-               if ( !connection.contains( t.first ) ) {
-                 VLOG( 2 ) << "Adding " << t.first << " to proposal";
-                 connection.incomplete_proposal_->emplace(
-                   visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
-                 connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
-               }
-             },
-             [&]( RunPayload r ) {
-               if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
-                 VLOG( 2 ) << "No proposal sending run directly";
-                 connection.push_message( OutgoingMessage::to_message( r ) );
-               } else if ( connection.incomplete_proposal_->empty() ) {
-                 // Paylod should be send after last proposed_proposals_ is sent
-                 connection.proposed_proposals_.push(
-                   { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
-                     make_unique<Remote::DataProposal>() } );
-               } else if ( connection.proposal_size_ < 1048576 ) {
-                 // Proposal too small, sending directly
-                 for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
-                   auto h = name;
-                   h.visit<void>( overload {
-                       [&]( Handle<Named>) { connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } ); },
-                       [&]( Handle<AnyTree>) { connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } ); },
-                       [] ( Handle<Literal> ) {},
-                       [] ( Handle<Relation> ) {}
-                    } );
-                 }
-                 connection.push_message( OutgoingMessage::to_message( r ) );
-                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
-                 connection.proposal_size_ = 0;
-               } else {
-                 ProposeTransferPayload payload;
-                 payload.todo = r.task;
-                 for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
-                   payload.handles.push_back( name );
-                 }
-                 connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-                 connection.proposed_proposals_.push(
-                   { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
-                     std::move( connection.incomplete_proposal_ ) } );
-                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
-                 connection.proposal_size_ = 0;
-               }
+    visit(
+      overload {
+        [&]( BlobDataPayload b ) {
+          if ( !connection.contains( b.first ) ) {
+            VLOG( 2 ) << "Adding " << b.first << " to proposal";
+            connection.incomplete_proposal_->emplace( b.first, b.second );
+            connection.proposal_size_ += b.second->size();
+          }
+        },
+        [&]( TreeDataPayload t ) {
+          if ( !connection.contains( t.first ) ) {
+            VLOG( 2 ) << "Adding " << t.first << " to proposal";
+            connection.incomplete_proposal_->emplace(
+              visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
+            connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
+          }
+        },
+        [&]( RunPayload r ) {
+          if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
+            VLOG( 2 ) << "No proposal sending run directly";
+            connection.push_message( OutgoingMessage::to_message( r ) );
+          } else if ( connection.incomplete_proposal_->empty() ) {
+            // Paylod should be send after last proposed_proposals_ is sent
+            connection.proposed_proposals_.push( { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
+                                                   make_unique<Remote::DataProposal>() } );
+          } else if ( connection.proposal_size_ < 1048576 ) {
+            // Proposal too small, sending directly
+            for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
+              auto h = name;
+              h.visit<void>(
+                overload { [&]( Handle<Named> ) {
+                            connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                          },
+                           [&]( Handle<AnyTree> ) {
+                             connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                           },
+                           []( Handle<Literal> ) {},
+                           []( Handle<Relation> ) {} } );
+            }
+            connection.push_message( OutgoingMessage::to_message( r ) );
+            connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+            connection.proposal_size_ = 0;
+          } else {
+            ProposeTransferPayload payload;
+            payload.todo = r.task;
+            for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
+              payload.handles.push_back( name );
+            }
+            connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+            connection.proposed_proposals_.push( { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
+                                                   std::move( connection.incomplete_proposal_ ) } );
+            connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+            connection.proposal_size_ = 0;
+          }
 
-               connection.pending_result_.insert( r.task );
-             },
-             [&]( ResultPayload r ) {
-               if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
-                 VLOG( 2 ) << "No proposal sending result directly";
-                 connection.push_message( OutgoingMessage::to_message( r ) );
-                 connection.relations_view_.write()->insert( r.task );
-               } else if ( connection.incomplete_proposal_->empty() ) {
-                 // Paylod should be send after last proposed_proposals_ is sent
-                 connection.proposed_proposals_.push(
-                   { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
-                     make_unique<Remote::DataProposal>() } );
-               } else if ( connection.proposal_size_ < 1048576 ) {
-                 // Proposal too small, sending directly
-                 for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
-                   auto h = name;
-                   h.visit<void>( overload {
-                       [&]( Handle<Named>) { connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } ); },
-                       [&]( Handle<AnyTree>) { connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } ); },
-                       [] ( Handle<Literal> ) {},
-                       [] ( Handle<Relation> ) {}
-                    } );
-                 }
-                 connection.push_message( OutgoingMessage::to_message( r ) );
-                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
-                 connection.proposal_size_ = 0;
-               } else {
-                 ProposeTransferPayload payload;
-                 payload.todo = r.task;
-                 payload.result = r.result;
-                 for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
-                   VLOG( 2 ) << "Proposing " << name << " for " << r.task;
-                   payload.handles.push_back( name );
-                 }
-                 connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-                 connection.proposed_proposals_.push(
-                   { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
-                     std::move( connection.incomplete_proposal_ ) } );
-                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
-                 connection.proposal_size_ = 0;
-               }
-             },
-             [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },
-           payload );
+          connection.pending_result_.insert( r.task );
+        },
+        [&]( ResultPayload r ) {
+          if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
+            VLOG( 2 ) << "No proposal sending result directly";
+            connection.push_message( OutgoingMessage::to_message( r ) );
+            connection.relations_view_.write()->insert( r.task );
+          } else if ( connection.incomplete_proposal_->empty() ) {
+            // Paylod should be send after last proposed_proposals_ is sent
+            connection.proposed_proposals_.push(
+              { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
+                make_unique<Remote::DataProposal>() } );
+          } else if ( connection.proposal_size_ < 1048576 ) {
+            // Proposal too small, sending directly
+            for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
+              auto h = name;
+              h.visit<void>(
+                overload { [&]( Handle<Named> ) {
+                            connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                          },
+                           [&]( Handle<AnyTree> ) {
+                             connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                           },
+                           []( Handle<Literal> ) {},
+                           []( Handle<Relation> ) {} } );
+            }
+            connection.push_message( OutgoingMessage::to_message( r ) );
+            connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+            connection.proposal_size_ = 0;
+          } else {
+            ProposeTransferPayload payload;
+            payload.todo = r.task;
+            payload.result = r.result;
+            for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
+              VLOG( 2 ) << "Proposing " << name << " for " << r.task;
+              payload.handles.push_back( name );
+            }
+            connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+            connection.proposed_proposals_.push(
+              { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
+                std::move( connection.incomplete_proposal_ ) } );
+            connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+            connection.proposal_size_ = 0;
+          }
+        },
+        [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },
+      payload );
   }
 }
 

@@ -200,6 +200,7 @@ size_t BasePass::absent_size( std::shared_ptr<IRuntime> worker, Handle<AnyDataTy
   auto root = job::get_root( job );
   size_t contained_size = 0;
   relater_.get().early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
+    VLOG( 2 ) << "Checking if " << worker << " contains " << handle;
     auto contained = handle.visit<bool>(
       overload { [&]( Handle<Literal> ) { return true; }, [&]( auto h ) { return worker->contains( h ); } } );
     if ( contained ) {

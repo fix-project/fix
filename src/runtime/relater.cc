@@ -304,6 +304,7 @@ Handle<Value> Relater::execute( Handle<Relation> r )
 
 optional<BlobData> Relater::get( Handle<Named> name )
 {
+  VLOG( 2 ) << "Getting name " << name;
   if ( storage_.contains( name ) ) {
     return storage_.get( name );
   } else if ( repository_.contains( name ) ) {
