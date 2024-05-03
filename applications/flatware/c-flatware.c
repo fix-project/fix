@@ -81,9 +81,11 @@ static filedesc fds[N_FDS] = {
 static file files[N_FILES] = { { .name = { "stdin", 5 }, .mem_id = StdInROMem, .num_fds = 1 },
                                { .name = { "stdout", 6 }, .mem_id = StdOutRWMem, .num_fds = 1 },
                                { .name = { "stderr", 6 }, .mem_id = StdErrRWMem, .num_fds = 1 },
-                               { .name = { ".", 1 }, .mem_id = FileSystemBaseROTable, .num_fds = 0 } };
+                               { .name = { ".", 1 }, .mem_id = FileSystemBaseROTable, .num_fds = 1 } };
 
 static unsigned int* ro_mem_use;
+
+static int64_t random_seed;
 
 // Bitset functions
 static bool bitset_get( unsigned int*, uint32_t );
@@ -125,7 +127,7 @@ static void write_trace( const char* str, int32_t len )
   }
   flatware_mem_to_rw_mem( StdTraceRWMem, trace_offset, (int32_t)str, len );
   trace_offset += len;
-  // flatware_mem_unsafe_io( str, len );
+  flatware_mem_unsafe_io( str, len );
 }
 
 static void write_uint( uint64_t val )
@@ -965,11 +967,30 @@ int32_t sched_yield( void )
   return 0;
 }
 
+
+
+/**
+ * @brief Gets a random value.
+ * 
+ * @param buf Result buffer
+ * @param buf_len Buffer size
+ * @return int32_t 
+ */
 int32_t random_get( int32_t buf, int32_t buf_len )
 {
+  uint8_t random;
   FUNC_TRACE( T32, buf, T32, buf_len, TEND );
 
-  return 0;
+  for ( int32_t i = 0; i < buf_len; i++ ) {
+    int64_t a = 16807;
+    int64_t m = 2147483647;
+    random_seed = ( a * random_seed ) % m;
+
+    random = (uint8_t)( random_seed % 256 );
+    flatware_mem_to_program_mem( buf + i, (int32_t)&random, 1 );
+  }
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
@@ -1033,7 +1054,8 @@ externref fixpoint_apply( externref encode )
   fds[STDIN].size = byte_size_ro_mem( StdInROMem );
   attach_tree_ro_table( EnvROTable, get_ro_table( InputROTable, INPUT_ENV ) );
 
-  attach_tree_ro_table( EnvROTable, get_ro_table( InputROTable, INPUT_ENV ) );
+  attach_blob_ro_mem( ScratchROMem, get_ro_table( InputROTable, INPUT_RANDOM_SEED ) );
+  random_seed = get_i32_ro_mem( ScratchROMem, 0);
 
   grow_rw_table( OutputRWTable, 5, create_blob_i32( 0 ) );
 

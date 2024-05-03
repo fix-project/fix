@@ -81,7 +81,8 @@ static Handle<Eval> flatware_input( IRuntime& rt,
                                     std::optional<Handle<Fix>> filesystem = std::nullopt,
                                     std::optional<Handle<Fix>> args = std::nullopt,
                                     std::optional<Handle<Blob>> stdin = std::nullopt,
-                                    std::optional<Handle<Fix>> env = std::nullopt )
+                                    std::optional<Handle<Fix>> env = std::nullopt,
+                                    std::optional<Handle<Blob>> random_seed = std::nullopt )
 {
   auto input_tree = tree( rt,
                           limits,
@@ -89,6 +90,7 @@ static Handle<Eval> flatware_input( IRuntime& rt,
                           filesystem.value_or( handle::upcast( tree( rt ) ) ),
                           args.value_or( handle::upcast( tree( rt ) ) ),
                           stdin.value_or( blob( rt, "" ) ),
-                          env.value_or( handle::upcast( tree( rt ) ) ) );
+                          env.value_or( handle::upcast( tree( rt ) ) ),
+                          random_seed.value_or( blob( rt, "abcd" ) ) );
   return Handle<Eval>( Handle<Application>( handle::upcast( input_tree ) ) );
 }
