@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unistd.h>
 
+#include "base16.hh"
 #include "handle.hh"
 #include "runtimes.hh"
 #include "tester-utils.hh"
@@ -8,21 +9,50 @@
 
 using namespace std;
 
-auto rt = make_shared<Relater>();
-
-int main()
+int main( int argc, char* argv[] )
 {
-  auto compile_encode = rt->labeled( "compile-encode" ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<ValueTree>();
-  rt->get( compile_encode );
+  std::shared_ptr<Client> rt;
 
-  auto wasm2c = Handle<BlobRef>( rt->labeled( "wasm-to-c-fix-wasm" ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>() );
+  if ( argc != 2 )
+    cerr << "Usage: +[address]:[port]" << endl;
+
+  if ( argv[1][0] == '+' ) {
+    string addr( &argv[1][1] );
+    if ( addr.find( ':' ) == string::npos ) {
+      throw runtime_error( "invalid argument " + addr );
+    }
+    Address address( addr.substr( 0, addr.find( ':' ) ), stoi( addr.substr( addr.find( ':' ) + 1 ) ) );
+    rt = Client::init( address );
+  } else {
+    exit( 1 );
+  }
+
+  auto compile_encode = rt->get_rt()
+                          .labeled( "compile-encode" )
+                          .unwrap<Expression>()
+                          .unwrap<Object>()
+                          .unwrap<Value>()
+                          .unwrap<ValueTree>();
+  rt->get_rt().get( compile_encode );
+
+  auto wasm2c = rt->get_rt()
+                  .labeled( "wasm-to-c-fix-wasm" )
+                  .unwrap<Expression>()
+                  .unwrap<Object>()
+                  .unwrap<Value>()
+                  .unwrap<BlobRef>();
+  // auto linkelfs = Handle<BlobRef>( Handle<Fix>::forge( base16::decode(
+  // "8276ca7ec55e2be248a81fc23be64d6fc78ff03e902351326127150300000400" )
+  // ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>() );
 
   auto application = OwnedMutTree::allocate( 3 );
-  application[0] = make_limits( *rt, 1024 * 1024 * 1024, 1024 * 1024, 1); 
+  application[0] = make_limits( rt->get_rt(), 1024 * 1024 * 1024, 1024 * 1024, 1 );
   application[1] = compile_encode;
   application[2] = wasm2c;
+  // application[2] = linkelfs;
 
-  auto handle = rt->create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ValueTree>();
+  auto handle = rt->get_rt().create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ValueTree>();
+
   auto res = rt->execute( Handle<Eval>( Handle<Object>( Handle<Application>( handle::upcast( handle ) ) ) ) );
 
   // print the result

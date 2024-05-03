@@ -10,9 +10,11 @@
 
 #include <glog/logging.h>
 
+#include "base16.hh"
 #include "eventloop.hh"
 #include "handle.hh"
 #include "handle_post.hh"
+#include "handle_util.hh"
 #include "message.hh"
 #include "network.hh"
 #include "object.hh"
@@ -68,6 +70,8 @@ void Remote::send_tree( Handle<AnyTree> handle, TreeData )
                                 push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
                               } } );
   } );
+
+  trees_view_.write()->insert( handle::upcast( handle ) );
 }
 
 void Remote::push_message( OutgoingMessage&& msg )
@@ -158,8 +162,10 @@ void Remote::put( Handle<AnyTree> name, TreeData )
       h.visit<void>( overload { []( Handle<Literal> ) {},
                                 []( Handle<Relation> ) {},
                                 [&]( auto x ) {
-                                  msg_q_.enqueue(
-                                    make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  if ( !this->contains( x ) ) {
+                                    msg_q_.enqueue(
+                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  }
                                 } } );
     } );
   }
@@ -175,12 +181,14 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
         h.visit<void>( overload { []( Handle<Literal> ) {},
                                   []( Handle<Relation> ) {},
                                   [&]( auto x ) {
-                                    msg_q_.enqueue(
-                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                    if ( !this->contains( x ) ) {
+                                      msg_q_.enqueue( make_pair(
+                                        index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                    }
                                   } } );
       } );
 
-      VLOG( 2 ) << "Putting result to remote " << name;
+      VLOG( 2 ) << "Putting result to remote " << name << " " << data;
       ResultPayload payload { .task = name, .result = data };
       msg_q_.enqueue( make_pair( index_, move( payload ) ) );
     }
@@ -201,6 +209,26 @@ bool Remote::contains( Handle<AnyTree> handle )
 bool Remote::contains( Handle<Relation> handle )
 {
   return relations_view_.read()->contains( handle );
+}
+
+std::optional<Handle<AnyTree>> Remote::contains( Handle<AnyTreeRef> handle )
+{
+  auto tmp_tree = handle.visit<Handle<AnyTree>>(
+    overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
+               []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); } } );
+
+  auto entry = trees_view_.read()->find( handle::upcast( tmp_tree ) );
+
+  if ( entry == trees_view_.read()->end() ) {
+    return {};
+  }
+
+  // Cast to same kind as Handle<AnyTreeRef>
+  auto res_tree = handle.visit<Handle<AnyTree>>( overload {
+    [&]( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( entry->content, entry->size(), r.is_tag() ); },
+    [&]( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( entry->content, entry->size(), r.is_tag() ); } } );
+
+  return res_tree;
 }
 
 bool Remote::contains( __attribute__( ( unused ) ) const std::string_view label )
@@ -310,11 +338,16 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       }
 
       for ( auto handle : payload.data ) {
-        handle.visit<void>(
-          overload { [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
-                     [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
-                     []( Handle<Literal> ) {},
-                     []( Handle<Relation> ) {} } );
+        handle.visit<void>( overload { [&]( Handle<Named> h ) {
+                                        VLOG( 1 ) << "Got blob view " << h;
+                                        blobs_view_.write()->insert( h );
+                                      },
+                                       [&]( Handle<AnyTree> t ) {
+                                         VLOG( 1 ) << "Got tree view " << t;
+                                         trees_view_.write()->insert( handle::upcast( t ) );
+                                       },
+                                       []( Handle<Literal> ) {},
+                                       []( Handle<Relation> ) {} } );
       }
 
       break;
@@ -331,8 +364,10 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::REQUESTBLOB: {
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
       auto blob = parent.get( payload.handle );
-      if ( blob )
+      if ( blob ) {
         send_blob( blob.value() );
+        blobs_view_.write()->insert( payload.handle );
+      }
       break;
     }
 
@@ -393,7 +428,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::ACCEPT_TRANSFER: {
       auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string>( msg.payload() ) );
 
-      VLOG( 1 ) << "Sending " << handles.size() << " objects.";
+      VLOG( 1 ) << "Sending " << handles.size() << " objects for " << todo;
       for ( const auto& h : handles ) {
         VLOG( 2 ) << "Sending " << handle::fix( h );
         std::visit(
@@ -411,7 +446,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       }
 
       // Any objects in this proposal are considered "exising" on the remote side
-      for ( const auto& [h, _] : *proposed_proposals_.at( todo ) ) {
+      for ( const auto& [h, _] : *proposed_proposals_[todo] ) {
         std::visit( overload { [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
                                [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
                                []( Handle<Relation> ) {},
@@ -475,13 +510,18 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
     Remote& connection = *connections_.read()->at( remote_idx );
 
     visit( overload {
-             [&]( BlobDataPayload b ) { connection.incomplete_proposal_->emplace( b.first, b.second ); },
+             [&]( BlobDataPayload b ) {
+               VLOG( 2 ) << "Adding " << b.first << " to proposal";
+               connection.incomplete_proposal_->emplace( b.first, b.second );
+             },
              [&]( TreeDataPayload t ) {
+               VLOG( 2 ) << "Adding " << t.first << " to proposal";
                connection.incomplete_proposal_->emplace(
                  visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
              },
              [&]( RunPayload r ) {
-               if ( connection.incomplete_proposal_->empty() ) {
+               if ( connection.incomplete_proposal_->empty()
+                    && !connection.proposed_proposals_.contains( r.task ) ) {
                  connection.push_message( OutgoingMessage::to_message( r ) );
                } else {
                  ProposeTransferPayload payload;
@@ -497,7 +537,9 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                connection.pending_result_.insert( r.task );
              },
              [&]( ResultPayload r ) {
-               if ( connection.incomplete_proposal_->empty() ) {
+               if ( connection.incomplete_proposal_->empty()
+                    && !connection.proposed_proposals_.contains( r.task ) ) {
+                 VLOG( 2 ) << "No proposal sending result directly";
                  connection.push_message( OutgoingMessage::to_message( r ) );
                  connection.relations_view_.write()->insert( r.task );
                } else {

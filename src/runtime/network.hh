@@ -73,7 +73,7 @@ class Remote : public IRuntime
   absl::flat_hash_map<Handle<Relation>, std::unique_ptr<DataProposal>> proposed_proposals_ {};
 
   SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> blobs_view_ {};
-  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash>> trees_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash, handle::tree_equal>> trees_view_ {};
   SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> relations_view_ {};
 
 public:
@@ -95,6 +95,7 @@ public:
   bool contains( Handle<Named> handle ) override;
   bool contains( Handle<AnyTree> handle ) override;
   bool contains( Handle<Relation> handle ) override;
+  std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle ) override;
   bool contains( const std::string_view label ) override;
   std::optional<Info> get_info() override;
 
