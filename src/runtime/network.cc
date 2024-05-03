@@ -153,8 +153,10 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
     } );
   }
 
+  parent_->get().erase_backward_dependencies( name );
   RunPayload payload { .task = name };
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
+
 
   return {};
 }

@@ -90,4 +90,10 @@ public:
       return {};
     }
   }
+
+  void erase_backward_dependencies( Task blocked ) {
+    for ( const auto dependency : forward_dependencies_[blocked] ) {
+      backward_dependencies_[dependency].erase( blocked );
+    }
+  }
 };
