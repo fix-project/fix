@@ -203,7 +203,7 @@ public:
 
 class FinalPass : public PrunedSelectionPass
 {
-  std::unordered_map<std::shared_ptr<IRuntime>, std::vector<Handle<AnyDataType>>> remote_jobs_ {};
+  std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>> remote_jobs_ {};
 
   virtual void leaf( Handle<AnyDataType> ) override;
   virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
@@ -218,7 +218,7 @@ public:
     : PrunedSelectionPass( base, relater, move( prev ) )
   {}
 
-  const std::unordered_map<std::shared_ptr<IRuntime>, std::vector<Handle<AnyDataType>>>& get_remote_jobs()
+  const std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>>& get_remote_jobs()
   {
     return remote_jobs_;
   };

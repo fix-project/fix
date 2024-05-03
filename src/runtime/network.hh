@@ -70,7 +70,8 @@ class Remote : public IRuntime
 
   using DataProposal = absl::flat_hash_map<Handle<AnyDataType>, std::variant<BlobData, TreeData>, AbslHash>;
   std::unique_ptr<DataProposal> incomplete_proposal_ { std::make_unique<DataProposal>() };
-  absl::flat_hash_map<Handle<Relation>, std::unique_ptr<DataProposal>> proposed_proposals_ {};
+  std::queue<std::pair<std::pair<Handle<Relation>, std::optional<Handle<Object>>>, std::unique_ptr<DataProposal>>>
+    proposed_proposals_ {};
 
   SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> blobs_view_ {};
   SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash, handle::tree_equal>> trees_view_ {};

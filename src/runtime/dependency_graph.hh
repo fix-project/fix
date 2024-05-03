@@ -84,6 +84,10 @@ public:
 
   absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Task blocked ) const
   {
-    return forward_dependencies_.at( blocked );
+    if ( forward_dependencies_.contains( blocked ) ) {
+      return forward_dependencies_.at( blocked );
+    } else {
+      return {};
+    }
   }
 };

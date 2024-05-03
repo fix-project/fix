@@ -428,25 +428,30 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::ACCEPT_TRANSFER: {
       auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string>( msg.payload() ) );
 
+      if ( proposed_proposals_.size() == 0 ) {
+        throw std::runtime_error( "Mismatch propose and accept" );
+      }
+
       VLOG( 1 ) << "Sending " << handles.size() << " objects for " << todo;
       for ( const auto& h : handles ) {
         VLOG( 2 ) << "Sending " << handle::fix( h );
-        std::visit(
-          overload {
-            [&]( Handle<Named> ) {
-              push_message( { Opcode::BLOBDATA, std::get<BlobData>( proposed_proposals_.at( todo )->at( h ) ) } );
-            },
-            [&]( Handle<AnyTree> ) {
-              push_message( { Opcode::TREEDATA, std::get<TreeData>( proposed_proposals_.at( todo )->at( h ) ) } );
-            },
-            []( Handle<Literal> ) {},
-            []( Handle<Relation> ) {},
-          },
-          h.get() );
+        std::visit( overload {
+                      [&]( Handle<Named> ) {
+                        push_message(
+                          { Opcode::BLOBDATA, std::get<BlobData>( proposed_proposals_.front().second->at( h ) ) } );
+                      },
+                      [&]( Handle<AnyTree> ) {
+                        push_message(
+                          { Opcode::TREEDATA, std::get<TreeData>( proposed_proposals_.front().second->at( h ) ) } );
+                      },
+                      []( Handle<Literal> ) {},
+                      []( Handle<Relation> ) {},
+                    },
+                    h.get() );
       }
 
       // Any objects in this proposal are considered "exising" on the remote side
-      for ( const auto& [h, _] : *proposed_proposals_[todo] ) {
+      for ( const auto& [h, _] : *proposed_proposals_.front().second ) {
         std::visit( overload { [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
                                [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
                                []( Handle<Relation> ) {},
@@ -454,13 +459,32 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
                     h.get() );
       }
 
-      proposed_proposals_.erase( todo );
+      proposed_proposals_.pop();
 
       if ( result ) {
         push_message( OutgoingMessage::to_message( ResultPayload { .task = todo, .result = *result } ) );
         relations_view_.write()->insert( todo );
       } else {
         push_message( OutgoingMessage::to_message( RunPayload { .task = todo } ) );
+      }
+
+      while ( !proposed_proposals_.empty() ) {
+        // Handle and Run/Result payload without corresponding proposal but should be started now
+        if ( proposed_proposals_.front().second->empty() ) {
+          auto pending_todo = proposed_proposals_.front().first.first;
+          auto pending_result = proposed_proposals_.front().first.second;
+          if ( pending_result ) {
+            push_message(
+              OutgoingMessage::to_message( ResultPayload { .task = pending_todo, .result = *pending_result } ) );
+            relations_view_.write()->insert( pending_todo );
+          } else {
+            push_message( OutgoingMessage::to_message( RunPayload { .task = pending_todo } ) );
+          }
+
+          proposed_proposals_.pop();
+        } else {
+          break;
+        }
       }
       break;
     }
@@ -520,9 +544,14 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                  visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
              },
              [&]( RunPayload r ) {
-               if ( connection.incomplete_proposal_->empty()
-                    && !connection.proposed_proposals_.contains( r.task ) ) {
+               if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
+                 VLOG( 2 ) << "No proposal sending run directly";
                  connection.push_message( OutgoingMessage::to_message( r ) );
+               } else if ( connection.incomplete_proposal_->empty() ) {
+                 // Paylod should be send after last proposed_proposals_ is sent
+                 connection.proposed_proposals_.push(
+                   { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
+                     make_unique<Remote::DataProposal>() } );
                } else {
                  ProposeTransferPayload payload;
                  payload.todo = r.task;
@@ -530,28 +559,36 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                    payload.handles.push_back( name );
                  }
                  connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-                 connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
+                 connection.proposed_proposals_.push(
+                   { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
+                     std::move( connection.incomplete_proposal_ ) } );
                  connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
                }
 
                connection.pending_result_.insert( r.task );
              },
              [&]( ResultPayload r ) {
-               if ( connection.incomplete_proposal_->empty()
-                    && !connection.proposed_proposals_.contains( r.task ) ) {
+               if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
                  VLOG( 2 ) << "No proposal sending result directly";
                  connection.push_message( OutgoingMessage::to_message( r ) );
                  connection.relations_view_.write()->insert( r.task );
+               } else if ( connection.incomplete_proposal_->empty() ) {
+                 // Paylod should be send after last proposed_proposals_ is sent
+                 connection.proposed_proposals_.push(
+                   { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
+                     make_unique<Remote::DataProposal>() } );
                } else {
                  ProposeTransferPayload payload;
                  payload.todo = r.task;
                  payload.result = r.result;
                  for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
-                   VLOG( 2 ) << "Proposing " << name;
+                   VLOG( 2 ) << "Proposing " << name << " for " << r.task;
                    payload.handles.push_back( name );
                  }
                  connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-                 connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
+                 connection.proposed_proposals_.push(
+                   { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
+                     std::move( connection.incomplete_proposal_ ) } );
                  connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
                }
              },

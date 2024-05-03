@@ -44,6 +44,10 @@ void Pass::run( Handle<AnyDataType> job )
 
 void PrunedSelectionPass::run( Handle<AnyDataType> job )
 {
+  if ( !chosen_remotes_.contains( job ) ) {
+    throw std::runtime_error( "Chosen remotes has no info about job" );
+  }
+
   if ( !is_local( chosen_remotes_.at( job ).first ) ) {
     independent( job );
     return;
@@ -116,6 +120,9 @@ void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<A
   size_t output_size = input_size;
   size_t output_fan_out = 0;
   for ( const auto& dependency : dependencies ) {
+    if ( !tasks_info_.contains( dependency ) ) {
+      throw std::runtime_error( "Task info does not contain dependency" );
+    }
     output_fan_out += tasks_info_.at( dependency ).output_fan_out;
     auto out = tasks_info_.at( dependency ).output_size;
     output_size += out;
@@ -142,6 +149,13 @@ void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<A
           }
         },
         [&]( Handle<Identification> ) -> pair<size_t, size_t> {
+          if ( dependencies.size() == 0 ) {
+            VLOG( 3 ) << "Dependency preresolved";
+            return { output_size, 1 };
+          }
+          if ( !tasks_info_.contains( *dependencies.begin() ) ) {
+            throw std::runtime_error( "Task info does not contain dependency" );
+          }
           auto out = tasks_info_.at( *dependencies.begin() ).output_size;
           return { out, 1 };
         },
@@ -277,6 +291,9 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
     absl::flat_hash_map<shared_ptr<IRuntime>, size_t> present_output;
 
     for ( const auto& d : dependencies ) {
+      if ( !chosen_remotes_.contains( d ) ) {
+        throw std::runtime_error( "chosen_remotes_ does not contain d " );
+      }
       present_output[chosen_remotes_.at( d ).first] += base_.get().get_output_size( d );
       // TODO: handle data and load differently
     }
@@ -399,19 +416,16 @@ void ChildBackProp::pre( Handle<AnyDataType> job, const absl::flat_hash_set<Hand
 
 void SendtoRemote::leaf( Handle<AnyDataType> job )
 {
-  std::cout << "SendtoRemote leaf " << job << std::endl;
   job.visit<void>( overload {
     []( Handle<Relation> ) {},
     []( Handle<Literal> ) {},
     [&]( Handle<AnyTree> t ) {
       if ( relater_.get().contains( t ) ) {
-        std::cout << "Outsourcing putting " << t << "to remote";
         t.visit<void>( [&]( auto h ) { to_send_.insert( h ); } );
       }
     },
     [&]( Handle<Named> n ) {
       if ( relater_.get().contains( n ) ) {
-        std::cout << "Outsourcing putting " << n << "to remote";
         to_send_.insert( n );
       }
     },
@@ -429,7 +443,7 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
       if ( !local.has_value() ) {
         local = chosen_remotes_.at( d ).first;
       }
-      assigned += base_.get().get_fan_out( d );
+      assigned += 1;
       scores.insert( { chosen_remotes_.at( d ).second, d } );
     }
   }
@@ -453,17 +467,16 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
 
     size_t remote_idx = 0;
     for ( const auto& [_, d] : scores ) {
-      if ( assigned - base_.get().get_fan_out( d ) < local.value()->get_info()->parallelism ) {
+      if ( assigned - 1 < local.value()->get_info()->parallelism ) {
         break;
       }
-
-      std::cout << "Real outsourcing " << std::endl;
 
       auto send_local_stuffs
         = SendtoRemote( base_, relater_, available_remotes[remote_idx], to_sends_[available_remotes[remote_idx]] );
       send_local_stuffs.run( d );
       chosen_remotes_.insert_or_assign( d, { available_remotes[remote_idx], 0 } );
 
+      assigned--;
       remote_idx++;
 
       if ( remote_idx == available_remotes.size() ) {
@@ -537,7 +550,7 @@ void FinalPass::leaf( Handle<AnyDataType> job )
             << endl;
   if ( !is_local( chosen_remotes_.at( job ).first ) ) {
     VLOG( 1 ) << "Run job remotely " << job << endl;
-    remote_jobs_[chosen_remotes_.at( job ).first].push_back( job );
+    remote_jobs_[chosen_remotes_.at( job ).first].insert( job );
   } else {
     job.visit<void>(
       overload { []( Handle<Literal> ) {}, [&]( auto h ) { chosen_remotes_.at( job ).first->get( h ); } } );
@@ -548,7 +561,7 @@ void FinalPass::independent( Handle<AnyDataType> job )
 {
   if ( !is_local( chosen_remotes_.at( job ).first ) ) {
     VLOG( 1 ) << "Run job remotely " << job << endl;
-    remote_jobs_[chosen_remotes_.at( job ).first].push_back( job );
+    remote_jobs_[chosen_remotes_.at( job ).first].insert( job );
   }
 }
 
@@ -557,7 +570,7 @@ void FinalPass::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
   for ( auto d : dependencies ) {
     if ( !is_local( chosen_remotes_.at( d ).first ) ) {
       VLOG( 1 ) << "Run job remotely " << d << endl;
-      remote_jobs_[chosen_remotes_.at( d ).first].push_back( d );
+      remote_jobs_[chosen_remotes_.at( d ).first].insert( d );
     }
   }
 }

@@ -14,6 +14,7 @@ using namespace std;
 template<FixType T>
 void Relater::get_from_repository( Handle<T> handle )
 {
+  VLOG( 2 ) << "get_from_repository " << handle;
   if constexpr ( std::same_as<T, Literal> )
     return;
 
@@ -315,6 +316,7 @@ optional<BlobData> Relater::get( Handle<Named> name )
 
 optional<TreeData> Relater::get( Handle<AnyTree> name )
 {
+  VLOG( 2 ) << "Getting name " << name;
   if ( storage_.contains( name ) ) {
     return storage_.get( name );
   } else if ( repository_.contains( name ) ) {
@@ -372,6 +374,7 @@ void Relater::put( Handle<Named> name, BlobData data )
 }
 void Relater::put( Handle<AnyTree> name, TreeData data )
 {
+  VLOG( 2 ) << "Putting " << name;
   if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
     absl::flat_hash_set<Handle<Relation>> unblocked;
