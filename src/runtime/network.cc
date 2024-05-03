@@ -550,11 +550,13 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
              [&]( BlobDataPayload b ) {
                VLOG( 2 ) << "Adding " << b.first << " to proposal";
                connection.incomplete_proposal_->emplace( b.first, b.second );
+               connection.proposal_size_ += b.second->size();
              },
              [&]( TreeDataPayload t ) {
                VLOG( 2 ) << "Adding " << t.first << " to proposal";
                connection.incomplete_proposal_->emplace(
                  visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
+               connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
              },
              [&]( RunPayload r ) {
                if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
@@ -565,6 +567,20 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                  connection.proposed_proposals_.push(
                    { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
                      make_unique<Remote::DataProposal>() } );
+               } else if ( connection.proposal_size_ < 1048576 ) {
+                 // Proposal too small, sending directly
+                 for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
+                   auto h = name;
+                   h.visit<void>( overload {
+                       [&]( Handle<Named>) { connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } ); },
+                       [&]( Handle<AnyTree>) { connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } ); },
+                       [] ( Handle<Literal> ) {},
+                       [] ( Handle<Relation> ) {}
+                    } );
+                 }
+                 connection.push_message( OutgoingMessage::to_message( r ) );
+                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+                 connection.proposal_size_ = 0;
                } else {
                  ProposeTransferPayload payload;
                  payload.todo = r.task;
@@ -576,6 +592,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                    { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
                      std::move( connection.incomplete_proposal_ ) } );
                  connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+                 connection.proposal_size_ = 0;
                }
 
                connection.pending_result_.insert( r.task );
@@ -590,6 +607,20 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                  connection.proposed_proposals_.push(
                    { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
                      make_unique<Remote::DataProposal>() } );
+               } else if ( connection.proposal_size_ < 1048576 ) {
+                 // Proposal too small, sending directly
+                 for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
+                   auto h = name;
+                   h.visit<void>( overload {
+                       [&]( Handle<Named>) { connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } ); },
+                       [&]( Handle<AnyTree>) { connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } ); },
+                       [] ( Handle<Literal> ) {},
+                       [] ( Handle<Relation> ) {}
+                    } );
+                 }
+                 connection.push_message( OutgoingMessage::to_message( r ) );
+                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+                 connection.proposal_size_ = 0;
                } else {
                  ProposeTransferPayload payload;
                  payload.todo = r.task;
@@ -603,6 +634,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                    { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
                      std::move( connection.incomplete_proposal_ ) } );
                  connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+                 connection.proposal_size_ = 0;
                }
              },
              [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },

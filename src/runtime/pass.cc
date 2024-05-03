@@ -465,7 +465,7 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
     }
 
     std::cout << "available_remotes " << available_remotes.size() << std::endl;
-    size_t local_jobs = round( 1.0 * dependencies.size() / available_remotes.size() * 1.5 );
+    size_t local_jobs = dependencies.size() / ( available_remotes.size() + 1 );
 
     size_t remote_idx = 0;
     for ( const auto& [_, d] : scores ) {
