@@ -2,6 +2,7 @@
 #include "handle.hh"
 #include "handle_post.hh"
 #include "overload.hh"
+#include <iterator>
 #include <limits>
 #include <stdexcept>
 
@@ -636,9 +637,26 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
     }
   }
 
+  vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>::const_iterator>> iterators {};
   for ( auto& [r, handles] : final.get_remote_jobs() ) {
-    for ( auto h : handles ) {
+    iterators.push_back( make_pair( r, handles.begin() ) );
+  }
+
+  unordered_set<shared_ptr<IRuntime>> finished;
+  size_t iterator_index = 0;
+  while ( finished.size() < iterators.size() ) {
+    auto& [r, it] = iterators.at( iterator_index );
+    if ( it != final.get_remote_jobs().at( r ).end() ) {
+      auto h = *it;
       h.visit<void>( overload { []( Handle<Literal> ) {}, [&]( auto d ) { r->get( d ); } } );
+      it++;
+    } else {
+      finished.insert( r );
+    }
+
+    iterator_index++;
+    if ( iterator_index == iterators.size() ) {
+      iterator_index = 0;
     }
   }
 }
