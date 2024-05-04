@@ -174,4 +174,6 @@ public:
   virtual void erase_backward_dependencies ( Handle<Relation> blocked ) override {
     graph_.write()->erase_backward_dependencies( blocked );
   }
+
+  std::shared_ptr<IRuntime> get_local() { return local_; }
 };

@@ -577,6 +577,18 @@ void FinalPass::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
   }
 }
 
+void FinalPass::make_root_local( Handle<AnyDataType> job )
+{
+  job.visit<void>( overload { [&]( Handle<Relation> r ) {
+                               if ( !is_local( chosen_remotes_.at( job ).first ) ) {
+                                 if ( chosen_remotes_.at( job ).first->reply_to_contains( r ) ) {
+                                   chosen_remotes_.at( job ) = { relater_.get().get_local(), 0 };
+                                 }
+                               }
+                             },
+                              []( auto ) {} } );
+}
+
 void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_level_job, vector<PassType> passes )
 {
   BasePass base( rt );
@@ -629,6 +641,7 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
   }
 
   FinalPass final( base, rt, move( selection.value() ) );
+  final.make_root_local( top_level_job );
   final.run( top_level_job );
 
   for ( auto& [r, handles] : to_sends ) {
