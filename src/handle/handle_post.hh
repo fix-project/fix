@@ -34,8 +34,9 @@ static inline Handle<AnyDataType> data( Handle<T> handle )
 {
   if constexpr ( std::same_as<T, Relation> ) {
     return handle;
-  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef>
-                        or std::same_as<T, BlobRef> ) {
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+    // TODO: why is this called on BlobRefs?
+    /* or std::same_as<T, BlobRef> ) { */
     assert( false );
     __builtin_unreachable();
   } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
