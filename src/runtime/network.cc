@@ -102,16 +102,16 @@ optional<TreeData> Remote::get( Handle<AnyTree> name )
 
 optional<Handle<Object>> Remote::get( Handle<Relation> name )
 {
-  if ( reply_to_.contains( name ) ) {
-    // Job sent to us, something must have been done here
-    const auto dependenies = parent_->get().get_forward_dependencies( name );
-    for ( auto d : dependenies ) {
-      d.visit<void>( overload { [&]( Handle<Relation> sub ) { this->get( sub ); },
-                                []( auto ) { throw std::runtime_error( "Unimplemented remote get" ); } } );
-    }
+  // if ( reply_to_.contains( name ) ) {
+  //   // Job sent to us, something must have been done here
+  //   const auto dependenies = parent_->get().get_forward_dependencies( name );
+  //   for ( auto d : dependenies ) {
+  //     d.visit<void>( overload { [&]( Handle<Relation> sub ) { this->get( sub ); },
+  //                               []( auto ) { throw std::runtime_error( "Unimplemented remote get" ); } } );
+  //   }
 
-    return {};
-  }
+  //  return {};
+  //}
 
   if ( !contains( name ) ) {
 

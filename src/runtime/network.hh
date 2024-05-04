@@ -110,6 +110,12 @@ public:
 
   bool dead() const { return dead_; }
 
+  virtual bool reply_to_contains( Handle<Relation> handle ) override
+  {
+    std::shared_lock lock( mutex_ );
+    return reply_to_.contains( handle );
+  }
+
   bool erase_reply_to( Handle<Relation> handle )
   {
     std::unique_lock lock( mutex_ );
