@@ -163,7 +163,7 @@ void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<A
                         .value_or( false );
 
             if ( ep ) {
-              if ( input_size > 20 * curr_output_size ) {
+              if ( ( output_size - input_size ) > 20 * curr_output_size ) {
                 ep = false;
               }
             }
