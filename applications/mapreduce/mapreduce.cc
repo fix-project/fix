@@ -62,7 +62,7 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
   auto reducer = get_ro_table_0( 3 );
   auto target = get_ro_table_0( 4 );
   auto rlimitsm = get_ro_table_0( 5 );
-  auto rlimitsr = get_ro_table_0( 5 );
+  auto rlimitsr = get_ro_table_0( 6 );
 
   attach_tree_ro_table_0( target );
   auto N = get_length( target );
