@@ -114,7 +114,7 @@ public:
 
   bool dead() const { return dead_; }
 
-  virtual bool reply_to_contains( Handle<Relation> handle )
+  virtual bool reply_to_contains( Handle<Relation> handle ) override
   {
     std::shared_lock lock( mutex_ );
     return reply_to_.contains( handle );
