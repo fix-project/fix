@@ -98,9 +98,15 @@ void BasePass::leaf( Handle<AnyDataType> job )
                                    auto output_fan_out = handle::extract<Literal>( limits->at( 2 ) )
                                                            .transform( [&]( auto x ) { return uint64_t( x ); } )
                                                            .value_or( 1 );
+                                   bool ep = ( limits->size() > 3 )
+                                               ? handle::extract<Literal>( limits->at( 3 ) )
+                                                   .transform( [&]( auto x ) { return uint8_t( x ); } )
+                                                   .value_or( 0 )
+                                               : false;
 
                                    tasks_info_[job].output_size = output_size;
                                    tasks_info_[job].output_fan_out = output_fan_out;
+                                   tasks_info_[job].ep = ep;
                                  },
                                  [&]( Handle<Eval> ) {},
                                } );
@@ -129,45 +135,64 @@ void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<A
     output_size += out;
   }
 
-  auto outs = obj.visit<pair<size_t, size_t>>( overload {
+  auto outs = obj.visit<tuple<size_t, size_t, bool>>( overload {
     [&]( Handle<Thunk> t ) {
-      return t.visit<pair<size_t, size_t>>( overload {
-        [&]( Handle<Application> a ) -> pair<size_t, size_t> {
+      return t.visit<tuple<size_t, size_t, bool>>( overload {
+        [&]( Handle<Application> a ) -> tuple<size_t, size_t, bool> {
           if ( relater_.get().contains( a.unwrap<ExpressionTree>() ) ) {
             auto rlimits = relater_.get().get( a.unwrap<ExpressionTree>() ).value()->at( 0 );
             auto limits
               = handle::extract<ValueTree>( rlimits ).and_then( [&]( auto x ) { return relater_.get().get( x ); } );
 
-            return { limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 1 ) ); } )
+            auto curr_output_size
+              = limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 1 ) ); } )
+                  .transform( [&]( auto x ) { return uint64_t( x ); } )
+                  .value_or( output_size );
+            auto curr_fan_out
+              = max( limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 2 ) ); } )
                        .transform( [&]( auto x ) { return uint64_t( x ); } )
-                       .value_or( output_size ),
-                     max( limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 2 ) ); } )
-                            .transform( [&]( auto x ) { return uint64_t( x ); } )
-                            .value_or( output_fan_out ),
-                          output_fan_out ) };
+                       .value_or( output_fan_out ),
+                     output_fan_out );
+            bool ep = limits
+                        .transform( [&]( auto x ) -> bool {
+                          return ( x->size() > 3 ) ? handle::extract<Literal>( x->at( 3 ) )
+                                                       .transform( [&]( auto x ) { return uint8_t( x ); } )
+                                                       .value_or( 0 )
+                                                   : false;
+                        } )
+                        .value_or( false );
+
+            if ( ep ) {
+              if ( input_size > 20 * curr_output_size ) {
+                ep = false;
+              }
+            }
+
+            return { curr_output_size, curr_fan_out, ep };
           } else {
-            return { output_size, output_fan_out };
+            return { output_size, output_fan_out, false };
           }
         },
-        [&]( Handle<Identification> ) -> pair<size_t, size_t> {
+        [&]( Handle<Identification> ) -> tuple<size_t, size_t, bool> {
           if ( dependencies.size() == 0 ) {
             VLOG( 3 ) << "Dependency preresolved";
-            return { output_size, 1 };
+            return { output_size, 1, false };
           }
           if ( !tasks_info_.contains( *dependencies.begin() ) ) {
             throw std::runtime_error( "Task info does not contain dependency" );
           }
           auto out = tasks_info_.at( *dependencies.begin() ).output_size;
-          return { out, 1 };
+          return { out, 1, false };
         },
-        [&]( Handle<Selection> ) -> pair<size_t, size_t> { throw std::runtime_error( "Unimplemented" ); } } );
+        [&]( Handle<Selection> ) -> tuple<size_t, size_t, bool> { throw std::runtime_error( "Unimplemented" ); } } );
     },
-    [&]( auto ) -> pair<size_t, size_t> {
-      return { output_size, output_fan_out };
+    [&]( auto ) -> tuple<size_t, size_t, bool> {
+      return { output_size, output_fan_out, false };
     } } );
 
-  tasks_info_[job].output_size = outs.first;
-  tasks_info_[job].output_fan_out = outs.second;
+  tasks_info_[job].output_size = get<0>( outs );
+  tasks_info_[job].output_fan_out = get<1>( outs );
+  tasks_info_[job].ep = get<2>( outs );
 }
 
 size_t BasePass::absent_size( std::shared_ptr<IRuntime> worker, Handle<AnyDataType> job )
@@ -280,13 +305,19 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
 {
   optional<shared_ptr<IRuntime>> chosen_remote;
 
-  job.visit<void>( overload { [&]( Handle<Relation> r ) {
-                               const auto& contains = base_.get().get_contains( r );
-                               if ( !contains.empty() ) {
-                                 chosen_remote = *contains.begin();
-                               }
-                             },
-                              []( auto ) {} } );
+  if ( base_.get().get_ep( job ) ) {
+    chosen_remote = relater_.get().get_local();
+  }
+
+  if ( !chosen_remote.has_value() ) {
+    job.visit<void>( overload { [&]( Handle<Relation> r ) {
+                                 const auto& contains = base_.get().get_contains( r );
+                                 if ( !contains.empty() ) {
+                                   chosen_remote = *contains.begin();
+                                 }
+                               },
+                                []( auto ) {} } );
+  }
 
   if ( !chosen_remote.has_value() ) {
     absl::flat_hash_map<shared_ptr<IRuntime>, size_t> present_output;
@@ -433,8 +464,18 @@ void SendtoRemote::leaf( Handle<AnyDataType> job )
   } );
 }
 
-void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void InOutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
+  bool any_ep = false;
+  for ( auto d : dependencies ) {
+    if ( base_.get().get_ep( d ) ) {
+      chosen_remotes_.at( d ) = { relater_.get().get_local(), 0 };
+      any_ep = true;
+    }
+  }
+  if ( any_ep )
+    return;
+
   size_t assigned = 0;
   multimap<int64_t, Handle<AnyDataType>, greater<int64_t>> scores;
   optional<shared_ptr<IRuntime>> local;
@@ -618,9 +659,9 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
         break;
       }
 
-      case PassType::OutSource: {
+      case PassType::InOutSource: {
         if ( selection.has_value() ) {
-          selection = make_unique<OutSource>( base, rt, move( selection.value() ), to_sends );
+          selection = make_unique<InOutSource>( base, rt, move( selection.value() ), to_sends );
         } else {
           throw runtime_error( "Invalid pass sequence." );
         }
