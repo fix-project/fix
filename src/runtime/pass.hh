@@ -41,6 +41,7 @@ private:
     std::unordered_set<std::shared_ptr<IRuntime>> contains {};
     size_t output_size {};
     size_t output_fan_out {};
+    bool ep { false };
   };
 
   absl::flat_hash_map<Handle<AnyDataType>, TaskInfo> tasks_info_ {};
@@ -71,6 +72,8 @@ public:
   size_t get_output_size( const Handle<AnyDataType> task ) const { return tasks_info_.at( task ).output_size; }
 
   size_t get_fan_out( const Handle<AnyDataType> task ) const { return tasks_info_.at( task ).output_fan_out; }
+
+  bool get_ep( const Handle<AnyDataType> task ) const { return tasks_info_.at( task ).ep; }
 };
 
 class SelectionPass : public Pass
@@ -145,7 +148,7 @@ public:
   {}
 };
 
-class OutSource : public PrunedSelectionPass
+class InOutSource : public PrunedSelectionPass
 {
   virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
 
@@ -154,9 +157,9 @@ class OutSource : public PrunedSelectionPass
   virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
 public:
-  OutSource( std::reference_wrapper<BasePass> base,
-             std::reference_wrapper<Relater> relater,
-             std::unique_ptr<SelectionPass> prev )
+  InOutSource( std::reference_wrapper<BasePass> base,
+               std::reference_wrapper<Relater> relater,
+               std::unique_ptr<SelectionPass> prev )
     : PrunedSelectionPass( base, relater, move( prev ) )
   {}
 };
@@ -209,7 +212,7 @@ public:
   {
     MinAbsentMaxParallelism,
     ChildBackProp,
-    OutSource,
+    InOutSource,
     Random
   };
 
