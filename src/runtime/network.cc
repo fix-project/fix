@@ -340,13 +340,13 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
         .parallelism = parent_info.parallelism, .link_speed = parent_info.link_speed, .data = parent.data() };
       // TODO: there was a bug here where we'd assume that the handle being in the view means it's in
       // RuntimeStorage, but this only means it's in Repository; this is an inefficient fix
-      for ( auto x : parent.data() ) {
-        x.visit<void>( overload {
-          []( Handle<Literal> ) {},
-          [&]( auto x ) { parent.get( x ); },
-        } );
-      }
-      push_message( OutgoingMessage::to_message( move( payload ) ) );
+      /* for ( auto x : parent.data() ) { */
+      /*   x.visit<void>( overload { */
+      /*     []( Handle<Literal> ) {}, */
+      /*     [&]( auto x ) { parent.get( x ); }, */
+      /*   } ); */
+      /* } */
+      /* push_message( OutgoingMessage::to_message( move( payload ) ) ); */
       break;
     }
 
