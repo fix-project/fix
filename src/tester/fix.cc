@@ -140,6 +140,8 @@ void create( int argc, char* argv[] )
     while ( !cin.eof() ) {
       std::string ref;
       std::getline( cin, ref );
+      if ( ref == "" )
+        continue;
       auto handle = storage.lookup( ref );
       contents.push_back( handle );
     }
