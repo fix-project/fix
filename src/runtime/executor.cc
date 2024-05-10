@@ -80,7 +80,8 @@ void Executor::run()
 void Executor::progress( Handle<AnyDataType> runnable_or_loadable )
 {
   VLOG( 2 ) << "Progressing " << runnable_or_loadable;
-  // Load from repository if contains
+
+  GlobalScopeTimer<Timer::Category::Execution> record_timer; // Load from repository if contains
   auto loaded = load( runnable_or_loadable );
   if ( loaded.has_value() )
     return;

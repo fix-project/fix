@@ -131,17 +131,6 @@ inline void set_time_baseline( uint64_t baseline )
   Timer::baseline_ = baseline;
 }
 
-#ifndef TIME_FIXPOINT
-
-template<Timer::Category category>
-class GlobalScopeTimer
-{
-public:
-  GlobalScopeTimer() {}
-  ~GlobalScopeTimer() {}
-};
-
-#elif TIME_FIXPOINT == 1
 template<Timer::Category category>
 class GlobalScopeTimer
 {
@@ -161,24 +150,6 @@ inline GlobalScopeTimer<Timer::Category::Execution>::~GlobalScopeTimer()
 {
   global_timer().stop<Timer::Category::Execution>();
 }
-
-#elif TIME_FIXPOINT == 2
-template<Timer::Category category>
-class GlobalScopeTimer
-{
-public:
-  GlobalScopeTimer() { global_timer().start<category>(); }
-  ~GlobalScopeTimer() { global_timer().stop<category>(); }
-};
-
-template<>
-inline GlobalScopeTimer<Timer::Category::Execution>::GlobalScopeTimer()
-{}
-
-template<>
-inline GlobalScopeTimer<Timer::Category::Execution>::~GlobalScopeTimer()
-{}
-#endif
 
 template<Timer::Category category>
 class MultiTimer
