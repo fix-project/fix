@@ -27,7 +27,7 @@ Handle<Value> ReadWriteRT::execute( Handle<Relation> x )
   relater_.visit_full( x, [this]( Handle<AnyDataType> h ) {
     h.visit<void>( overload { []( Handle<Literal> ) {},
                               [&]( auto handle ) {
-                                auto repo = relater_.get_repository();
+                                auto& repo = relater_.get_repository();
                                 if ( not repo.contains( handle ) )
                                   repo.put( handle, relater_.get( handle ).value() );
                               } } );
