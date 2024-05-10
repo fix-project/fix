@@ -6,7 +6,7 @@ set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(PkgConfig)
 find_package(Boost 1.74.0 REQUIRED COMPONENTS headers)
 pkg_search_module(GLOG REQUIRED libglog IMPORTED_TARGET glog)
-add_compile_options(-DGLOG_USE_GLOG_EXPORT)
+add_compile_definitions(GOOGLE_STRIP_LOG=1)
 
 include(etc/sanitizers.cmake)
 add_compile_options(-march=znver2) # for AVX2

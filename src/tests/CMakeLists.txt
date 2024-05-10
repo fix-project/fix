@@ -88,3 +88,6 @@ target_link_libraries(test-python-flatware runtime)
 add_executable(create-bptree create-bptree.cc)
 target_link_libraries(create-bptree runtime)
 
+add_executable(lwvirt-timing lwvirt-timing.cc add.cc )
+target_link_libraries(lwvirt-timing runtime)
+
