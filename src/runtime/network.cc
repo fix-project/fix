@@ -10,9 +10,11 @@
 
 #include <glog/logging.h>
 
+#include "base16.hh"
 #include "eventloop.hh"
 #include "handle.hh"
 #include "handle_post.hh"
+#include "handle_util.hh"
 #include "message.hh"
 #include "network.hh"
 #include "object.hh"
@@ -68,6 +70,8 @@ void Remote::send_tree( Handle<AnyTree> handle, TreeData )
                                 push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
                               } } );
   } );
+
+  trees_view_.write()->insert( handle::upcast( handle ) );
 }
 
 void Remote::push_message( OutgoingMessage&& msg )
@@ -99,6 +103,34 @@ optional<TreeData> Remote::get( Handle<AnyTree> name )
 optional<Handle<Object>> Remote::get( Handle<Relation> name )
 {
   if ( !contains( name ) ) {
+    vector<Handle<Fix>> extra;
+
+    name.visit<void>( overload { [&]( Handle<Apply> ) { return; },
+                                 [&]( Handle<Eval> e ) {
+                                   e.unwrap<Object>().visit<void>(
+                                     overload { [&]( Handle<ObjectTree> tree ) {
+                                                 auto treedata = parent_.value().get().get( tree ).value()->span();
+                                                 for ( const auto& subtask : treedata ) {
+                                                   extra.push_back( job::get_root( Handle<Eval>(
+                                                     subtask.unwrap<Expression>().unwrap<Object>() ) ) );
+                                                 }
+                                               },
+                                                []( auto ) { return; } } );
+                                 } } );
+
+    for ( const auto& e : extra ) {
+      VLOG( 2 ) << "Sending extra root " << e;
+      std::cout << e << std::endl;
+      parent_.value().get().visit( e, [&]( Handle<AnyDataType> h ) {
+        h.visit<void>( overload { []( Handle<Literal> ) {},
+                                  []( Handle<Relation> ) {},
+                                  [&]( auto x ) {
+                                    msg_q_.enqueue(
+                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  } } );
+      } );
+    }
+
     parent_.value().get().visit( job::get_root( name ), [&]( Handle<AnyDataType> h ) {
       h.visit<void>( overload { []( Handle<Literal> ) {},
                                 []( Handle<Relation> ) {},
@@ -156,7 +188,7 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
                                   } } );
       } );
 
-      VLOG( 2 ) << "Putting result to remote " << name;
+      VLOG( 2 ) << "Putting result to remote " << name << " " << data;
       ResultPayload payload { .task = name, .result = data };
       msg_q_.enqueue( make_pair( index_, move( payload ) ) );
     }
@@ -193,6 +225,26 @@ bool Remote::contains( Handle<Relation> handle )
 bool Remote::loaded( Handle<Relation> handle )
 {
   return relations_view_.read()->contains( handle );
+}
+
+std::optional<Handle<AnyTree>> Remote::contains( Handle<AnyTreeRef> handle )
+{
+  auto tmp_tree = handle.visit<Handle<AnyTree>>(
+    overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
+               []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); } } );
+
+  auto entry = trees_view_.read()->find( handle::upcast( tmp_tree ) );
+
+  if ( entry == trees_view_.read()->end() ) {
+    return {};
+  }
+
+  // Cast to same kind as Handle<AnyTreeRef>
+  auto res_tree = handle.visit<Handle<AnyTree>>( overload {
+    [&]( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( entry->content, entry->size(), r.is_tag() ); },
+    [&]( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( entry->content, entry->size(), r.is_tag() ); } } );
+
+  return res_tree;
 }
 
 bool Remote::contains( __attribute__( ( unused ) ) const std::string_view label )
@@ -389,25 +441,34 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::ACCEPT_TRANSFER: {
       auto [todo, result, handles] = parse<AcceptTransferPayload>( std::get<string>( msg.payload() ) );
 
-      VLOG( 1 ) << "Sending " << handles.size() << " objects.";
+      if ( proposed_proposals_.size() == 0 ) {
+        throw std::runtime_error( "Mismatch propose and accept" );
+      }
+
+      VLOG( 1 ) << "Sending " << handles.size() << " objects for " << todo;
       for ( const auto& h : handles ) {
         VLOG( 2 ) << "Sending " << handle::fix( h );
-        std::visit(
-          overload {
-            [&]( Handle<Named> ) {
-              push_message( { Opcode::BLOBDATA, std::get<BlobData>( proposed_proposals_.at( todo )->at( h ) ) } );
-            },
-            [&]( Handle<AnyTree> ) {
-              push_message( { Opcode::TREEDATA, std::get<TreeData>( proposed_proposals_.at( todo )->at( h ) ) } );
-            },
-            []( Handle<Literal> ) {},
-            []( Handle<Relation> ) {},
-          },
-          h.get() );
+        std::visit( overload {
+                      [&]( Handle<Named> n ) {
+                        if ( !contains( n ) ) {
+                          push_message( { Opcode::BLOBDATA,
+                                          std::get<BlobData>( proposed_proposals_.front().second->at( h ) ) } );
+                        }
+                      },
+                      [&]( Handle<AnyTree> t ) {
+                        if ( !contains( t ) ) {
+                          push_message( { Opcode::TREEDATA,
+                                          std::get<TreeData>( proposed_proposals_.front().second->at( h ) ) } );
+                        }
+                      },
+                      []( Handle<Literal> ) {},
+                      []( Handle<Relation> ) {},
+                    },
+                    h.get() );
       }
 
       // Any objects in this proposal are considered "exising" on the remote side
-      for ( const auto& [h, _] : *proposed_proposals_.at( todo ) ) {
+      for ( const auto& [h, _] : *proposed_proposals_.front().second ) {
         std::visit( overload { [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
                                [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
                                []( Handle<Relation> ) {},
@@ -415,13 +476,32 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
                     h.get() );
       }
 
-      proposed_proposals_.erase( todo );
+      proposed_proposals_.pop();
 
       if ( result ) {
         push_message( OutgoingMessage::to_message( ResultPayload { .task = todo, .result = *result } ) );
         relations_view_.write()->insert( todo );
       } else {
         push_message( OutgoingMessage::to_message( RunPayload { .task = todo } ) );
+      }
+
+      while ( !proposed_proposals_.empty() ) {
+        // Handle and Run/Result payload without corresponding proposal but should be started now
+        if ( proposed_proposals_.front().second->empty() ) {
+          auto pending_todo = proposed_proposals_.front().first.first;
+          auto pending_result = proposed_proposals_.front().first.second;
+          if ( pending_result ) {
+            push_message(
+              OutgoingMessage::to_message( ResultPayload { .task = pending_todo, .result = *pending_result } ) );
+            relations_view_.write()->insert( pending_todo );
+          } else {
+            push_message( OutgoingMessage::to_message( RunPayload { .task = pending_todo } ) );
+          }
+
+          proposed_proposals_.pop();
+        } else {
+          break;
+        }
       }
       break;
     }
@@ -470,47 +550,108 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
   } else {
     Remote& connection = *connections_.read()->at( remote_idx );
 
-    visit( overload {
-             [&]( BlobDataPayload b ) { connection.incomplete_proposal_->emplace( b.first, b.second ); },
-             [&]( TreeDataPayload t ) {
-               connection.incomplete_proposal_->emplace(
-                 visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
-             },
-             [&]( RunPayload r ) {
-               if ( connection.incomplete_proposal_->empty() ) {
-                 connection.push_message( OutgoingMessage::to_message( r ) );
-               } else {
-                 ProposeTransferPayload payload;
-                 payload.todo = r.task;
-                 for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
-                   payload.handles.push_back( name );
-                 }
-                 connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-                 connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
-                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
-               }
+    visit(
+      overload {
+        [&]( BlobDataPayload b ) {
+          if ( !connection.loaded( b.first ) ) {
+            VLOG( 2 ) << "Adding " << b.first << " to proposal";
+            connection.incomplete_proposal_->emplace( b.first, b.second );
+            connection.proposal_size_ += b.second->size();
+          }
+        },
+        [&]( TreeDataPayload t ) {
+          if ( !connection.loaded( t.first ) ) {
+            VLOG( 2 ) << "Adding " << t.first << " to proposal";
+            connection.incomplete_proposal_->emplace(
+              visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
+            connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
+          }
+        },
+        [&]( RunPayload r ) {
+          if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
+            VLOG( 2 ) << "No proposal sending run directly";
+            connection.push_message( OutgoingMessage::to_message( r ) );
+          } else if ( connection.incomplete_proposal_->empty() ) {
+            // Payload should be sent after last proposed_proposals_ is sent
+            connection.proposed_proposals_.push( { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
+                                                   make_unique<Remote::DataProposal>() } );
+          } else if ( connection.proposal_size_ < 1048576 ) {
+            // Proposal too small, sending directly
+            for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
+              auto h = name;
+              h.visit<void>(
+                overload { [&]( Handle<Named> ) {
+                            connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                          },
+                           [&]( Handle<AnyTree> ) {
+                             connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                           },
+                           []( Handle<Literal> ) {},
+                           []( Handle<Relation> ) {} } );
+            }
+            connection.push_message( OutgoingMessage::to_message( r ) );
+            connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+            connection.proposal_size_ = 0;
+          } else {
+            ProposeTransferPayload payload;
+            payload.todo = r.task;
+            for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
+              payload.handles.push_back( name );
+            }
+            connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+            connection.proposed_proposals_.push( { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
+                                                   std::move( connection.incomplete_proposal_ ) } );
+            connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+            connection.proposal_size_ = 0;
+          }
 
-               connection.pending_result_.insert( r.task );
-             },
-             [&]( ResultPayload r ) {
-               if ( connection.incomplete_proposal_->empty() ) {
-                 connection.push_message( OutgoingMessage::to_message( r ) );
-                 connection.relations_view_.write()->insert( r.task );
-               } else {
-                 ProposeTransferPayload payload;
-                 payload.todo = r.task;
-                 payload.result = r.result;
-                 for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
-                   VLOG( 2 ) << "Proposing " << name;
-                   payload.handles.push_back( name );
-                 }
-                 connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
-                 connection.proposed_proposals_.emplace( r.task, std::move( connection.incomplete_proposal_ ) );
-                 connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
-               }
-             },
-             [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },
-           payload );
+          connection.pending_result_.insert( r.task );
+        },
+        [&]( ResultPayload r ) {
+          if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
+            VLOG( 2 ) << "No proposal sending result directly";
+            connection.push_message( OutgoingMessage::to_message( r ) );
+            connection.relations_view_.write()->insert( r.task );
+          } else if ( connection.incomplete_proposal_->empty() ) {
+            // Paylod should be send after last proposed_proposals_ is sent
+            connection.proposed_proposals_.push(
+              { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
+                make_unique<Remote::DataProposal>() } );
+          } else if ( connection.proposal_size_ < 1048576 ) {
+            // Proposal too small, sending directly
+            for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
+              auto h = name;
+              h.visit<void>(
+                overload { [&]( Handle<Named> ) {
+                            connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                          },
+                           [&]( Handle<AnyTree> ) {
+                             connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                           },
+                           []( Handle<Literal> ) {},
+                           []( Handle<Relation> ) {} } );
+            }
+            connection.push_message( OutgoingMessage::to_message( r ) );
+            connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+            connection.proposal_size_ = 0;
+          } else {
+            ProposeTransferPayload payload;
+            payload.todo = r.task;
+            payload.result = r.result;
+            for ( const auto& [name, _] : *connection.incomplete_proposal_ ) {
+              VLOG( 2 ) << "Proposing " << name << " for " << r.task;
+              payload.handles.push_back( name );
+            }
+            connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+            connection.proposed_proposals_.push(
+              { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
+                std::move( connection.incomplete_proposal_ ) } );
+            connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
+            connection.proposal_size_ = 0;
+          }
+        },
+        [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },
+      payload );
   }
 }
 

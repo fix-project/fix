@@ -156,6 +156,7 @@ public:
           = handle.template visit<Handle<Thunk>>( []( auto s ) { return s.template unwrap<Thunk>(); } );
         thunk.visit<void>(
           overload { [&]( Handle<Application> a ) { visit( a.unwrap<ExpressionTree>(), visitor, visited ); },
+                     [&]( Handle<Identification> i ) { visit( i.unwrap<Value>(), visitor, visited ); },
                      []( auto ) {} } );
       }
 
@@ -166,10 +167,12 @@ public:
       return;
     } else {
       if constexpr ( FixTreeType<T> ) {
-        // Having the handle means that the data presents in storage
-        auto tree = get( handle );
-        for ( const auto& element : tree.value()->span() ) {
-          visit( element, visitor, visited );
+        if ( contains( handle ) ) {
+          // Having the handle means that the data presents in storage
+          auto tree = get( handle );
+          for ( const auto& element : tree.value()->span() ) {
+            visit( element, visitor, visited );
+          }
         }
       }
       VLOG( 3 ) << "visiting " << handle;

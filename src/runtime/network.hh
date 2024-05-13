@@ -70,10 +70,12 @@ class Remote : public IRuntime
 
   using DataProposal = absl::flat_hash_map<Handle<AnyDataType>, std::variant<BlobData, TreeData>, AbslHash>;
   std::unique_ptr<DataProposal> incomplete_proposal_ { std::make_unique<DataProposal>() };
-  absl::flat_hash_map<Handle<Relation>, std::unique_ptr<DataProposal>> proposed_proposals_ {};
+  size_t proposal_size_ {};
+  std::queue<std::pair<std::pair<Handle<Relation>, std::optional<Handle<Object>>>, std::unique_ptr<DataProposal>>>
+    proposed_proposals_ {};
 
   SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> blobs_view_ {};
-  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash>> trees_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash, handle::tree_equal>> trees_view_ {};
   SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> relations_view_ {};
 
   SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> loadable_blobs_view_ {};
@@ -99,6 +101,7 @@ public:
   bool contains( Handle<Named> handle ) override;
   bool contains( Handle<AnyTree> handle ) override;
   bool contains( Handle<Relation> handle ) override;
+  std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle ) override;
   bool contains( const std::string_view label ) override;
   std::optional<Info> get_info() override;
 
@@ -110,6 +113,12 @@ public:
   std::unordered_set<Handle<Relation>> pending_result_ {};
 
   bool dead() const { return dead_; }
+
+  virtual bool reply_to_contains( Handle<Relation> handle )
+  {
+    std::shared_lock lock( mutex_ );
+    return reply_to_.contains( handle );
+  }
 
   bool erase_reply_to( Handle<Relation> handle )
   {
