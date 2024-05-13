@@ -76,6 +76,10 @@ class Remote : public IRuntime
   SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash>> trees_view_ {};
   SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> relations_view_ {};
 
+  SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> loadable_blobs_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash>> loadable_trees_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> loadable_relations_view_ {};
+
 public:
   Remote( EventLoop& events,
           EventCategories categories,
@@ -125,6 +129,10 @@ private:
   void send_tree( TreeData tree );
 
   void clean_up();
+
+  bool loaded( Handle<Named> handle );
+  bool loaded( Handle<AnyTree> handle );
+  bool loaded( Handle<Relation> handle );
 };
 
 class NetworkWorker

@@ -94,8 +94,10 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
       h.visit<void>( overload { []( Handle<Literal> ) {},
                                 []( Handle<Relation> ) {},
                                 [&]( auto x ) {
-                                  msg_q_.enqueue(
-                                    make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  if ( !loaded( x ) ) {
+                                    msg_q_.enqueue(
+                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  }
                                 } } );
     } );
   }
@@ -107,20 +109,22 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
 
 void Remote::put( Handle<Named> name, BlobData data )
 {
-  if ( !contains( name ) ) {
+  if ( !loaded( name ) ) {
     msg_q_.enqueue( make_pair( index_, make_pair( name, data ) ) );
   }
 }
 
 void Remote::put( Handle<AnyTree> name, TreeData )
 {
-  if ( !contains( name ) ) {
+  if ( !loaded( name ) ) {
     parent_.value().get().visit( handle::upcast( name ), [&]( Handle<AnyDataType> h ) {
       h.visit<void>( overload { []( Handle<Literal> ) {},
                                 []( Handle<Relation> ) {},
                                 [&]( auto x ) {
-                                  msg_q_.enqueue(
-                                    make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  if ( !loaded( x ) ) {
+                                    msg_q_.enqueue(
+                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  }
                                 } } );
     } );
   }
@@ -136,8 +140,10 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
         h.visit<void>( overload { []( Handle<Literal> ) {},
                                   []( Handle<Relation> ) {},
                                   [&]( auto x ) {
-                                    msg_q_.enqueue(
-                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                    if ( !loaded( x ) ) {
+                                      msg_q_.enqueue( make_pair(
+                                        index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                    }
                                   } } );
       } );
 
@@ -151,15 +157,31 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
 
 bool Remote::contains( Handle<Named> handle )
 {
+  return blobs_view_.read()->contains( handle ) || loadable_blobs_view_.read()->contains( handle );
+}
+
+bool Remote::loaded( Handle<Named> handle )
+{
   return blobs_view_.read()->contains( handle );
 }
 
 bool Remote::contains( Handle<AnyTree> handle )
 {
+  return trees_view_.read()->contains( handle::upcast( handle ) )
+         || loadable_trees_view_.read()->contains( handle::upcast( handle ) );
+}
+
+bool Remote::loaded( Handle<AnyTree> handle )
+{
   return trees_view_.read()->contains( handle::upcast( handle ) );
 }
 
 bool Remote::contains( Handle<Relation> handle )
+{
+  return relations_view_.read()->contains( handle ) || loadable_relations_view_.read()->contains( handle );
+}
+
+bool Remote::loaded( Handle<Relation> handle )
 {
   return relations_view_.read()->contains( handle );
 }
@@ -256,14 +278,28 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::REQUESTINFO: {
-      InfoPayload payload { parent.get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } ) };
+      auto parent_info = parent.get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } );
+      InfoPayload payload {
+        .parallelism = parent_info.parallelism, .link_speed = parent_info.link_speed, .data = parent.data() };
       push_message( OutgoingMessage::to_message( move( payload ) ) );
       break;
     }
 
     case Opcode::INFO: {
-      unique_lock lock( mutex_ );
-      info_ = parse<InfoPayload>( std::get<string>( msg.payload() ) );
+      auto payload = parse<InfoPayload>( std::get<string>( msg.payload() ) );
+      {
+        unique_lock lock( mutex_ );
+        info_ = { .parallelism = payload.parallelism, .link_speed = payload.link_speed };
+      }
+
+      for ( auto handle : payload.data ) {
+        handle.visit<void>(
+          overload { [&]( Handle<Named> h ) { loadable_blobs_view_.write()->insert( h ); },
+                     [&]( Handle<AnyTree> t ) { loadable_trees_view_.write()->insert( handle::upcast( t ) ); },
+                     []( Handle<Literal> ) {},
+                     []( Handle<Relation> ) {} } );
+      }
+
       break;
     }
 

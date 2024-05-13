@@ -386,17 +386,17 @@ Handle<Fix> Repository::lookup( const std::string_view ref )
     return labeled( ref );
   } catch ( LabelNotFound& ) {}
 
-  std::optional<Handle<Fix>> candidate;
+  std::optional<Handle<AnyDataType>> candidate;
   for ( const auto& handle : data() ) {
     std::string name = base16::encode( handle.content );
     if ( name.rfind( ref, 0 ) == 0 ) {
       if ( candidate )
         throw AmbiguousReference( ref );
-      candidate = handle::fix( handle );
+      candidate = handle::data( handle::fix( handle ) );
     }
   }
   if ( candidate )
-    return *candidate;
+    return handle::fix( *candidate );
 
   if ( fs::exists( ref ) ) {
     try {
