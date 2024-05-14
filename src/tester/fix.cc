@@ -168,22 +168,27 @@ void cat( int argc, char* argv[] )
 
   Repository storage;
   auto handle = storage.lookup( ref );
-  handle::data( handle ).visit<void>( overload {
-    [&]( Handle<AnyTree> tree ) {
-      auto data = storage.get( tree ).value();
-      for ( size_t i = 0; i < data->size(); i++ ) {
-        cout << data->at( i ).content << "\n";
-      }
-    },
-    [&]( Handle<Relation> ) {
-      cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
-      exit( EXIT_FAILURE );
-    },
-    [&]( Handle<Blob> ) {
-      cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
-      exit( EXIT_FAILURE );
-    },
-  } );
+  if ( handle::data( handle ).has_value() ) {
+    handle::data( handle ).value().visit<void>( overload {
+      [&]( Handle<AnyTree> tree ) {
+        auto data = storage.get( tree ).value();
+        for ( size_t i = 0; i < data->size(); i++ ) {
+          cout << data->at( i ).content << "\n";
+        }
+      },
+      [&]( Handle<Relation> ) {
+        cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
+        exit( EXIT_FAILURE );
+      },
+      [&]( Handle<Blob> ) {
+        cerr << "Error: \"" << ref << "\" does not describe a Tree.\n";
+        exit( EXIT_FAILURE );
+      },
+    } );
+  } else {
+    cerr << "Error: \"" << ref << "\" is a Ref.\n";
+    exit( EXIT_FAILURE );
+  }
 }
 
 void print_tree( Repository& storage, Handle<AnyTree> handle, bool decode )
@@ -211,17 +216,24 @@ void ls( int argc, char* argv[] )
 
   Repository storage;
   auto handle = handle::data( storage.lookup( ref ) )
-                  .visit<Handle<AnyTree>>( overload {
-                    []( Handle<AnyTree> x ) { return x; },
-                    [&]( Handle<Relation> ) -> Handle<AnyTree> {
-                      cerr << std::format( "Ref {} does not a describe a tree.", ref );
-                      exit( EXIT_FAILURE );
-                    },
-                    [&]( Handle<Blob> ) -> Handle<AnyTree> {
-                      cerr << std::format( "Ref {} does not a describe a tree.", ref );
-                      exit( EXIT_FAILURE );
-                    },
-                  } );
+                  .transform( [&]( auto h ) {
+                    return h.template visit<Handle<AnyTree>>( overload {
+                      []( Handle<AnyTree> x ) { return x; },
+                      [&]( Handle<Relation> ) -> Handle<AnyTree> {
+                        cerr << std::format( "Ref {} does not a describe a tree.", ref );
+                        exit( EXIT_FAILURE );
+                      },
+                      [&]( Handle<Blob> ) -> Handle<AnyTree> {
+                        cerr << std::format( "Ref {} does not a describe a tree.", ref );
+                        exit( EXIT_FAILURE );
+                      },
+                    } );
+                  } )
+                  .or_else( [&]() -> optional<Handle<AnyTree>> {
+                    cerr << std::format( "Ref {} does not contain data.", ref );
+                    exit( EXIT_FAILURE );
+                  } )
+                  .value();
   print_tree( storage, handle, decode );
 }
 }
@@ -267,25 +279,27 @@ void gc_visit( Repository& repo, Handle<Fix> root, unordered_set<Handle<Fix>>& r
 {
   reachable.insert( root );
   auto data = handle::data( root );
-  handle::data( data ).visit<void>( overload {
-    [&]( Handle<Relation> relation ) {
-      auto rhs = relation.visit<Handle<Object>>(
-        [&]( auto x ) { return std::visit( []( auto x ) { return x; }, x.get() ); } );
-      auto lhs = repo.get( relation ).value();
-      gc_visit( repo, rhs, reachable );
-      gc_visit( repo, lhs, reachable );
-    },
-    [&]( Handle<AnyTree> tree ) {
-      auto data = repo.get( tree ).value();
-      for ( const auto& x : data->span() ) {
-        gc_visit( repo, x, reachable );
-      }
-    },
-    [&]( Handle<Blob> ) {},
-  } );
-  auto pins = repo.pinned( root );
-  for ( const auto& p : pins ) {
-    gc_visit( repo, p, reachable );
+  if ( data.has_value() ) {
+    data.value().visit<void>( overload {
+      [&]( Handle<Relation> relation ) {
+        auto rhs = relation.visit<Handle<Object>>(
+          [&]( auto x ) { return std::visit( []( auto x ) { return x; }, x.get() ); } );
+        auto lhs = repo.get( relation ).value();
+        gc_visit( repo, rhs, reachable );
+        gc_visit( repo, lhs, reachable );
+      },
+      [&]( Handle<AnyTree> tree ) {
+        auto data = repo.get( tree ).value();
+        for ( const auto& x : data->span() ) {
+          gc_visit( repo, x, reachable );
+        }
+      },
+      [&]( Handle<Blob> ) {},
+    } );
+    auto pins = repo.pinned( root );
+    for ( const auto& p : pins ) {
+      gc_visit( repo, p, reachable );
+    }
   }
 }
 
@@ -332,7 +346,7 @@ void gc( int argc, char* argv[] )
                   [&]( const Handle<Literal> ) { total_size += 0; },
                   [&]( const Handle<AnyTree> x ) { total_size += handle::size( x ) * sizeof( Handle<Fix> ); },
                 },
-                handle::data( x ).get() );
+                handle::data( x )->get() );
   }
 
   if ( dry_run ) {
@@ -344,7 +358,7 @@ void gc( int argc, char* argv[] )
                                          [&]( const Handle<Literal> ) { return "Blob"; },
                                          [&]( const Handle<AnyTree> ) { return "Tree"; },
                                        },
-                                       handle::data( x ).get() );
+                                       handle::data( x )->get() );
       cout << ", ";
       cout << std::visit<size_t>(
         overload {
@@ -353,7 +367,7 @@ void gc( int argc, char* argv[] )
           [&]( const Handle<Literal> ) { return 0; },
           [&]( const Handle<AnyTree> x ) { return handle::size( x ) * sizeof( Handle<Fix> ); },
         },
-        handle::data( x ).get() );
+        handle::data( x )->get() );
       cout << " bytes)\n";
     }
     cout << "Would have deleted " << total_size << " bytes.\n";
@@ -463,21 +477,26 @@ void ref_( int argc, char* argv[] )
   try {
     auto result = base16::decode( handle );
     auto handle = Handle<Fix>::forge( result );
-    auto ref = handle::data( handle ).visit<Handle<Fix>>( overload {
-      []( Handle<Literal> x ) { return Handle<Fix>( Handle<BlobRef>( x ) ); },
-      []( Handle<Named> x ) { return Handle<Fix>( Handle<BlobRef>( x ) ); },
-      []( Handle<ValueTree> x ) {
-        Repository storage;
-        auto result = storage.get( x ).value();
-        return Handle<Fix>( Handle<ValueTreeRef>( x, result->size() ) );
-      },
-      []( Handle<ObjectTree> x ) {
-        Repository storage;
-        auto result = storage.get( x ).value();
-        return Handle<Fix>( Handle<ObjectTreeRef>( x, result->size() ) );
-      },
-      []( auto ) -> Handle<Fix> { throw std::runtime_error( "cannot make Ref" ); },
-    } );
+    auto ref = handle::data( handle )
+                 .transform( [&]( auto h ) {
+                   return h.template visit<Handle<Fix>>( overload {
+                     []( Handle<Literal> x ) { return Handle<Fix>( Handle<BlobRef>( x ) ); },
+                     []( Handle<Named> x ) { return Handle<Fix>( Handle<BlobRef>( x ) ); },
+                     []( Handle<ValueTree> x ) {
+                       Repository storage;
+                       auto result = storage.get( x ).value();
+                       return Handle<Fix>( Handle<ValueTreeRef>( x, result->size() ) );
+                     },
+                     []( Handle<ObjectTree> x ) {
+                       Repository storage;
+                       auto result = storage.get( x ).value();
+                       return Handle<Fix>( Handle<ObjectTreeRef>( x, result->size() ) );
+                     },
+                     []( auto ) -> Handle<Fix> { throw std::runtime_error( "cannot make Ref" ); },
+                   } );
+                 } )
+                 .or_else( [&]() -> optional<Handle<Fix>> { throw std::runtime_error( "cannot ref a ref" ); } )
+                 .value();
     cout << ref.content << "\n";
   } catch ( std::runtime_error& e ) {
     cerr << "Error: " << e.what() << "\n";

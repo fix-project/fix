@@ -6,11 +6,11 @@
 Handle<Fix> parse_args( IRuntime& rt, std::span<char*>& args );
 void parser_usage_message();
 
-static Handle<ValueTree> make_limits( IRuntime& rt,
-                                      uint64_t memory,
-                                      uint64_t output_size,
-                                      uint64_t output_fanout,
-                                      bool fast = false )
+[[maybe_unused]] static Handle<ValueTree> make_limits( IRuntime& rt,
+                                                       uint64_t memory,
+                                                       uint64_t output_size,
+                                                       uint64_t output_fanout,
+                                                       bool fast = false )
 {
   auto tree = OwnedMutTree::allocate( 4 );
   tree.at( 0 ) = Handle<Literal>( memory );
@@ -21,7 +21,7 @@ static Handle<ValueTree> make_limits( IRuntime& rt,
   return handle::extract<ValueTree>( created ).value();
 }
 
-static Handle<Fix> make_identification( Handle<Fix> name )
+[[maybe_unused]] static Handle<Fix> make_identification( Handle<Fix> name )
 {
   return handle::extract<Value>( name )
     .transform( [&]( auto h ) -> Handle<Fix> {

@@ -1,5 +1,4 @@
 #pragma once
-#include <concepts>
 #include <variant>
 
 #include "handle.hh"
@@ -30,13 +29,13 @@ inline std::optional<Handle<S>> extract( Handle<T> original )
 }
 
 template<typename T>
-static inline Handle<AnyDataType> data( Handle<T> handle )
+static inline std::optional<Handle<AnyDataType>> data( Handle<T> handle )
 {
   if constexpr ( std::same_as<T, Relation> ) {
     return handle;
   } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef>
                         or std::same_as<T, BlobRef> ) {
-    __builtin_unreachable();
+    return {};
   } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
     return handle;
   } else {
@@ -131,7 +130,7 @@ Handle<T> tree_unwrap( Handle<AnyTree> handle )
 template<FixTreeType T>
 Handle<T> tree_unwrap( Handle<Expression> handle )
 {
-  return data( handle ).visit<Handle<T>>( [&]( auto t ) -> Handle<T> {
+  return data( handle )->visit<Handle<T>>( [&]( auto t ) -> Handle<T> {
     if constexpr ( std::constructible_from<Handle<T>, decltype( t )> ) {
       return Handle<T>( t );
     } else {
