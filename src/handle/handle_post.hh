@@ -54,13 +54,13 @@ static inline bool is_local( Handle<T> handle )
         return x.is_local();
       }
     },
-    data( handle ).get() );
+    data( handle ).value().get() );
 }
 
 template<typename T>
 static inline size_t local_name( Handle<T> handle )
 {
-  return std::visit( []( const auto x ) { return x.local_name(); }, data( handle ).get() );
+  return std::visit( []( const auto x ) { return x.local_name(); }, data( handle ).value().get() );
 }
 
 template<typename T>
