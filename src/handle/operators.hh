@@ -85,7 +85,10 @@ inline std::ostream& operator<<( std::ostream& os, const Handle<Tree<T>>& h )
   } else if constexpr ( std::same_as<T, Expression> ) {
     os << "Expression";
   }
-  os << "Tree " << h.size() << " ";
+  if ( h.is_tag() )
+    os << "Tag " << h.size() << " ";
+  else
+    os << "Tree " << h.size() << " ";
   if ( h.is_local() ) {
     os << "(Local " << h.local_name() << ")";
   } else {
