@@ -1,6 +1,5 @@
 #include "scheduler.hh"
 #include "handle.hh"
-#include "handle_post.hh"
 #include "overload.hh"
 #include "pass.hh"
 #include "storage_exception.hh"
@@ -36,7 +35,7 @@ void LocalFirstScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Hand
     for ( const auto& remote : locked_remotes.get() ) {
       auto locked_remote = remote.lock();
       if ( locked_remote ) {
-        scheduler::get( locked_remote, top_level_job, relater_->get() );
+        locked_remote->get( top_level_job );
         return;
       }
     }
