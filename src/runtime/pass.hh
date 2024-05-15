@@ -145,32 +145,8 @@ public:
   {}
 };
 
-class SendtoRemote : public SelectionPass
-{
-  std::shared_ptr<IRuntime> target_remote_;
-  absl::flat_hash_set<Handle<AnyDataType>>& to_send_;
-
-  virtual void independent( Handle<AnyDataType> ) override {};
-  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {};
-  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {};
-
-  virtual void leaf( Handle<AnyDataType> ) override;
-
-public:
-  SendtoRemote( std::reference_wrapper<BasePass> base,
-                std::reference_wrapper<Relater> relater,
-                std::shared_ptr<IRuntime> target_remote,
-                absl::flat_hash_set<Handle<AnyDataType>>& to_send )
-    : SelectionPass( base, relater )
-    , target_remote_( target_remote )
-    , to_send_( to_send )
-  {}
-};
-
 class OutSource : public PrunedSelectionPass
 {
-  std::map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>>& to_sends_;
-
   virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
 
   virtual void leaf( Handle<AnyDataType> ) override {}
@@ -180,10 +156,8 @@ class OutSource : public PrunedSelectionPass
 public:
   OutSource( std::reference_wrapper<BasePass> base,
              std::reference_wrapper<Relater> relater,
-             std::unique_ptr<SelectionPass> prev,
-             std::map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>>& to_sends )
+             std::unique_ptr<SelectionPass> prev )
     : PrunedSelectionPass( base, relater, move( prev ) )
-    , to_sends_( to_sends )
   {}
 };
 

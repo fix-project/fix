@@ -415,24 +415,6 @@ void ChildBackProp::pre( Handle<AnyDataType> job, const absl::flat_hash_set<Hand
   }
 }
 
-void SendtoRemote::leaf( Handle<AnyDataType> job )
-{
-  job.visit<void>( overload {
-    []( Handle<Relation> ) {},
-    []( Handle<Literal> ) {},
-    [&]( Handle<AnyTree> t ) {
-      if ( relater_.get().contains( t ) ) {
-        t.visit<void>( [&]( auto h ) { to_send_.insert( h ); } );
-      }
-    },
-    [&]( Handle<Named> n ) {
-      if ( relater_.get().contains( n ) ) {
-        to_send_.insert( n );
-      }
-    },
-  } );
-}
-
 void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
   size_t assigned = 0;
@@ -473,9 +455,6 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
         break;
       }
 
-      auto send_local_stuffs
-        = SendtoRemote( base_, relater_, available_remotes[remote_idx], to_sends_[available_remotes[remote_idx]] );
-      send_local_stuffs.run( d );
       chosen_remotes_.insert_or_assign( d, { available_remotes[remote_idx], 0 } );
 
       assigned--;
@@ -486,47 +465,6 @@ void OutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
       }
     }
   }
-
-  // if ( local.has_value() and assigned > local.value()->get_info()->parallelism ) {
-  //   unordered_map<shared_ptr<IRuntime>, size_t> assigned_tasks;
-  //   for ( const auto& [_, d] : scores ) {
-  //     // XXX: We may want to oursource less
-  //     if ( assigned - base_.get().get_fan_out( d ) < local.value()->get_info()->parallelism ) {
-  //       break;
-  //     }
-
-  //    // Choose a different remote for this dependency
-  //    // XXX: calculate score by queue length and data movement cost
-  //    const auto& absent_size = base_.get().get_absent_size( d );
-
-  //    size_t min_absent_size = numeric_limits<size_t>::max();
-
-  //    optional<shared_ptr<IRuntime>> chosen_remote;
-
-  //    for ( const auto& [r, s] : absent_size ) {
-  //      if ( is_local( r ) )
-  //        continue;
-
-  //      if ( s < min_absent_size ) {
-  //        min_absent_size = s;
-  //        chosen_remote = r;
-  //      } else if ( s == min_absent_size && chosen_remote.has_value()
-  //                  && assigned_tasks[r] < assigned_tasks[chosen_remote.value()] ) {
-  //        chosen_remote = r;
-  //      }
-  //    }
-
-  //    if ( chosen_remote.has_value() ) {
-  //      VLOG( 2 ) << "Outsource moved " << d << ( is_local( chosen_remote.value() ) ? " locally" : " remotely" );
-  //      chosen_remotes_.insert_or_assign( d, { chosen_remote.value(), min_absent_size } );
-  //      assigned -= base_.get().get_fan_out( d );
-  //      assigned_tasks[chosen_remote.value()] += base_.get().get_fan_out( d );
-  //    } else {
-  //      // No outsourcable locatons
-  //      break;
-  //    }
-  //  }
-  //}
 }
 
 void RandomSelection::independent( Handle<AnyDataType> job )
@@ -595,7 +533,6 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
   base.run( top_level_job );
 
   optional<unique_ptr<SelectionPass>> selection;
-  std::map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>> to_sends {};
   for ( const auto& pass : passes ) {
     switch ( pass ) {
       case PassType::MinAbsentMaxParallelism: {
@@ -620,7 +557,7 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
 
       case PassType::OutSource: {
         if ( selection.has_value() ) {
-          selection = make_unique<OutSource>( base, rt, move( selection.value() ), to_sends );
+          selection = make_unique<OutSource>( base, rt, move( selection.value() ) );
         } else {
           throw runtime_error( "Invalid pass sequence." );
         }
@@ -643,13 +580,6 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
   FinalPass final( base, rt, move( selection.value() ) );
   final.make_root_local( top_level_job );
   final.run( top_level_job );
-
-  for ( auto& [r, handles] : to_sends ) {
-    for ( auto h : handles ) {
-      h.visit<void>(
-        overload { []( Handle<Literal> ) {}, [&]( auto d ) { r->put( d, rt.get().get( d ).value() ); } } );
-    }
-  }
 
   vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>::const_iterator>> iterators {};
   for ( auto& [r, handles] : final.get_remote_jobs() ) {
