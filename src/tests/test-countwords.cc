@@ -28,29 +28,31 @@ void test( void )
   auto blob = tester::Blob( "the quick brown fox jumps over the lazy dog" );
   auto blob2 = tester::Blob( "it was the best of times, it was the worst of times" );
   auto tree = tester::Tree( blob, blob2 );
-  auto thunk = Handle<Thunk>( tester::Tree( tester::Limits(), mapreduce, count_words, merge_counts, tree ) );
+  auto thunk = Handle<Thunk>( tester::Tree(
+    tester::Limits(), mapreduce, count_words, merge_counts, tree, tester::Limits(), tester::Limits() ) );
   auto result = tester::rt->execute( Handle<Eval>( thunk ) );
 
   auto x = result.unwrap<Blob>().unwrap<Named>();
   auto y = tester::rt->get( x ).value();
-  auto actual = std::string( y->span().data(), y->span().size() );
 
-  std::string expected = "best,0x00000001\n"
-                         "brown,0x00000001\n"
-                         "dog,0x00000001\n"
-                         "fox,0x00000001\n"
-                         "it,0x00000002\n"
-                         "jumps,0x00000001\n"
-                         "lazy,0x00000001\n"
-                         "of,0x00000002\n"
-                         "over,0x00000001\n"
-                         "quick,0x00000001\n"
-                         "the,0x00000004\n"
-                         "times,0x00000002\n"
-                         "was,0x00000002\n"
-                         "worst,0x00000001\n";
+  uint64_t actual_counts[256] = { 0 };
+  for ( char c : tester::rt->get( blob.unwrap<Named>() ).value()->span() ) {
+    actual_counts[static_cast<uint8_t>( c )]++;
+  }
+  for ( char c : tester::rt->get( blob2.unwrap<Named>() ).value()->span() ) {
+    actual_counts[static_cast<uint8_t>( c )]++;
+  }
 
-  CHECK_EQ( expected, actual );
+  for ( size_t i = 0; i < 256; i++ ) {
+    if ( actual_counts[i] != reinterpret_cast<const uint64_t*>( y->span().data() )[i] ) {
+      fprintf( stderr,
+               "%ld: got %ld, expected %ld.\n",
+               i,
+               reinterpret_cast<const uint64_t*>( y->span().data() )[i],
+               actual_counts[i] );
+      exit( 1 );
+    }
+  }
 
   exit( 0 );
 }
