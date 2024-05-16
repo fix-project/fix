@@ -92,8 +92,14 @@ public:
   }
 
   void erase_backward_dependencies( Task blocked ) {
-    for ( const auto dependency : forward_dependencies_[blocked] ) {
+    for ( auto dependency : forward_dependencies_[blocked] ) {
       backward_dependencies_[dependency].erase( blocked );
+      dependency.visit<void>( overload {
+          [&]( Handle<Relation> r ) {
+            erase_backward_dependencies( r );
+          },
+          []( auto ) {}
+      } );
     }
   }
 };

@@ -12,6 +12,7 @@ inline thread_local std::optional<Handle<Relation>> current_;
 class Executor;
 class Scheduler;
 class LocalFirstScheduler;
+class HintScheduler;
 class Pass;
 class BasePass;
 class PrunedSelectionPass;
@@ -22,6 +23,7 @@ class Relater
 {
   friend class Executor;
   friend class LocalFirstScheduler;
+  friend class HintScheduler;
   friend class Pass;
   friend class BasePass;
   friend class PrunedSelectionPass;
