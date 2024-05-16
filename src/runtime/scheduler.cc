@@ -65,6 +65,17 @@ void HintScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Rel
     return;
   }
 
+  if ( relater_->get().remotes_.read()->size() == 0 ) {
+    for ( auto leaf_job : leaf_jobs ) {
+      leaf_job.visit<void>( overload {
+        [&]( Handle<Literal> ) {},
+        [&]( auto h ) { relater_->get().local_->get( h ); },
+      } );
+
+      return;
+    }
+  }
+
   PassRunner::run( relater_.value(),
                    top_level_job,
                    { PassRunner::PassType::MinAbsentMaxParallelism,

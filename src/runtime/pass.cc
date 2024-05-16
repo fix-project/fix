@@ -275,22 +275,29 @@ void MinAbsentMaxParallelism::leaf( Handle<AnyDataType> job )
     const auto& absent_size = base_.get().get_absent_size( job );
 
     size_t max_parallelism = 0;
-    size_t min_absent_size = numeric_limits<size_t>::max();
+    optional<size_t> min_absent_size;
     int64_t min_absent_size_diff = 0;
 
     for ( const auto& [r, s] : absent_size ) {
-      if ( s < min_absent_size ) {
-        if ( min_absent_size != numeric_limits<int64_t>::max() ) {
-          min_absent_size_diff = s - min_absent_size;
-        }
+      if ( !min_absent_size.has_value() ) {
         min_absent_size = s;
         max_parallelism = r->get_info()->parallelism;
         chosen_remote = r;
-      } else if ( s == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
-        max_parallelism = r->get_info()->parallelism;
-        chosen_remote = r;
-      } else if ( s == min_absent_size && r->get_info()->parallelism == max_parallelism && is_local( r ) ) {
-        chosen_remote = r;
+      } else {
+        if ( s < min_absent_size.value() ) {
+          min_absent_size_diff = s - min_absent_size.value();
+          min_absent_size = s;
+          max_parallelism = r->get_info()->parallelism;
+          chosen_remote = r;
+        } else if ( s == min_absent_size.value() && r->get_info()->parallelism > max_parallelism ) {
+          min_absent_size_diff = 0;
+          max_parallelism = r->get_info()->parallelism;
+          chosen_remote = r;
+        } else if ( s == min_absent_size.value() && r->get_info()->parallelism == max_parallelism
+                    && is_local( r ) ) {
+          min_absent_size_diff = 0;
+          chosen_remote = r;
+        }
       }
     }
 
@@ -334,24 +341,29 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
 
     const auto& absent_size = base_.get().get_absent_size( job );
 
-    int64_t min_absent_size = numeric_limits<int64_t>::max();
+    optional<int64_t> min_absent_size;
     size_t max_parallelism = 0;
     int64_t min_absent_size_diff = 0;
 
     for ( const auto& [r, s] : absent_size ) {
       int64_t sum_size = s - present_output[r];
-      if ( sum_size < min_absent_size ) {
-        if ( min_absent_size != numeric_limits<int64_t>::max() ) {
-          min_absent_size_diff = sum_size - min_absent_size;
-        }
+      if ( !min_absent_size.has_value() ) {
         min_absent_size = sum_size;
         max_parallelism = r->get_info()->parallelism;
         chosen_remote = r;
-      } else if ( sum_size == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
-        max_parallelism = r->get_info()->parallelism;
-        chosen_remote = r;
-      } else if ( sum_size == min_absent_size && r->get_info()->parallelism == max_parallelism && is_local( r ) ) {
-        chosen_remote = r;
+      } else {
+        if ( sum_size < min_absent_size.value() ) {
+          min_absent_size_diff = sum_size - min_absent_size.value();
+          min_absent_size = sum_size;
+          max_parallelism = r->get_info()->parallelism;
+          chosen_remote = r;
+        } else if ( sum_size == min_absent_size.value() && r->get_info()->parallelism > max_parallelism ) {
+          max_parallelism = r->get_info()->parallelism;
+          chosen_remote = r;
+        } else if ( sum_size == min_absent_size.value() && r->get_info()->parallelism == max_parallelism
+                    && is_local( r ) ) {
+          chosen_remote = r;
+        }
       }
     }
     VLOG( 2 ) << "MinAbsent::post " << job << " " << chosen_remote.value();
@@ -375,6 +387,8 @@ void ChildBackProp::independent( Handle<AnyDataType> job )
     }
 
     optional<shared_ptr<IRuntime>> chosen_remote;
+    int64_t score = 0;
+    auto curr_output_size = base_.get().get_output_size( job );
 
     if ( move_output_to.contains( chosen_remotes_.at( job ).first ) ) {
       return;
@@ -390,53 +404,55 @@ void ChildBackProp::independent( Handle<AnyDataType> job )
                                      }
                                    }
                                    chosen_remote = chosen_remotes_.at( r ).first;
+                                   score = -curr_output_size;
                                  }
                                },
                                 []( Handle<Literal> ) {} } );
 
     if ( !chosen_remote.has_value() ) {
-      // Previous score for selecting the current assignment
+      // How much current choice is better than other choices (the smaller the better)
       auto prev = chosen_remotes_.at( job ).second;
 
-      const auto& absent_size = base_.get().get_absent_size( job );
+      if ( prev + curr_output_size < 0 ) {
+        return;
+      }
 
-      int64_t min_absent_size = numeric_limits<int64_t>::max();
-      size_t max_parallelism = 0;
-      int64_t min_absent_size_diff = 0;
+      score = 0 - ( prev + curr_output_size );
+      // Pick the one with the smallest absent_size
+      if ( move_output_to.size() == 1 ) {
+        chosen_remote = *move_output_to.begin();
+      } else {
+        optional<size_t> min_absent_size;
+        int64_t max_parallelism = 0;
+        const auto& absent_size = base_.get().get_absent_size( job );
 
-      for ( const auto& [r, s] : absent_size ) {
-        if ( r == chosen_remotes_.at( job ).first ) {
-          continue;
-        }
-
-        int64_t sum_size = s - ( move_output_to.contains( r ) ? base_.get().get_output_size( job ) : 0 );
-        if ( sum_size < prev ) {
-          if ( sum_size < min_absent_size ) {
-            if ( min_absent_size != numeric_limits<int64_t>::max() ) {
-              min_absent_size_diff = sum_size - min_absent_size;
+        for ( const auto& r : move_output_to ) {
+          auto s = absent_size.at( r );
+          if ( !min_absent_size.has_value() ) {
+            min_absent_size = s;
+            max_parallelism = r->get_info()->parallelism;
+            chosen_remote = r;
+          } else {
+            if ( s < min_absent_size.value() ) {
+              min_absent_size = s;
+              max_parallelism = r->get_info()->parallelism;
+              chosen_remote = r;
+            } else if ( s == min_absent_size.value() && r->get_info()->parallelism > max_parallelism ) {
+              max_parallelism = r->get_info()->parallelism;
+              chosen_remote = r;
+            } else if ( s == min_absent_size.value() && r->get_info()->parallelism == max_parallelism
+                        && is_local( r ) ) {
+              chosen_remote = r;
             }
-            min_absent_size = sum_size;
-            max_parallelism = r->get_info()->parallelism;
-            chosen_remote = r;
-          } else if ( sum_size == min_absent_size && r->get_info()->parallelism > max_parallelism ) {
-            max_parallelism = r->get_info()->parallelism;
-            chosen_remote = r;
-          } else if ( sum_size == min_absent_size && r->get_info()->parallelism == max_parallelism
-                      && is_local( r ) ) {
-            chosen_remote = r;
           }
         }
       }
+    }
 
-      if ( chosen_remote.has_value() ) {
-        VLOG( 2 ) << "ChildBackProp::independent move " << job << " to "
-                  << ( is_local( chosen_remote.value() ) ? "local" : "remote" );
-        chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), min_absent_size_diff } );
-      }
-    } else {
+    if ( chosen_remote.has_value() ) {
       VLOG( 2 ) << "ChildBackProp::independent move " << job << " to "
                 << ( is_local( chosen_remote.value() ) ? "local" : "remote" );
-      chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), 0 } );
+      chosen_remotes_.insert_or_assign( job, { chosen_remote.value(), score } );
     }
   }
 }
@@ -490,7 +506,7 @@ void InOutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<Any
     }
 
     std::cout << "available_remotes " << available_remotes.size() << std::endl;
-    size_t local_jobs = round( 1.0 * dependencies.size() / available_remotes.size() * 1.5 );
+    size_t local_jobs = std::thread::hardware_concurrency();
 
     size_t remote_idx = 0;
     for ( const auto& [_, d] : scores ) {
@@ -600,7 +616,7 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
 
       case PassType::InOutSource: {
         if ( selection.has_value() ) {
-          selection = make_unique<InOutSource>( base, rt, move( selection.value() ), to_sends );
+          selection = make_unique<InOutSource>( base, rt, move( selection.value() ) );
         } else {
           throw runtime_error( "Invalid pass sequence." );
         }
