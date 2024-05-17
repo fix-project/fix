@@ -79,7 +79,7 @@ class Remote : public IRuntime
   SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> relations_view_ {};
 
   SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> loadable_blobs_view_ {};
-  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash>> loadable_trees_view_ {};
+  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash, handle::tree_equal>> loadable_trees_view_ {};
   SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> loadable_relations_view_ {};
 
 public:

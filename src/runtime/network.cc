@@ -236,7 +236,10 @@ std::optional<Handle<AnyTree>> Remote::contains( Handle<AnyTreeRef> handle )
   auto entry = trees_view_.read()->find( handle::upcast( tmp_tree ) );
 
   if ( entry == trees_view_.read()->end() ) {
-    return {};
+    entry = loadable_trees_view_.read()->find( handle::upcast( tmp_tree ) );
+    if ( entry == loadable_trees_view_.read()->end() ) {
+      return {};
+    }
   }
 
   // Cast to same kind as Handle<AnyTreeRef>
