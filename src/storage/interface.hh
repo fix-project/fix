@@ -214,7 +214,7 @@ public:
   // Return the list of forward dependencies
   virtual absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Handle<Relation> ) { return {}; }
   // Make task only unblock by finishing itself
-  virtual void erase_backward_dependencies ( Handle<Relation> ) {}
+  virtual void erase_backward_dependencies( Handle<Relation> ) {}
 
   virtual bool reply_to_contains( Handle<Relation> ) { return false; }
 };

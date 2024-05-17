@@ -147,7 +147,6 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
   RunPayload payload { .task = name };
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
-
   return {};
 }
 
