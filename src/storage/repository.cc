@@ -313,7 +313,7 @@ bool Repository::contains( Handle<Fix> handle )
 bool Repository::contains( const std::string_view label )
 {
   try {
-    return fs::exists( repo_ / "labels" / label );
+    return fs::is_symlink( repo_ / "labels" / label );
   } catch ( fs::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
