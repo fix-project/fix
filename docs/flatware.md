@@ -95,7 +95,7 @@ tree:4
 ## WASI Implementation Status
 
 - [x] `proc_exit`
-- [] `fd_close` (doesn't currently persist file changes)
+- [ ] `fd_close` (doesn't currently persist file changes)
 - [x] `fd_fdstat_get`
 - [x] `fd_seek`
 - [x] `fd_read`
@@ -103,38 +103,38 @@ tree:4
 - [x] `fd_fdstat_set_flags`
 - [x] `fd_prestat_get`
 - [x] `fd_prestat_dir_name`
-- [] `fd_advise` (no effect)
+- [ ] `fd_advise` (no effect)
 - [x] `fd_allocate`
 - [x] `fd_filestat_get`
 - [x] `fd_filestat_set_size`
-- [] `fd_filestat_set_times`
-- [] `fd_pread`
-- [] `fd_pwrite`
-- [] `fd_readdir`
-- [] `fd_sync`
-- [] `fd_tell`
-- [] `path_create_directory`
-- [] `path_filestat_get`
-- [] `path_filestat_set_times`
-- [] `path_link`
-- [] `path_readlink`
-- [] `path_remove_directory`
-- [] `path_rename`
-- [] `path_symlink`
-- [] `path_unlink_file`
+- [ ] `fd_filestat_set_times`
+- [ ] `fd_pread`
+- [ ] `fd_pwrite`
+- [ ] `fd_readdir`
+- [ ] `fd_sync`
+- [ ] `fd_tell`
+- [ ] `path_create_directory`
+- [ ] `path_filestat_get`
+- [ ] `path_filestat_set_times`
+- [ ] `path_link`
+- [ ] `path_readlink`
+- [ ] `path_remove_directory`
+- [ ] `path_rename`
+- [ ] `path_symlink`
+- [ ] `path_unlink_file`
 - [x] `arg_sizes_get`
 - [x] `args_get`
 - [x] `environ_sizes_get`
 - [x] `environ_get`
 - [x] `path_open`
 - [x] `clock_res_get` (throws invalid argument error for all clocks as time is not implemented)
-- [] `clock_time_get` (note: will likely be implemented to return a constant from the input combination)
-- [] `poll_oneoff`
-- [] `sched_yield`
+- [ ] `clock_time_get` (note: will likely be implemented to return a constant from the input combination)
+- [ ] `poll_oneoff`
+- [ ] `sched_yield`
 - [x] `random_get`
-- [] `sock_accept`
-- [] `sock_recv`
-- [] `sock_send`
-- [] `sock_shutdown`
+- [ ] `sock_accept`
+- [ ] `sock_recv`
+- [ ] `sock_send`
+- [ ] `sock_shutdown`
 
 
