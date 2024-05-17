@@ -434,7 +434,7 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
  *
  * @param fd File descriptor
  * @param fdflags Flags to set as __wasi_fdflags_t
- * @return int32_t
+ * @return int32_t Status code
  */
 int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
 {
@@ -566,6 +566,12 @@ int32_t fd_allocate( int32_t fd, int64_t offset, int64_t len )
   return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Synchronizes the data of a file descriptor.
+ * 
+ * @param fd File descriptor
+ * @return int32_t Status code
+ */
 int32_t fd_datasync( int32_t fd )
 {
   FUNC_TRACE( T32, fd, TEND );
@@ -629,6 +635,15 @@ int32_t fd_filestat_set_size( int32_t fd, int64_t size )
   return __WASI_ERRNO_PERM;
 }
 
+/**
+ * @brief Updates the timestamp metadata of a file descriptor.
+ * 
+ * @param fd File descriptor
+ * @param atim Accessed timestamp
+ * @param mtim Modified timestamp
+ * @param fst_flags Bitmask of __wasi_fstflags_t
+ * @return int32_t 
+ */
 int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t fst_flags )
 {
   FUNC_TRACE( T32, fd, T64, atim, T64, mtim, T32, fst_flags, TEND );
@@ -636,13 +651,71 @@ int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t f
   return 0;
 }
 
+/**
+ * @brief Reads from a file descriptor at a given offset without changing the file descriptor's offset.
+ *
+ * @param fd File descriptor
+ * @param iovs Array of __wasi_iovec_t structs containing buffers to read from
+ * @param iovs_len Number of buffers in iovs
+ * @param offset Offset to read from
+ * @param retptr0 Number of bytes read
+ * @return int32_t Status code
+ */
 int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
+  int32_t total_read = 0;
+  int32_t iobuf_offset, iobuf_len;
+  int32_t size_to_read;
+  file f;
+
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
+
+  if ( fd >= N_FDS ) {
+    return __WASI_ERRNO_MFILE;
+  }
+
+  if ( ( fd < FILE_START && fd != STDIN ) || fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  f = files[fds[fd].file_id];
+
+  // Iterate over buffers
+  for ( int32_t i = 0; i < iovs_len; ++i ) {
+    int32_t file_remaining = fds[fd].size - offset;
+    if ( file_remaining == 0 ) {
+      break;
+    }
+
+    iobuf_offset
+      = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t ) + (int32_t)offsetof( __wasi_iovec_t, buf ) );
+    iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
+                                 + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
+
+    size_to_read = iobuf_len < file_remaining ? iobuf_len : file_remaining;
+    ro_mem_to_program_mem( f.mem_id, iobuf_offset, offset, size_to_read );
+    offset += size_to_read;
+    total_read += size_to_read;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&total_read, sizeof( total_read ) );
+  RET_TRACE( total_read );
+  return __WASI_ERRNO_SUCCESS;
+
 
   return 0;
 }
 
+/**
+ * @brief Writes to a file descriptor at a given offset without changing the file descriptor's offset.
+ * 
+ * @param fd File descriptor
+ * @param iovs Array of __wasi_ciovec_t structs containing buffers to write from
+ * @param iovs_len Number of buffers in iovs
+ * @param offset Offset to write to
+ * @param retptr0 Number of bytes written
+ * @return int32_t Status code
+ */
 int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
@@ -650,6 +723,16 @@ int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, i
   return 0;
 }
 
+/**
+ * @brief Reads directory entries.
+ * 
+ * @param fd File descriptor
+ * @param buf Buffer to store directory entries
+ * @param buf_len Buffer length
+ * @param cookie Offset to start reading from
+ * @param retptr0 Number of bytes read
+ * @return int32_t Status code
+ */
 int32_t fd_readdir( int32_t fd, int32_t buf, int32_t buf_len, int64_t cookie, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, buf, T32, buf_len, T64, cookie, T32, retptr0, TEND );
@@ -657,6 +740,12 @@ int32_t fd_readdir( int32_t fd, int32_t buf, int32_t buf_len, int64_t cookie, in
   return 0;
 }
 
+/**
+ * @brief Synchronizes file and metadata changes to storage.
+ * 
+ * @param fd File descriptor
+ * @return int32_t Status code
+ */
 int32_t fd_sync( int32_t fd )
 {
   FUNC_TRACE( T32, fd, TEND );
@@ -664,13 +753,39 @@ int32_t fd_sync( int32_t fd )
   return 0;
 }
 
+/**
+ * @brief Gets the current offset of a file descriptor.
+ * 
+ * @param fd File descriptor
+ * @param retptr0 Returns offset as int32_t
+ * @return int32_t Status code
+ */
 int32_t fd_tell( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
-  return 0;
-}
+  if ( fd >= N_FDS ) {
+    return __WASI_ERRNO_MFILE;
+  }
 
+  if ( fd < FILE_START || fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&fds[fd].offset, sizeof( fds[fd].offset ) );
+  RET_TRACE( fds[fd].offset );
+
+  return __WASI_ERRNO_SUCCESS;
+}
+  
+/**
+ * @brief Creates a directory.
+ * 
+ * @param fd Base directory for path
+ * @param path Path of directoy
+ * @param path_len Path length
+ * @return int32_t Status code
+ */
 int32_t path_create_directory( int32_t fd, int32_t path, int32_t path_len )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
@@ -678,6 +793,16 @@ int32_t path_create_directory( int32_t fd, int32_t path, int32_t path_len )
   return 0;
 }
 
+/**
+ * @brief Gets file metadata
+ * 
+ * @param fd Base directory for path
+ * @param flags Path flags as __wasi_lookupflags_t
+ * @param path Path to file
+ * @param path_len Path length
+ * @param retptr0 Returns file metadata as __wasi_filestat_t
+ * @return int32_t Status code
+ */
 int32_t path_filestat_get( int32_t fd, int32_t flags, int32_t path, int32_t path_len, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T32, retptr0, TEND );
@@ -685,6 +810,18 @@ int32_t path_filestat_get( int32_t fd, int32_t flags, int32_t path, int32_t path
   return 0;
 }
 
+/**
+ * @brief Sets the time metadata for a file.
+ *
+ * @param fd Base directory for path
+ * @param flags Path flags as __wasi_lookupflags_t
+ * @param path Path to file
+ * @param path_len Length of path
+ * @param atim Last accessed time
+ * @param mtim Last modified time
+ * @param fst_flags Bitmask of __wasi_fstflags_t
+ * @return int32_t Status code
+ */
 int32_t path_filestat_set_times( int32_t fd,
                                  int32_t flags,
                                  int32_t path,
@@ -698,6 +835,18 @@ int32_t path_filestat_set_times( int32_t fd,
   return 0;
 }
 
+/**
+ * @brief Creates a hard link.
+ * 
+ * @param old_fd Base directory for source path
+ * @param old_flags Source flags
+ * @param old_path Source path 
+ * @param old_path_len Source path length
+ * @param new_fd Base directory for destination path
+ * @param new_path Destination path
+ * @param new_path_len Destination path length
+ * @return int32_t Status code
+ */
 int32_t path_link( int32_t old_fd,
                    int32_t old_flags,
                    int32_t old_path,
@@ -724,6 +873,17 @@ int32_t path_link( int32_t old_fd,
   return 0;
 }
 
+/**
+ * @brief Reads the target path of a symlink
+ * 
+ * @param fd Base directory for path
+ * @param path Path
+ * @param path_len Path length
+ * @param buf Target path buffer
+ * @param buf_len Buffer length
+ * @param retptr0 Number of bytes read
+ * @return int32_t Status code
+ */
 int32_t path_readlink( int32_t fd, int32_t path, int32_t path_len, int32_t buf, int32_t buf_len, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, T32, buf, T32, buf_len, T32, retptr0, TEND );
@@ -731,6 +891,14 @@ int32_t path_readlink( int32_t fd, int32_t path, int32_t path_len, int32_t buf, 
   return 0;
 }
 
+/**
+ * @brief Removes a directory.
+ * 
+ * @param fd Base directory for path
+ * @param path Path to directory
+ * @param path_len Path length
+ * @return int32_t Status code
+ */
 int32_t path_remove_directory( int32_t fd, int32_t path, int32_t path_len )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
@@ -738,6 +906,17 @@ int32_t path_remove_directory( int32_t fd, int32_t path, int32_t path_len )
   return 0;
 }
 
+/**
+ * @brief Renames a file.
+ * 
+ * @param fd Base directory for source path
+ * @param old_path Source path
+ * @param old_path_len Source path length
+ * @param new_fd Base directory for destination path
+ * @param new_path Destination path
+ * @param new_path_len Destination path length
+ * @return int32_t Status code
+ */
 int32_t path_rename( int32_t fd,
                      int32_t old_path,
                      int32_t old_path_len,
@@ -750,6 +929,16 @@ int32_t path_rename( int32_t fd,
   return 0;
 }
 
+/**
+ * @brief Creates a symbolic link.
+ * 
+ * @param old_path Source path
+ * @param old_path_len Source path length
+ * @param fd Base directory for paths
+ * @param new_path Destination path
+ * @param new_path_len Destination path length
+ * @return int32_t Status code
+ */
 int32_t path_symlink( int32_t old_path, int32_t old_path_len, int32_t fd, int32_t new_path, int32_t new_path_len )
 {
   FUNC_TRACE( T32, old_path, T32, old_path_len, T32, fd, T32, new_path, T32, new_path_len, TEND );
@@ -757,6 +946,14 @@ int32_t path_symlink( int32_t old_path, int32_t old_path_len, int32_t fd, int32_
   return 0;
 }
 
+/**
+ * @brief Unlinks a file at the given path.
+ * 
+ * @param fd Base directory for path
+ * @param path Path to file
+ * @param path_len Length of path
+ * @return int32_t Status code
+ */
 int32_t path_unlink_file( int32_t fd, int32_t path, int32_t path_len )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
@@ -769,7 +966,7 @@ int32_t path_unlink_file( int32_t fd, int32_t path, int32_t path_len )
  *
  * @param num_argument_ptr Number of arguments
  * @param size_argument_ptr Size of arguments in bytes
- * @return int32_t
+ * @return int32_t Status code
  */
 int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
 {
@@ -853,7 +1050,7 @@ int32_t environ_sizes_get( int32_t retptr0, int32_t retptr1 )
  * 
  * @param environ Environment variable array pointer (char**)
  * @param environ_buf Environment variable buffer pointer (char*)
- * @return int32_t 
+ * @return int32_t Status code
  */
 int32_t environ_get( int32_t environ, int32_t environ_buf )
 {
@@ -876,7 +1073,7 @@ int32_t environ_get( int32_t environ, int32_t environ_buf )
 /**
  * @brief Opens file descriptor.
  *
- * @param fd File descriptor
+ * @param fd Base directory for path
  * @param dirflags Directory flags
  * @param path Path to file
  * @param path_len Length of path

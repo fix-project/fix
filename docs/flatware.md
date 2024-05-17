@@ -105,14 +105,15 @@ tree:4
 - [x] `fd_prestat_dir_name`
 - [ ] `fd_advise` (no effect)
 - [x] `fd_allocate`
+- [ ] `fd_datasync`
 - [x] `fd_filestat_get`
 - [x] `fd_filestat_set_size`
 - [ ] `fd_filestat_set_times`
-- [ ] `fd_pread`
+- [x] `fd_pread`
 - [ ] `fd_pwrite`
 - [ ] `fd_readdir`
 - [ ] `fd_sync`
-- [ ] `fd_tell`
+- [x] `fd_tell`
 - [ ] `path_create_directory`
 - [ ] `path_filestat_get`
 - [ ] `path_filestat_set_times`
