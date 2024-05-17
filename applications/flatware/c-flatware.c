@@ -413,7 +413,7 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
     iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
                                  + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
 
-    if ( fds[fd].offset + iobuf_len > page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE ) {
+    while ( fds[fd].offset + iobuf_len > page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE ) {
       grow_rw_mem_pages( f.mem_id, iobuf_len / WASM_RT_PAGESIZE + 1 );
     }
     // if ( fd == STDOUT || fd == STDERR ) {
@@ -535,7 +535,7 @@ int32_t fd_advise( int32_t fd, int64_t offset, int64_t len, int32_t advice )
 {
   FUNC_TRACE( T32, fd, T64, offset, T64, len, T32, advice, TEND );
 
-  return 0;
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -573,18 +573,60 @@ int32_t fd_datasync( int32_t fd )
   return 0;
 }
 
+/**
+ * @brief Gets the attributes of a file descriptor.
+ * @details Not supported yet. Returns NOTSUP.
+ *
+ * @param fd File descriptor
+ * @param retptr0 Returns file descriptor attributes as __wasi_filestat_t
+ * @return int32_t Status code
+ */
 int32_t fd_filestat_get( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
-  return 0;
+  if ( fd >= N_FDS ) {
+    return __WASI_ERRNO_MFILE;
+  }
+
+  if ( fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  return __WASI_ERRNO_NOTSUP;
 }
 
+/**
+ * @brief Adjusts the size of a file descriptor.
+ *
+ * @param fd File descriptor
+ * @param size Size to set
+ * @return int32_t Status code
+ */
 int32_t fd_filestat_set_size( int32_t fd, int64_t size )
 {
   FUNC_TRACE( T32, fd, T64, size, TEND );
 
-  return 0;
+  if ( fd >= N_FDS ) {
+    return __WASI_ERRNO_MFILE;
+  }
+
+  if ( fd < FILE_START || fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( fds[fd].stat.fs_rights_base & __WASI_RIGHTS_FD_FILESTAT_SET_SIZE ) {
+    file f = files[fds[fd].file_id];
+    int32_t grow_pages = (int32_t)( ( size - page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE ) / WASM_RT_PAGESIZE + 1 );
+    fds[fd].size = (int32_t)size;
+    f = files[fds[fd].file_id];
+    if ( grow_pages > 0 ) {
+      grow_rw_mem_pages( f.mem_id, grow_pages );
+    }
+    return __WASI_ERRNO_SUCCESS;
+  }
+
+  return __WASI_ERRNO_PERM;
 }
 
 int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t fst_flags )
@@ -762,7 +804,7 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
  */
 int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 {
-  int32_t size;
+  int32_t size = 0;
   int32_t addr = argv_buf_ptr;
 
   FUNC_TRACE( T32, argv_ptr, T32, argv_buf_ptr, TEND );
@@ -806,11 +848,29 @@ int32_t environ_sizes_get( int32_t retptr0, int32_t retptr1 )
   return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Gets the environment variables. 
+ * 
+ * @param environ Environment variable array pointer (char**)
+ * @param environ_buf Environment variable buffer pointer (char*)
+ * @return int32_t 
+ */
 int32_t environ_get( int32_t environ, int32_t environ_buf )
 {
+  int32_t size = 0;
+  int32_t addr = environ_buf;
+
   FUNC_TRACE( T32, environ, T32, environ_buf, TEND );
 
-  return 0;
+  for ( int32_t i = 0; i < size_ro_table( EnvROTable ); i++ ) {
+    attach_blob_ro_mem( ScratchROMem, get_ro_table( EnvROTable, i ) );
+    size = byte_size_ro_mem( ScratchROMem );
+    flatware_mem_to_program_mem( environ + i * (int32_t)sizeof( char* ), (int32_t)&addr, sizeof( char* ) );
+    ro_mem_to_program_mem( ScratchROMem, addr, 0, size );
+    addr += size;
+  }
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -937,7 +997,7 @@ int32_t path_open( int32_t fd,
  *
  * @param id Clock ID
  * @param retptr0 Returns resolution as int64_t
- * @return int32_t
+ * @return int32_t Status code
  */
 int32_t clock_res_get( int32_t id, int32_t retptr0 )
 {
@@ -946,6 +1006,14 @@ int32_t clock_res_get( int32_t id, int32_t retptr0 )
   return __WASI_ERRNO_INVAL;
 }
 
+/**
+ * @brief Gets the time of a clock.
+ * 
+ * @param id Clock ID
+ * @param precision Maximum permitted error in nanoseconds
+ * @param retptr0 Returns time as int64_t
+ * @return int32_t Status code
+ */
 int32_t clock_time_get( int32_t id, int64_t precision, int32_t retptr0 )
 {
   FUNC_TRACE( T32, id, T64, precision, T32, retptr0, TEND );
@@ -953,6 +1021,15 @@ int32_t clock_time_get( int32_t id, int64_t precision, int32_t retptr0 )
   return 0;
 }
 
+/**
+ * @brief Concurrently polls for a set of events
+ * 
+ * @param in The events to subscribe to (array of __wasi_subscription_t)
+ * @param out The events that have occurred (array of __wasi_event_t)
+ * @param nsubscriptions Number of subscriptions
+ * @param retptr0 Returns number of events as int32_t
+ * @return int32_t Status code
+ */
 int32_t poll_oneoff( int32_t in, int32_t out, int32_t nsubscriptions, int32_t retptr0 )
 {
   FUNC_TRACE( T32, in, T32, out, T32, nsubscriptions, T32, retptr0, TEND );
@@ -960,6 +1037,11 @@ int32_t poll_oneoff( int32_t in, int32_t out, int32_t nsubscriptions, int32_t re
   return 0;
 }
 
+/**
+ * @brief Yields the execution of the current process.
+ * 
+ * @return int32_t Status code
+ */
 int32_t sched_yield( void )
 {
   FUNC_TRACE( TEND );
@@ -967,14 +1049,12 @@ int32_t sched_yield( void )
   return 0;
 }
 
-
-
 /**
  * @brief Gets a random value.
- * 
+ *
  * @param buf Result buffer
  * @param buf_len Buffer size
- * @return int32_t 
+ * @return int32_t
  */
 int32_t random_get( int32_t buf, int32_t buf_len )
 {
@@ -993,6 +1073,14 @@ int32_t random_get( int32_t buf, int32_t buf_len )
   return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Accepts a new connection on a socket.
+ * 
+ * @param fd File descriptor
+ * @param flags Flags
+ * @param retptr0 New file descriptor
+ * @return int32_t Status code
+ */
 int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, flags, T32, retptr0, TEND );
@@ -1000,6 +1088,17 @@ int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
   return 0;
 }
 
+/**
+ * @brief Receives a message from a socket.
+ *
+ * @param fd File descriptor of socket
+ * @param ri_data Array of __wasi_iovec_t structs containing buffers to read into
+ * @param ri_data_len Number of buffers in ri_data
+ * @param ri_flags Flags
+ * @param retptr0 Number of bytes read
+ * @param retptr1 Message flags
+ * @return int32_t Status code
+ */
 int32_t sock_recv( int32_t fd,
                    int32_t ri_data,
                    int32_t ri_data_len,
@@ -1012,6 +1111,16 @@ int32_t sock_recv( int32_t fd,
   return 0;
 }
 
+/**
+ * @brief Sends a message on a socket.
+ * 
+ * @param fd File descriptor of socket
+ * @param si_data Array of __wasi_ciovec_t structs containing buffers to send
+ * @param si_data_len Number of buffers in si_data
+ * @param si_flags Flags
+ * @param retptr0 Number of bytes sent
+ * @return int32_t Status code
+ */
 int32_t sock_send( int32_t fd, int32_t si_data, int32_t si_data_len, int32_t si_flags, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, si_data, T32, si_data_len, T32, si_flags, T32, retptr0, TEND );
@@ -1019,6 +1128,13 @@ int32_t sock_send( int32_t fd, int32_t si_data, int32_t si_data_len, int32_t si_
   return 0;
 }
 
+/**
+ * @brief Closes a socket.
+ *
+ * @param fd File descriptor of socket
+ * @param how How to close the socket as __wasi_sdflags_t
+ * @return int32_t Status code
+ */
 int32_t sock_shutdown( int32_t fd, int32_t how )
 {
   FUNC_TRACE( T32, fd, T32, how, TEND );
@@ -1026,11 +1142,25 @@ int32_t sock_shutdown( int32_t fd, int32_t how )
   return 0;
 }
 
+/**
+ * @brief Gets the value of the bitset at the given index. 
+ * 
+ * @param bitset Bitset
+ * @param index Index
+ * @return true Index is set
+ * @return false Index isn't set
+ */
 static bool bitset_get( unsigned int* bitset, uint32_t index )
 {
   return ( bitset[index / sizeof( unsigned int )] >> ( index % sizeof( unsigned int ) ) ) & 1;
 }
 
+/**
+ * @brief Sets the value of the bitset at the given index.
+ * 
+ * @param bitset Bitset
+ * @param index Index
+ */
 static void bitset_set( unsigned int* bitset, uint32_t index )
 {
   bitset[index / sizeof( unsigned int )] |= 1 << ( index % sizeof( unsigned int ) );
@@ -1055,7 +1185,7 @@ externref fixpoint_apply( externref encode )
   attach_tree_ro_table( EnvROTable, get_ro_table( InputROTable, INPUT_ENV ) );
 
   attach_blob_ro_mem( ScratchROMem, get_ro_table( InputROTable, INPUT_RANDOM_SEED ) );
-  random_seed = get_i32_ro_mem( ScratchROMem, 0);
+  random_seed = get_i32_ro_mem( ScratchROMem, 0 );
 
   grow_rw_table( OutputRWTable, 5, create_blob_i32( 0 ) );
 

@@ -1,8 +1,13 @@
-configure_file(python-wasm/python.wasm python.wasm COPYONLY)
+file(
+  DOWNLOAD
+  https://github.com/vmware-labs/webassembly-language-runtimes/releases/download/python%2F3.12.0%2B20231211-040d5a6/python-3.12.0.wasm
+  ${CMAKE_CURRENT_BINARY_DIR}/python.wasm
+  SHOW_PROGRESS
+)
 
 add_custom_command(
   OUTPUT "python-fixpoint.wasm"
-  DEPENDS python-wasm/python.wasm
+  DEPENDS python.wasm
           ../../c-flatware.c
           ../../filesys.c
           ../../asm-flatware.wat

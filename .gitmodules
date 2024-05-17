@@ -10,6 +10,3 @@
 [submodule "third-party/BLAKE3"]
 	path = third-party/BLAKE3
 	url = https://github.com/BLAKE3-team/BLAKE3
-[submodule "applications/flatware/examples/python/python-wasm"]
-	path = applications/flatware/examples/python/python-wasm
-	url = https://github.com/fix-project/python-wasm.git
