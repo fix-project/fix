@@ -413,7 +413,7 @@ void ChildBackProp::independent( Handle<AnyDataType> job )
       // How much current choice is better than other choices (the smaller the better)
       auto prev = chosen_remotes_.at( job ).second;
 
-      if ( prev + curr_output_size < 0 ) {
+      if ( prev + static_cast<int64_t>( curr_output_size ) < 0 ) {
         return;
       }
 
