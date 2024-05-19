@@ -665,7 +665,7 @@ int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, in
 {
   int32_t total_read = 0;
   int32_t iobuf_offset, iobuf_len;
-  int32_t size_to_read;
+  int64_t size_to_read;
   file f;
 
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
@@ -682,7 +682,7 @@ int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, in
 
   // Iterate over buffers
   for ( int32_t i = 0; i < iovs_len; ++i ) {
-    int32_t file_remaining = fds[fd].size - offset;
+    int64_t file_remaining = fds[fd].size - offset;
     if ( file_remaining == 0 ) {
       break;
     }
@@ -693,7 +693,7 @@ int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, in
                                  + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
 
     size_to_read = iobuf_len < file_remaining ? iobuf_len : file_remaining;
-    ro_mem_to_program_mem( f.mem_id, iobuf_offset, offset, size_to_read );
+    ro_mem_to_program_mem( f.mem_id, iobuf_offset, (int32_t)offset, (int32_t)size_to_read );
     offset += size_to_read;
     total_read += size_to_read;
   }
@@ -701,9 +701,6 @@ int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, in
   flatware_mem_to_program_mem( retptr0, (int32_t)&total_read, sizeof( total_read ) );
   RET_TRACE( total_read );
   return __WASI_ERRNO_SUCCESS;
-
-
-  return 0;
 }
 
 /**
