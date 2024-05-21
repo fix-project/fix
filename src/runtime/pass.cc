@@ -2,7 +2,7 @@
 #include "handle.hh"
 #include "handle_post.hh"
 #include "overload.hh"
-#include <iterator>
+#include "relater.hh"
 #include <limits>
 #include <stdexcept>
 
@@ -314,6 +314,10 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
 {
   optional<shared_ptr<IRuntime>> chosen_remote;
 
+  if ( must_be_local_.contains( job.unwrap<Relation>() ) ) {
+    chosen_remote = relater_.get().get_local();
+  }
+
   if ( base_.get().get_ep( job ) ) {
     chosen_remote = relater_.get().get_local();
   }
@@ -495,6 +499,11 @@ void InOutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<Any
     // Collect available remotes
     std::vector<shared_ptr<IRuntime>> available_remotes;
     for ( auto d : dependencies ) {
+      if ( d.visit<bool>( overload { []( Handle<Relation> r ) { return must_be_local_.contains( r ); },
+                                     []( auto ) { return false; } } ) ) {
+        continue;
+      }
+
       const auto& absent_size = base_.get().get_absent_size( d );
       for ( const auto& [r, _] : absent_size ) {
         if ( is_local( r ) )
@@ -574,18 +583,6 @@ void FinalPass::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDa
   }
 }
 
-void FinalPass::make_root_local( Handle<AnyDataType> job )
-{
-  job.visit<void>( overload { [&]( Handle<Relation> r ) {
-                               if ( !is_local( chosen_remotes_.at( job ).first ) ) {
-                                 if ( chosen_remotes_.at( job ).first->reply_to_contains( r ) ) {
-                                   chosen_remotes_.at( job ) = { relater_.get().get_local(), 0 };
-                                 }
-                               }
-                             },
-                              []( auto ) {} } );
-}
-
 void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_level_job, vector<PassType> passes )
 {
   BasePass base( rt );
@@ -637,7 +634,6 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
   }
 
   FinalPass final( base, rt, move( selection.value() ) );
-  final.make_root_local( top_level_job );
   final.run( top_level_job );
 
   vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>::const_iterator>> iterators {};

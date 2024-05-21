@@ -199,8 +199,6 @@ public:
   {
     return remote_jobs_;
   };
-
-  void make_root_local( Handle<AnyDataType> );
 };
 
 // A correct sequence of passes contains: BasePass + (n >= 1) * SelectionPass + (n >= 0) * PrunedSelectionPass +

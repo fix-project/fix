@@ -7,7 +7,9 @@
 #include "runner.hh"
 
 inline thread_local std::vector<Handle<AnyDataType>> works_;
-inline thread_local std::optional<Handle<Relation>> current_;
+inline thread_local Handle<Relation> current_;
+inline thread_local absl::flat_hash_set<Handle<Relation>> must_be_local_;
+inline thread_local bool replaced_;
 
 class Executor;
 class Scheduler;
@@ -16,6 +18,7 @@ class HintScheduler;
 class Pass;
 class BasePass;
 class PrunedSelectionPass;
+class RelaterTest;
 
 class Relater
   : public MultiWorkerRuntime
@@ -27,6 +30,7 @@ class Relater
   friend class Pass;
   friend class BasePass;
   friend class PrunedSelectionPass;
+  friend class RelaterTest;
 
 private:
   SharedMutex<DependencyGraph> graph_ {};

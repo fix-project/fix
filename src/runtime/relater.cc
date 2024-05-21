@@ -73,11 +73,9 @@ Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
   } else {
     handle.visit<void>( overload {
       []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
-      [&]( Handle<AnyTree> t ) {
-        t.visit<void>( [&]( auto h ) { graph->add_dependency( current_.value(), h ); } );
-      },
-      [&]( Handle<Named> n ) { graph->add_dependency( current_.value(), n ); },
-      [&]( Handle<Relation> r ) { graph->add_dependency( current_.value(), r ); },
+      [&]( Handle<AnyTree> t ) { t.visit<void>( [&]( auto h ) { graph->add_dependency( current_, h ); } ); },
+      [&]( Handle<Named> n ) { graph->add_dependency( current_, n ); },
+      [&]( Handle<Relation> r ) { graph->add_dependency( current_, r ); },
     } );
     works_.push_back( handle );
     return {};
@@ -104,7 +102,7 @@ Relater::Result<AnyTree> Relater::load( Handle<AnyTreeRef> handle )
     return h.value();
   } else {
     auto d = h.value().visit<Handle<AnyDataType>>( []( auto h ) { return h; } );
-    graph_.write()->add_dependency( current_.value(), d );
+    graph_.write()->add_dependency( current_, d );
     works_.push_back( d );
     return {};
   }
@@ -123,9 +121,11 @@ Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
   auto apply = Handle<Relation>( Handle<Apply>( combination ) );
 
   if ( storage_.contains( apply ) ) {
+    replaced_ = true;
     return storage_.get( apply );
   } else if ( contains( apply ) ) {
     // Relation exists in repository
+    replaced_ = true;
     VLOG( 2 ) << "Relation existed " << apply;
     return get( apply );
   }
@@ -133,8 +133,9 @@ Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
   {
     auto graph = graph_.write();
     if ( apply != current_ and !storage_.contains( apply ) ) {
-      graph->add_dependency( current_.value(), apply );
+      graph->add_dependency( current_, apply );
     } else if ( storage_.contains( apply ) ) {
+      replaced_ = true;
       return storage_.get( apply );
     }
   }
@@ -144,21 +145,27 @@ Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
 
 Relater::Result<Object> Relater::get_or_block( Handle<Relation> goal )
 {
-  auto prev_current = current_;
-
   current_ = goal;
   auto res = evaluator_.relate( goal );
-  if ( !res.has_value() and prev_current.has_value() ) {
-    graph_.write()->add_dependency( prev_current.value(), goal );
-  }
 
-  current_ = prev_current;
   return res;
 }
 
 Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
 {
   Handle<Eval> goal( expression );
+
+  if ( storage_.contains( goal ) || contains( goal ) ) {
+    expression.visit<void>( overload { []( Handle<Value> ) {},
+                                       []( Handle<Thunk> t ) {
+                                         t.visit<void>(
+                                           overload { []( Handle<Identification> ) {},
+                                                      []( Handle<Application> ) { replaced_ = true; },
+                                                      []( Handle<Selection> ) { replaced_ = true; } } );
+                                       },
+                                       []( Handle<ObjectTree> ) { replaced_ = true; },
+                                       []( Handle<ObjectTreeRef> ) { replaced_ = true; } } );
+  }
 
   if ( storage_.contains( goal ) ) {
     return storage_.get( goal ).unwrap<Value>();
@@ -168,22 +175,39 @@ Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
   }
 
   auto prev_current = current_;
+  auto prev_replaced = replaced_;
   current_ = goal;
+  replaced_ = false;
 
   auto result = evaluator_.evalStrict( expression );
+
+  current_ = prev_current;
+  replaced_ = prev_replaced;
+
   if ( result.has_value() ) {
     this->put( goal, result.value() );
   } else {
     auto graph = graph_.write();
-    if ( prev_current.has_value() and prev_current.value() != Handle<Relation>( goal )
-         and !storage_.contains( goal ) ) {
-      graph->add_dependency( prev_current.value(), goal );
+    if ( current_ != Handle<Relation>( goal ) and !storage_.contains( goal ) ) {
+      if ( replaced_ || must_be_local_.contains( goal ) ) {
+        must_be_local_.insert( current_ );
+      }
+      graph->add_dependency( current_, goal );
     } else if ( storage_.contains( goal ) ) {
-      return storage_.get( goal ).unwrap<Value>();
+      expression.visit<void>( overload { []( Handle<Value> ) {},
+                                         [&]( Handle<Thunk> t ) {
+                                           t.visit<void>(
+                                             overload { []( Handle<Identification> ) {},
+                                                        [&]( Handle<Application> ) { replaced_ = true; },
+                                                        [&]( Handle<Selection> ) { replaced_ = true; } } );
+                                         },
+                                         [&]( Handle<ObjectTree> ) { replaced_ = true; },
+                                         [&]( Handle<ObjectTreeRef> ) { replaced_ = true; } } );
+
+      result = storage_.get( goal ).unwrap<Value>();
     }
   }
 
-  current_ = prev_current;
   return result;
 }
 
@@ -303,6 +327,7 @@ Relater::Result<ValueTree> Relater::mapLift( Handle<ValueTree> tree )
 vector<Handle<AnyDataType>> Relater::relate( Handle<Relation> goal )
 {
   works_ = {};
+  must_be_local_ = {};
   get_or_block( goal );
   return works_;
 }
