@@ -22,9 +22,9 @@ protected:
   // Function to be executed on every leaf of the dependency graph.
   virtual void leaf( Handle<AnyDataType> ) = 0;
   // Function to be executed on every depender before recurse into its dependees
-  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) = 0;
+  virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) = 0;
   // Function to be executed on every depender after recurse into its dependees
-  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) = 0;
+  virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) = 0;
 
 public:
   Pass( std::reference_wrapper<Relater> relater );
@@ -48,9 +48,9 @@ private:
 
   virtual void leaf( Handle<AnyDataType> ) override;
   virtual void independent( Handle<AnyDataType> ) override;
-  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
+  virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
 
-  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
   // Calculate absent size from a root
   size_t absent_size( std::shared_ptr<IRuntime> worker, Handle<AnyDataType> job );
@@ -109,10 +109,10 @@ public:
 class MinAbsentMaxParallelism : public SelectionPass
 {
   virtual void leaf( Handle<AnyDataType> ) override;
-  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
+  virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
 
   virtual void independent( Handle<AnyDataType> ) override {};
-  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
 public:
   MinAbsentMaxParallelism( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater )
@@ -131,10 +131,10 @@ class ChildBackProp : public SelectionPass
   absl::flat_hash_map<Handle<AnyDataType>, absl::flat_hash_set<Handle<AnyDataType>>> dependees_ {};
 
   virtual void independent( Handle<AnyDataType> ) override;
-  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
+  virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
 
   virtual void leaf( Handle<AnyDataType> ) override {}
-  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
 public:
   ChildBackProp( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater )
@@ -150,11 +150,11 @@ public:
 
 class InOutSource : public PrunedSelectionPass
 {
-  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
+  virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
 
   virtual void leaf( Handle<AnyDataType> ) override {}
   virtual void independent( Handle<AnyDataType> ) override {};
-  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
 public:
   InOutSource( std::reference_wrapper<BasePass> base,
@@ -166,9 +166,9 @@ public:
 
 class RandomSelection : public SelectionPass
 {
-  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
   virtual void leaf( Handle<AnyDataType> ) override {}
-  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
   virtual void independent( Handle<AnyDataType> ) override;
 
@@ -183,10 +183,10 @@ class FinalPass : public PrunedSelectionPass
   std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>> remote_jobs_ {};
 
   virtual void leaf( Handle<AnyDataType> ) override;
-  virtual void pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
+  virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
   virtual void independent( Handle<AnyDataType> ) override;
 
-  virtual void post( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
 
 public:
   FinalPass( std::reference_wrapper<BasePass> base,

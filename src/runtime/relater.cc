@@ -63,8 +63,6 @@ Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<
 
 Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
 {
-  auto graph = graph_.write();
-
   auto contained = handle.visit<bool>(
     overload { [&]( Handle<Literal> ) { return true; }, [&]( auto h ) { return storage_.contains( h ); } } );
 
@@ -73,9 +71,9 @@ Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
   } else {
     handle.visit<void>( overload {
       []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
-      [&]( Handle<AnyTree> t ) { t.visit<void>( [&]( auto h ) { graph->add_dependency( current_, h ); } ); },
-      [&]( Handle<Named> n ) { graph->add_dependency( current_, n ); },
-      [&]( Handle<Relation> r ) { graph->add_dependency( current_, r ); },
+      [&]( Handle<AnyTree> t ) { t.visit<void>( [&]( auto h ) { sketch_graph_.add_dependency( current_, h ); } ); },
+      [&]( Handle<Named> n ) { sketch_graph_.add_dependency( current_, n ); },
+      [&]( Handle<Relation> r ) { sketch_graph_.add_dependency( current_, r ); },
     } );
     works_.push_back( handle );
     return {};
@@ -102,7 +100,7 @@ Relater::Result<AnyTree> Relater::load( Handle<AnyTreeRef> handle )
     return h.value();
   } else {
     auto d = h.value().visit<Handle<AnyDataType>>( []( auto h ) { return h; } );
-    graph_.write()->add_dependency( current_, d );
+    sketch_graph_.add_dependency( current_, d );
     works_.push_back( d );
     return {};
   }
@@ -130,25 +128,11 @@ Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
     return get( apply );
   }
 
-  {
-    auto graph = graph_.write();
-    if ( apply != current_ and !storage_.contains( apply ) ) {
-      graph->add_dependency( current_, apply );
-    } else if ( storage_.contains( apply ) ) {
-      replaced_ = true;
-      return storage_.get( apply );
-    }
+  if ( apply != current_ and !storage_.contains( apply ) ) {
+    sketch_graph_.add_dependency( current_, apply );
   }
   works_.push_back( Handle<Apply>( combination ) );
   return {};
-}
-
-Relater::Result<Object> Relater::get_or_block( Handle<Relation> goal )
-{
-  current_ = goal;
-  auto res = evaluator_.relate( goal );
-
-  return res;
 }
 
 Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
@@ -187,24 +171,11 @@ Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
   if ( result.has_value() ) {
     this->put( goal, result.value() );
   } else {
-    auto graph = graph_.write();
     if ( current_ != Handle<Relation>( goal ) and !storage_.contains( goal ) ) {
       if ( replaced_ || must_be_local_.contains( goal ) ) {
         must_be_local_.insert( current_ );
       }
-      graph->add_dependency( current_, goal );
-    } else if ( storage_.contains( goal ) ) {
-      expression.visit<void>( overload { []( Handle<Value> ) {},
-                                         [&]( Handle<Thunk> t ) {
-                                           t.visit<void>(
-                                             overload { []( Handle<Identification> ) {},
-                                                        [&]( Handle<Application> ) { replaced_ = true; },
-                                                        [&]( Handle<Selection> ) { replaced_ = true; } } );
-                                         },
-                                         [&]( Handle<ObjectTree> ) { replaced_ = true; },
-                                         [&]( Handle<ObjectTreeRef> ) { replaced_ = true; } } );
-
-      result = storage_.get( goal ).unwrap<Value>();
+      sketch_graph_.add_dependency( current_, goal );
     }
   }
 
@@ -324,12 +295,13 @@ Relater::Result<ValueTree> Relater::mapLift( Handle<ValueTree> tree )
   }
 }
 
-vector<Handle<AnyDataType>> Relater::relate( Handle<Relation> goal )
+void Relater::relate( Handle<Relation> goal )
 {
   works_ = {};
   must_be_local_ = {};
-  get_or_block( goal );
-  return works_;
+  sketch_graph_ = {};
+  current_ = goal;
+  evaluator_.relate( goal );
 }
 
 void Relater::add_worker( shared_ptr<IRuntime> rmt )
@@ -392,9 +364,9 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
     }
     return {};
   } else {
-    auto works = relate( name );
-    if ( !works.empty() ) {
-      scheduler_->schedule( works, name );
+    relate( name );
+    if ( !works_.empty() ) {
+      scheduler_->schedule( works_, name );
       return {};
     } else {
       return storage_.get( name );
@@ -482,4 +454,20 @@ Handle<Fix> Relater::labeled( const std::string_view label )
     return repository_.labeled( label );
   }
   return storage_.labeled( label );
+}
+
+void Relater::merge_sketch_graph( Handle<Relation> r, absl::flat_hash_set<Handle<Relation>>& unblocked )
+{
+  auto graph = graph_.write();
+
+  for ( auto d : sketch_graph_.get_forward_dependencies( r ) ) {
+    auto contained = d.visit<bool>(
+      overload { []( Handle<Literal> ) { return true; }, [&]( auto h ) { return storage_.contains( h ); } } );
+
+    if ( contained ) {
+      sketch_graph_.finish( d, unblocked );
+    } else {
+      graph->add_dependency( r, d );
+    }
+  }
 }

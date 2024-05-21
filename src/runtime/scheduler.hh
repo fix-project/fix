@@ -7,6 +7,7 @@ class Scheduler
 {
 protected:
   std::optional<std::reference_wrapper<Relater>> relater_ {};
+  void merge_sketch_graph( Handle<Relation> job, absl::flat_hash_set<Handle<Relation>>& unblocked );
 
 public:
   /*
