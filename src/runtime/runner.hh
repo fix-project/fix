@@ -39,11 +39,6 @@ public:
 
   virtual Handle<Object> apply( Handle<ObjectTree> handle, TreeData combination ) override
   {
-    // Check minrepo are all loaded
-    if ( not fixpoint::storage->complete( handle ) ) {
-      throw std::runtime_error( "Incomplete minrepo." );
-    }
-
     std::optional<Handle<AnyTree>> function_tag {};
 
     auto rlimits = combination->at( 0 );

@@ -428,16 +428,6 @@ bool RuntimeStorage::compare_handles( Handle<Fix> x, Handle<Fix> y )
 }
 #endif
 
-bool RuntimeStorage::complete( Handle<Fix> handle )
-{
-  bool res {};
-  visit( handle, [&]( Handle<Fix> h ) {
-    res |= handle::data( h ).visit<bool>(
-      overload { []( Handle<Literal> ) { return true; }, [&]( auto h ) { return contains( h ); } } );
-  } );
-  return res;
-}
-
 #if 0
 std::vector<Handle<Fix>> RuntimeStorage::minrepo( Handle<Fix> handle )
 {

@@ -44,7 +44,8 @@ std::unordered_set<Handle<AnyDataType>> Repository::data() const
   try {
     std::unordered_set<Handle<AnyDataType>> result;
     for ( const auto& datum : fs::directory_iterator( repo_ / "data" ) ) {
-      result.insert( handle::data( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) ) );
+      result.insert(
+        handle::data( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) ).value() );
     }
     return result;
   } catch ( std::filesystem::filesystem_error& ) {
@@ -376,27 +377,32 @@ Handle<Fix> Repository::lookup( const std::string_view ref )
 {
   if ( ref.size() == 64 ) {
     auto handle = Handle<Fix>::forge( base16::decode( ref ) );
-    if ( handle::data( handle ).visit<bool>( overload {
-           [&]( Handle<Literal> ) { return true; },
-           [&]( auto x ) { return contains( x ); },
-         } ) )
+    if ( handle::data( handle ).has_value() ) {
+      if ( handle::data( handle )->visit<bool>( overload {
+             [&]( Handle<Literal> ) { return true; },
+             [&]( auto x ) { return contains( x ); },
+           } ) )
+        return handle;
+    } else {
       return handle;
+    }
   }
+
   try {
     return labeled( ref );
   } catch ( LabelNotFound& ) {}
 
-  std::optional<Handle<Fix>> candidate;
+  std::optional<Handle<AnyDataType>> candidate;
   for ( const auto& handle : data() ) {
     std::string name = base16::encode( handle.content );
     if ( name.rfind( ref, 0 ) == 0 ) {
       if ( candidate )
         throw AmbiguousReference( ref );
-      candidate = handle::fix( handle );
+      candidate = handle::data( handle::fix( handle ) ).value();
     }
   }
   if ( candidate )
-    return *candidate;
+    return handle::fix( *candidate );
 
   if ( fs::exists( ref ) ) {
     try {

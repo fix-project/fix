@@ -104,9 +104,9 @@ void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
     wasm_rt_trap( WASM_RT_TRAP_OOB );
   }
   for ( int i = index; i < index + length; i++ ) {
-    cout << mem->data[i];
+    cerr << mem->data[i];
   }
-  cout << endl;
+  cerr << endl;
   flush( cout );
 }
 

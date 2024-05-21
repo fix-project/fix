@@ -55,9 +55,11 @@ Server::~Server()
   network_worker_->stop();
 }
 
-shared_ptr<Server> Server::init( const Address& address, vector<Address> peer_servers )
+shared_ptr<Server> Server::init( const Address& address,
+                                 shared_ptr<Scheduler> scheduler,
+                                 vector<Address> peer_servers )
 {
-  auto runtime = std::make_shared<Server>();
+  auto runtime = std::make_shared<Server>( scheduler );
   runtime->network_worker_.emplace( runtime->relater_ );
   runtime->network_worker_->start();
 

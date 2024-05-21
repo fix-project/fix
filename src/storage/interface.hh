@@ -4,6 +4,7 @@
 #include "handle_util.hh"
 #include "object.hh"
 #include "overload.hh"
+#include "types.hh"
 #include <functional>
 #include <glog/logging.h>
 #include <unordered_set>
@@ -154,9 +155,37 @@ public:
       if constexpr ( std::same_as<T, Encode> ) {
         Handle<Thunk> thunk
           = handle.template visit<Handle<Thunk>>( []( auto s ) { return s.template unwrap<Thunk>(); } );
-        thunk.visit<void>(
-          overload { [&]( Handle<Application> a ) { visit( a.unwrap<ExpressionTree>(), visitor, visited ); },
-                     []( auto ) {} } );
+        thunk.visit<void>( overload {
+          [&]( Handle<Application> a ) { visit( a.unwrap<ExpressionTree>(), visitor, visited ); },
+          [&]( Handle<Identification> i ) {
+            auto v = i.unwrap<Value>();
+            v.visit<void>( overload { [&]( Handle<Blob> b ) {
+                                       b.visit<void>( overload { []( Handle<Literal> ) {},
+                                                                 [&]( Handle<Named> n ) {
+                                                                   if ( contains( n ) )
+                                                                     visit( n, visitor, visited );
+                                                                 } } );
+                                     },
+                                      [&]( Handle<BlobRef> br ) {
+                                        br.unwrap<Blob>().visit<void>( overload { []( Handle<Literal> ) {},
+                                                                                  [&]( Handle<Named> n ) {
+                                                                                    if ( contains( n ) )
+                                                                                      visit( n, visitor, visited );
+                                                                                  } } );
+                                      },
+                                      [&]( Handle<ValueTree> t ) {
+                                        if ( contains( t ) )
+                                          visit( t, visitor, visited );
+                                      },
+                                      [&]( Handle<ValueTreeRef> tr ) {
+                                        auto t = contains( tr );
+                                        if ( t.has_value() ) {
+                                          if ( contains( t.value() ) )
+                                            visit( t.value().unwrap<ValueTree>(), visitor, visited );
+                                        }
+                                      } } );
+          },
+          []( auto ) {} } );
       }
 
       if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, BlobRef> ) )
@@ -177,6 +206,9 @@ public:
       visited.insert( handle );
     }
   }
+
+  // Return the list of data presening in .fix repository
+  virtual std::unordered_set<Handle<AnyDataType>> data() const { return {}; };
 };
 
 class MultiWorkerRuntime : public IRuntime
