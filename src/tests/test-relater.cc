@@ -7,10 +7,7 @@ using namespace std;
 class RelaterTest
 {
 public:
-  static vector<Handle<AnyDataType>> relate( shared_ptr<Relater> rt, Handle<Relation> r )
-  {
-    return rt->relate( r );
-  }
+  static void relate( shared_ptr<Relater> rt, Handle<Relation> r ) { rt->relate( r ); }
 };
 
 void case0()
@@ -25,9 +22,9 @@ void case0()
            thunk1 );
   auto thunk_tree = tree( *rt, thunk0, thunk2 );
 
-  auto works = RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
+  RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
 
-  if ( works.size() != 2 ) {
+  if ( works_.size() != 2 ) {
     fprintf( stderr, "Wrong number of leaf jobs" );
     exit( 1 );
   }
@@ -37,7 +34,7 @@ void case0()
   auto apply2 = Handle<AnyDataType>( Handle<Relation>(
     Handle<Apply>( Handle<ObjectTree>( tree( *rt, Handle<Literal>( "two" ) ).unwrap<ValueTree>() ) ) ) );
 
-  if ( !( works[0] == apply1 && works[1] == apply2 ) && !( works[0] == apply2 && works[1] == apply1 ) ) {
+  if ( !( works_[0] == apply1 && works_[1] == apply2 ) && !( works_[0] == apply2 && works_[1] == apply1 ) ) {
     fprintf( stderr, "Wrong leaf jobs" );
     exit( 1 );
   }
@@ -64,9 +61,9 @@ void case1()
   rt->put( Handle<Eval>( thunk0 ), Handle<Literal>( "zero" ) );
   auto thunk_tree = tree( *rt, thunk0, thunk1 );
 
-  auto works = RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
+  RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
 
-  if ( works.size() != 1 ) {
+  if ( works_.size() != 1 ) {
     fprintf( stderr, "Wrong number of leaf jobs" );
     exit( 1 );
   }
@@ -74,7 +71,7 @@ void case1()
   auto apply1 = Handle<AnyDataType>( Handle<Relation>(
     Handle<Apply>( Handle<ObjectTree>( tree( *rt, Handle<Literal>( "one" ) ).unwrap<ValueTree>() ) ) ) );
 
-  if ( !( works[0] == apply1 ) ) {
+  if ( !( works_[0] == apply1 ) ) {
     fprintf( stderr, "Wrong leaf jobs" );
     exit( 1 );
   }
@@ -100,9 +97,9 @@ void case2()
   rt->put( Handle<Eval>( thunk0 ), Handle<Literal>( "zero" ) );
   auto thunk_tree = tree( *rt, thunk0, thunk1 );
 
-  auto works = RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
+  RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
 
-  if ( works.size() != 1 ) {
+  if ( works_.size() != 1 ) {
     fprintf( stderr, "Wrong number of leaf jobs" );
     exit( 1 );
   }
@@ -110,7 +107,7 @@ void case2()
   auto apply1 = Handle<AnyDataType>( Handle<Relation>(
     Handle<Apply>( Handle<ObjectTree>( tree( *rt, Handle<Literal>( "one" ) ).unwrap<ValueTree>() ) ) ) );
 
-  if ( !( works[0] == apply1 ) ) {
+  if ( !( works_[0] == apply1 ) ) {
     fprintf( stderr, "Wrong leaf jobs" );
     exit( 1 );
   }

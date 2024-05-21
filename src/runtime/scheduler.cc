@@ -2,31 +2,55 @@
 #include "handle.hh"
 #include "overload.hh"
 #include "pass.hh"
+#include "relater.hh"
 #include "storage_exception.hh"
 #include "types.hh"
-#include <limits>
 #include <optional>
 #include <stdexcept>
 
 using namespace std;
 
-namespace scheduler {
-bool is_local( shared_ptr<IRuntime> rt )
+void Scheduler::merge_sketch_graph( Handle<Relation> job, absl::flat_hash_set<Handle<Relation>>& unblocked )
 {
-  return rt->get_info()->link_speed == numeric_limits<double>::max();
-}
+  if ( relater_.value().get().contains( job ) ) {
+    return;
+  }
+
+  relater_.value().get().merge_sketch_graph( job, unblocked );
+
+  if ( unblocked.contains( job ) ) {
+    return;
+  }
+
+  for ( auto d : relater_.value().get().get_forward_dependencies( job ) ) {
+    d.visit<void>( overload { [&]( Handle<Relation> r ) {
+                               r.visit<void>(
+                                 overload { [&]( Handle<Eval> e ) { merge_sketch_graph( e, unblocked ); },
+                                            []( Handle<Apply> ) {} } );
+                             },
+                              []( auto ) {} } );
+  }
 }
 
 void LocalFirstScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
 {
   auto local = relater_.value().get().local_;
   if ( local->get_info()->parallelism > 0 ) {
+    absl::flat_hash_set<Handle<Relation>> unblocked;
+    VLOG( 1 ) << "Merging sketch graph";
+    merge_sketch_graph( top_level_job, unblocked );
+
     for ( auto leaf_job : leaf_jobs ) {
       leaf_job.visit<void>( overload {
         [&]( Handle<Literal> ) {},
         [&]( auto h ) { local->get( h ); },
       } );
     }
+
+    for ( auto job : unblocked ) {
+      local->get( job );
+    }
+
     return;
   }
 
@@ -66,14 +90,21 @@ void HintScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Rel
   }
 
   if ( relater_->get().remotes_.read()->size() == 0 ) {
+    absl::flat_hash_set<Handle<Relation>> unblocked;
+    merge_sketch_graph( top_level_job, unblocked );
+
     for ( auto leaf_job : leaf_jobs ) {
       leaf_job.visit<void>( overload {
         [&]( Handle<Literal> ) {},
-        [&]( auto h ) { relater_->get().local_->get( h ); },
+        [&]( auto h ) { relater_->get().get_local()->get( h ); },
       } );
-
-      return;
     }
+
+    for ( auto job : unblocked ) {
+      relater_->get().get_local()->get( job );
+    }
+
+    return;
   }
 
   PassRunner::run( relater_.value(),

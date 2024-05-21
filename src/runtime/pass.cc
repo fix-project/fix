@@ -26,7 +26,7 @@ void Pass::run( Handle<AnyDataType> job )
                                    leaf( a );
                                  },
                                  [&]( Handle<Eval> e ) {
-                                   auto dependencies = relater_.get().graph_.read()->get_forward_dependencies( e );
+                                   auto dependencies = sketch_graph_.get_forward_dependencies( e );
                                    independent( e );
                                    pre( e, dependencies );
                                    for ( const auto& dependency : dependencies ) {
@@ -61,7 +61,7 @@ void PrunedSelectionPass::run( Handle<AnyDataType> job )
                                    leaf( a );
                                  },
                                  [&]( Handle<Eval> e ) {
-                                   auto dependencies = relater_.get().graph_.read()->get_forward_dependencies( e );
+                                   auto dependencies = sketch_graph_.get_forward_dependencies( e );
                                    independent( e );
                                    pre( e, dependencies );
                                    for ( const auto& dependency : dependencies ) {
@@ -118,10 +118,10 @@ void BasePass::leaf( Handle<AnyDataType> job )
                               } } );
 }
 
-void BasePass::post( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void BasePass::post( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
   // Output size = input_size + replacing every dependent's input with output
-  Handle<Object> obj = job.unwrap<Relation>().unwrap<Eval>().unwrap<Object>();
+  Handle<Object> obj = job.unwrap<Object>();
   auto input_size = handle::size( obj );
 
   size_t output_size = input_size;
@@ -309,12 +309,11 @@ void MinAbsentMaxParallelism::leaf( Handle<AnyDataType> job )
   }
 }
 
-void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
-                                    const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void MinAbsentMaxParallelism::post( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
   optional<shared_ptr<IRuntime>> chosen_remote;
 
-  if ( must_be_local_.contains( job.unwrap<Relation>() ) ) {
+  if ( must_be_local_.contains( job ) ) {
     chosen_remote = relater_.get().get_local();
   }
 
@@ -323,13 +322,10 @@ void MinAbsentMaxParallelism::post( Handle<AnyDataType> job,
   }
 
   if ( !chosen_remote.has_value() ) {
-    job.visit<void>( overload { [&]( Handle<Relation> r ) {
-                                 const auto& contains = base_.get().get_contains( r );
-                                 if ( !contains.empty() ) {
-                                   chosen_remote = *contains.begin();
-                                 }
-                               },
-                                []( auto ) {} } );
+    const auto& contains = base_.get().get_contains( job );
+    if ( !contains.empty() ) {
+      chosen_remote = *contains.begin();
+    }
   }
 
   if ( !chosen_remote.has_value() ) {
@@ -461,14 +457,14 @@ void ChildBackProp::independent( Handle<AnyDataType> job )
   }
 }
 
-void ChildBackProp::pre( Handle<AnyDataType> job, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void ChildBackProp::pre( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
   for ( const auto& d : dependencies ) {
-    dependees_[d].insert( job );
+    dependees_[d].insert( Handle<AnyDataType>( Handle<Relation>( job ) ) );
   }
 }
 
-void InOutSource::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void InOutSource::pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
 {
   bool any_ep = false;
   for ( auto d : dependencies ) {
@@ -556,10 +552,7 @@ void FinalPass::leaf( Handle<AnyDataType> job )
 {
   VLOG( 1 ) << "Run job " << ( is_local( chosen_remotes_.at( job ).first ) ? "locally " : "remotely " ) << job
             << endl;
-  if ( !is_local( chosen_remotes_.at( job ).first ) ) {
-    VLOG( 1 ) << "Run job remotely " << job << endl;
-    remote_jobs_[chosen_remotes_.at( job ).first].insert( job );
-  } else {
+  if ( is_local( chosen_remotes_.at( job ).first ) ) {
     job.visit<void>(
       overload { []( Handle<Literal> ) {}, [&]( auto h ) { chosen_remotes_.at( job ).first->get( h ); } } );
   }
@@ -573,9 +566,22 @@ void FinalPass::independent( Handle<AnyDataType> job )
   }
 }
 
-void FinalPass::pre( Handle<AnyDataType>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void FinalPass::pre( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataType>>& )
 {
-  for ( auto d : dependencies ) {
+  if ( relater_.get().contains( job ) ) {
+    sketch_graph_.erase_forward_dependencies( job );
+  }
+
+  absl::flat_hash_set<Handle<Relation>> unblocked;
+  relater_.get().merge_sketch_graph( job, unblocked );
+
+  for ( auto r : unblocked ) {
+    if ( is_local( chosen_remotes_.at( r ).first ) ) {
+      chosen_remotes_.at( r ).first->get( r );
+    }
+  }
+
+  for ( auto d : sketch_graph_.get_forward_dependencies( job ) ) {
     if ( !is_local( chosen_remotes_.at( d ).first ) ) {
       VLOG( 1 ) << "Run job remotely " << d << endl;
       remote_jobs_[chosen_remotes_.at( d ).first].insert( d );
