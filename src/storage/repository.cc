@@ -1,6 +1,5 @@
 #include <filesystem>
 #include <glog/logging.h>
-#include <iostream>
 
 #include "base16.hh"
 #include "handle_post.hh"
@@ -14,6 +13,17 @@ Repository::Repository( std::filesystem::path directory )
   : repo_( find( directory ) )
 {
   VLOG( 1 ) << "using repository " << repo_;
+
+  for ( auto h : data() ) {
+    h.visit<void>( overload { []( Handle<Literal> ) {},
+                              [&]( Handle<Named> n ) { blobs_.write()->insert( n ); },
+                              [&]( Handle<AnyTree> t ) { trees_.write()->insert( t ); },
+                              []( Handle<Relation> ) {} } );
+  }
+
+  for ( auto r : relations() ) {
+    relations_.write()->insert( r );
+  }
 }
 
 std::filesystem::path Repository::find( std::filesystem::path directory )
@@ -29,18 +39,34 @@ std::filesystem::path Repository::find( std::filesystem::path directory )
   return current_directory / ".fix";
 }
 
-std::unordered_set<Handle<Fix>> Repository::data() const
+std::unordered_set<Handle<AnyDataType>> Repository::data() const
 {
   try {
-    std::unordered_set<Handle<Fix>> result;
+    std::unordered_set<Handle<AnyDataType>> result;
     for ( const auto& datum : fs::directory_iterator( repo_ / "data" ) ) {
-      result.insert( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) );
+      result.insert(
+        handle::data( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) ).value() );
     }
     return result;
   } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
   }
 }
+
+std::unordered_set<Handle<Relation>> Repository::relations() const
+{
+  try {
+    std::unordered_set<Handle<Relation>> result;
+    for ( const auto& relation : fs::directory_iterator( repo_ / "relations" ) ) {
+      result.insert(
+        Handle<Fix>::forge( base16::decode( relation.path().filename().string() ) ).unwrap<Relation>() );
+    }
+    return result;
+  } catch ( std::filesystem::filesystem_error& ) {
+    throw RepositoryCorrupt( repo_ );
+  }
+}
+
 std::unordered_set<std::string> Repository::labels() const
 {
   try {
@@ -134,6 +160,7 @@ void Repository::put( Handle<Named> name, BlobData data )
     auto path = repo_ / "data" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
+    blobs_.write()->insert( name );
     data->to_file( path );
   } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
@@ -149,6 +176,7 @@ void Repository::put( Handle<AnyTree> name, TreeData data )
     auto path = repo_ / "data" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
+    trees_.write()->insert( name );
     data->to_file( path );
   } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
@@ -166,6 +194,7 @@ void Repository::put( Handle<Relation> relation, Handle<Object> target )
     if ( fs::exists( path ) )
       return;
     VLOG( 1 ) << "linking to " << target.content;
+    relations_.write()->insert( relation );
     fs::create_symlink( "../data/" + base16::encode( target.content ), path );
   } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
@@ -228,68 +257,38 @@ void Repository::pin( Handle<Fix> src, const std::unordered_set<Handle<Fix>>& ds
 
 bool Repository::contains( Handle<Named> handle )
 {
-  try {
-    return fs::exists( repo_ / "data" / base16::encode( Handle<Fix>( handle ).content ) );
-  } catch ( fs::filesystem_error& ) {
-    throw RepositoryCorrupt( repo_ );
-  }
+  return blobs_.read()->contains( handle );
 }
 
 bool Repository::contains( Handle<AnyTree> handle )
 {
-  try {
-    auto vtree = handle.visit<Handle<ValueTree>>( []( auto h ) -> Handle<ValueTree> {
-      return { h.content, h.size(), h.is_tag() };
-    } );
-    auto otree = handle.visit<Handle<ObjectTree>>( []( auto h ) -> Handle<ObjectTree> {
-      return { h.content, h.size(), h.is_tag() };
-    } );
-    auto etree = handle.visit<Handle<ExpressionTree>>( []( auto h ) -> Handle<ExpressionTree> {
-      return { h.content, h.size(), h.is_tag() };
-    } );
-    return fs::exists( repo_ / "data" / base16::encode( Handle<Fix>( vtree ).content ) )
-           || fs::exists( repo_ / "data" / base16::encode( Handle<Fix>( otree ).content ) )
-           || fs::exists( repo_ / "data" / base16::encode( Handle<Fix>( etree ).content ) );
-  } catch ( fs::filesystem_error& ) {
-    throw RepositoryCorrupt( repo_ );
-  }
+  return trees_.read()->contains( handle );
 }
 
 bool Repository::contains( Handle<Relation> handle )
 {
-  try {
-    return fs::is_symlink( repo_ / "relations" / base16::encode( Handle<Fix>( handle ).content ) );
-  } catch ( fs::filesystem_error& ) {
-    throw RepositoryCorrupt( repo_ );
-  }
+  return relations_.read()->contains( handle );
 }
 
 std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
 {
-  auto content_hash = base16::encode( handle::fix( handle ).content ).erase( 192 );
-  optional<Handle<Fix>> res {};
-  for ( const auto& dir_entry : fs::directory_iterator( repo_ / "data" ) ) {
-    if ( dir_entry.path().filename().string().find( content_hash ) == 0 ) {
-      res = Handle<Fix>::forge( base16::decode( dir_entry.path().filename().string() ) );
-      break;
-    }
+  auto tmp_tree = handle.visit<Handle<AnyTree>>(
+    overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
+               []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); } } );
+
+  auto trees = trees_.read();
+  auto entry = trees->find( tmp_tree );
+
+  if ( entry == trees->end() ) {
+    return {};
   }
 
-  auto etree
-    = res.and_then( []( auto h ) -> optional<Handle<AnyTree>> { return handle::extract<ExpressionTree>( h ); } )
-        .or_else( [&]() -> optional<Handle<AnyTree>> {
-          return res.and_then( []( auto h ) { return handle::extract<ObjectTree>( h ); } );
-        } )
-        .or_else( [&]() -> optional<Handle<AnyTree>> {
-          return res.and_then( []( auto h ) { return handle::extract<ValueTree>( h ); } );
-        } )
-        .transform( []( auto h ) -> Handle<ExpressionTree> { return handle::upcast( h ); } );
+  auto hash = std::visit( []( auto e ) { return e.content; }, entry->get() );
+  auto size = std::visit( []( auto e ) { return e.size(); }, entry->get() );
 
-  return etree.transform( [&]( auto h ) {
-    return handle.visit<Handle<AnyTree>>( overload {
-      [&]( Handle<ValueTreeRef> v ) { return Handle<ValueTree>( h.content, h.size(), v.is_tag() ); },
-      [&]( Handle<ObjectTreeRef> o ) { return Handle<ObjectTree>( h.content, h.size(), o.is_tag() ); },
-    } );
+  return handle.visit<Handle<AnyTree>>( overload {
+    [&]( Handle<ValueTreeRef> v ) { return Handle<ValueTree>( hash, size, v.is_tag() ); },
+    [&]( Handle<ObjectTreeRef> o ) { return Handle<ObjectTree>( hash, size, o.is_tag() ); },
   } );
 }
 
@@ -378,27 +377,32 @@ Handle<Fix> Repository::lookup( const std::string_view ref )
 {
   if ( ref.size() == 64 ) {
     auto handle = Handle<Fix>::forge( base16::decode( ref ) );
-    if ( handle::data( handle ).visit<bool>( overload {
-           [&]( Handle<Literal> ) { return true; },
-           [&]( auto x ) { return contains( x ); },
-         } ) )
+    if ( handle::data( handle ).has_value() ) {
+      if ( handle::data( handle )->visit<bool>( overload {
+             [&]( Handle<Literal> ) { return true; },
+             [&]( auto x ) { return contains( x ); },
+           } ) )
+        return handle;
+    } else {
       return handle;
+    }
   }
+
   try {
     return labeled( ref );
   } catch ( LabelNotFound& ) {}
 
-  std::optional<Handle<Fix>> candidate;
+  std::optional<Handle<AnyDataType>> candidate;
   for ( const auto& handle : data() ) {
     std::string name = base16::encode( handle.content );
     if ( name.rfind( ref, 0 ) == 0 ) {
       if ( candidate )
         throw AmbiguousReference( ref );
-      candidate = handle;
+      candidate = handle::data( handle::fix( handle ) ).value();
     }
   }
   if ( candidate )
-    return *candidate;
+    return handle::fix( *candidate );
 
   if ( fs::exists( ref ) ) {
     try {

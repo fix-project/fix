@@ -40,7 +40,8 @@ void test( void )
                                 14_literal32,
                                 15_literal32 );
 
-  auto thunk = Handle<Thunk>( tester::Tree( tester::Limits(), mapreduce, add100, sum, original ) );
+  auto thunk = Handle<Thunk>(
+    tester::Tree( tester::Limits(), mapreduce, add100, sum, original, tester::Limits(), tester::Limits() ) );
   auto result = tester::rt->execute( Handle<Eval>( thunk ) );
 
   cout << result << endl;

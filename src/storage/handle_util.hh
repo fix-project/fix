@@ -71,6 +71,15 @@ struct tree_equal
 #endif
   }
 };
+
+struct any_tree_equal
+{
+  tree_equal te;
+  constexpr bool operator()( const Handle<AnyTree>& lhs, const Handle<AnyTree>& rhs ) const
+  {
+    return te( handle::upcast( lhs ), handle::upcast( rhs ) );
+  }
+};
 }
 
 namespace job {

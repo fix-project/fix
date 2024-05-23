@@ -171,11 +171,6 @@ public:
   bool compare_handles( Handle<Fix> x, Handle<Fix> y );
 
   /**
-   * Checks if @p root, as well as all its dependencies, are resident in storage.
-   */
-  bool complete( Handle<Fix> root );
-
-  /**
    * Computes the minimum repository of @p root.
    */
   std::vector<Handle<Fix>> minrepo( Handle<Fix> root );

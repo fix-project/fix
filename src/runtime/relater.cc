@@ -25,10 +25,11 @@ void Relater::get_from_repository( Handle<T> handle )
       return;
     }
 
-    if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, ValueTreeRef>
-                        or std::same_as<T, ObjectTreeRef> ) )
+    if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, BlobRef> ) )
       std::visit( [&]( const auto x ) { get_from_repository( x ); }, handle.get() );
 
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+    return;
   } else {
     if constexpr ( FixTreeType<T> ) {
       // Having the handle means that the data presents in storage
@@ -194,87 +195,108 @@ Relater::Result<Object> Relater::evalShallow( Handle<Object> expression )
 Relater::Result<ValueTree> Relater::mapEval( Handle<ObjectTree> tree )
 {
   bool ready = true;
+  bool toreplace = false;
   auto data = storage_.get( tree );
   for ( const auto& x : data->span() ) {
     auto obj = x.unwrap<Expression>().unwrap<Object>();
     auto result = evalStrict( obj );
     if ( not result ) {
       ready = false;
+    } else if ( !toreplace && Handle<Object>( result.value() ) != obj ) {
+      toreplace = true;
     }
   }
   if ( not ready ) {
     return {};
   }
 
-  auto values = OwnedMutTree::allocate( data->size() );
-  for ( size_t i = 0; i < data->size(); i++ ) {
-    auto x = data->at( i );
-    auto obj = x.unwrap<Expression>().unwrap<Object>();
-    values[i] = evalStrict( obj ).value();
-  }
+  if ( toreplace ) {
+    auto values = OwnedMutTree::allocate( data->size() );
+    for ( size_t i = 0; i < data->size(); i++ ) {
+      auto x = data->at( i );
+      auto obj = x.unwrap<Expression>().unwrap<Object>();
+      values[i] = evalStrict( obj ).value();
+    }
 
-  if ( tree.is_tag() ) {
-    return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>().tag();
+    if ( tree.is_tag() ) {
+      return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>().tag();
+    } else {
+      return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>();
+    }
   } else {
-    return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>();
+    return Handle<ValueTree>( tree.content, tree.size(), tree.is_tag() );
   }
 }
 
 Relater::Result<ObjectTree> Relater::mapReduce( Handle<ExpressionTree> tree )
 {
   bool ready = true;
+  bool toreplace = false;
   TreeData data = storage_.get( tree );
   for ( const auto& x : data->span() ) {
     auto exp = x.unwrap<Expression>();
     auto result = evaluator_.reduce( exp );
     if ( not result ) {
       ready = false;
+    } else if ( !toreplace && x != Handle<Fix>( Handle<Expression>( result.value() ) ) ) {
+      toreplace = true;
     }
   }
   if ( not ready ) {
     return {};
   }
 
-  auto objs = OwnedMutTree::allocate( data->size() );
-  for ( size_t i = 0; i < data->size(); i++ ) {
-    auto exp = data->at( i ).unwrap<Expression>();
-    objs[i] = evaluator_.reduce( exp ).value();
-  }
+  if ( toreplace ) {
+    auto objs = OwnedMutTree::allocate( data->size() );
+    for ( size_t i = 0; i < data->size(); i++ ) {
+      auto exp = data->at( i ).unwrap<Expression>();
+      objs[i] = evaluator_.reduce( exp ).value();
+    }
 
-  if ( tree.is_tag() ) {
-    return handle::tree_unwrap<ObjectTree>( storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ) )
-      .tag();
+    if ( tree.is_tag() ) {
+      return handle::tree_unwrap<ObjectTree>( storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ) )
+        .tag();
+    } else {
+      return handle::tree_unwrap<ObjectTree>( storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ) );
+    }
   } else {
-    return handle::tree_unwrap<ObjectTree>( storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ) );
+    return Handle<ObjectTree>( tree.content, tree.size(), tree.is_tag() );
   }
 }
 
 Relater::Result<ValueTree> Relater::mapLift( Handle<ValueTree> tree )
 {
   bool ready = true;
+  bool toreplace = false;
   auto data = storage_.get( tree );
   for ( const auto& x : data->span() ) {
     auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
     auto result = evaluator_.lift( val );
     if ( not result ) {
       ready = false;
+    } else if ( !toreplace && result.value() != val ) {
+      toreplace = true;
     }
   }
   if ( not ready ) {
     return {};
   }
 
-  auto vals = OwnedMutTree::allocate( data->size() );
-  for ( size_t i = 0; i < data->size(); i++ ) {
-    auto x = data->at( i );
-    auto exp = x.unwrap<Expression>();
-    vals[i] = evaluator_.reduce( exp ).value();
-  }
+  if ( toreplace ) {
+    auto vals = OwnedMutTree::allocate( data->size() );
+    for ( size_t i = 0; i < data->size(); i++ ) {
+      auto x = data->at( i );
+      auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
+      vals[i] = evaluator_.lift( val ).value();
+    }
 
-  if ( tree.is_tag() ) {
-    return storage_.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>().tag();
+    if ( tree.is_tag() ) {
+      return storage_.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>().tag();
+    } else {
+      return storage_.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>();
+    }
   } else {
-    return storage_.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>();
+    return tree;
   }
 }
 

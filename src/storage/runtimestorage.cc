@@ -101,16 +101,16 @@ void RuntimeStorage::visit( Handle<T> handle,
     return;
 
   if constexpr ( Handle<T>::is_fix_sum_type ) {
-    if ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
-      return;
-    }
-    if ( not( std::same_as<T, Thunk> or std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) ) {
+    if ( not( std::same_as<T, Thunk> or std::same_as<T, BlobRef> ) ) {
       std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
     }
+
     if constexpr ( std::same_as<T, Relation> ) {
       auto target = get( handle );
       std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, target.get() );
     }
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+    return;
   } else {
     if constexpr ( FixTreeType<T> ) {
       auto tree = get( handle );
@@ -427,16 +427,6 @@ bool RuntimeStorage::compare_handles( Handle<Fix> x, Handle<Fix> y )
   return canonicalize( x ) == canonicalize( y );
 }
 #endif
-
-bool RuntimeStorage::complete( Handle<Fix> handle )
-{
-  bool res {};
-  visit( handle, [&]( Handle<Fix> h ) {
-    res |= handle::data( h ).visit<bool>(
-      overload { []( Handle<Literal> ) { return true; }, [&]( auto h ) { return contains( h ); } } );
-  } );
-  return res;
-}
 
 #if 0
 std::vector<Handle<Fix>> RuntimeStorage::minrepo( Handle<Fix> handle )

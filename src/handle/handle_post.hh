@@ -1,5 +1,4 @@
 #pragma once
-#include <concepts>
 #include <variant>
 
 #include "handle.hh"
@@ -19,7 +18,8 @@ inline std::optional<Handle<S>> extract( Handle<T> original )
 {
   if constexpr ( std::same_as<S, T> ) {
     return original;
-  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef>
+                        or std::same_as<T, BlobRef> ) {
     return {};
   } else if constexpr ( Handle<T>::is_fix_sum_type ) {
     return std::visit( []( const auto x ) { return extract<S>( x ); }, original.get() );
@@ -29,12 +29,13 @@ inline std::optional<Handle<S>> extract( Handle<T> original )
 }
 
 template<typename T>
-static inline Handle<AnyDataType> data( Handle<T> handle )
+static inline std::optional<Handle<AnyDataType>> data( Handle<T> handle )
 {
   if constexpr ( std::same_as<T, Relation> ) {
     return handle;
-  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
-    __builtin_unreachable();
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef>
+                        or std::same_as<T, BlobRef> ) {
+    return {};
   } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
     return handle;
   } else {
@@ -53,13 +54,13 @@ static inline bool is_local( Handle<T> handle )
         return x.is_local();
       }
     },
-    data( handle ).get() );
+    data( handle ).value().get() );
 }
 
 template<typename T>
 static inline size_t local_name( Handle<T> handle )
 {
-  return std::visit( []( const auto x ) { return x.local_name(); }, data( handle ).get() );
+  return std::visit( []( const auto x ) { return x.local_name(); }, data( handle ).value().get() );
 }
 
 template<typename T>
@@ -78,11 +79,12 @@ template<typename T>
 static inline size_t byte_size( Handle<T> handle )
 {
   if constexpr ( std::same_as<T, Relation> ) {
-    return sizeof( Handle<Fix> );
-  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+    return 0;
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef>
+                        or std::same_as<T, BlobRef> ) {
     return 0;
   } else if constexpr ( std::same_as<T, Thunk> ) {
-    return sizeof( Handle<Fix> );
+    return 0;
   } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
     return handle.size();
   } else {
@@ -129,7 +131,7 @@ Handle<T> tree_unwrap( Handle<AnyTree> handle )
 template<FixTreeType T>
 Handle<T> tree_unwrap( Handle<Expression> handle )
 {
-  return data( handle ).visit<Handle<T>>( [&]( auto t ) -> Handle<T> {
+  return data( handle )->visit<Handle<T>>( [&]( auto t ) -> Handle<T> {
     if constexpr ( std::constructible_from<Handle<T>, decltype( t )> ) {
       return Handle<T>( t );
     } else {
