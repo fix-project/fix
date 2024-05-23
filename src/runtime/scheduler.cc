@@ -110,7 +110,7 @@ void HintScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Rel
   PassRunner::run( relater_.value(),
                    top_level_job,
                    { PassRunner::PassType::MinAbsentMaxParallelism,
-                     // PassRunner::PassType::ChildBackProp,
+                     PassRunner::PassType::ChildBackProp,
                      PassRunner::PassType::InOutSource } );
 }
 
