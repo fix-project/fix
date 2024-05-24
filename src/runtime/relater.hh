@@ -9,8 +9,6 @@
 inline thread_local std::vector<Handle<AnyDataType>> works_;
 inline thread_local Handle<Relation> current_;
 inline thread_local DependencyGraph sketch_graph_;
-inline thread_local absl::flat_hash_set<Handle<Relation>> must_be_local_;
-inline thread_local bool replaced_;
 
 class Executor;
 class Scheduler;
