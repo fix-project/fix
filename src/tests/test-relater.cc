@@ -38,17 +38,6 @@ void case0()
     fprintf( stderr, "Wrong leaf jobs" );
     exit( 1 );
   }
-
-  if ( must_be_local_.size() != 2 ) {
-    fprintf( stderr, "Wrong number of jobs that must happen locally" );
-    exit( 1 );
-  }
-
-  if ( !must_be_local_.contains( Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) )
-       || !must_be_local_.contains( Handle<Eval>( thunk0 ) ) ) {
-    fprintf( stderr, "Wrong jobs that must happen locally" );
-    exit( 1 );
-  }
 }
 
 void case1()
@@ -75,16 +64,6 @@ void case1()
     fprintf( stderr, "Wrong leaf jobs" );
     exit( 1 );
   }
-
-  if ( must_be_local_.size() != 1 ) {
-    fprintf( stderr, "Wrong number of jobs that must happen locally" );
-    exit( 1 );
-  }
-
-  if ( !must_be_local_.contains( Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) ) ) {
-    fprintf( stderr, "Wrong jobs that must happen locally" );
-    exit( 1 );
-  }
 }
 
 void case2()
@@ -109,11 +88,6 @@ void case2()
 
   if ( !( works_[0] == apply1 ) ) {
     fprintf( stderr, "Wrong leaf jobs" );
-    exit( 1 );
-  }
-
-  if ( must_be_local_.size() != 0 ) {
-    fprintf( stderr, "Wrong number of jobs that must happen locally" );
     exit( 1 );
   }
 }

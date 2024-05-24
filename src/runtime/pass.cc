@@ -322,10 +322,6 @@ void MinAbsentMaxParallelism::post( Handle<Eval> job, const absl::flat_hash_set<
 {
   optional<shared_ptr<IRuntime>> chosen_remote;
 
-  if ( must_be_local_.contains( job ) ) {
-    chosen_remote = relater_.get().get_local();
-  }
-
   if ( base_.get().get_ep( job ) ) {
     chosen_remote = relater_.get().get_local();
   }
@@ -538,11 +534,6 @@ void InOutSource::pre( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDat
     // Collect available remotes
     std::vector<shared_ptr<IRuntime>> available_remotes;
     for ( auto d : dependencies ) {
-      if ( d.visit<bool>( overload { []( Handle<Relation> r ) { return must_be_local_.contains( r ); },
-                                     []( auto ) { return false; } } ) ) {
-        continue;
-      }
-
       const auto& absent_size = base_.get().get_absent_size( d );
       for ( const auto& [r, _] : absent_size ) {
         if ( is_local( r ) )
