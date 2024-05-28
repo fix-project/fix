@@ -33,8 +33,8 @@ static inline std::optional<Handle<AnyDataType>> data( Handle<T> handle )
 {
   if constexpr ( std::same_as<T, Relation> ) {
     return handle;
-  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef>
-                        or std::same_as<T, BlobRef> ) {
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> or std::same_as<T, BlobRef>
+                        or std::same_as<T, Thunk> ) {
     return {};
   } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
     return handle;

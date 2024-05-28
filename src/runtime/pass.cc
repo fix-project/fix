@@ -1,6 +1,7 @@
 #include "pass.hh"
 #include "handle.hh"
 #include "handle_post.hh"
+#include "handle_util.hh"
 #include "overload.hh"
 #include "relater.hh"
 #include <limits>
@@ -197,13 +198,7 @@ void BasePass::post( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataT
 
 size_t BasePass::absent_size( std::shared_ptr<IRuntime> worker, Handle<AnyDataType> job )
 {
-  auto root = job.visit<Handle<Fix>>(
-    overload { [&]( Handle<Relation> r ) {
-                return r.visit<Handle<Fix>>( overload { [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-                                                        [&]( Handle<Eval> e ) { return e.unwrap<Object>(); } } );
-              },
-               [&]( Handle<AnyTree> h ) { return handle::fix( h ); },
-               [&]( auto h ) { return h; } } );
+  auto root = job::get_root( job );
 
   size_t contained_size = 0;
   relater_.get().early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
@@ -581,6 +576,107 @@ void RandomSelection::independent( Handle<AnyDataType> job )
   }
 }
 
+void SendToRemotePass::independent( Handle<AnyDataType> job )
+{
+  if ( !is_local( chosen_remotes_.at( job ).first ) ) {
+    VLOG( 1 ) << "Run job remotely " << job << endl;
+    remote_jobs_[chosen_remotes_.at( job ).first].insert( job );
+  }
+}
+
+void SendToRemotePass::pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+{
+  for ( auto d : dependencies ) {
+    if ( !is_local( chosen_remotes_.at( d ).first ) ) {
+      VLOG( 1 ) << "Run job remotely " << d << endl;
+      remote_jobs_[chosen_remotes_.at( d ).first].insert( d );
+    }
+  }
+}
+
+void SendToRemotePass::send_job_dependencies( shared_ptr<IRuntime> rt, Handle<AnyDataType> job )
+{
+  auto remote_contained = job.visit<bool>(
+    overload { []( Handle<Literal> ) { return true; }, [&]( auto x ) { return rt->contains( x ); } } );
+
+  if ( remote_contained ) {
+    return;
+  }
+
+  job.visit<void>( overload { []( Handle<Literal> ) {},
+                              [&]( Handle<Relation> r ) {
+                                r.visit<void>( overload { [&]( Handle<Apply> a ) {
+                                                           if ( relater_.get().contains( a ) ) {
+                                                             remote_data_[rt].insert( a );
+                                                           }
+                                                         },
+                                                          [&]( Handle<Eval> e ) {
+                                                            if ( relater_.get().contains( e ) ) {
+                                                              remote_data_[rt].insert( e );
+                                                            } else {
+                                                              auto data = handle::data( e.unwrap<Object>() );
+                                                              if ( data.has_value() ) {
+                                                                remote_data_[rt].insert( data.value() );
+                                                              }
+
+                                                              for ( auto d :
+                                                                    sketch_graph_.get_forward_dependencies( e ) ) {
+                                                                send_job_dependencies( rt, d );
+                                                              }
+                                                            }
+                                                          } } );
+                              },
+                              [&]( auto d ) {
+                                if ( relater_.get().contains( d ) ) {
+                                  remote_data_[rt].insert( d );
+                                }
+                              } } );
+}
+
+void SendToRemotePass::send_remote_jobs( Handle<AnyDataType> root )
+{
+  this->run( root );
+
+  vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>::const_iterator>> iterators {};
+  for ( const auto& [rt, handles] : remote_jobs_ ) {
+    iterators.push_back( make_pair( rt, handles.begin() ) );
+    for ( auto h : handles ) {
+      send_job_dependencies( rt, h );
+    }
+  }
+
+  for ( const auto& [rt, data] : remote_data_ ) {
+    for ( auto d : data ) {
+      d.visit<void>( overload { []( Handle<Literal> ) {},
+                                [&]( Handle<Relation> r ) { rt->put_force( r, relater_.get().get( r ).value() ); },
+                                [&]( auto x ) { rt->put( x, relater_.get().get( x ).value() ); } } );
+    }
+  }
+
+  unordered_set<shared_ptr<IRuntime>> finished;
+  size_t iterator_index = 0;
+  while ( finished.size() < iterators.size() ) {
+    auto& [r, it] = iterators.at( iterator_index );
+    if ( it != remote_jobs_.at( r ).end() ) {
+      auto h = *it;
+      h.visit<void>( overload { []( Handle<Literal> ) {},
+                                [&]( Handle<Relation> d ) {
+                                  r->get( d );
+                                  sketch_graph_.erase_forward_dependencies( d );
+                                },
+                                [&]( auto d ) { r->get( d ); } } );
+      it++;
+    } else {
+      finished.insert( r );
+    }
+
+    iterator_index++;
+    if ( iterator_index == iterators.size() ) {
+      iterator_index = 0;
+    }
+  }
+}
+
 void FinalPass::leaf( Handle<AnyDataType> job )
 {
   VLOG( 1 ) << "Run job " << ( is_local( chosen_remotes_.at( job ).first ) ? "locally " : "remotely " ) << job
@@ -588,14 +684,6 @@ void FinalPass::leaf( Handle<AnyDataType> job )
   if ( is_local( chosen_remotes_.at( job ).first ) ) {
     job.visit<void>(
       overload { []( Handle<Literal> ) {}, [&]( auto h ) { chosen_remotes_.at( job ).first->get( h ); } } );
-  }
-}
-
-void FinalPass::independent( Handle<AnyDataType> job )
-{
-  if ( !is_local( chosen_remotes_.at( job ).first ) ) {
-    VLOG( 1 ) << "Run job remotely " << job << endl;
-    remote_jobs_[chosen_remotes_.at( job ).first].insert( job );
   }
 }
 
@@ -611,13 +699,6 @@ void FinalPass::pre( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataT
   for ( auto r : unblocked ) {
     if ( is_local( chosen_remotes_.at( r ).first ) ) {
       chosen_remotes_.at( r ).first->get( r );
-    }
-  }
-
-  for ( auto d : sketch_graph_.get_forward_dependencies( job ) ) {
-    if ( !is_local( chosen_remotes_.at( d ).first ) ) {
-      VLOG( 1 ) << "Run job remotely " << d << endl;
-      remote_jobs_[chosen_remotes_.at( d ).first].insert( d );
     }
   }
 }
@@ -672,29 +753,8 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
     throw runtime_error( "Invalid pass sequence." );
   }
 
+  selection = make_unique<SendToRemotePass>( base, rt, move( selection.value() ) );
+  dynamic_cast<SendToRemotePass*>( selection.value().get() )->send_remote_jobs( top_level_job );
   FinalPass final( base, rt, move( selection.value() ) );
   final.run( top_level_job );
-
-  vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>::const_iterator>> iterators {};
-  for ( auto& [r, handles] : final.get_remote_jobs() ) {
-    iterators.push_back( make_pair( r, handles.begin() ) );
-  }
-
-  unordered_set<shared_ptr<IRuntime>> finished;
-  size_t iterator_index = 0;
-  while ( finished.size() < iterators.size() ) {
-    auto& [r, it] = iterators.at( iterator_index );
-    if ( it != final.get_remote_jobs().at( r ).end() ) {
-      auto h = *it;
-      h.visit<void>( overload { []( Handle<Literal> ) {}, [&]( auto d ) { r->get( d ); } } );
-      it++;
-    } else {
-      finished.insert( r );
-    }
-
-    iterator_index++;
-    if ( iterator_index == iterators.size() ) {
-      iterator_index = 0;
-    }
-  }
 }
