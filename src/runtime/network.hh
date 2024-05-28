@@ -18,7 +18,6 @@
 #include "interface.hh"
 #include "message.hh"
 #include "mutex.hh"
-#include "relater.hh"
 #include "ring_buffer.hh"
 #include "runtimestorage.hh"
 #include "socket.hh"
@@ -97,6 +96,7 @@ public:
   void put( Handle<Named> name, BlobData data ) override;
   void put( Handle<AnyTree> name, TreeData data ) override;
   void put( Handle<Relation> name, Handle<Object> data ) override;
+  void put_force( Handle<Relation> name, Handle<Object> data ) override;
 
   bool contains( Handle<Named> handle ) override;
   bool contains( Handle<AnyTree> handle ) override;

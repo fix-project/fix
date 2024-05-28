@@ -178,15 +178,35 @@ public:
   {}
 };
 
-class FinalPass : public PrunedSelectionPass
+class SendToRemotePass : public PrunedSelectionPass
 {
   std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>> remote_jobs_ {};
+  std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>> remote_data_ {};
+  void send_job_dependencies( std::shared_ptr<IRuntime>, Handle<AnyDataType> );
 
-  virtual void leaf( Handle<AnyDataType> ) override;
   virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
   virtual void independent( Handle<AnyDataType> ) override;
 
+  virtual void leaf( Handle<AnyDataType> ) override {};
   virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+
+public:
+  SendToRemotePass( std::reference_wrapper<BasePass> base,
+                    std::reference_wrapper<Relater> relater,
+                    std::unique_ptr<SelectionPass> prev )
+    : PrunedSelectionPass( base, relater, move( prev ) )
+  {}
+
+  void send_remote_jobs( Handle<AnyDataType> );
+};
+
+class FinalPass : public PrunedSelectionPass
+{
+  virtual void leaf( Handle<AnyDataType> ) override;
+  virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
+
+  virtual void post( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override {}
+  virtual void independent( Handle<AnyDataType> ) override {};
 
 public:
   FinalPass( std::reference_wrapper<BasePass> base,
@@ -194,11 +214,6 @@ public:
              std::unique_ptr<SelectionPass> prev )
     : PrunedSelectionPass( base, relater, move( prev ) )
   {}
-
-  const std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>>& get_remote_jobs()
-  {
-    return remote_jobs_;
-  };
 };
 
 // A correct sequence of passes contains: BasePass + (n >= 1) * SelectionPass + (n >= 0) * PrunedSelectionPass +

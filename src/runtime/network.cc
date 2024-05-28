@@ -10,7 +10,6 @@
 
 #include <glog/logging.h>
 
-#include "base16.hh"
 #include "eventloop.hh"
 #include "handle.hh"
 #include "handle_post.hh"
@@ -60,7 +59,7 @@ void Remote::send_blob( BlobData blob )
 
 void Remote::send_tree( Handle<AnyTree> handle, TreeData )
 {
-  parent_.value().get().visit( handle::upcast( handle ), [&]( Handle<AnyDataType> h ) {
+  parent_.value().get().visit_minrepo( handle::upcast( handle ), [&]( Handle<AnyDataType> h ) {
     h.visit<void>( overload { []( Handle<Literal> ) {},
                               []( Handle<Relation> ) {},
                               [&]( Handle<AnyTree> t ) {
@@ -103,35 +102,8 @@ optional<TreeData> Remote::get( Handle<AnyTree> name )
 optional<Handle<Object>> Remote::get( Handle<Relation> name )
 {
   if ( !contains( name ) ) {
-    vector<Handle<Fix>> extra;
-
-    name.visit<void>( overload { [&]( Handle<Apply> ) { return; },
-                                 [&]( Handle<Eval> e ) {
-                                   e.unwrap<Object>().visit<void>(
-                                     overload { [&]( Handle<ObjectTree> tree ) {
-                                                 auto treedata = parent_.value().get().get( tree ).value()->span();
-                                                 for ( const auto& subtask : treedata ) {
-                                                   extra.push_back( job::get_root( Handle<Eval>(
-                                                     subtask.unwrap<Expression>().unwrap<Object>() ) ) );
-                                                 }
-                                               },
-                                                []( auto ) { return; } } );
-                                 } } );
-
-    for ( const auto& e : extra ) {
-      VLOG( 2 ) << "Sending extra root " << e;
-      std::cout << e << std::endl;
-      parent_.value().get().visit( e, [&]( Handle<AnyDataType> h ) {
-        h.visit<void>( overload { []( Handle<Literal> ) {},
-                                  []( Handle<Relation> ) {},
-                                  [&]( auto x ) {
-                                    msg_q_.enqueue(
-                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
-                                  } } );
-      } );
-    }
-
-    parent_.value().get().visit( job::get_root( name ), [&]( Handle<AnyDataType> h ) {
+    // XXX
+    parent_.value().get().visit_minrepo( job::get_root( name ), [&]( Handle<AnyDataType> h ) {
       h.visit<void>( overload { []( Handle<Literal> ) {},
                                 []( Handle<Relation> ) {},
                                 [&]( auto x ) {
@@ -159,7 +131,7 @@ void Remote::put( Handle<Named> name, BlobData data )
 void Remote::put( Handle<AnyTree> name, TreeData )
 {
   if ( !loaded( name ) ) {
-    parent_.value().get().visit( handle::upcast( name ), [&]( Handle<AnyDataType> h ) {
+    parent_.value().get().visit_minrepo( handle::upcast( name ), [&]( Handle<AnyDataType> h ) {
       h.visit<void>( overload { []( Handle<Literal> ) {},
                                 []( Handle<Relation> ) {},
                                 [&]( auto x ) {
@@ -178,7 +150,7 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
   if ( reply_to_.contains( name ) ) {
     if ( !contains( name ) ) {
       // Send the result of the relation first
-      parent_.value().get().visit( data, [&]( Handle<AnyDataType> h ) {
+      parent_.value().get().visit_minrepo( data, [&]( Handle<AnyDataType> h ) {
         h.visit<void>( overload { []( Handle<Literal> ) {},
                                   []( Handle<Relation> ) {},
                                   [&]( auto x ) {
@@ -195,6 +167,28 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
     }
     reply_to_.erase( name );
   }
+}
+
+void Remote::put_force( Handle<Relation> name, Handle<Object> data )
+{
+  if ( !contains( name ) ) {
+    // Send the result of the relation first
+    parent_.value().get().visit_minrepo( data, [&]( Handle<AnyDataType> h ) {
+      h.visit<void>( overload { []( Handle<Literal> ) {},
+                                []( Handle<Relation> ) {},
+                                [&]( auto x ) {
+                                  if ( !loaded( x ) ) {
+                                    msg_q_.enqueue(
+                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+                                  }
+                                } } );
+    } );
+
+    VLOG( 2 ) << "Putting result to remote " << name << " " << data;
+    ResultPayload payload { .task = name, .result = data };
+    msg_q_.enqueue( make_pair( index_, move( payload ) ) );
+  }
+  reply_to_.erase( name );
 }
 
 bool Remote::contains( Handle<Named> handle )

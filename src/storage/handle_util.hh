@@ -1,6 +1,5 @@
 #pragma once
 #include <cwchar>
-#include <iostream>
 #include <string_view>
 
 #include "blake3.hh"
@@ -85,25 +84,12 @@ struct any_tree_equal
 namespace job {
 static inline Handle<Fix> get_root( Handle<AnyDataType> job )
 {
-  return job.visit<Handle<Fix>>( overload {
-    [&]( Handle<Relation> r ) {
-      return r.visit<Handle<Fix>>( overload {
-
-        [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-        [&]( Handle<Eval> e ) {
-          return e.unwrap<Object>().visit<Handle<Fix>>( overload {
-            []( Handle<Thunk> t ) {
-              return t.visit<Handle<Fix>>( overload {
-                []( Handle<Application> a ) { return a.unwrap<ExpressionTree>(); },
-                []( Handle<Identification> i ) { return i.unwrap<Value>(); },
-                []( Handle<Selection> ) -> Handle<Fix> { throw std::runtime_error( "Unimplemented" ); } } );
-            },
-            []( auto h ) { return h; }
-
-          } );
-        } } );
-    },
-    [&]( Handle<AnyTree> h ) { return handle::fix( h ); },
-    [&]( auto h ) { return h; } } );
+  return job.visit<Handle<Fix>>( overload { [&]( Handle<Relation> r ) {
+                                             return r.visit<Handle<Fix>>(
+                                               overload { [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
+                                                          [&]( Handle<Eval> e ) { return e.unwrap<Object>(); } } );
+                                           },
+                                            [&]( Handle<AnyTree> h ) { return handle::fix( h ); },
+                                            [&]( auto h ) { return h; } } );
 }
 }
