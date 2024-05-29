@@ -220,6 +220,13 @@ void BasePass::independent( Handle<AnyDataType> job )
     if ( local->get_info().has_value() and local->get_info()->parallelism > 0 ) {
       tasks_info_[job].absent_size.insert( { local, absent_size( local, job ) } );
       VLOG( 2 ) << "local absent_size " << job << " " << tasks_info_[job].absent_size.at( local );
+
+      job.visit<void>( overload { [&]( auto r ) {
+                                   if ( local->contains( r ) ) {
+                                     tasks_info_[job].contains.insert( local );
+                                   }
+                                 },
+                                  []( Handle<Literal> ) {} } );
     }
   }
 
