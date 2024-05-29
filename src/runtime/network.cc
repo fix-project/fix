@@ -60,14 +60,16 @@ void Remote::send_blob( BlobData blob )
 void Remote::send_tree( Handle<AnyTree> handle, TreeData )
 {
   parent_.value().get().visit_minrepo( handle::upcast( handle ), [&]( Handle<AnyDataType> h ) {
-    h.visit<void>( overload { []( Handle<Literal> ) {},
-                              []( Handle<Relation> ) {},
-                              [&]( Handle<AnyTree> t ) {
-                                push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } );
-                              },
-                              [&]( Handle<Named> b ) {
-                                push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
-                              } } );
+    h.visit<void>( overload {
+      []( Handle<Literal> ) {},
+      []( Handle<Relation> ) {},
+      [&]( Handle<AnyTree> t ) {
+        push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } );
+      },
+      [&]( Handle<Named> b ) {
+        push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
+      },
+    } );
   } );
 
   trees_view_.write()->insert( handle::upcast( handle ) );
@@ -104,14 +106,15 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
   if ( !contains( name ) ) {
     // XXX
     parent_.value().get().visit_minrepo( job::get_root( name ), [&]( Handle<AnyDataType> h ) {
-      h.visit<void>( overload { []( Handle<Literal> ) {},
-                                []( Handle<Relation> ) {},
-                                [&]( auto x ) {
-                                  if ( !loaded( x ) ) {
-                                    msg_q_.enqueue(
-                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
-                                  }
-                                } } );
+      h.visit<void>( overload {
+        []( Handle<Literal> ) {},
+        []( Handle<Relation> ) {},
+        [&]( auto x ) {
+          if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          }
+        },
+      } );
     } );
   }
 
@@ -132,14 +135,15 @@ void Remote::put( Handle<AnyTree> name, TreeData )
 {
   if ( !loaded( name ) ) {
     parent_.value().get().visit_minrepo( handle::upcast( name ), [&]( Handle<AnyDataType> h ) {
-      h.visit<void>( overload { []( Handle<Literal> ) {},
-                                []( Handle<Relation> ) {},
-                                [&]( auto x ) {
-                                  if ( !loaded( x ) ) {
-                                    msg_q_.enqueue(
-                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
-                                  }
-                                } } );
+      h.visit<void>( overload {
+        []( Handle<Literal> ) {},
+        []( Handle<Relation> ) {},
+        [&]( auto x ) {
+          if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          }
+        },
+      } );
     } );
   }
 }
@@ -151,14 +155,15 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
     if ( !contains( name ) ) {
       // Send the result of the relation first
       parent_.value().get().visit_minrepo( data, [&]( Handle<AnyDataType> h ) {
-        h.visit<void>( overload { []( Handle<Literal> ) {},
-                                  []( Handle<Relation> ) {},
-                                  [&]( auto x ) {
-                                    if ( !loaded( x ) ) {
-                                      msg_q_.enqueue( make_pair(
-                                        index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
-                                    }
-                                  } } );
+        h.visit<void>( overload {
+          []( Handle<Literal> ) {},
+          []( Handle<Relation> ) {},
+          [&]( auto x ) {
+            if ( !loaded( x ) ) {
+              msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+            }
+          },
+        } );
       } );
 
       VLOG( 2 ) << "Putting result to remote " << name << " " << data;
@@ -174,14 +179,15 @@ void Remote::put_force( Handle<Relation> name, Handle<Object> data )
   if ( !contains( name ) ) {
     // Send the result of the relation first
     parent_.value().get().visit_minrepo( data, [&]( Handle<AnyDataType> h ) {
-      h.visit<void>( overload { []( Handle<Literal> ) {},
-                                []( Handle<Relation> ) {},
-                                [&]( auto x ) {
-                                  if ( !loaded( x ) ) {
-                                    msg_q_.enqueue(
-                                      make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
-                                  }
-                                } } );
+      h.visit<void>( overload {
+        []( Handle<Literal> ) {},
+        []( Handle<Relation> ) {},
+        [&]( auto x ) {
+          if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          }
+        },
+      } );
     } );
 
     VLOG( 2 ) << "Putting result to remote " << name << " " << data;
@@ -224,9 +230,10 @@ bool Remote::loaded( Handle<Relation> handle )
 
 std::optional<Handle<AnyTree>> Remote::contains( Handle<AnyTreeRef> handle )
 {
-  auto tmp_tree = handle.visit<Handle<AnyTree>>(
-    overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
-               []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); } } );
+  auto tmp_tree = handle.visit<Handle<AnyTree>>( overload {
+    []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
+    []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); },
+  } );
 
   auto entry = trees_view_.read()->find( handle::upcast( tmp_tree ) );
 
@@ -240,7 +247,8 @@ std::optional<Handle<AnyTree>> Remote::contains( Handle<AnyTreeRef> handle )
   // Cast to same kind as Handle<AnyTreeRef>
   auto res_tree = handle.visit<Handle<AnyTree>>( overload {
     [&]( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( entry->content, entry->size(), r.is_tag() ); },
-    [&]( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( entry->content, entry->size(), r.is_tag() ); } } );
+    [&]( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( entry->content, entry->size(), r.is_tag() ); },
+  } );
 
   return res_tree;
 }
@@ -353,11 +361,12 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       }
 
       for ( auto handle : payload.data ) {
-        handle.visit<void>(
-          overload { [&]( Handle<Named> h ) { loadable_blobs_view_.write()->insert( h ); },
-                     [&]( Handle<AnyTree> t ) { loadable_trees_view_.write()->insert( handle::upcast( t ) ); },
-                     []( Handle<Literal> ) {},
-                     []( Handle<Relation> ) {} } );
+        handle.visit<void>( overload {
+          [&]( Handle<Named> h ) { loadable_blobs_view_.write()->insert( h ); },
+          [&]( Handle<AnyTree> t ) { loadable_trees_view_.write()->insert( handle::upcast( t ) ); },
+          []( Handle<Literal> ) {},
+          []( Handle<Relation> ) {},
+        } );
       }
 
       break;
@@ -400,24 +409,26 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
       for ( auto it = handles.begin(); it != handles.end(); ) {
         // Any handle proposed by the remote are considered "existing" on remote
-        auto contained = std::visit( overload { [&]( Handle<Named> h ) {
-                                                 blobs_view_.write()->insert( h );
+        auto contained = std::visit( overload {
+                                       [&]( Handle<Named> h ) {
+                                         blobs_view_.write()->insert( h );
 
-                                                 if ( parent.contains( h ) ) {
-                                                   parent.get( h );
-                                                 }
-                                                 return parent.contains( h );
-                                               },
-                                                [&]( Handle<AnyTree> t ) {
-                                                  trees_view_.write()->insert( handle::upcast( t ) );
+                                         if ( parent.contains( h ) ) {
+                                           parent.get( h );
+                                         }
+                                         return parent.contains( h );
+                                       },
+                                       [&]( Handle<AnyTree> t ) {
+                                         trees_view_.write()->insert( handle::upcast( t ) );
 
-                                                  if ( parent.contains( t ) ) {
-                                                    parent.get( t );
-                                                  }
-                                                  return parent.contains( t );
-                                                },
-                                                [&]( Handle<Literal> ) { return true; },
-                                                [&]( Handle<Relation> ) { return true; } },
+                                         if ( parent.contains( t ) ) {
+                                           parent.get( t );
+                                         }
+                                         return parent.contains( t );
+                                       },
+                                       [&]( Handle<Literal> ) { return true; },
+                                       [&]( Handle<Relation> ) { return true; },
+                                     },
                                      //[&]( auto ) -> bool { VLOG( 1 ) << handle::fix( *it );
                                      // throw std::runtime_error( "Invalid propose transfer payload." ); } },
                                      it->get() );
@@ -468,10 +479,12 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
       // Any objects in this proposal are considered "exising" on the remote side
       for ( const auto& [h, _] : *proposed_proposals_.front().second ) {
-        std::visit( overload { [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
-                               [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
-                               []( Handle<Relation> ) {},
-                               []( Handle<Literal> ) {} },
+        std::visit( overload {
+                      [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
+                      [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
+                      []( Handle<Relation> ) {},
+                      []( Handle<Literal> ) {},
+                    },
                     h.get() );
       }
 
@@ -578,15 +591,16 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             // Proposal too small, sending directly
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
-              h.visit<void>(
-                overload { [&]( Handle<Named> ) {
-                            connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
-                          },
-                           [&]( Handle<AnyTree> ) {
-                             connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
-                           },
-                           []( Handle<Literal> ) {},
-                           []( Handle<Relation> ) {} } );
+              h.visit<void>( overload {
+                [&]( Handle<Named> ) {
+                  connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                },
+                [&]( Handle<AnyTree> ) {
+                  connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                },
+                []( Handle<Literal> ) {},
+                []( Handle<Relation> ) {},
+              } );
             }
             connection.push_message( OutgoingMessage::to_message( r ) );
             connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
@@ -620,15 +634,16 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             // Proposal too small, sending directly
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
-              h.visit<void>(
-                overload { [&]( Handle<Named> ) {
-                            connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
-                          },
-                           [&]( Handle<AnyTree> ) {
-                             connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
-                           },
-                           []( Handle<Literal> ) {},
-                           []( Handle<Relation> ) {} } );
+              h.visit<void>( overload {
+                [&]( Handle<Named> ) {
+                  connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                },
+                [&]( Handle<AnyTree> ) {
+                  connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                },
+                []( Handle<Literal> ) {},
+                []( Handle<Relation> ) {},
+              } );
             }
             connection.push_message( OutgoingMessage::to_message( r ) );
             connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();

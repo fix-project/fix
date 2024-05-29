@@ -22,12 +22,15 @@ void Scheduler::merge_sketch_graph( Handle<Relation> job, absl::flat_hash_set<Ha
   }
 
   for ( auto d : relater_.value().get().get_forward_dependencies( job ) ) {
-    d.visit<void>( overload { [&]( Handle<Relation> r ) {
-                               r.visit<void>(
-                                 overload { [&]( Handle<Eval> e ) { merge_sketch_graph( e, unblocked ); },
-                                            []( Handle<Apply> ) {} } );
-                             },
-                              []( auto ) {} } );
+    d.visit<void>( overload {
+      [&]( Handle<Relation> r ) {
+        r.visit<void>( overload {
+          [&]( Handle<Eval> e ) { merge_sketch_graph( e, unblocked ); },
+          []( Handle<Apply> ) {},
+        } );
+      },
+      []( auto ) {},
+    } );
   }
 }
 
