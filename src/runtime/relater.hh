@@ -12,7 +12,6 @@ inline thread_local DependencyGraph sketch_graph_;
 
 class Executor;
 class Scheduler;
-class LocalFirstScheduler;
 class HintScheduler;
 class BasePass;
 class RelaterTest;
@@ -22,7 +21,6 @@ class Relater
   , FixRuntime
 {
   friend class Executor;
-  friend class LocalFirstScheduler;
   friend class HintScheduler;
   friend class BasePass;
   friend class RelaterTest;

@@ -349,6 +349,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       {
         unique_lock lock( mutex_ );
         info_ = { .parallelism = payload.parallelism, .link_speed = payload.link_speed };
+        info_cv_.notify_all();
       }
 
       for ( auto handle : payload.data ) {
