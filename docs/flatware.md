@@ -33,6 +33,8 @@ blob.
 The sixth entry is the environment variables. It is specified as a tree of
 null-terminated strings. Each entry is of the form "NAME=VALUE".
 
+The seventh entry is a random seed. It is specified as a blob of 4 bytes.
+
 
 ```
 "apply" combination example
@@ -53,6 +55,7 @@ tree:5
 ├─ tree:2 (env)
 |  ├─ ENV_1_1
 |  ├─ ENV_1_2
+├─ blob:4 (random seed)
 ```
 
 ## Flatware Filesystem
@@ -88,3 +91,51 @@ tree:4
 ├─ blob: STDERR
 ├─ blob: trace
 ```
+
+## WASI Implementation Status
+
+- [x] `proc_exit`
+- [ ] `fd_close` (doesn't currently persist file changes)
+- [x] `fd_fdstat_get`
+- [x] `fd_seek`
+- [x] `fd_read`
+- [x] `fd_write`
+- [x] `fd_fdstat_set_flags`
+- [x] `fd_prestat_get`
+- [x] `fd_prestat_dir_name`
+- [ ] `fd_advise` (no effect)
+- [x] `fd_allocate`
+- [ ] `fd_datasync`
+- [x] `fd_filestat_get`
+- [x] `fd_filestat_set_size`
+- [ ] `fd_filestat_set_times`
+- [x] `fd_pread`
+- [ ] `fd_pwrite`
+- [ ] `fd_readdir`
+- [ ] `fd_sync`
+- [x] `fd_tell`
+- [ ] `path_create_directory`
+- [ ] `path_filestat_get`
+- [ ] `path_filestat_set_times`
+- [ ] `path_link`
+- [ ] `path_readlink`
+- [ ] `path_remove_directory`
+- [ ] `path_rename`
+- [ ] `path_symlink`
+- [ ] `path_unlink_file`
+- [x] `arg_sizes_get`
+- [x] `args_get`
+- [x] `environ_sizes_get`
+- [x] `environ_get`
+- [x] `path_open`
+- [x] `clock_res_get` (throws invalid argument error for all clocks as time is not implemented)
+- [ ] `clock_time_get` (note: will likely be implemented to return a constant from the input combination)
+- [ ] `poll_oneoff`
+- [ ] `sched_yield`
+- [x] `random_get`
+- [ ] `sock_accept`
+- [ ] `sock_recv`
+- [ ] `sock_send`
+- [ ] `sock_shutdown`
+
+

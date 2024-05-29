@@ -102,6 +102,7 @@ add_custom_command(
           -r memory
           linked_with_fixpoint_storage.wasm
           wasi_snapshot_preview1.wasm
+          2> export-audit.log
 )
 
 add_custom_target(

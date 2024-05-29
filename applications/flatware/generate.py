@@ -24,6 +24,9 @@ WAT_IMPORT_MEM = '(import "fixpoint_storage" "{type}_mem_{index}" (memory ${type
 WAT_IMPORT_PMEM = '(import "wasi_command" "memory" (memory $program_mem 0))\n'
 WAT_IMPORT_START = '(import "wasi_command" "_start" (func $start))\n'
 
+# exports
+WAT_EXPORT_MEM = '(export "{type}_mem" (memory ${type}_mem))\n'
+
 # gets
 WAT_GET_I32 = '(func (export "get_i32_{type}") (param $offset i32) (result i32)\n\
     (local.get $offset)\n\
@@ -75,6 +78,10 @@ def write_wat(path):
                 f.write(WAT_IMPORT_MEM.format(type=mem_type, index=i))
         f.write(WAT_IMPORT_PMEM)
         f.write(WAT_IMPORT_START)
+
+        # export memory
+        for mem_type in OTHER_MEM_TYPES:
+            f.write(WAT_EXPORT_MEM.format(type=mem_type))
 
         # i32 gets and sets
         for mem_type in OTHER_MEM_TYPES:
@@ -134,6 +141,9 @@ C_COPY_SOURCE_TO_RW_MEM_FUNC = 'void {src}_mem_to_rw_mem( int32_t rw_mem_id, int
     {src}_to_rw_functions[rw_mem_id]( rw_offset, {src}_offset, len );\n\
     }}\n'
 
+# unsafe io
+C_MEM_UNSAFE_IO = 'extern void {type}_mem_unsafe_io( const char* s, int32_t size )\n\
+    __attribute__( ( import_module( "fixpoint" ), import_name( "{type}_mem_unsafe_io" ) ) );\n'
 
 # code generation
 def write_c(path):
@@ -182,6 +192,10 @@ def write_header(path):
         # copies
         f.write(C_COPY_PTR.format(src='flatware', dest='program', module=MODULE))
         f.write(C_COPY_PTR.format(src='program', dest='flatware', module=MODULE))
+
+        # unsafe io
+        for mem_type in OTHER_MEM_TYPES:
+            f.write(C_MEM_UNSAFE_IO.format(type=mem_type))
 
         # function prototypes
         for dest in OTHER_MEM_TYPES:

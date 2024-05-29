@@ -106,8 +106,7 @@ void unsafe_io( int32_t index, int32_t length, wasm_rt_memory_t* mem )
   for ( int i = index; i < index + length; i++ ) {
     cerr << mem->data[i];
   }
-  cerr << endl;
-  flush( cout );
+  flush( cerr );
 }
 
 u8x32 create_tree( wasm_rt_externref_table_t* table, size_t size )

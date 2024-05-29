@@ -64,3 +64,6 @@ target_link_libraries(test-helloworld-flatware runtime)
 add_executable(test-return-flatware test-return-flatware.cc main.cc)
 target_link_libraries(test-return-flatware runtime)
 
+add_executable(test-python-flatware test-python-flatware.cc main.cc)
+target_link_libraries(test-python-flatware runtime)
+

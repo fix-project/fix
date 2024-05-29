@@ -44,18 +44,48 @@ enum fd_
 };
 
 static filedesc fds[N_FDS] = {
-  { .open = true, .size = -1, .offset = 0, .file_id = 0 }, // STDIN
-  { .open = true, .size = -1, .offset = 0, .file_id = 1 }, // STDOUT
-  { .open = true, .size = -1, .offset = 0, .file_id = 2 }, // STDERR
-  { .open = true, .size = -1, .offset = 0, .file_id = 4 }, // WORKING DIRECTORY
+  { .open = true,
+    .size = 0,
+    .offset = 0,
+    .file_id = 0,
+    .stat = { .fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE,
+              .fs_rights_base = __WASI_RIGHTS_FD_READ,
+              .fs_rights_inheriting = __WASI_RIGHTS_FD_READ,
+              .fs_flags = 0 } }, // STDIN
+  { .open = true,
+    .size = 0,
+    .offset = 0,
+    .file_id = 1,
+    .stat = { .fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE,
+              .fs_rights_base = __WASI_RIGHTS_FD_WRITE,
+              .fs_rights_inheriting = __WASI_RIGHTS_FD_WRITE,
+              .fs_flags = 0 } }, // STDOUT
+  { .open = true,
+    .size = 0,
+    .offset = 0,
+    .file_id = 2,
+    .stat = { .fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE,
+              .fs_rights_base = __WASI_RIGHTS_FD_WRITE,
+              .fs_rights_inheriting = __WASI_RIGHTS_FD_WRITE,
+              .fs_flags = 0 } }, // STDERR
+  { .open = true,
+    .size = -1,
+    .offset = 0,
+    .file_id = 3,
+    .stat = { .fs_filetype = __WASI_FILETYPE_DIRECTORY,
+              .fs_rights_base = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_READDIR,
+              .fs_rights_inheriting = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_READDIR,
+              .fs_flags = 0 } }, // WORKING DIRECTORY
 };
 
 static file files[N_FILES] = { { .name = { "stdin", 5 }, .mem_id = StdInROMem, .num_fds = 1 },
                                { .name = { "stdout", 6 }, .mem_id = StdOutRWMem, .num_fds = 1 },
                                { .name = { "stderr", 6 }, .mem_id = StdErrRWMem, .num_fds = 1 },
-                               { .name = { ".", 1 }, .mem_id = FileSystemBaseROTable, .num_fds = 0 } };
+                               { .name = { ".", 1 }, .mem_id = FileSystemBaseROTable, .num_fds = 1 } };
 
 static unsigned int* ro_mem_use;
+
+static int64_t random_seed;
 
 // Bitset functions
 static bool bitset_get( unsigned int*, uint32_t );
@@ -97,6 +127,7 @@ static void write_trace( const char* str, int32_t len )
   }
   flatware_mem_to_rw_mem( StdTraceRWMem, trace_offset, (int32_t)str, len );
   trace_offset += len;
+  flatware_mem_unsafe_io( str, len );
 }
 
 static void write_uint( uint64_t val )
@@ -242,8 +273,6 @@ int32_t fd_close( int32_t fd )
  */
 int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
 {
-  __wasi_fdstat_t stat;
-
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
   if ( fd >= N_FDS ) {
@@ -255,20 +284,7 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
   }
 
   // Copy stat struct to program memory
-  if ( fd >= FILE_START ) {
-    flatware_mem_to_program_mem( retptr0, (int32_t)&fds[fd].stat, sizeof( fds[fd].stat ) );
-    return __WASI_ERRNO_SUCCESS;
-  }
-
-  // Build stat struct for non-file descriptors
-  stat.fs_filetype = __WASI_FILETYPE_UNKNOWN;
-  stat.fs_flags = __WASI_FDFLAGS_APPEND;
-  stat.fs_rights_base = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
-  if ( fd == STDOUT )
-    stat.fs_rights_base |= __WASI_RIGHTS_FD_WRITE;
-  stat.fs_rights_inheriting = stat.fs_rights_base;
-
-  flatware_mem_to_program_mem( retptr0, (int32_t)&stat, sizeof( stat ) );
+  flatware_mem_to_program_mem( retptr0, (int32_t)&fds[fd].stat, sizeof( fds[fd].stat ) );
   return __WASI_ERRNO_SUCCESS;
 }
 
@@ -277,7 +293,7 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
  *
  * @param fd File descriptor
  * @param offset Number of bytes to seek
- * @param whence Relative offset base
+ * @param whence Whence to seek from (SEEK_SET, SEEK_CUR, SEEK_END)
  * @param retptr0 Returns resulting offset as int64_t
  * @return int32_t Status code
  */
@@ -293,12 +309,20 @@ int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
     return __WASI_ERRNO_BADF;
   }
 
-  // Error if offset is out of bounds
-  if ( fds[fd].offset + offset + whence >= fds[fd].size || fds[fd].offset + offset + whence < 0 ) {
-    return __WASI_ERRNO_INVAL;
+  switch ( whence ) {
+    case __WASI_WHENCE_SET:
+      break;
+    case __WASI_WHENCE_CUR:
+      offset = fds[fd].offset + offset;
+      break;
+    case __WASI_WHENCE_END:
+      offset = fds[fd].size + offset;
+      break;
+    default:
+      return __WASI_ERRNO_INVAL;
   }
 
-  fds[fd].offset += offset + whence;
+  fds[fd].offset = (int32_t)offset;
 
   flatware_mem_to_program_mem( retptr0, (int32_t)&fds[fd].offset, sizeof( fds[fd].offset ) );
   RET_TRACE( fds[fd].offset );
@@ -389,9 +413,12 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
     iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
                                  + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
 
-    if ( fds[fd].offset + iobuf_len > page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE ) {
+    while ( fds[fd].offset + iobuf_len > page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE ) {
       grow_rw_mem_pages( f.mem_id, iobuf_len / WASM_RT_PAGESIZE + 1 );
     }
+    // if ( fd == STDOUT || fd == STDERR ) {
+    //   program_mem_unsafe_io( (const char*)iobuf_offset, iobuf_len );
+    // }
     program_mem_to_rw_mem( f.mem_id, fds[fd].offset, iobuf_offset, iobuf_len );
     fds[fd].offset += iobuf_len;
     total_written += iobuf_len;
@@ -407,7 +434,7 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
  *
  * @param fd File descriptor
  * @param fdflags Flags to set as __wasi_fdflags_t
- * @return int32_t
+ * @return int32_t Status code
  */
 int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
 {
@@ -508,7 +535,7 @@ int32_t fd_advise( int32_t fd, int64_t offset, int64_t len, int32_t advice )
 {
   FUNC_TRACE( T32, fd, T64, offset, T64, len, T32, advice, TEND );
 
-  return 0;
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -539,6 +566,12 @@ int32_t fd_allocate( int32_t fd, int64_t offset, int64_t len )
   return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Synchronizes the data of a file descriptor.
+ * 
+ * @param fd File descriptor
+ * @return int32_t Status code
+ */
 int32_t fd_datasync( int32_t fd )
 {
   FUNC_TRACE( T32, fd, TEND );
@@ -546,20 +579,71 @@ int32_t fd_datasync( int32_t fd )
   return 0;
 }
 
+/**
+ * @brief Gets the attributes of a file descriptor.
+ * @details Not supported yet. Returns NOTSUP.
+ *
+ * @param fd File descriptor
+ * @param retptr0 Returns file descriptor attributes as __wasi_filestat_t
+ * @return int32_t Status code
+ */
 int32_t fd_filestat_get( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
-  return 0;
+  if ( fd >= N_FDS ) {
+    return __WASI_ERRNO_MFILE;
+  }
+
+  if ( fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  return __WASI_ERRNO_NOTSUP;
 }
 
+/**
+ * @brief Adjusts the size of a file descriptor.
+ *
+ * @param fd File descriptor
+ * @param size Size to set
+ * @return int32_t Status code
+ */
 int32_t fd_filestat_set_size( int32_t fd, int64_t size )
 {
   FUNC_TRACE( T32, fd, T64, size, TEND );
 
-  return 0;
+  if ( fd >= N_FDS ) {
+    return __WASI_ERRNO_MFILE;
+  }
+
+  if ( fd < FILE_START || fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( fds[fd].stat.fs_rights_base & __WASI_RIGHTS_FD_FILESTAT_SET_SIZE ) {
+    file f = files[fds[fd].file_id];
+    int32_t grow_pages = (int32_t)( ( size - page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE ) / WASM_RT_PAGESIZE + 1 );
+    fds[fd].size = (int32_t)size;
+    f = files[fds[fd].file_id];
+    if ( grow_pages > 0 ) {
+      grow_rw_mem_pages( f.mem_id, grow_pages );
+    }
+    return __WASI_ERRNO_SUCCESS;
+  }
+
+  return __WASI_ERRNO_PERM;
 }
 
+/**
+ * @brief Updates the timestamp metadata of a file descriptor.
+ * 
+ * @param fd File descriptor
+ * @param atim Accessed timestamp
+ * @param mtim Modified timestamp
+ * @param fst_flags Bitmask of __wasi_fstflags_t
+ * @return int32_t 
+ */
 int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t fst_flags )
 {
   FUNC_TRACE( T32, fd, T64, atim, T64, mtim, T32, fst_flags, TEND );
@@ -567,13 +651,68 @@ int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t f
   return 0;
 }
 
+/**
+ * @brief Reads from a file descriptor at a given offset without changing the file descriptor's offset.
+ *
+ * @param fd File descriptor
+ * @param iovs Array of __wasi_iovec_t structs containing buffers to read from
+ * @param iovs_len Number of buffers in iovs
+ * @param offset Offset to read from
+ * @param retptr0 Number of bytes read
+ * @return int32_t Status code
+ */
 int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
+  int32_t total_read = 0;
+  int32_t iobuf_offset, iobuf_len;
+  int64_t size_to_read;
+  file f;
+
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
 
-  return 0;
+  if ( fd >= N_FDS ) {
+    return __WASI_ERRNO_MFILE;
+  }
+
+  if ( ( fd < FILE_START && fd != STDIN ) || fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  f = files[fds[fd].file_id];
+
+  // Iterate over buffers
+  for ( int32_t i = 0; i < iovs_len; ++i ) {
+    int64_t file_remaining = fds[fd].size - offset;
+    if ( file_remaining == 0 ) {
+      break;
+    }
+
+    iobuf_offset
+      = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t ) + (int32_t)offsetof( __wasi_iovec_t, buf ) );
+    iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
+                                 + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
+
+    size_to_read = iobuf_len < file_remaining ? iobuf_len : file_remaining;
+    ro_mem_to_program_mem( f.mem_id, iobuf_offset, (int32_t)offset, (int32_t)size_to_read );
+    offset += size_to_read;
+    total_read += size_to_read;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&total_read, sizeof( total_read ) );
+  RET_TRACE( total_read );
+  return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Writes to a file descriptor at a given offset without changing the file descriptor's offset.
+ * 
+ * @param fd File descriptor
+ * @param iovs Array of __wasi_ciovec_t structs containing buffers to write from
+ * @param iovs_len Number of buffers in iovs
+ * @param offset Offset to write to
+ * @param retptr0 Number of bytes written
+ * @return int32_t Status code
+ */
 int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
@@ -581,6 +720,16 @@ int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, i
   return 0;
 }
 
+/**
+ * @brief Reads directory entries.
+ * 
+ * @param fd File descriptor
+ * @param buf Buffer to store directory entries
+ * @param buf_len Buffer length
+ * @param cookie Offset to start reading from
+ * @param retptr0 Number of bytes read
+ * @return int32_t Status code
+ */
 int32_t fd_readdir( int32_t fd, int32_t buf, int32_t buf_len, int64_t cookie, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, buf, T32, buf_len, T64, cookie, T32, retptr0, TEND );
@@ -588,6 +737,12 @@ int32_t fd_readdir( int32_t fd, int32_t buf, int32_t buf_len, int64_t cookie, in
   return 0;
 }
 
+/**
+ * @brief Synchronizes file and metadata changes to storage.
+ * 
+ * @param fd File descriptor
+ * @return int32_t Status code
+ */
 int32_t fd_sync( int32_t fd )
 {
   FUNC_TRACE( T32, fd, TEND );
@@ -595,13 +750,39 @@ int32_t fd_sync( int32_t fd )
   return 0;
 }
 
+/**
+ * @brief Gets the current offset of a file descriptor.
+ * 
+ * @param fd File descriptor
+ * @param retptr0 Returns offset as int32_t
+ * @return int32_t Status code
+ */
 int32_t fd_tell( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
-  return 0;
+  if ( fd >= N_FDS ) {
+    return __WASI_ERRNO_MFILE;
+  }
+
+  if ( fd < FILE_START || fds[fd].open == false ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&fds[fd].offset, sizeof( fds[fd].offset ) );
+  RET_TRACE( fds[fd].offset );
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Creates a directory.
+ *
+ * @param fd Base directory for path
+ * @param path Path of directory
+ * @param path_len Path length
+ * @return int32_t Status code
+ */
 int32_t path_create_directory( int32_t fd, int32_t path, int32_t path_len )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
@@ -609,6 +790,16 @@ int32_t path_create_directory( int32_t fd, int32_t path, int32_t path_len )
   return 0;
 }
 
+/**
+ * @brief Gets file metadata
+ * 
+ * @param fd Base directory for path
+ * @param flags Path flags as __wasi_lookupflags_t
+ * @param path Path to file
+ * @param path_len Path length
+ * @param retptr0 Returns file metadata as __wasi_filestat_t
+ * @return int32_t Status code
+ */
 int32_t path_filestat_get( int32_t fd, int32_t flags, int32_t path, int32_t path_len, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T32, retptr0, TEND );
@@ -616,6 +807,18 @@ int32_t path_filestat_get( int32_t fd, int32_t flags, int32_t path, int32_t path
   return 0;
 }
 
+/**
+ * @brief Sets the time metadata for a file.
+ *
+ * @param fd Base directory for path
+ * @param flags Path flags as __wasi_lookupflags_t
+ * @param path Path to file
+ * @param path_len Length of path
+ * @param atim Last accessed time
+ * @param mtim Last modified time
+ * @param fst_flags Bitmask of __wasi_fstflags_t
+ * @return int32_t Status code
+ */
 int32_t path_filestat_set_times( int32_t fd,
                                  int32_t flags,
                                  int32_t path,
@@ -629,6 +832,18 @@ int32_t path_filestat_set_times( int32_t fd,
   return 0;
 }
 
+/**
+ * @brief Creates a hard link.
+ * 
+ * @param old_fd Base directory for source path
+ * @param old_flags Source flags
+ * @param old_path Source path 
+ * @param old_path_len Source path length
+ * @param new_fd Base directory for destination path
+ * @param new_path Destination path
+ * @param new_path_len Destination path length
+ * @return int32_t Status code
+ */
 int32_t path_link( int32_t old_fd,
                    int32_t old_flags,
                    int32_t old_path,
@@ -655,6 +870,17 @@ int32_t path_link( int32_t old_fd,
   return 0;
 }
 
+/**
+ * @brief Reads the target path of a symlink
+ * 
+ * @param fd Base directory for path
+ * @param path Path
+ * @param path_len Path length
+ * @param buf Target path buffer
+ * @param buf_len Buffer length
+ * @param retptr0 Number of bytes read
+ * @return int32_t Status code
+ */
 int32_t path_readlink( int32_t fd, int32_t path, int32_t path_len, int32_t buf, int32_t buf_len, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, T32, buf, T32, buf_len, T32, retptr0, TEND );
@@ -662,6 +888,14 @@ int32_t path_readlink( int32_t fd, int32_t path, int32_t path_len, int32_t buf, 
   return 0;
 }
 
+/**
+ * @brief Removes a directory.
+ * 
+ * @param fd Base directory for path
+ * @param path Path to directory
+ * @param path_len Path length
+ * @return int32_t Status code
+ */
 int32_t path_remove_directory( int32_t fd, int32_t path, int32_t path_len )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
@@ -669,6 +903,17 @@ int32_t path_remove_directory( int32_t fd, int32_t path, int32_t path_len )
   return 0;
 }
 
+/**
+ * @brief Renames a file.
+ * 
+ * @param fd Base directory for source path
+ * @param old_path Source path
+ * @param old_path_len Source path length
+ * @param new_fd Base directory for destination path
+ * @param new_path Destination path
+ * @param new_path_len Destination path length
+ * @return int32_t Status code
+ */
 int32_t path_rename( int32_t fd,
                      int32_t old_path,
                      int32_t old_path_len,
@@ -681,6 +926,16 @@ int32_t path_rename( int32_t fd,
   return 0;
 }
 
+/**
+ * @brief Creates a symbolic link.
+ * 
+ * @param old_path Source path
+ * @param old_path_len Source path length
+ * @param fd Base directory for paths
+ * @param new_path Destination path
+ * @param new_path_len Destination path length
+ * @return int32_t Status code
+ */
 int32_t path_symlink( int32_t old_path, int32_t old_path_len, int32_t fd, int32_t new_path, int32_t new_path_len )
 {
   FUNC_TRACE( T32, old_path, T32, old_path_len, T32, fd, T32, new_path, T32, new_path_len, TEND );
@@ -688,6 +943,14 @@ int32_t path_symlink( int32_t old_path, int32_t old_path_len, int32_t fd, int32_
   return 0;
 }
 
+/**
+ * @brief Unlinks a file at the given path.
+ * 
+ * @param fd Base directory for path
+ * @param path Path to file
+ * @param path_len Length of path
+ * @return int32_t Status code
+ */
 int32_t path_unlink_file( int32_t fd, int32_t path, int32_t path_len )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
@@ -700,7 +963,7 @@ int32_t path_unlink_file( int32_t fd, int32_t path, int32_t path_len )
  *
  * @param num_argument_ptr Number of arguments
  * @param size_argument_ptr Size of arguments in bytes
- * @return int32_t
+ * @return int32_t Status code
  */
 int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
 {
@@ -735,7 +998,7 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
  */
 int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 {
-  int32_t size;
+  int32_t size = 0;
   int32_t addr = argv_buf_ptr;
 
   FUNC_TRACE( T32, argv_ptr, T32, argv_buf_ptr, TEND );
@@ -750,24 +1013,64 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
   return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Gets the environment variables.
+ *
+ * @param retptr0 Returns number of environment variables as int32_t
+ * @param retptr1 Returns size of environment variables in bytes as int32_t
+ * @return int32_t Status code
+ */
 int32_t environ_sizes_get( int32_t retptr0, int32_t retptr1 )
 {
+  int32_t size = 0;
+  int32_t num = size_ro_table( EnvROTable );
+
   FUNC_TRACE( T32, retptr0, T32, retptr1, TEND );
 
-  return 0;
+  for ( int32_t i = 0; i < num; i++ ) {
+    attach_blob_ro_mem( ScratchROMem, get_ro_table( EnvROTable, i ) );
+    size += byte_size_ro_mem( ScratchROMem );
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&num, sizeof( num ) );
+  flatware_mem_to_program_mem( retptr1, (int32_t)&size, sizeof( size ) );
+
+  RET_TRACE( num );
+  RAW_TRACE( ", ", 2 );
+  INT_TRACE( size );
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Gets the environment variables. 
+ * 
+ * @param environ Environment variable array pointer (char**)
+ * @param environ_buf Environment variable buffer pointer (char*)
+ * @return int32_t Status code
+ */
 int32_t environ_get( int32_t environ, int32_t environ_buf )
 {
+  int32_t size = 0;
+  int32_t addr = environ_buf;
+
   FUNC_TRACE( T32, environ, T32, environ_buf, TEND );
 
-  return 0;
+  for ( int32_t i = 0; i < size_ro_table( EnvROTable ); i++ ) {
+    attach_blob_ro_mem( ScratchROMem, get_ro_table( EnvROTable, i ) );
+    size = byte_size_ro_mem( ScratchROMem );
+    flatware_mem_to_program_mem( environ + i * (int32_t)sizeof( char* ), (int32_t)&addr, sizeof( char* ) );
+    ro_mem_to_program_mem( ScratchROMem, addr, 0, size );
+    addr += size;
+  }
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
  * @brief Opens file descriptor.
  *
- * @param fd File descriptor
+ * @param fd Base directory for path
  * @param dirflags Directory flags
  * @param path Path to file
  * @param path_len Length of path
@@ -883,13 +1186,28 @@ int32_t path_open( int32_t fd,
   return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Gets the resolution of a clock.
+ *
+ * @param id Clock ID
+ * @param retptr0 Returns resolution as int64_t
+ * @return int32_t Status code
+ */
 int32_t clock_res_get( int32_t id, int32_t retptr0 )
 {
   FUNC_TRACE( T32, id, T32, retptr0, TEND );
 
-  return 0;
+  return __WASI_ERRNO_INVAL;
 }
 
+/**
+ * @brief Gets the time of a clock.
+ * 
+ * @param id Clock ID
+ * @param precision Maximum permitted error in nanoseconds
+ * @param retptr0 Returns time as int64_t
+ * @return int32_t Status code
+ */
 int32_t clock_time_get( int32_t id, int64_t precision, int32_t retptr0 )
 {
   FUNC_TRACE( T32, id, T64, precision, T32, retptr0, TEND );
@@ -897,6 +1215,15 @@ int32_t clock_time_get( int32_t id, int64_t precision, int32_t retptr0 )
   return 0;
 }
 
+/**
+ * @brief Concurrently polls for a set of events
+ * 
+ * @param in The events to subscribe to (array of __wasi_subscription_t)
+ * @param out The events that have occurred (array of __wasi_event_t)
+ * @param nsubscriptions Number of subscriptions
+ * @param retptr0 Returns number of events as int32_t
+ * @return int32_t Status code
+ */
 int32_t poll_oneoff( int32_t in, int32_t out, int32_t nsubscriptions, int32_t retptr0 )
 {
   FUNC_TRACE( T32, in, T32, out, T32, nsubscriptions, T32, retptr0, TEND );
@@ -904,6 +1231,11 @@ int32_t poll_oneoff( int32_t in, int32_t out, int32_t nsubscriptions, int32_t re
   return 0;
 }
 
+/**
+ * @brief Yields the execution of the current process.
+ * 
+ * @return int32_t Status code
+ */
 int32_t sched_yield( void )
 {
   FUNC_TRACE( TEND );
@@ -911,13 +1243,38 @@ int32_t sched_yield( void )
   return 0;
 }
 
+/**
+ * @brief Gets a random value.
+ *
+ * @param buf Result buffer
+ * @param buf_len Buffer size
+ * @return int32_t
+ */
 int32_t random_get( int32_t buf, int32_t buf_len )
 {
+  uint8_t random;
   FUNC_TRACE( T32, buf, T32, buf_len, TEND );
 
-  return 0;
+  for ( int32_t i = 0; i < buf_len; i++ ) {
+    int64_t a = 16807;
+    int64_t m = 2147483647;
+    random_seed = ( a * random_seed ) % m;
+
+    random = (uint8_t)( random_seed % 256 );
+    flatware_mem_to_program_mem( buf + i, (int32_t)&random, 1 );
+  }
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
+/**
+ * @brief Accepts a new connection on a socket.
+ * 
+ * @param fd File descriptor
+ * @param flags Flags
+ * @param retptr0 New file descriptor
+ * @return int32_t Status code
+ */
 int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, flags, T32, retptr0, TEND );
@@ -925,6 +1282,17 @@ int32_t sock_accept( int32_t fd, int32_t flags, int32_t retptr0 )
   return 0;
 }
 
+/**
+ * @brief Receives a message from a socket.
+ *
+ * @param fd File descriptor of socket
+ * @param ri_data Array of __wasi_iovec_t structs containing buffers to read into
+ * @param ri_data_len Number of buffers in ri_data
+ * @param ri_flags Flags
+ * @param retptr0 Number of bytes read
+ * @param retptr1 Message flags
+ * @return int32_t Status code
+ */
 int32_t sock_recv( int32_t fd,
                    int32_t ri_data,
                    int32_t ri_data_len,
@@ -937,6 +1305,16 @@ int32_t sock_recv( int32_t fd,
   return 0;
 }
 
+/**
+ * @brief Sends a message on a socket.
+ * 
+ * @param fd File descriptor of socket
+ * @param si_data Array of __wasi_ciovec_t structs containing buffers to send
+ * @param si_data_len Number of buffers in si_data
+ * @param si_flags Flags
+ * @param retptr0 Number of bytes sent
+ * @return int32_t Status code
+ */
 int32_t sock_send( int32_t fd, int32_t si_data, int32_t si_data_len, int32_t si_flags, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, si_data, T32, si_data_len, T32, si_flags, T32, retptr0, TEND );
@@ -944,6 +1322,13 @@ int32_t sock_send( int32_t fd, int32_t si_data, int32_t si_data_len, int32_t si_
   return 0;
 }
 
+/**
+ * @brief Closes a socket.
+ *
+ * @param fd File descriptor of socket
+ * @param how How to close the socket as __wasi_sdflags_t
+ * @return int32_t Status code
+ */
 int32_t sock_shutdown( int32_t fd, int32_t how )
 {
   FUNC_TRACE( T32, fd, T32, how, TEND );
@@ -951,11 +1336,25 @@ int32_t sock_shutdown( int32_t fd, int32_t how )
   return 0;
 }
 
+/**
+ * @brief Gets the value of the bitset at the given index. 
+ * 
+ * @param bitset Bitset
+ * @param index Index
+ * @return true Index is set
+ * @return false Index isn't set
+ */
 static bool bitset_get( unsigned int* bitset, uint32_t index )
 {
   return ( bitset[index / sizeof( unsigned int )] >> ( index % sizeof( unsigned int ) ) ) & 1;
 }
 
+/**
+ * @brief Sets the value of the bitset at the given index.
+ * 
+ * @param bitset Bitset
+ * @param index Index
+ */
 static void bitset_set( unsigned int* bitset, uint32_t index )
 {
   bitset[index / sizeof( unsigned int )] |= 1 << ( index % sizeof( unsigned int ) );
@@ -975,7 +1374,12 @@ externref fixpoint_apply( externref encode )
 
   attach_tree_ro_table( FileSystemBaseROTable, get_ro_table( InputROTable, INPUT_FILESYSTEM ) );
   attach_tree_ro_table( ArgsROTable, get_ro_table( InputROTable, INPUT_ARGS ) );
+  attach_blob_ro_mem( StdInROMem, get_ro_table( InputROTable, INPUT_STDIN ) );
+  fds[STDIN].size = byte_size_ro_mem( StdInROMem );
   attach_tree_ro_table( EnvROTable, get_ro_table( InputROTable, INPUT_ENV ) );
+
+  attach_blob_ro_mem( ScratchROMem, get_ro_table( InputROTable, INPUT_RANDOM_SEED ) );
+  random_seed = get_i32_ro_mem( ScratchROMem, 0 );
 
   grow_rw_table( OutputRWTable, 5, create_blob_i32( 0 ) );
 

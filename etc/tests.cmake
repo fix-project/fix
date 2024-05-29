@@ -8,7 +8,10 @@ add_custom_target (fixpoint-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-fai
 )
 add_custom_target (all-fixpoint-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^t_" COMMENT "Testing Fix...")
 
-add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" COMMENT "Testing Flatware...")
+add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" -E "f_python_flatware"
+  COMMENT "Testing Flatware..."
+)
+add_custom_target (all-flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" COMMENT "Testing Flatware...")
 
 add_test(NAME u_handle COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-handle)
 add_test(NAME u_storage COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-storage)
@@ -34,3 +37,4 @@ add_test(NAME f_add_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DI
 add_test(NAME f_return_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-return-flatware)
 add_test(NAME f_helloworld_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-helloworld-flatware)
 add_test(NAME f_open_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-open-flatware)
+add_test(NAME f_python_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-python-flatware)

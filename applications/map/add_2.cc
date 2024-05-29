@@ -2,7 +2,7 @@
 
 int32_t add_2( int32_t x )
 {
-  unsafe_io( "add_2 called." );
+  unsafe_io( "add_2 called.\n" );
   return x + 2;
 }
 
