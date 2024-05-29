@@ -596,8 +596,10 @@ void SendToRemotePass::pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDa
 
 void SendToRemotePass::send_job_dependencies( shared_ptr<IRuntime> rt, Handle<AnyDataType> job )
 {
-  auto remote_contained = job.visit<bool>(
-    overload { []( Handle<Literal> ) { return true; }, [&]( auto x ) { return rt->contains( x ); } } );
+  auto remote_contained = job.visit<bool>( overload { []( Handle<Literal> ) { return true; },
+                                                      [&]( Handle<Relation> x ) { return rt->contains( x ); },
+                                                      // Leave whether to send data to not to Remote's decision
+                                                      []( auto ) { return false; } } );
 
   if ( remote_contained ) {
     return;

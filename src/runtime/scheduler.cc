@@ -3,7 +3,6 @@
 #include "overload.hh"
 #include "pass.hh"
 #include "relater.hh"
-#include "storage_exception.hh"
 #include "types.hh"
 #include <optional>
 #include <stdexcept>
@@ -30,42 +29,6 @@ void Scheduler::merge_sketch_graph( Handle<Relation> job, absl::flat_hash_set<Ha
                              },
                               []( auto ) {} } );
   }
-}
-
-void LocalFirstScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
-{
-  auto local = relater_.value().get().local_;
-  if ( local->get_info()->parallelism > 0 ) {
-    absl::flat_hash_set<Handle<Relation>> unblocked;
-    VLOG( 1 ) << "Merging sketch graph";
-    merge_sketch_graph( top_level_job, unblocked );
-
-    for ( auto leaf_job : leaf_jobs ) {
-      leaf_job.visit<void>( overload {
-        [&]( Handle<Literal> ) {},
-        [&]( auto h ) { local->get( h ); },
-      } );
-    }
-
-    for ( auto job : unblocked ) {
-      local->get( job );
-    }
-
-    return;
-  }
-
-  auto locked_remotes = relater_->get().remotes_.read();
-  if ( locked_remotes->size() > 0 ) {
-    for ( const auto& remote : locked_remotes.get() ) {
-      auto locked_remote = remote.lock();
-      if ( locked_remote ) {
-        locked_remote->get( top_level_job );
-        return;
-      }
-    }
-  }
-
-  throw HandleNotFound( top_level_job );
 }
 
 void OnePassScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )

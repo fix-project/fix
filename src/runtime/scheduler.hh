@@ -27,12 +27,6 @@ public:
   virtual ~Scheduler() {};
 };
 
-class LocalFirstScheduler : public Scheduler
-{
-public:
-  virtual void schedule( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job ) override;
-};
-
 class OnePassScheduler : public Scheduler
 {
 public:

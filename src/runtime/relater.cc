@@ -55,7 +55,7 @@ void Relater::get_from_repository( Handle<T> handle )
 
 Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<shared_ptr<Scheduler>> scheduler )
   : evaluator_( *this )
-  , scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<LocalFirstScheduler>() )
+  , scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
 {
   scheduler_->set_relater( *this );
   local_ = make_shared<Executor>( *this, threads, runner );
@@ -338,25 +338,12 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
     return storage_.get( name );
   }
 
-  if ( local_->get_info()->parallelism == 0 ) {
-    auto locked_remotes = remotes_.read();
-    if ( locked_remotes->size() > 0 ) {
-      for ( const auto& remote : locked_remotes.get() ) {
-        auto locked_remote = remote.lock();
-        if ( locked_remote ) {
-          locked_remote->get( name );
-        }
-      }
-    }
+  relate( name );
+  if ( !works_.empty() ) {
+    scheduler_->schedule( works_, name );
     return {};
   } else {
-    relate( name );
-    if ( !works_.empty() ) {
-      scheduler_->schedule( works_, name );
-      return {};
-    } else {
-      return storage_.get( name );
-    }
+    return storage_.get( name );
   }
 }
 
