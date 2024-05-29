@@ -774,12 +774,12 @@ int32_t fd_tell( int32_t fd, int32_t retptr0 )
 
   return __WASI_ERRNO_SUCCESS;
 }
-  
+
 /**
  * @brief Creates a directory.
- * 
+ *
  * @param fd Base directory for path
- * @param path Path of directoy
+ * @param path Path of directory
  * @param path_len Path length
  * @return int32_t Status code
  */
