@@ -60,9 +60,9 @@ int main( int argc, char* argv[] )
       peerfile = argument;
     } );
   parser.AddOption(
-    's', "scheduler", "scheduler", "Scheduler to use [local, onepass, hint, random]", [&]( const char* argument ) {
+    's', "scheduler", "scheduler", "Scheduler to use [onepass, hint, random]", [&]( const char* argument ) {
       sche_opt = argument;
-      if ( not( *sche_opt == "local" or *sche_opt == "onepass" or *sche_opt == "hint" or *sche_opt == "random" ) ) {
+      if ( not( *sche_opt == "onepass" or *sche_opt == "hint" or *sche_opt == "random" ) ) {
         throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
       }
     } );
@@ -95,7 +95,7 @@ int main( int argc, char* argv[] )
     }
   }
 
-  shared_ptr<Scheduler> scheduler = make_shared<LocalFirstScheduler>();
+  shared_ptr<Scheduler> scheduler = make_shared<HintScheduler>();
   if ( sche_opt.has_value() ) {
     if ( *sche_opt == "onepass" ) {
       scheduler = make_shared<OnePassScheduler>();

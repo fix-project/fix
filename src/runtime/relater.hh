@@ -7,24 +7,23 @@
 #include "runner.hh"
 
 inline thread_local std::vector<Handle<AnyDataType>> works_;
-inline thread_local std::optional<Handle<Relation>> current_;
+inline thread_local Handle<Relation> current_;
+inline thread_local DependencyGraph sketch_graph_;
 
 class Executor;
 class Scheduler;
-class LocalFirstScheduler;
-class Pass;
+class HintScheduler;
 class BasePass;
-class PrunedSelectionPass;
+class RelaterTest;
 
 class Relater
   : public MultiWorkerRuntime
   , FixRuntime
 {
   friend class Executor;
-  friend class LocalFirstScheduler;
-  friend class Pass;
+  friend class HintScheduler;
   friend class BasePass;
-  friend class PrunedSelectionPass;
+  friend class RelaterTest;
 
 private:
   SharedMutex<DependencyGraph> graph_ {};
@@ -36,11 +35,9 @@ private:
   SharedMutex<std::vector<std::weak_ptr<IRuntime>>> remotes_ {};
   std::shared_ptr<IRuntime> local_ {};
 
-  // Return result if completed, otherwise add a dependency from current_ to goal
-  Result<Object> get_or_block( Handle<Relation> goal );
   // Return the list of doable works. After the function returns, graph_ is modified such that
   // finishing all the doable works would recursivly finish the top level relation.
-  std::vector<Handle<AnyDataType>> relate( Handle<Relation> );
+  void relate( Handle<Relation> );
 
   template<FixType T>
   void get_from_repository( Handle<T> handle );
@@ -167,4 +164,12 @@ public:
 
   Repository& get_repository() { return repository_; }
   virtual std::unordered_set<Handle<AnyDataType>> data() const override { return repository_.data(); }
+  virtual absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Handle<Relation> blocked ) override
+  {
+    return graph_.read()->get_forward_dependencies( blocked );
+  }
+
+  void merge_sketch_graph( Handle<Relation> r, absl::flat_hash_set<Handle<Relation>>& unblocked );
+
+  std::shared_ptr<IRuntime> get_local() { return local_; }
 };

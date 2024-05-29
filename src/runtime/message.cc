@@ -53,21 +53,25 @@ void OutgoingMessage::serialize_header( string& out )
 
 string_view OutgoingMessage::payload()
 {
-  return std::visit( overload { []( BlobData& b ) -> string_view {
-                                 return { b->data(), b->size() };
-                               },
-                                []( TreeData& t ) -> string_view {
-                                  return { reinterpret_cast<const char*>( t->data() ), t->span().size_bytes() };
-                                },
-                                []( string& s ) -> string_view { return s; } },
+  return std::visit( overload {
+                       []( BlobData& b ) -> string_view {
+                         return { b->data(), b->size() };
+                       },
+                       []( TreeData& t ) -> string_view {
+                         return { reinterpret_cast<const char*>( t->data() ), t->span().size_bytes() };
+                       },
+                       []( string& s ) -> string_view { return s; },
+                     },
                      payload_ );
 }
 
 size_t OutgoingMessage::payload_length()
 {
-  return std::visit( overload { []( BlobData& b ) { return b->size(); },
-                                []( TreeData& t ) { return t->span().size_bytes(); },
-                                []( string& s ) { return s.size(); } },
+  return std::visit( overload {
+                       []( BlobData& b ) { return b->size(); },
+                       []( TreeData& t ) { return t->span().size_bytes(); },
+                       []( string& s ) { return s.size(); },
+                     },
                      payload_ );
 }
 
@@ -92,16 +96,18 @@ size_t IncomingMessage::expected_payload_length( string_view header )
 
 OutgoingMessage OutgoingMessage::to_message( MessagePayload&& payload )
 {
-  return std::visit( overload { []( BlobDataPayload b ) -> OutgoingMessage {
-                                 return { Opcode::BLOBDATA, b.second };
-                               },
-                                []( TreeDataPayload t ) -> OutgoingMessage {
-                                  return { Opcode::TREEDATA, t.second };
-                                },
-                                []( auto&& p ) -> OutgoingMessage {
-                                  using T = std::decay_t<decltype( p )>;
-                                  return { T::OPCODE, serialize( p ) };
-                                } },
+  return std::visit( overload {
+                       []( BlobDataPayload b ) -> OutgoingMessage {
+                         return { Opcode::BLOBDATA, b.second };
+                       },
+                       []( TreeDataPayload t ) -> OutgoingMessage {
+                         return { Opcode::TREEDATA, t.second };
+                       },
+                       []( auto&& p ) -> OutgoingMessage {
+                         using T = std::decay_t<decltype( p )>;
+                         return { T::OPCODE, serialize( p ) };
+                       },
+                     },
                      payload );
 }
 

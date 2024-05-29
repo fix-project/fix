@@ -55,7 +55,7 @@ void Relater::get_from_repository( Handle<T> handle )
 
 Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<shared_ptr<Scheduler>> scheduler )
   : evaluator_( *this )
-  , scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<LocalFirstScheduler>() )
+  , scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
 {
   scheduler_->set_relater( *this );
   local_ = make_shared<Executor>( *this, threads, runner );
@@ -63,22 +63,15 @@ Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<
 
 Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
 {
-  auto graph = graph_.write();
-
   auto contained = handle.visit<bool>(
     overload { [&]( Handle<Literal> ) { return true; }, [&]( auto h ) { return storage_.contains( h ); } } );
+
+  handle.visit<void>(
+    overload { []( Handle<Literal> ) {}, [&]( auto ) { sketch_graph_.add_dependency( current_, handle ); } } );
 
   if ( contained ) {
     return handle::fix( handle );
   } else {
-    handle.visit<void>( overload {
-      []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
-      [&]( Handle<AnyTree> t ) {
-        t.visit<void>( [&]( auto h ) { graph->add_dependency( current_.value(), h ); } );
-      },
-      [&]( Handle<Named> n ) { graph->add_dependency( current_.value(), n ); },
-      [&]( Handle<Relation> r ) { graph->add_dependency( current_.value(), r ); },
-    } );
     works_.push_back( handle );
     return {};
   }
@@ -100,11 +93,12 @@ Relater::Result<AnyTree> Relater::load( Handle<AnyTreeRef> handle )
     throw HandleNotFound( handle::fix( handle ) );
   }
 
+  auto d = h.value().visit<Handle<AnyDataType>>( []( auto h ) { return h; } );
+  sketch_graph_.add_dependency( current_, d );
+
   if ( storage_.contains( h.value() ) ) {
     return h.value();
   } else {
-    auto d = h.value().visit<Handle<AnyDataType>>( []( auto h ) { return h; } );
-    graph_.write()->add_dependency( current_.value(), d );
     works_.push_back( d );
     return {};
   }
@@ -121,6 +115,9 @@ Handle<AnyTreeRef> Relater::ref( Handle<AnyTree> tree )
 Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
 {
   auto apply = Handle<Relation>( Handle<Apply>( combination ) );
+  if ( apply != current_ ) {
+    sketch_graph_.add_dependency( current_, apply );
+  }
 
   if ( storage_.contains( apply ) ) {
     return storage_.get( apply );
@@ -130,60 +127,45 @@ Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
     return get( apply );
   }
 
-  {
-    auto graph = graph_.write();
-    if ( apply != current_ and !storage_.contains( apply ) ) {
-      graph->add_dependency( current_.value(), apply );
-    } else if ( storage_.contains( apply ) ) {
-      return storage_.get( apply );
-    }
-  }
   works_.push_back( Handle<Apply>( combination ) );
   return {};
-}
-
-Relater::Result<Object> Relater::get_or_block( Handle<Relation> goal )
-{
-  auto prev_current = current_;
-
-  current_ = goal;
-  auto res = evaluator_.relate( goal );
-  if ( !res.has_value() and prev_current.has_value() ) {
-    graph_.write()->add_dependency( prev_current.value(), goal );
-  }
-
-  current_ = prev_current;
-  return res;
 }
 
 Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
 {
   Handle<Eval> goal( expression );
+  optional<Handle<Value>> result;
 
   if ( storage_.contains( goal ) ) {
-    return storage_.get( goal ).unwrap<Value>();
+    result = storage_.get( goal ).unwrap<Value>();
   } else if ( contains( goal ) ) {
     VLOG( 2 ) << "Relation existed " << goal;
-    return get( goal )->unwrap<Value>();
+    result = get( goal )->unwrap<Value>();
+  }
+
+  if ( result.has_value() ) {
+    if ( current_ != Handle<Relation>( goal ) && Handle<Object>( result.value() ) != expression ) {
+      sketch_graph_.add_dependency( current_, goal );
+    }
+    return result.value();
   }
 
   auto prev_current = current_;
   current_ = goal;
 
-  auto result = evaluator_.evalStrict( expression );
-  if ( result.has_value() ) {
-    this->put( goal, result.value() );
-  } else {
-    auto graph = graph_.write();
-    if ( prev_current.has_value() and prev_current.value() != Handle<Relation>( goal )
-         and !storage_.contains( goal ) ) {
-      graph->add_dependency( prev_current.value(), goal );
-    } else if ( storage_.contains( goal ) ) {
-      return storage_.get( goal ).unwrap<Value>();
-    }
-  }
+  result = evaluator_.evalStrict( expression );
 
   current_ = prev_current;
+
+  if ( result.has_value() ) {
+    this->put( goal, result.value() );
+  }
+
+  if ( current_ != Handle<Relation>( goal )
+       && ( !result.has_value() || Handle<Object>( result.value() ) != expression ) ) {
+    sketch_graph_.add_dependency( current_, goal );
+  }
+
   return result;
 }
 
@@ -300,11 +282,12 @@ Relater::Result<ValueTree> Relater::mapLift( Handle<ValueTree> tree )
   }
 }
 
-vector<Handle<AnyDataType>> Relater::relate( Handle<Relation> goal )
+void Relater::relate( Handle<Relation> goal )
 {
   works_ = {};
-  get_or_block( goal );
-  return works_;
+  sketch_graph_ = {};
+  current_ = goal;
+  evaluator_.relate( goal );
 }
 
 void Relater::add_worker( shared_ptr<IRuntime> rmt )
@@ -355,9 +338,9 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
     return storage_.get( name );
   }
 
-  auto works = relate( name );
-  if ( !works.empty() ) {
-    scheduler_->schedule( works, name );
+  relate( name );
+  if ( !works_.empty() ) {
+    scheduler_->schedule( works_, name );
     return {};
   } else {
     return storage_.get( name );
@@ -444,4 +427,20 @@ Handle<Fix> Relater::labeled( const std::string_view label )
     return repository_.labeled( label );
   }
   return storage_.labeled( label );
+}
+
+void Relater::merge_sketch_graph( Handle<Relation> r, absl::flat_hash_set<Handle<Relation>>& unblocked )
+{
+  auto graph = graph_.write();
+
+  for ( auto d : sketch_graph_.get_forward_dependencies( r ) ) {
+    auto contained = d.visit<bool>(
+      overload { []( Handle<Literal> ) { return true; }, [&]( auto h ) { return storage_.contains( h ); } } );
+
+    if ( contained ) {
+      sketch_graph_.finish( d, unblocked );
+    } else {
+      graph->add_dependency( r, d );
+    }
+  }
 }

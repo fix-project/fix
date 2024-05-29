@@ -1,81 +1,37 @@
 #include "scheduler.hh"
 #include "handle.hh"
-#include "handle_post.hh"
 #include "overload.hh"
 #include "pass.hh"
-#include "storage_exception.hh"
+#include "relater.hh"
 #include "types.hh"
-#include <limits>
 #include <optional>
 #include <stdexcept>
 
 using namespace std;
 
-namespace scheduler {
-bool is_local( shared_ptr<IRuntime> rt )
+void Scheduler::merge_sketch_graph( Handle<Relation> job, absl::flat_hash_set<Handle<Relation>>& unblocked )
 {
-  return rt->get_info()->link_speed == numeric_limits<double>::max();
-}
-
-void get( shared_ptr<IRuntime> worker, Handle<AnyDataType> job, Relater& rt )
-{
-  if ( is_local( worker ) ) {
-    job.visit<void>( overload {
-      [&]( Handle<Literal> ) {},
-      [&]( auto h ) { worker->get( h ); },
-    } );
-  } else {
-    // Send visit( job ) before sending the job itself
-    auto send = [&]( Handle<AnyDataType> h ) {
-      h.visit<void>( overload { []( Handle<Literal> ) {},
-                                []( Handle<Relation> ) {},
-                                [&]( auto x ) { worker->put( x, rt.get( x ).value() ); } } );
-    };
-
-    job.visit<void>( overload {
-      [&]( Handle<Relation> r ) {
-        rt.visit( r.visit<Handle<Fix>>( overload { []( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
-                                                   []( Handle<Eval> e ) {
-                                                     auto obj = e.unwrap<Object>();
-                                                     return handle::extract<Thunk>( obj )
-                                                       .transform( []( auto obj ) -> Handle<Fix> {
-                                                         return Handle<Strict>( obj );
-                                                       } )
-                                                       .or_else( [&]() -> optional<Handle<Fix>> { return obj; } )
-                                                       .value();
-                                                   } } ),
-                  send );
-      },
-      []( auto ) {} } );
-
-    job.visit<void>( overload { []( Handle<Literal> ) { throw runtime_error( "Unreachable" ); },
-                                [&]( auto h ) { worker->get( h ); } } );
-  }
-}
-}
-
-void LocalFirstScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
-{
-  auto local = relater_.value().get().local_;
-  if ( local->get_info()->parallelism > 0 ) {
-    for ( const auto& leaf_job : leaf_jobs ) {
-      scheduler::get( local, leaf_job, relater_->get() );
-    }
+  if ( relater_.value().get().contains( job ) ) {
     return;
   }
 
-  auto locked_remotes = relater_->get().remotes_.read();
-  if ( locked_remotes->size() > 0 ) {
-    for ( const auto& remote : locked_remotes.get() ) {
-      auto locked_remote = remote.lock();
-      if ( locked_remote ) {
-        scheduler::get( locked_remote, top_level_job, relater_->get() );
-        return;
-      }
-    }
+  relater_.value().get().merge_sketch_graph( job, unblocked );
+
+  if ( unblocked.contains( job ) ) {
+    return;
   }
 
-  throw HandleNotFound( top_level_job );
+  for ( auto d : relater_.value().get().get_forward_dependencies( job ) ) {
+    d.visit<void>( overload {
+      [&]( Handle<Relation> r ) {
+        r.visit<void>( overload {
+          [&]( Handle<Eval> e ) { merge_sketch_graph( e, unblocked ); },
+          []( Handle<Apply> ) {},
+        } );
+      },
+      []( auto ) {},
+    } );
+  }
 }
 
 void OnePassScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
@@ -99,11 +55,29 @@ void HintScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Rel
     return;
   }
 
+  if ( relater_->get().remotes_.read()->size() == 0 ) {
+    absl::flat_hash_set<Handle<Relation>> unblocked;
+    merge_sketch_graph( top_level_job, unblocked );
+
+    for ( auto leaf_job : leaf_jobs ) {
+      leaf_job.visit<void>( overload {
+        [&]( Handle<Literal> ) {},
+        [&]( auto h ) { relater_->get().get_local()->get( h ); },
+      } );
+    }
+
+    for ( auto job : unblocked ) {
+      relater_->get().get_local()->get( job );
+    }
+
+    return;
+  }
+
   PassRunner::run( relater_.value(),
                    top_level_job,
                    { PassRunner::PassType::MinAbsentMaxParallelism,
                      PassRunner::PassType::ChildBackProp,
-                     PassRunner::PassType::OutSource } );
+                     PassRunner::PassType::InOutSource } );
 }
 
 void RandomScheduler::schedule( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )

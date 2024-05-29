@@ -5,6 +5,8 @@
 #include "object.hh"
 #include "overload.hh"
 #include "types.hh"
+
+#include <absl/container/flat_hash_set.h>
 #include <functional>
 #include <glog/logging.h>
 #include <unordered_set>
@@ -53,6 +55,9 @@ public:
   virtual void put( Handle<AnyTree> name, TreeData data ) = 0;
   virtual void put( Handle<Relation> name, Handle<Object> data ) = 0;
   ///@}
+
+  // XXX
+  virtual void put_force( Handle<Relation>, Handle<Object> ) {};
 
   /**
    * These functions automatically compute the canonical name of data before storing them.  Implementors may
@@ -140,75 +145,10 @@ public:
     }
   }
 
-  // Visit from a root (include Handle<Strict>( Handle<Application>( Handle<ExrpessionTree> ) ) )
-  template<FixType T>
-  void visit( Handle<T> handle,
-              std::function<void( Handle<AnyDataType> )> visitor,
-              std::unordered_set<Handle<Fix>> visited = {} )
-  {
-    if ( visited.contains( handle ) )
-      return;
-    if constexpr ( std::same_as<T, Literal> )
-      return;
-
-    if constexpr ( Handle<T>::is_fix_sum_type ) {
-      if constexpr ( std::same_as<T, Encode> ) {
-        Handle<Thunk> thunk
-          = handle.template visit<Handle<Thunk>>( []( auto s ) { return s.template unwrap<Thunk>(); } );
-        thunk.visit<void>( overload {
-          [&]( Handle<Application> a ) { visit( a.unwrap<ExpressionTree>(), visitor, visited ); },
-          [&]( Handle<Identification> i ) {
-            auto v = i.unwrap<Value>();
-            v.visit<void>( overload { [&]( Handle<Blob> b ) {
-                                       b.visit<void>( overload { []( Handle<Literal> ) {},
-                                                                 [&]( Handle<Named> n ) {
-                                                                   if ( contains( n ) )
-                                                                     visit( n, visitor, visited );
-                                                                 } } );
-                                     },
-                                      [&]( Handle<BlobRef> br ) {
-                                        br.unwrap<Blob>().visit<void>( overload { []( Handle<Literal> ) {},
-                                                                                  [&]( Handle<Named> n ) {
-                                                                                    if ( contains( n ) )
-                                                                                      visit( n, visitor, visited );
-                                                                                  } } );
-                                      },
-                                      [&]( Handle<ValueTree> t ) {
-                                        if ( contains( t ) )
-                                          visit( t, visitor, visited );
-                                      },
-                                      [&]( Handle<ValueTreeRef> tr ) {
-                                        auto t = contains( tr );
-                                        if ( t.has_value() ) {
-                                          if ( contains( t.value() ) )
-                                            visit( t.value().unwrap<ValueTree>(), visitor, visited );
-                                        }
-                                      } } );
-          },
-          []( auto ) {} } );
-      }
-
-      if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, BlobRef> ) )
-        std::visit( [&]( const auto x ) { visit( x, visitor, visited ); }, handle.get() );
-
-    } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
-      return;
-    } else {
-      if constexpr ( FixTreeType<T> ) {
-        // Having the handle means that the data presents in storage
-        auto tree = get( handle );
-        for ( const auto& element : tree.value()->span() ) {
-          visit( element, visitor, visited );
-        }
-      }
-      VLOG( 3 ) << "visiting " << handle;
-      visitor( handle );
-      visited.insert( handle );
-    }
-  }
-
   // Return the list of data presening in .fix repository
   virtual std::unordered_set<Handle<AnyDataType>> data() const { return {}; };
+  // Return the list of forward dependencies
+  virtual absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Handle<Relation> ) { return {}; }
 };
 
 class MultiWorkerRuntime : public IRuntime

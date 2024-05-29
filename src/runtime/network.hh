@@ -3,6 +3,7 @@
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <concurrentqueue/concurrentqueue.h>
+#include <condition_variable>
 #include <functional>
 #include <glog/logging.h>
 #include <memory>
@@ -18,7 +19,6 @@
 #include "interface.hh"
 #include "message.hh"
 #include "mutex.hh"
-#include "relater.hh"
 #include "ring_buffer.hh"
 #include "runtimestorage.hh"
 #include "socket.hh"
@@ -63,6 +63,7 @@ class Remote : public IRuntime
   std::vector<EventLoop::RuleHandle> installed_rules_ {};
 
   std::shared_mutex mutex_ {};
+  std::condition_variable_any info_cv_ {};
   std::optional<Info> info_ {};
   absl::flat_hash_set<Handle<Relation>> reply_to_ {};
 
@@ -97,6 +98,7 @@ public:
   void put( Handle<Named> name, BlobData data ) override;
   void put( Handle<AnyTree> name, TreeData data ) override;
   void put( Handle<Relation> name, Handle<Object> data ) override;
+  void put_force( Handle<Relation> name, Handle<Object> data ) override;
 
   bool contains( Handle<Named> handle ) override;
   bool contains( Handle<AnyTree> handle ) override;
@@ -113,12 +115,6 @@ public:
   std::unordered_set<Handle<Relation>> pending_result_ {};
 
   bool dead() const { return dead_; }
-
-  virtual bool reply_to_contains( Handle<Relation> handle )
-  {
-    std::shared_lock lock( mutex_ );
-    return reply_to_.contains( handle );
-  }
 
   bool erase_reply_to( Handle<Relation> handle )
   {
@@ -208,6 +204,11 @@ public:
   {
     auto address_str = address.to_string();
     addresses_.read().wait( [&] { return addresses_.read()->contains( address_str ); } );
-    return std::static_pointer_cast<IRuntime>( connections_.read()->at( addresses_.read()->at( address_str ) ) );
+    auto rt = connections_.read()->at( addresses_.read()->at( address_str ) );
+
+    std::shared_lock lock( rt->mutex_ );
+    rt->info_cv_.wait( lock, [&]() { return rt->info_.has_value(); } );
+
+    return std::static_pointer_cast<IRuntime>( rt );
   }
 };
