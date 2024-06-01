@@ -1,6 +1,7 @@
 #include "c-flatware.h"
 #include "filesys.h"
 #include "flatware-decs.h"
+#include "util/linked_list.h"
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -26,6 +27,7 @@ enum fd_
 static entry* filesys = NULL;
 static fd_table fds;
 static int64_t random_seed;
+static uint64_t clock_time;
 
 // for each value, first pass the width (T32 or T64), then pass the value
 // to specify the end, pass TEND
@@ -193,6 +195,13 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&f->stat, sizeof( f->stat ) );
+
   return __WASI_ERRNO_SUCCESS;
 }
 
@@ -214,6 +223,14 @@ int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
     return __WASI_ERRNO_BADF;
   }
 
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_SEEK ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_REGULAR_FILE ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
   switch ( whence ) {
     case __WASI_WHENCE_SET:
       f->offset = offset;
@@ -222,13 +239,14 @@ int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
       f->offset += offset;
       break;
     case __WASI_WHENCE_END:
-      f->offset = f->entry->size + offset;
+      f->offset = f->entry->stat.size + offset;
       break;
     default:
       return __WASI_ERRNO_INVAL;
   }
 
   flatware_mem_to_program_mem( retptr0, (int32_t)&f->offset, sizeof( f->offset ) );
+  RET_TRACE( f->offset );
 
   return __WASI_ERRNO_SUCCESS;
 }
@@ -251,10 +269,20 @@ int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
     return __WASI_ERRNO_BADF;
   }
 
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_READ ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_REGULAR_FILE
+       && f->stat.fs_filetype != __WASI_FILETYPE_CHARACTER_DEVICE ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
   // Iterate over buffers
   int32_t bytes_read = 0;
+  int32_t offset = f->offset;
   for ( int32_t i = 0; i < iovs_len; ++i ) {
-    int32_t file_remaining = f->entry->size - f->offset;
+    int32_t file_remaining = f->entry->stat.size - f->offset;
     if ( file_remaining <= 0 ) {
       break;
     }
@@ -266,9 +294,10 @@ int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 
     int32_t size_to_read = min( file_remaining, iobuf_len );
     flatware_mem_to_program_mem( iobuf_offset, (int32_t)f->entry->content + f->offset, size_to_read );
-    f->offset += size_to_read;
+    offset += size_to_read;
     bytes_read += size_to_read;
   }
+  f->offset = offset;
 
   flatware_mem_to_program_mem( retptr0, (int32_t)&bytes_read, sizeof( bytes_read ) );
   RET_TRACE( bytes_read );
@@ -291,29 +320,46 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 
   filedesc* f = fd_table_find( &fds, fd );
   if ( f == NULL ) {
+    RAW_TRACE( "-> bad file descriptor", 23 );
     return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_WRITE ) ) {
+    RAW_TRACE( "-> no write rights", 15 );
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_REGULAR_FILE
+       && f->stat.fs_filetype != __WASI_FILETYPE_CHARACTER_DEVICE ) {
+    RAW_TRACE( "-> not a regular file", 21 );
+    return __WASI_ERRNO_INVAL;
   }
 
   // Iterate over buffers
   int32_t bytes_written = 0;
+  int32_t offset = f->stat.fs_flags & __WASI_FDFLAGS_APPEND ? f->entry->stat.size : f->offset;
   for ( int32_t i = 0; i < iovs_len; ++i ) {
     int32_t iobuf_offset = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_ciovec_t )
                                             + (int32_t)offsetof( __wasi_ciovec_t, buf ) );
     int32_t iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_ciovec_t )
                                          + (int32_t)offsetof( __wasi_ciovec_t, buf_len ) );
 
-    if ( f->entry->size < f->offset + iobuf_len && !entry_grow( f->entry, f->offset + iobuf_len ) ) {
+    if ( f->entry->stat.size < f->offset + iobuf_len && !entry_grow( f->entry, f->offset + iobuf_len ) ) {
+      RAW_TRACE( "-> no space", 11 );
       return __WASI_ERRNO_NOSPC;
     }
 
     program_mem_to_flatware_mem( (int32_t)f->entry->content + f->offset, iobuf_offset, iobuf_len );
-    
-    if (fd == STDOUT) {
-      flatware_mem_unsafe_io((char*)f->entry->content + f->offset, iobuf_len);
+
+    if ( fd == STDOUT || fd == STDERR ) {
+      flatware_mem_unsafe_io( (char*)f->entry->content + f->offset, iobuf_len );
     }
 
-    f->offset += iobuf_len;
+    offset += iobuf_len;
     bytes_written += iobuf_len;
+  }
+  if ( !( f->stat.fs_flags & __WASI_FDFLAGS_APPEND ) ) {
+    f->offset = offset;
   }
 
   flatware_mem_to_program_mem( retptr0, (int32_t)&bytes_written, sizeof( bytes_written ) );
@@ -332,6 +378,17 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
 {
   FUNC_TRACE( T32, fd, T32, fdflags, TEND );
+
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  f->stat.fs_flags = fdflags;
 
   return __WASI_ERRNO_SUCCESS;
 }
@@ -352,8 +409,12 @@ int32_t fd_prestat_get( int32_t fd, int32_t retptr0 )
     return __WASI_ERRNO_BADF;
   }
 
-  if ( f->entry->type != ENTRY_DIR ) {
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_DIRECTORY ) {
     return __WASI_ERRNO_NOTDIR;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_FILESTAT_GET ) ) {
+    return __WASI_ERRNO_ACCES;
   }
 
   __wasi_prestat_t prestat = { .tag = __WASI_PREOPENTYPE_DIR, .u.dir.pr_name_len = strlen( f->entry->name ) };
@@ -379,8 +440,12 @@ int32_t fd_prestat_dir_name( int32_t fd, int32_t path, int32_t path_len )
     return __WASI_ERRNO_BADF;
   }
 
-  if ( f->entry->type != ENTRY_DIR ) {
+  if ( f->entry->stat.filetype != __WASI_FILETYPE_DIRECTORY ) {
     return __WASI_ERRNO_NOTDIR;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_FILESTAT_GET ) ) {
+    return __WASI_ERRNO_ACCES;
   }
 
   flatware_mem_to_program_mem( path, (int32_t)f->entry->name, min( strlen( f->entry->name ), (uint64_t)path_len ) );
@@ -422,7 +487,19 @@ int32_t fd_allocate( int32_t fd, int64_t offset, int64_t len )
     return __WASI_ERRNO_BADF;
   }
 
-  if ( f->entry->size < offset + len && !entry_grow( f->entry, offset + len ) ) {
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_ALLOCATE ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_REGULAR_FILE ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
+  if ( offset + len < 0 ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
+  if ( f->entry->stat.size < (uint64_t)( offset + len ) && !entry_grow( f->entry, offset + len ) ) {
     return __WASI_ERRNO_NOSPC;
   }
 
@@ -431,7 +508,7 @@ int32_t fd_allocate( int32_t fd, int64_t offset, int64_t len )
 
 /**
  * @brief Synchronizes the data of a file descriptor.
- * @details No supported due to in-memory filesystem. Returns NOTSUP.
+ * @details No effect currently. Returns SUCCESS.
  *
  * @param fd File descriptor
  * @return int32_t Status code
@@ -440,12 +517,11 @@ int32_t fd_datasync( int32_t fd )
 {
   FUNC_TRACE( T32, fd, TEND );
 
-  return __WASI_ERRNO_NOTSUP;
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
  * @brief Gets the attributes of a file descriptor.
- * @details Not supported yet. Returns NOTSUP.
  *
  * @param fd File descriptor
  * @param retptr0 Returns file descriptor attributes as __wasi_filestat_t
@@ -455,7 +531,18 @@ int32_t fd_filestat_get( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
-  return __WASI_ERRNO_NOTSUP;
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_FILESTAT_GET ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&f->entry->stat, sizeof( f->entry->stat ) );
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -478,9 +565,21 @@ int32_t fd_filestat_set_size( int32_t fd, int64_t size )
     return __WASI_ERRNO_BADF;
   }
 
-  if (size < f->entry->size) {
-    f->entry->size = size;
-  } else if (!entry_grow(f->entry, size)) {
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_FILESTAT_SET_SIZE ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_REGULAR_FILE ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
+  if ( size < 0 ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
+  if ( (uint64_t)size < f->entry->stat.size ) {
+    f->entry->stat.size = size;
+  } else if ( !entry_grow( f->entry, size ) ) {
     return __WASI_ERRNO_NOSPC;
   }
 
@@ -500,7 +599,29 @@ int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t f
 {
   FUNC_TRACE( T32, fd, T64, atim, T64, mtim, T32, fst_flags, TEND );
 
-  return 0;
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_FILESTAT_SET_TIMES ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( fst_flags & __WASI_FSTFLAGS_ATIM ) {
+    f->entry->stat.atim = atim;
+  }
+  if ( fst_flags & __WASI_FSTFLAGS_ATIM_NOW ) {
+    f->entry->stat.atim = clock_time;
+  }
+  if ( fst_flags & __WASI_FSTFLAGS_MTIM ) {
+    f->entry->stat.mtim = mtim;
+  }
+  if ( fst_flags & __WASI_FSTFLAGS_MTIM_NOW ) {
+    f->entry->stat.mtim = clock_time;
+  }
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -516,6 +637,42 @@ int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t f
 int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
+
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_READ ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_REGULAR_FILE
+       && f->stat.fs_filetype != __WASI_FILETYPE_CHARACTER_DEVICE ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
+  // Iterate over buffers
+  int32_t bytes_read = 0;
+  for ( int32_t i = 0; i < iovs_len; ++i ) {
+    int32_t file_remaining = f->entry->stat.size - f->offset;
+    if ( file_remaining <= 0 ) {
+      break;
+    }
+
+    int32_t iobuf_offset
+      = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t ) + (int32_t)offsetof( __wasi_iovec_t, buf ) );
+    int32_t iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
+                                         + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
+
+    int32_t size_to_read = min( file_remaining, iobuf_len );
+    flatware_mem_to_program_mem( iobuf_offset, (int32_t)f->entry->content + f->offset, size_to_read );
+    offset += size_to_read;
+    bytes_read += size_to_read;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&bytes_read, sizeof( bytes_read ) );
+  RET_TRACE( bytes_read );
 
   return __WASI_ERRNO_SUCCESS;
 }
@@ -534,7 +691,49 @@ int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, i
 {
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
 
-  return 0;
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_WRITE ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_REGULAR_FILE
+       && f->stat.fs_filetype != __WASI_FILETYPE_CHARACTER_DEVICE ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
+  // Iterate over buffers
+  int32_t bytes_written = 0;
+  if ( f->stat.fs_flags & __WASI_FDFLAGS_APPEND ) {
+    offset = f->entry->stat.size;
+  }
+  for ( int32_t i = 0; i < iovs_len; ++i ) {
+    int32_t iobuf_offset = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_ciovec_t )
+                                            + (int32_t)offsetof( __wasi_ciovec_t, buf ) );
+    int32_t iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_ciovec_t )
+                                         + (int32_t)offsetof( __wasi_ciovec_t, buf_len ) );
+
+    if ( f->entry->stat.size < f->offset + iobuf_len && !entry_grow( f->entry, f->offset + iobuf_len ) ) {
+      return __WASI_ERRNO_NOSPC;
+    }
+
+    program_mem_to_flatware_mem( (int32_t)f->entry->content + f->offset, iobuf_offset, iobuf_len );
+
+    if ( fd == STDOUT ) {
+      flatware_mem_unsafe_io( (char*)f->entry->content + f->offset, iobuf_len );
+    }
+
+    offset += iobuf_len;
+    bytes_written += iobuf_len;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&bytes_written, sizeof( bytes_written ) );
+  RET_TRACE( bytes_written );
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -551,11 +750,58 @@ int32_t fd_readdir( int32_t fd, int32_t buf, int32_t buf_len, int64_t cookie, in
 {
   FUNC_TRACE( T32, fd, T32, buf, T32, buf_len, T64, cookie, T32, retptr0, TEND );
 
-  return 0;
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_DIRECTORY ) {
+    return __WASI_ERRNO_NOTDIR;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_READDIR ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( cookie < 0 || (uint64_t)cookie >= f->entry->stat.size ) {
+    return __WASI_ERRNO_INVAL;
+  }
+
+  int32_t bytes_read = 0;
+  struct list_elem* e = list_begin( &f->entry->children );
+  for ( int64_t i = 0; i < cookie; ++i ) {
+    e = list_next( e );
+    if ( e == list_end( &f->entry->children ) ) {
+      break;
+    }
+  }
+
+  while ( e != list_end( &f->entry->children ) ) {
+    entry* child = list_entry( e, entry, elem );
+    __wasi_dirent_t dirent = { .d_next = list_next( e ) == list_end( &f->entry->children ) ? 0 : cookie++,
+                               .d_ino = child->stat.ino,
+                               .d_type = child->stat.filetype,
+                               .d_namlen = strlen( child->name ) };
+
+    int32_t child_size = sizeof( dirent ) + dirent.d_namlen;
+    if ( bytes_read + child_size > buf_len ) {
+      break;
+    }
+
+    flatware_mem_to_program_mem( buf + bytes_read, (int32_t)&dirent, sizeof( dirent ) );
+    flatware_mem_to_program_mem( buf + bytes_read + sizeof( dirent ), (int32_t)child->name, dirent.d_namlen );
+    bytes_read += child_size;
+    e = list_next( e );
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&bytes_read, sizeof( bytes_read ) );
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
  * @brief Synchronizes file and metadata changes to storage.
+ * @details No effect currently. Returns SUCCESS.
  *
  * @param fd File descriptor
  * @return int32_t Status code
@@ -564,7 +810,7 @@ int32_t fd_sync( int32_t fd )
 {
   FUNC_TRACE( T32, fd, TEND );
 
-  return 0;
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -577,6 +823,18 @@ int32_t fd_sync( int32_t fd )
 int32_t fd_tell( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
+
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_FD_TELL ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&f->offset, sizeof( f->offset ) );
+  RET_TRACE( f->offset );
 
   return __WASI_ERRNO_SUCCESS;
 }
@@ -593,7 +851,58 @@ int32_t path_create_directory( int32_t fd, int32_t path, int32_t path_len )
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
 
-  return 0;
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_PATH_CREATE_DIRECTORY ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_DIRECTORY ) {
+    return __WASI_ERRNO_NOTDIR;
+  }
+
+  char* name = (char*)malloc( path_len + 1 );
+  if ( name == NULL ) {
+    return __WASI_ERRNO_NOMEM;
+  }
+
+  program_mem_to_flatware_mem( (int32_t)name, path, path_len );
+  name[path_len] = '\0';
+
+  char *saveptr = name, *token = strtok_r( name, "/", &saveptr );
+  char* next_token = strtok_r( NULL, "/", &saveptr );
+  while ( next_token != NULL ) {
+    entry* child = entry_find( f->entry, token );
+    if ( child == NULL ) {
+      return __WASI_ERRNO_NOENT;
+    }
+
+    if ( child->stat.filetype != __WASI_FILETYPE_DIRECTORY ) {
+      return __WASI_ERRNO_NOTDIR;
+    }
+
+    token = next_token;
+    next_token = strtok_r( NULL, "/", &saveptr );
+  }
+
+  entry* child = entry_find( f->entry, token );
+  if ( child != NULL ) {
+    return __WASI_ERRNO_EXIST;
+  }
+
+  entry* new_entry = entry_create( token, __WASI_FILETYPE_DIRECTORY );
+  free( name );
+  if ( new_entry == NULL ) {
+    return __WASI_ERRNO_NOMEM;
+  }
+
+  list_push_back( &f->entry->children, &new_entry->elem );
+  f->entry->stat.size++;
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -610,7 +919,44 @@ int32_t path_filestat_get( int32_t fd, int32_t flags, int32_t path, int32_t path
 {
   FUNC_TRACE( T32, fd, T32, flags, T32, path, T32, path_len, T32, retptr0, TEND );
 
-  return 0;
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
+  }
+
+  if ( !( f->stat.fs_rights_base & __WASI_RIGHTS_PATH_FILESTAT_GET ) ) {
+    return __WASI_ERRNO_ACCES;
+  }
+
+  if ( f->stat.fs_filetype != __WASI_FILETYPE_DIRECTORY ) {
+    return __WASI_ERRNO_NOTDIR;
+  }
+
+  char* name = (char*)malloc( path_len + 1 );
+  if ( name == NULL ) {
+    return __WASI_ERRNO_NOMEM;
+  }
+
+  program_mem_to_flatware_mem( (int32_t)name, path, path_len );
+  name[path_len] = '\0';
+
+  entry* e = f->entry;
+  char *saveptr = name, *token;
+  while ( ( token = strtok_r( saveptr, "/", &saveptr ) ) != NULL ) {
+    e = entry_find( e, token );
+    if ( e == NULL ) {
+      break;
+    }
+  }
+  free( name );
+
+  if ( e == NULL ) {
+    return __WASI_ERRNO_NOENT;
+  }
+
+  flatware_mem_to_program_mem( retptr0, (int32_t)&e->stat, sizeof( e->stat ) );
+
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
@@ -691,7 +1037,7 @@ int32_t path_readlink( int32_t fd, int32_t path, int32_t path_len, int32_t buf, 
 {
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, T32, buf, T32, buf_len, T32, retptr0, TEND );
 
-  return 0;
+  return __WASI_ERRNO_NOLINK;
 }
 
 /**
@@ -930,6 +1276,9 @@ int32_t path_open( int32_t fd,
   }
 
   char* path_str = (char*)malloc( path_len + 1 );
+  if ( path_str == NULL ) {
+    return __WASI_ERRNO_NOMEM;
+  }
   program_mem_to_flatware_mem( (int32_t)path_str, path, path_len );
   path_str[path_len] = '\0';
 
@@ -941,7 +1290,7 @@ int32_t path_open( int32_t fd,
     }
 
     if ( strcmp( token, ".." ) == 0 ) {
-      e = e->type == ENTRY_DIR ? e->parent : NULL;
+      e = e->stat.filetype == __WASI_FILETYPE_DIRECTORY ? e->parent : NULL;
     }
 
     e = entry_find( e, token );
@@ -952,15 +1301,16 @@ int32_t path_open( int32_t fd,
     return __WASI_ERRNO_NOENT;
   }
 
-  int32_t new_fd = fd_table_insert( &fds, e );
-  flatware_mem_to_program_mem( retptr0, (int32_t)&new_fd, sizeof( new_fd ) );
-  RET_TRACE( new_fd );
+  filedesc* new_fd = fd_table_insert( &fds, e );
+  flatware_mem_to_program_mem( retptr0, (int32_t)&new_fd->index, sizeof( new_fd->index ) );
+  RET_TRACE( new_fd->index );
 
   return __WASI_ERRNO_SUCCESS;
 }
 
 /**
  * @brief Gets the resolution of a clock.
+ * @details No effect currently. Returns INVAL.
  *
  * @param id Clock ID
  * @param retptr0 Returns resolution as int64_t
@@ -985,7 +1335,7 @@ int32_t clock_time_get( int32_t id, int64_t precision, int32_t retptr0 )
 {
   FUNC_TRACE( T32, id, T64, precision, T32, retptr0, TEND );
 
-  return 0;
+  return __WASI_ERRNO_INVAL;
 }
 
 /**
@@ -1119,13 +1469,23 @@ externref fixpoint_apply( externref encode )
 
   // Load standard I/O
   entry* stdin = entry_from_blob( "stdin", get_ro_table( InputROTable, INPUT_STDIN ) );
-  entry* stdout = entry_create( "stdout", ENTRY_FILE );
-  entry* stderr = entry_create( "stderr", ENTRY_FILE );
+  entry* stdout = entry_create( "stdout", __WASI_FILETYPE_CHARACTER_DEVICE );
+  entry* stderr = entry_create( "stderr", __WASI_FILETYPE_CHARACTER_DEVICE );
 
   // Attach standard I/O to file descriptors
-  fd_table_insert_at( &fds, stdin, STDIN );
-  fd_table_insert_at( &fds, stdout, STDOUT );
-  fd_table_insert_at( &fds, stderr, STDERR );
+  filedesc* stdin_fd = fd_table_insert_at( &fds, stdin, STDIN );
+  filedesc* stdout_fd = fd_table_insert_at( &fds, stdout, STDOUT );
+  filedesc* stderr_fd = fd_table_insert_at( &fds, stderr, STDERR );
+
+  // Set standard I/O flags, rights, and types
+  stdin_fd->stat.fs_rights_base = __WASI_RIGHTS_FD_READ;
+  stdin_fd->stat.fs_rights_inheriting = 0;
+
+  stdout_fd->stat.fs_rights_base = __WASI_RIGHTS_FD_WRITE;
+  stdout_fd->stat.fs_rights_inheriting = 0;
+
+  stderr_fd->stat.fs_rights_base = __WASI_RIGHTS_FD_WRITE;
+  stderr_fd->stat.fs_rights_inheriting = 0;
 
   // Preload filesystem root
   fd_table_insert( &fds, filesys );
@@ -1133,6 +1493,9 @@ externref fixpoint_apply( externref encode )
   // Load random seed
   attach_blob_ro_mem( ScratchROMem, get_ro_table( InputROTable, INPUT_RANDOM_SEED ) );
   random_seed = get_i32_ro_mem( ScratchROMem, 0 );
+
+  // Load clock time
+  clock_time = 0;
 
   // Prepare output
   grow_rw_table( OutputRWTable, 4, create_blob_i32( 0 ) );

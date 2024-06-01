@@ -48,12 +48,15 @@ entry* entry_load_filesys( entry* parent, externref node )
   e->accessed = false;
   list_init( &e->children );
 
+  e->stat.dev = 0;
+  e->stat.ino = 0;
+
   externref contents = get_ro_table( ScratchROTable, 2 );
   if ( fixpoint_is_blob( contents ) ) {
-    e->type = ENTRY_FILE;
+    e->stat.filetype = __WASI_FILETYPE_REGULAR_FILE;
     entry_load_file( e, contents );
   } else {
-    e->type = ENTRY_DIR;
+    e->stat.filetype = __WASI_FILETYPE_DIRECTORY;
     e->content = NULL;
     entry_load_dir( e, contents );
   }
@@ -63,20 +66,20 @@ entry* entry_load_filesys( entry* parent, externref node )
 static void entry_load_file( entry* e, externref contents )
 {
   attach_blob_ro_mem( ScratchROMem, contents );
-  e->size = byte_size_ro_mem( ScratchROMem );
-  e->content = malloc( (unsigned long)e->size );
+  e->stat.size = byte_size_ro_mem( ScratchROMem );
+  e->content = malloc( (unsigned long)e->stat.size );
   if ( e->content == NULL ) {
     return;
   }
-  ro_mem_to_flatware_mem( ScratchROMem, (int32_t)e->content, 0, e->size );
+  ro_mem_to_flatware_mem( ScratchROMem, (int32_t)e->content, 0, e->stat.size );
 }
 
 static void entry_load_dir( entry* e, externref contents )
 {
   attach_tree_ro_table( ScratchROTable, contents );
-  e->size = size_ro_table( ScratchROTable );
+  e->stat.size = size_ro_table( ScratchROTable );
 
-  for ( int64_t i = 0; i < e->size; i++ ) {
+  for ( uint64_t i = 0; i < e->stat.size; i++ ) {
     attach_tree_ro_table( ScratchROTable, contents );
     entry* child = entry_load_filesys( e, get_ro_table( ScratchROTable, i ) );
     if ( child == NULL ) {
@@ -96,7 +99,7 @@ externref entry_save_filesys( entry* e )
   flatware_mem_to_rw_mem( ScratchRWMem, 0, (int32_t)e->name, name_len );
   externref name = create_blob_rw_mem( ScratchRWMem, name_len );
   externref contents;
-  if ( e->type == ENTRY_FILE ) {
+  if ( e->stat.filetype == __WASI_FILETYPE_REGULAR_FILE ) {
     contents = entry_save_file( e );
   } else {
     contents = entry_save_dir( e );
@@ -111,21 +114,21 @@ externref entry_save_filesys( entry* e )
 
 static externref entry_save_file( entry* e )
 {
-  if ( e->size > (uint32_t)page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) {
-    grow_rw_mem_pages( ScratchRWMem,
-                       ( e->size - page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) / WASM_RT_PAGESIZE + 1 );
+  if ( e->stat.size > (uint32_t)page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) {
+    grow_rw_mem_pages(
+      ScratchRWMem, ( e->stat.size - page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) / WASM_RT_PAGESIZE + 1 );
   }
-  flatware_mem_to_rw_mem( ScratchRWMem, 0, (int32_t)e->content, e->size );
-  return create_blob_rw_mem( ScratchRWMem, e->size );
+  flatware_mem_to_rw_mem( ScratchRWMem, 0, (int32_t)e->content, e->stat.size );
+  return create_blob_rw_mem( ScratchRWMem, e->stat.size );
 }
 
 static externref entry_save_dir( entry* e )
 {
-  if ( e->size + rw_table_index > (uint32_t)size_rw_table( FileSystemRWTable ) ) {
-    grow_rw_table( FileSystemRWTable, e->size, create_blob_i32( 0 ) );
+  if ( e->stat.size + rw_table_index > (uint32_t)size_rw_table( FileSystemRWTable ) ) {
+    grow_rw_table( FileSystemRWTable, e->stat.size, create_blob_i32( 0 ) );
   }
   uint64_t initial_index = rw_table_index;
-  rw_table_index += e->size;
+  rw_table_index += e->stat.size;
 
   uint64_t i = initial_index;
   for ( struct list_elem* elem = list_begin( &e->children ); elem != list_end( &e->children );
@@ -133,21 +136,20 @@ static externref entry_save_dir( entry* e )
     set_rw_table( FileSystemRWTable, i++, entry_save_filesys( list_entry( elem, entry, elem ) ) );
   }
 
-
-  if ( e->size > (uint32_t)size_rw_table( ScratchRWTable ) ) {
-    grow_rw_table( ScratchRWTable, e->size, create_blob_i32( 0 ) );
+  if ( e->stat.size > (uint32_t)size_rw_table( ScratchRWTable ) ) {
+    grow_rw_table( ScratchRWTable, e->stat.size, create_blob_i32( 0 ) );
   }
-  for ( int64_t i = 0; i < e->size; i++ ) {
+  for ( uint64_t i = 0; i < e->stat.size; i++ ) {
     set_rw_table( ScratchRWTable, i, get_rw_table( FileSystemRWTable, initial_index + i ) );
   }
-  
+
   rw_table_index = initial_index;
-  return create_tree_rw_table( ScratchRWTable, e->size );
+  return create_tree_rw_table( ScratchRWTable, e->stat.size );
 }
 
 void entry_free( entry* e )
 {
-  if ( e->type == ENTRY_DIR ) {
+  if ( e->stat.filetype == __WASI_FILETYPE_DIRECTORY ) {
     for ( struct list_elem* elem = list_begin( &e->children ); elem != list_end( &e->children );
           elem = list_next( elem ) ) {
       entry_free( list_entry( elem, entry, elem ) );
@@ -172,29 +174,29 @@ entry* entry_from_blob( const char* name, externref content )
   e->accessed = false;
   list_init( &e->children );
 
-  e->type = ENTRY_FILE;
+  e->stat.filetype = __WASI_FILETYPE_REGULAR_FILE;
   attach_blob_ro_mem( ScratchROMem, content );
-  e->size = byte_size_ro_mem( ScratchROMem );
-  e->content = malloc( (unsigned long)e->size );
+  e->stat.size = byte_size_ro_mem( ScratchROMem );
+  e->content = malloc( (unsigned long)e->stat.size );
   if ( e->content == NULL ) {
     return NULL;
   }
-  ro_mem_to_flatware_mem( ScratchROMem, (int32_t)e->content, 0, e->size );
+  ro_mem_to_flatware_mem( ScratchROMem, (int32_t)e->content, 0, e->stat.size );
 
   return e;
 }
 
 externref entry_to_blob( entry* e )
 {
-  if ( e->size > (uint32_t)page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) {
-    grow_rw_mem_pages( ScratchRWMem,
-                       ( e->size - page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) / WASM_RT_PAGESIZE + 1 );
+  if ( e->stat.size > (uint32_t)page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) {
+    grow_rw_mem_pages(
+      ScratchRWMem, ( e->stat.size - page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) / WASM_RT_PAGESIZE + 1 );
   }
-  flatware_mem_to_rw_mem( ScratchRWMem, 0, (int32_t)e->content, e->size );
-  return create_blob_rw_mem( ScratchRWMem, e->size );
+  flatware_mem_to_rw_mem( ScratchRWMem, 0, (int32_t)e->content, e->stat.size );
+  return create_blob_rw_mem( ScratchRWMem, e->stat.size );
 }
 
-entry* entry_create( const char* name, enum ENTRY_TYPE type )
+entry* entry_create( const char* name, __wasi_filetype_t type )
 {
   entry* e = (entry*)malloc( sizeof( entry ) );
   if ( e == NULL ) {
@@ -207,9 +209,12 @@ entry* entry_create( const char* name, enum ENTRY_TYPE type )
   e->accessed = false;
   list_init( &e->children );
 
-  e->type = type;
-  e->size = 0;
+  e->stat.size = 0;
   e->content = NULL;
+
+  e->stat.dev = 0;
+  e->stat.ino = 0;
+  e->stat.filetype = type;
 
   return e;
 }
@@ -224,6 +229,11 @@ static filedesc* filedesc_create( entry* e )
   fd->index = -1;
   fd->offset = 0;
   fd->entry = e;
+
+  fd->stat.fs_filetype = e->stat.filetype;
+  fd->stat.fs_rights_base = ~0;
+  fd->stat.fs_rights_inheriting = ~0;
+  fd->stat.fs_flags = 0;
 
   return fd;
 }
@@ -244,11 +254,11 @@ void fd_table_destroy( fd_table* f )
   hash_destroy( &f->fds, filedesc_destroy );
 }
 
-int32_t fd_table_insert( fd_table* f, entry* e )
+filedesc* fd_table_insert( fd_table* f, entry* e )
 {
   filedesc* fd = filedesc_create( e );
   if ( fd == NULL ) {
-    return -1;
+    return NULL;
   }
 
   while ( fd_table_find( f, f->next_fd ) != NULL ) {
@@ -257,20 +267,20 @@ int32_t fd_table_insert( fd_table* f, entry* e )
   fd->index = f->next_fd++;
 
   hash_insert( &f->fds, &fd->elem );
-  return fd->index;
+  return fd;
 }
 
-bool fd_table_insert_at( fd_table* f, entry* e, int32_t index )
+filedesc* fd_table_insert_at( fd_table* f, entry* e, int32_t index )
 {
   filedesc* fd = filedesc_create( e );
   if ( fd == NULL ) {
-    return false;
+    return NULL;
   }
 
   fd->index = index;
   hash_insert( &f->fds, &fd->elem );
 
-  return true;
+  return fd;
 }
 
 filedesc* fd_table_find( fd_table* f, int32_t index )
@@ -318,23 +328,28 @@ static void filedesc_destroy( struct hash_elem* e, void* aux UNUSED )
 
 bool entry_grow( entry* e, uint64_t size )
 {
-  if ( e->type != ENTRY_FILE ) {
+  if ( e->stat.filetype != __WASI_FILETYPE_BLOCK_DEVICE && e->stat.filetype != __WASI_FILETYPE_CHARACTER_DEVICE
+       && e->stat.filetype != __WASI_FILETYPE_REGULAR_FILE ) {
     return false;
+  }
+
+  if ( size <= e->stat.size ) {
+    return true;
   }
 
   e->content = realloc( e->content, (unsigned long)size );
   if ( e->content == NULL ) {
     return false;
   }
-  memset( e->content + e->size, 0, (unsigned long)( size - e->size ) );
+  memset( e->content + e->stat.size, 0, (unsigned long)( size - e->stat.size ) );
 
-  e->size = size;
+  e->stat.size = size;
   return true;
 }
 
 entry* entry_find( entry* e, const char* name )
 {
-  if ( e->type != ENTRY_DIR ) {
+  if ( e->stat.filetype != __WASI_FILETYPE_DIRECTORY ) {
     return NULL;
   }
 
