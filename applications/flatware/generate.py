@@ -2,8 +2,8 @@
 import os
 
 MEM_SIZES = {
-    "rw": 8,
-    "ro": 8,
+    "rw": 4,
+    "ro": 4,
 }
 
 OTHER_MEM_TYPES = ["program", "flatware"]

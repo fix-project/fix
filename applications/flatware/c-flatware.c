@@ -12,85 +12,20 @@
 #pragma clang diagnostic ignored "-Wunsafe-buffer-usage"
 
 #define DO_TRACE 1
-#define N_FDS 8
-#define N_FILES 8
+#define min( a, b ) ( ( a ) < ( b ) ? ( a ) : ( b ) )
 
 typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
-
-typedef struct filedesc
-{
-  int32_t offset;
-  int32_t size;
-  __wasi_fdstat_t stat;
-  int32_t file_id;
-  bool open;
-  char padding[3];
-} filedesc;
-
-typedef struct file
-{
-  int32_t mem_id;
-  int32_t num_fds;
-  struct substring name;
-} file;
 
 enum fd_
 {
   STDIN,
   STDOUT,
   STDERR,
-  WORKING_DIRECTORY,
-  FILE_START,
 };
 
-static filedesc fds[N_FDS] = {
-  { .open = true,
-    .size = 0,
-    .offset = 0,
-    .file_id = 0,
-    .stat = { .fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE,
-              .fs_rights_base = __WASI_RIGHTS_FD_READ,
-              .fs_rights_inheriting = __WASI_RIGHTS_FD_READ,
-              .fs_flags = 0 } }, // STDIN
-  { .open = true,
-    .size = 0,
-    .offset = 0,
-    .file_id = 1,
-    .stat = { .fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE,
-              .fs_rights_base = __WASI_RIGHTS_FD_WRITE,
-              .fs_rights_inheriting = __WASI_RIGHTS_FD_WRITE,
-              .fs_flags = 0 } }, // STDOUT
-  { .open = true,
-    .size = 0,
-    .offset = 0,
-    .file_id = 2,
-    .stat = { .fs_filetype = __WASI_FILETYPE_CHARACTER_DEVICE,
-              .fs_rights_base = __WASI_RIGHTS_FD_WRITE,
-              .fs_rights_inheriting = __WASI_RIGHTS_FD_WRITE,
-              .fs_flags = 0 } }, // STDERR
-  { .open = true,
-    .size = -1,
-    .offset = 0,
-    .file_id = 3,
-    .stat = { .fs_filetype = __WASI_FILETYPE_DIRECTORY,
-              .fs_rights_base = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_READDIR,
-              .fs_rights_inheriting = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_WRITE | __WASI_RIGHTS_FD_READDIR,
-              .fs_flags = 0 } }, // WORKING DIRECTORY
-};
-
-static file files[N_FILES] = { { .name = { "stdin", 5 }, .mem_id = StdInROMem, .num_fds = 1 },
-                               { .name = { "stdout", 6 }, .mem_id = StdOutRWMem, .num_fds = 1 },
-                               { .name = { "stderr", 6 }, .mem_id = StdErrRWMem, .num_fds = 1 },
-                               { .name = { ".", 1 }, .mem_id = FileSystemBaseROTable, .num_fds = 1 } };
-
-static unsigned int* ro_mem_use;
-
+static entry* filesys = NULL;
+static fd_table fds;
 static int64_t random_seed;
-
-// Bitset functions
-static bool bitset_get( unsigned int*, uint32_t );
-static void bitset_set( unsigned int*, uint32_t );
-// static void bitset_clear( unsigned int*, uint32_t );
 
 // for each value, first pass the width (T32 or T64), then pass the value
 // to specify the end, pass TEND
@@ -119,14 +54,8 @@ typedef enum trace_val_size
 // must be <= 16
 #define TRACE_RADIX 10
 
-static int32_t trace_offset = 0;
 static void write_trace( const char* str, int32_t len )
 {
-  if ( trace_offset + len > page_size_rw_mem( StdTraceRWMem ) * WASM_RT_PAGESIZE ) {
-    grow_rw_mem_pages( StdTraceRWMem, len / WASM_RT_PAGESIZE + 1 );
-  }
-  flatware_mem_to_rw_mem( StdTraceRWMem, trace_offset, (int32_t)str, len );
-  trace_offset += len;
   flatware_mem_unsafe_io( str, len );
 }
 
@@ -250,18 +179,7 @@ int32_t fd_close( int32_t fd )
 {
   FUNC_TRACE( T32, fd, TEND );
 
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( fd < FILE_START || fds[fd].open == false ) {
-    return __WASI_ERRNO_BADF;
-  }
-
-  files[fds[fd].file_id].num_fds--;
-  fds[fd].open = false;
-
-  return __WASI_ERRNO_SUCCESS;
+  return fd_table_remove( &fds, fd ) ? __WASI_ERRNO_SUCCESS : __WASI_ERRNO_BADF;
 }
 
 /**
@@ -275,16 +193,6 @@ int32_t fd_fdstat_get( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( fds[fd].open == false ) {
-    return __WASI_ERRNO_BADF;
-  }
-
-  // Copy stat struct to program memory
-  flatware_mem_to_program_mem( retptr0, (int32_t)&fds[fd].stat, sizeof( fds[fd].stat ) );
   return __WASI_ERRNO_SUCCESS;
 }
 
@@ -301,31 +209,27 @@ int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T64, offset, T32, whence, T32, retptr0, TEND );
 
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( fd < FILE_START ) {
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
     return __WASI_ERRNO_BADF;
   }
 
   switch ( whence ) {
     case __WASI_WHENCE_SET:
+      f->offset = offset;
       break;
     case __WASI_WHENCE_CUR:
-      offset = fds[fd].offset + offset;
+      f->offset += offset;
       break;
     case __WASI_WHENCE_END:
-      offset = fds[fd].size + offset;
+      f->offset = f->entry->size + offset;
       break;
     default:
       return __WASI_ERRNO_INVAL;
   }
 
-  fds[fd].offset = (int32_t)offset;
+  flatware_mem_to_program_mem( retptr0, (int32_t)&f->offset, sizeof( f->offset ) );
 
-  flatware_mem_to_program_mem( retptr0, (int32_t)&fds[fd].offset, sizeof( fds[fd].offset ) );
-  RET_TRACE( fds[fd].offset );
   return __WASI_ERRNO_SUCCESS;
 }
 
@@ -340,43 +244,35 @@ int32_t fd_seek( int32_t fd, int64_t offset, int32_t whence, int32_t retptr0 )
  */
 int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 {
-  int32_t total_read = 0;
-  int32_t iobuf_offset, iobuf_len;
-  int32_t size_to_read;
-  file f;
-
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T32, retptr0, TEND );
 
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( ( fd < FILE_START && fd != STDIN ) || fds[fd].open == false ) {
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
     return __WASI_ERRNO_BADF;
   }
 
-  f = files[fds[fd].file_id];
-
   // Iterate over buffers
+  int32_t bytes_read = 0;
   for ( int32_t i = 0; i < iovs_len; ++i ) {
-    int32_t file_remaining = fds[fd].size - fds[fd].offset;
-    if ( file_remaining == 0 ) {
+    int32_t file_remaining = f->entry->size - f->offset;
+    if ( file_remaining <= 0 ) {
       break;
     }
 
-    iobuf_offset
+    int32_t iobuf_offset
       = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t ) + (int32_t)offsetof( __wasi_iovec_t, buf ) );
-    iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
-                                 + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
+    int32_t iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
+                                         + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
 
-    size_to_read = iobuf_len < file_remaining ? iobuf_len : file_remaining;
-    ro_mem_to_program_mem( f.mem_id, iobuf_offset, fds[fd].offset, size_to_read );
-    fds[fd].offset += size_to_read;
-    total_read += size_to_read;
+    int32_t size_to_read = min( file_remaining, iobuf_len );
+    flatware_mem_to_program_mem( iobuf_offset, (int32_t)f->entry->content + f->offset, size_to_read );
+    f->offset += size_to_read;
+    bytes_read += size_to_read;
   }
 
-  flatware_mem_to_program_mem( retptr0, (int32_t)&total_read, sizeof( total_read ) );
-  RET_TRACE( total_read );
+  flatware_mem_to_program_mem( retptr0, (int32_t)&bytes_read, sizeof( bytes_read ) );
+  RET_TRACE( bytes_read );
+
   return __WASI_ERRNO_SUCCESS;
 }
 
@@ -391,41 +287,38 @@ int32_t fd_read( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
  */
 int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 {
-  int32_t iobuf_offset, iobuf_len;
-  int32_t total_written = 0;
-  file f;
-
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T32, retptr0, TEND );
 
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( fd == STDIN || fds[fd].open == false ) {
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
     return __WASI_ERRNO_BADF;
   }
 
-  f = files[fds[fd].file_id];
+  // Iterate over buffers
+  int32_t bytes_written = 0;
+  for ( int32_t i = 0; i < iovs_len; ++i ) {
+    int32_t iobuf_offset = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_ciovec_t )
+                                            + (int32_t)offsetof( __wasi_ciovec_t, buf ) );
+    int32_t iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_ciovec_t )
+                                         + (int32_t)offsetof( __wasi_ciovec_t, buf_len ) );
 
-  for ( int32_t i = 0; i < iovs_len; i++ ) {
-    iobuf_offset
-      = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t ) + (int32_t)offsetof( __wasi_iovec_t, buf ) );
-    iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
-                                 + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
-
-    while ( fds[fd].offset + iobuf_len > page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE ) {
-      grow_rw_mem_pages( f.mem_id, iobuf_len / WASM_RT_PAGESIZE + 1 );
+    if ( f->entry->size < f->offset + iobuf_len && !entry_grow( f->entry, f->offset + iobuf_len ) ) {
+      return __WASI_ERRNO_NOSPC;
     }
-    // if ( fd == STDOUT || fd == STDERR ) {
-    //   program_mem_unsafe_io( (const char*)iobuf_offset, iobuf_len );
-    // }
-    program_mem_to_rw_mem( f.mem_id, fds[fd].offset, iobuf_offset, iobuf_len );
-    fds[fd].offset += iobuf_len;
-    total_written += iobuf_len;
+
+    program_mem_to_flatware_mem( (int32_t)f->entry->content + f->offset, iobuf_offset, iobuf_len );
+    
+    if (fd == STDOUT) {
+      flatware_mem_unsafe_io((char*)f->entry->content + f->offset, iobuf_len);
+    }
+
+    f->offset += iobuf_len;
+    bytes_written += iobuf_len;
   }
 
-  flatware_mem_to_program_mem( retptr0, (int32_t)&total_written, sizeof( total_written ) );
-  RET_TRACE( total_written );
+  flatware_mem_to_program_mem( retptr0, (int32_t)&bytes_written, sizeof( bytes_written ) );
+  RET_TRACE( bytes_written );
+
   return __WASI_ERRNO_SUCCESS;
 }
 
@@ -440,23 +333,11 @@ int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
 {
   FUNC_TRACE( T32, fd, T32, fdflags, TEND );
 
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( fd < FILE_START || fds[fd].open == false )
-    return __WASI_ERRNO_BADF;
-
-  if ( !( fds[fd].stat.fs_rights_base & __WASI_RIGHTS_FD_FDSTAT_SET_FLAGS ) )
-    return __WASI_ERRNO_PERM;
-
-  fds[fd].stat.fs_flags = (__wasi_fdflags_t)fdflags;
   return __WASI_ERRNO_SUCCESS;
 }
 
 /**
  * @brief Gets file descriptor information about preopened files.
- * @details No effect as no files are preopened. Returns BADF.
  *
  * @param fd File descriptor
  * @param retptr0 Returns file descriptor information as __wasi_prestat_t
@@ -464,26 +345,18 @@ int32_t fd_fdstat_set_flags( int32_t fd, int32_t fdflags )
  */
 int32_t fd_prestat_get( int32_t fd, int32_t retptr0 )
 {
-  filedesc* f;
-  __wasi_prestat_t prestat;
-
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
 
-  if ( fd > N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( fd <= STDERR ) {
-    return __WASI_ERRNO_PERM;
-  }
-
-  f = &fds[fd];
-  if ( f->open == false ) {
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
     return __WASI_ERRNO_BADF;
   }
 
-  prestat.tag = __WASI_PREOPENTYPE_DIR;
-  prestat.u.dir.pr_name_len = files[f->file_id].name.len;
+  if ( f->entry->type != ENTRY_DIR ) {
+    return __WASI_ERRNO_NOTDIR;
+  }
+
+  __wasi_prestat_t prestat = { .tag = __WASI_PREOPENTYPE_DIR, .u.dir.pr_name_len = strlen( f->entry->name ) };
   flatware_mem_to_program_mem( retptr0, (int32_t)&prestat, sizeof( prestat ) );
 
   return __WASI_ERRNO_SUCCESS;
@@ -491,7 +364,6 @@ int32_t fd_prestat_get( int32_t fd, int32_t retptr0 )
 
 /**
  * @brief Gets path of preopened files.
- * @details No effect as no files are preopened. Returns BADF.
  *
  * @param fd File descriptor
  * @param path String buffer to store path
@@ -500,24 +372,19 @@ int32_t fd_prestat_get( int32_t fd, int32_t retptr0 )
  */
 int32_t fd_prestat_dir_name( int32_t fd, int32_t path, int32_t path_len )
 {
-  filedesc* f;
-
   FUNC_TRACE( T32, fd, T32, path, T32, path_len, TEND );
 
-  if ( fd <= STDERR ) {
-    return __WASI_ERRNO_PERM;
-  }
-
-  if ( fd > N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  f = &fds[fd];
-  if ( f->open == false ) {
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
     return __WASI_ERRNO_BADF;
   }
 
-  flatware_mem_to_program_mem( path, (int32_t)files[f->file_id].name.ptr, path_len );
+  if ( f->entry->type != ENTRY_DIR ) {
+    return __WASI_ERRNO_NOTDIR;
+  }
+
+  flatware_mem_to_program_mem( path, (int32_t)f->entry->name, min( strlen( f->entry->name ), (uint64_t)path_len ) );
+
   return __WASI_ERRNO_SUCCESS;
 }
 
@@ -548,19 +415,15 @@ int32_t fd_advise( int32_t fd, int64_t offset, int64_t len, int32_t advice )
  */
 int32_t fd_allocate( int32_t fd, int64_t offset, int64_t len )
 {
-  file f;
-  int64_t grow_length;
-
   FUNC_TRACE( T32, fd, T64, offset, T64, len, TEND );
 
-  if ( fd <= STDERR || fd >= N_FDS || fds[fd].open == false )
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
     return __WASI_ERRNO_BADF;
+  }
 
-  f = files[fds[fd].file_id];
-  grow_length = page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE - offset - len;
-
-  if ( grow_length > 0 ) {
-    grow_rw_mem_pages( f.mem_id, (int32_t)( grow_length / WASM_RT_PAGESIZE + 1 ) );
+  if ( f->entry->size < offset + len && !entry_grow( f->entry, offset + len ) ) {
+    return __WASI_ERRNO_NOSPC;
   }
 
   return __WASI_ERRNO_SUCCESS;
@@ -568,7 +431,8 @@ int32_t fd_allocate( int32_t fd, int64_t offset, int64_t len )
 
 /**
  * @brief Synchronizes the data of a file descriptor.
- * 
+ * @details No supported due to in-memory filesystem. Returns NOTSUP.
+ *
  * @param fd File descriptor
  * @return int32_t Status code
  */
@@ -576,7 +440,7 @@ int32_t fd_datasync( int32_t fd )
 {
   FUNC_TRACE( T32, fd, TEND );
 
-  return 0;
+  return __WASI_ERRNO_NOTSUP;
 }
 
 /**
@@ -590,14 +454,6 @@ int32_t fd_datasync( int32_t fd )
 int32_t fd_filestat_get( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
-
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( fds[fd].open == false ) {
-    return __WASI_ERRNO_BADF;
-  }
 
   return __WASI_ERRNO_NOTSUP;
 }
@@ -613,36 +469,32 @@ int32_t fd_filestat_set_size( int32_t fd, int64_t size )
 {
   FUNC_TRACE( T32, fd, T64, size, TEND );
 
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
+  if ( size < 0 ) {
+    return __WASI_ERRNO_INVAL;
   }
 
-  if ( fd < FILE_START || fds[fd].open == false ) {
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
     return __WASI_ERRNO_BADF;
   }
 
-  if ( fds[fd].stat.fs_rights_base & __WASI_RIGHTS_FD_FILESTAT_SET_SIZE ) {
-    file f = files[fds[fd].file_id];
-    int32_t grow_pages = (int32_t)( ( size - page_size_rw_mem( f.mem_id ) * WASM_RT_PAGESIZE ) / WASM_RT_PAGESIZE + 1 );
-    fds[fd].size = (int32_t)size;
-    f = files[fds[fd].file_id];
-    if ( grow_pages > 0 ) {
-      grow_rw_mem_pages( f.mem_id, grow_pages );
-    }
-    return __WASI_ERRNO_SUCCESS;
+  if (size < f->entry->size) {
+    f->entry->size = size;
+  } else if (!entry_grow(f->entry, size)) {
+    return __WASI_ERRNO_NOSPC;
   }
 
-  return __WASI_ERRNO_PERM;
+  return __WASI_ERRNO_SUCCESS;
 }
 
 /**
  * @brief Updates the timestamp metadata of a file descriptor.
- * 
+ *
  * @param fd File descriptor
  * @param atim Accessed timestamp
  * @param mtim Modified timestamp
  * @param fst_flags Bitmask of __wasi_fstflags_t
- * @return int32_t 
+ * @return int32_t
  */
 int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t fst_flags )
 {
@@ -663,49 +515,14 @@ int32_t fd_filestat_set_times( int32_t fd, int64_t atim, int64_t mtim, int32_t f
  */
 int32_t fd_pread( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, int32_t retptr0 )
 {
-  int32_t total_read = 0;
-  int32_t iobuf_offset, iobuf_len;
-  int64_t size_to_read;
-  file f;
-
   FUNC_TRACE( T32, fd, T32, iovs, T32, iovs_len, T64, offset, T32, retptr0, TEND );
 
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( ( fd < FILE_START && fd != STDIN ) || fds[fd].open == false ) {
-    return __WASI_ERRNO_BADF;
-  }
-
-  f = files[fds[fd].file_id];
-
-  // Iterate over buffers
-  for ( int32_t i = 0; i < iovs_len; ++i ) {
-    int64_t file_remaining = fds[fd].size - offset;
-    if ( file_remaining == 0 ) {
-      break;
-    }
-
-    iobuf_offset
-      = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t ) + (int32_t)offsetof( __wasi_iovec_t, buf ) );
-    iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_iovec_t )
-                                 + (int32_t)offsetof( __wasi_iovec_t, buf_len ) );
-
-    size_to_read = iobuf_len < file_remaining ? iobuf_len : file_remaining;
-    ro_mem_to_program_mem( f.mem_id, iobuf_offset, (int32_t)offset, (int32_t)size_to_read );
-    offset += size_to_read;
-    total_read += size_to_read;
-  }
-
-  flatware_mem_to_program_mem( retptr0, (int32_t)&total_read, sizeof( total_read ) );
-  RET_TRACE( total_read );
   return __WASI_ERRNO_SUCCESS;
 }
 
 /**
  * @brief Writes to a file descriptor at a given offset without changing the file descriptor's offset.
- * 
+ *
  * @param fd File descriptor
  * @param iovs Array of __wasi_ciovec_t structs containing buffers to write from
  * @param iovs_len Number of buffers in iovs
@@ -722,7 +539,7 @@ int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, i
 
 /**
  * @brief Reads directory entries.
- * 
+ *
  * @param fd File descriptor
  * @param buf Buffer to store directory entries
  * @param buf_len Buffer length
@@ -739,7 +556,7 @@ int32_t fd_readdir( int32_t fd, int32_t buf, int32_t buf_len, int64_t cookie, in
 
 /**
  * @brief Synchronizes file and metadata changes to storage.
- * 
+ *
  * @param fd File descriptor
  * @return int32_t Status code
  */
@@ -752,7 +569,7 @@ int32_t fd_sync( int32_t fd )
 
 /**
  * @brief Gets the current offset of a file descriptor.
- * 
+ *
  * @param fd File descriptor
  * @param retptr0 Returns offset as int32_t
  * @return int32_t Status code
@@ -760,17 +577,6 @@ int32_t fd_sync( int32_t fd )
 int32_t fd_tell( int32_t fd, int32_t retptr0 )
 {
   FUNC_TRACE( T32, fd, T32, retptr0, TEND );
-
-  if ( fd >= N_FDS ) {
-    return __WASI_ERRNO_MFILE;
-  }
-
-  if ( fd < FILE_START || fds[fd].open == false ) {
-    return __WASI_ERRNO_BADF;
-  }
-
-  flatware_mem_to_program_mem( retptr0, (int32_t)&fds[fd].offset, sizeof( fds[fd].offset ) );
-  RET_TRACE( fds[fd].offset );
 
   return __WASI_ERRNO_SUCCESS;
 }
@@ -792,7 +598,7 @@ int32_t path_create_directory( int32_t fd, int32_t path, int32_t path_len )
 
 /**
  * @brief Gets file metadata
- * 
+ *
  * @param fd Base directory for path
  * @param flags Path flags as __wasi_lookupflags_t
  * @param path Path to file
@@ -834,10 +640,10 @@ int32_t path_filestat_set_times( int32_t fd,
 
 /**
  * @brief Creates a hard link.
- * 
+ *
  * @param old_fd Base directory for source path
  * @param old_flags Source flags
- * @param old_path Source path 
+ * @param old_path Source path
  * @param old_path_len Source path length
  * @param new_fd Base directory for destination path
  * @param new_path Destination path
@@ -872,7 +678,7 @@ int32_t path_link( int32_t old_fd,
 
 /**
  * @brief Reads the target path of a symlink
- * 
+ *
  * @param fd Base directory for path
  * @param path Path
  * @param path_len Path length
@@ -890,7 +696,7 @@ int32_t path_readlink( int32_t fd, int32_t path, int32_t path_len, int32_t buf, 
 
 /**
  * @brief Removes a directory.
- * 
+ *
  * @param fd Base directory for path
  * @param path Path to directory
  * @param path_len Path length
@@ -905,7 +711,7 @@ int32_t path_remove_directory( int32_t fd, int32_t path, int32_t path_len )
 
 /**
  * @brief Renames a file.
- * 
+ *
  * @param fd Base directory for source path
  * @param old_path Source path
  * @param old_path_len Source path length
@@ -928,7 +734,7 @@ int32_t path_rename( int32_t fd,
 
 /**
  * @brief Creates a symbolic link.
- * 
+ *
  * @param old_path Source path
  * @param old_path_len Source path length
  * @param fd Base directory for paths
@@ -945,7 +751,7 @@ int32_t path_symlink( int32_t old_path, int32_t old_path_len, int32_t fd, int32_
 
 /**
  * @brief Unlinks a file at the given path.
- * 
+ *
  * @param fd Base directory for path
  * @param path Path to file
  * @param path_len Length of path
@@ -972,14 +778,15 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
 
   FUNC_TRACE( T32, num_argument_ptr, T32, size_argument_ptr, TEND );
 
-  num = size_ro_table( ArgsROTable );
+  attach_tree_ro_table( ScratchROTable, get_ro_table( InputROTable, INPUT_ARGS ) );
+  num = size_ro_table( ScratchROTable );
 
   flatware_mem_to_program_mem( num_argument_ptr, (int32_t)&num, 4 );
   RET_TRACE( num );
 
   // Actual arguments
   for ( int32_t i = 0; i < num; i++ ) {
-    attach_blob_ro_mem( ScratchROMem, get_ro_table( ArgsROTable, i ) );
+    attach_blob_ro_mem( ScratchROMem, get_ro_table( ScratchROTable, i ) );
     size += byte_size_ro_mem( ScratchROMem );
   }
 
@@ -998,12 +805,14 @@ int32_t args_sizes_get( int32_t num_argument_ptr, int32_t size_argument_ptr )
  */
 int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
 {
+  FUNC_TRACE( T32, argv_ptr, T32, argv_buf_ptr, TEND );
+
   int32_t size = 0;
   int32_t addr = argv_buf_ptr;
 
-  FUNC_TRACE( T32, argv_ptr, T32, argv_buf_ptr, TEND );
-  for ( int32_t i = 0; i < size_ro_table( ArgsROTable ); i++ ) {
-    attach_blob_ro_mem( ScratchROMem, get_ro_table( ArgsROTable, i ) );
+  attach_tree_ro_table( ScratchROTable, get_ro_table( InputROTable, INPUT_ARGS ) );
+  for ( int32_t i = 0; i < size_ro_table( ScratchROTable ); i++ ) {
+    attach_blob_ro_mem( ScratchROMem, get_ro_table( ScratchROTable, i ) );
     size = byte_size_ro_mem( ScratchROMem );
     flatware_mem_to_program_mem( argv_ptr + i * (int32_t)sizeof( char* ), (int32_t)&addr, sizeof( char* ) );
     ro_mem_to_program_mem( ScratchROMem, addr, 0, size );
@@ -1022,13 +831,15 @@ int32_t args_get( int32_t argv_ptr, int32_t argv_buf_ptr )
  */
 int32_t environ_sizes_get( int32_t retptr0, int32_t retptr1 )
 {
+  attach_tree_ro_table( ScratchROTable, get_ro_table( InputROTable, INPUT_ENV ) );
+
   int32_t size = 0;
-  int32_t num = size_ro_table( EnvROTable );
+  int32_t num = size_ro_table( ScratchROTable );
 
   FUNC_TRACE( T32, retptr0, T32, retptr1, TEND );
 
   for ( int32_t i = 0; i < num; i++ ) {
-    attach_blob_ro_mem( ScratchROMem, get_ro_table( EnvROTable, i ) );
+    attach_blob_ro_mem( ScratchROMem, get_ro_table( ScratchROTable, i ) );
     size += byte_size_ro_mem( ScratchROMem );
   }
 
@@ -1043,21 +854,23 @@ int32_t environ_sizes_get( int32_t retptr0, int32_t retptr1 )
 }
 
 /**
- * @brief Gets the environment variables. 
- * 
+ * @brief Gets the environment variables.
+ *
  * @param environ Environment variable array pointer (char**)
  * @param environ_buf Environment variable buffer pointer (char*)
  * @return int32_t Status code
  */
 int32_t environ_get( int32_t environ, int32_t environ_buf )
 {
+  FUNC_TRACE( T32, environ, T32, environ_buf, TEND );
+
   int32_t size = 0;
   int32_t addr = environ_buf;
 
-  FUNC_TRACE( T32, environ, T32, environ_buf, TEND );
+  attach_tree_ro_table( ScratchROTable, get_ro_table( InputROTable, INPUT_ENV ) );
 
-  for ( int32_t i = 0; i < size_ro_table( EnvROTable ); i++ ) {
-    attach_blob_ro_mem( ScratchROMem, get_ro_table( EnvROTable, i ) );
+  for ( int32_t i = 0; i < size_ro_table( ScratchROTable ); i++ ) {
+    attach_blob_ro_mem( ScratchROMem, get_ro_table( ScratchROTable, i ) );
     size = byte_size_ro_mem( ScratchROMem );
     flatware_mem_to_program_mem( environ + i * (int32_t)sizeof( char* ), (int32_t)&addr, sizeof( char* ) );
     ro_mem_to_program_mem( ScratchROMem, addr, 0, size );
@@ -1091,12 +904,6 @@ int32_t path_open( int32_t fd,
                    int32_t fdflags,
                    int32_t retptr0 )
 {
-  struct substring path_str;
-
-  __wasi_fd_t result_fd = FILE_START;
-  int32_t file_id = -1;     // File id
-  int32_t file_mem_id = -1; // File memory index
-
   FUNC_TRACE( T32,
               fd,
               T32,
@@ -1117,72 +924,38 @@ int32_t path_open( int32_t fd,
               retptr0,
               TEND );
 
-  while ( result_fd < N_FDS && fds[result_fd].open ) {
-    result_fd++;
+  filedesc* f = fd_table_find( &fds, fd );
+  if ( f == NULL ) {
+    return __WASI_ERRNO_BADF;
   }
 
-  if ( result_fd >= N_FDS ) {
-    return __WASI_ERRNO_NFILE;
+  char* path_str = (char*)malloc( path_len + 1 );
+  program_mem_to_flatware_mem( (int32_t)path_str, path, path_len );
+  path_str[path_len] = '\0';
+
+  char *token, *saveptr = path_str;
+  entry* e = f->entry;
+  while ( e != NULL && ( token = strtok_r( saveptr, "/", &saveptr ) ) != NULL ) {
+    if ( strlen( token ) == 0 || strcmp( token, "." ) == 0 ) {
+      continue;
+    }
+
+    if ( strcmp( token, ".." ) == 0 ) {
+      e = e->type == ENTRY_DIR ? e->parent : NULL;
+    }
+
+    e = entry_find( e, token );
+  }
+  free( path_str );
+
+  if ( e == NULL ) {
+    return __WASI_ERRNO_NOENT;
   }
 
-  path_str.len = (size_t)path_len;
-  path_str.ptr = (char*)calloc( path_str.len + 1, sizeof( char ) );
-  program_mem_to_flatware_mem( (int32_t)path_str.ptr, (int32_t)path, (int32_t)path_str.len );
+  int32_t new_fd = fd_table_insert( &fds, e );
+  flatware_mem_to_program_mem( retptr0, (int32_t)&new_fd, sizeof( new_fd ) );
+  RET_TRACE( new_fd );
 
-  for ( int32_t i = 0; i < N_FILES; ++i ) {
-    if ( files[i].name.len == path_str.len && strncmp( files[i].name.ptr, path_str.ptr, path_str.len ) == 0 ) {
-      file_id = i;
-      file_mem_id = files[i].mem_id;
-      break;
-    }
-  }
-
-  if ( file_mem_id == -1 ) {
-    for ( int32_t i = 0; i < N_FILES; ++i ) {
-      if ( files[i].num_fds == 0 ) {
-        file_id = i;
-        break;
-      }
-    }
-
-    if ( file_id == -1 ) {
-      return __WASI_ERRNO_NFILE;
-    }
-
-    for ( int32_t i = File0ROMem; i < NUM_RO_MEM; ++i ) {
-      if ( !bitset_get( ro_mem_use, (uint32_t)i ) ) {
-        file_mem_id = i;
-        bitset_set( ro_mem_use, (uint32_t)i );
-        break;
-      }
-    }
-    if ( find_deep_entry( path_str, FileSystemBaseROTable, ScratchROTable ) == FILESYS_SEARCH_FAILED ) {
-      return __WASI_ERRNO_NOENT;
-    }
-
-    if ( is_dir( ScratchROTable ) ) {
-      return __WASI_ERRNO_NOENT;
-    }
-
-    attach_blob_ro_mem( file_mem_id, get_ro_table( ScratchROTable, DIRENT_CONTENT ) );
-
-    files[file_id].mem_id = file_mem_id;
-    files[file_id].name = path_str;
-  }
-  files[file_id].num_fds++;
-
-  fds[result_fd].offset = 0;
-  fds[result_fd].size = byte_size_ro_mem( file_mem_id );
-  fds[result_fd].open = true;
-  fds[result_fd].file_id = file_id;
-
-  fds[result_fd].stat.fs_filetype = __WASI_FILETYPE_REGULAR_FILE;
-  fds[result_fd].stat.fs_flags = __WASI_FDFLAGS_APPEND;
-  fds[result_fd].stat.fs_rights_base = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
-  fds[result_fd].stat.fs_rights_inheriting = __WASI_RIGHTS_FD_READ | __WASI_RIGHTS_FD_SEEK;
-
-  flatware_mem_to_program_mem( retptr0, (int32_t)&result_fd, sizeof( result_fd ) );
-  RET_TRACE( result_fd );
   return __WASI_ERRNO_SUCCESS;
 }
 
@@ -1202,7 +975,7 @@ int32_t clock_res_get( int32_t id, int32_t retptr0 )
 
 /**
  * @brief Gets the time of a clock.
- * 
+ *
  * @param id Clock ID
  * @param precision Maximum permitted error in nanoseconds
  * @param retptr0 Returns time as int64_t
@@ -1217,7 +990,7 @@ int32_t clock_time_get( int32_t id, int64_t precision, int32_t retptr0 )
 
 /**
  * @brief Concurrently polls for a set of events
- * 
+ *
  * @param in The events to subscribe to (array of __wasi_subscription_t)
  * @param out The events that have occurred (array of __wasi_event_t)
  * @param nsubscriptions Number of subscriptions
@@ -1233,7 +1006,7 @@ int32_t poll_oneoff( int32_t in, int32_t out, int32_t nsubscriptions, int32_t re
 
 /**
  * @brief Yields the execution of the current process.
- * 
+ *
  * @return int32_t Status code
  */
 int32_t sched_yield( void )
@@ -1269,7 +1042,7 @@ int32_t random_get( int32_t buf, int32_t buf_len )
 
 /**
  * @brief Accepts a new connection on a socket.
- * 
+ *
  * @param fd File descriptor
  * @param flags Flags
  * @param retptr0 New file descriptor
@@ -1307,7 +1080,7 @@ int32_t sock_recv( int32_t fd,
 
 /**
  * @brief Sends a message on a socket.
- * 
+ *
  * @param fd File descriptor of socket
  * @param si_data Array of __wasi_ciovec_t structs containing buffers to send
  * @param si_data_len Number of buffers in si_data
@@ -1336,65 +1109,55 @@ int32_t sock_shutdown( int32_t fd, int32_t how )
   return 0;
 }
 
-/**
- * @brief Gets the value of the bitset at the given index. 
- * 
- * @param bitset Bitset
- * @param index Index
- * @return true Index is set
- * @return false Index isn't set
- */
-static bool bitset_get( unsigned int* bitset, uint32_t index )
-{
-  return ( bitset[index / sizeof( unsigned int )] >> ( index % sizeof( unsigned int ) ) ) & 1;
-}
-
-/**
- * @brief Sets the value of the bitset at the given index.
- * 
- * @param bitset Bitset
- * @param index Index
- */
-static void bitset_set( unsigned int* bitset, uint32_t index )
-{
-  bitset[index / sizeof( unsigned int )] |= 1 << ( index % sizeof( unsigned int ) );
-}
-
-// static void bitset_clear( unsigned int* bitset, uint32_t index )
-// {
-//   bitset[index / sizeof( unsigned int )] &= ~( 1 << ( index % sizeof( unsigned int ) ) );
-// }
-
 externref fixpoint_apply( externref encode )
 {
-  ro_mem_use
-    = (unsigned int*)calloc( ( NUM_RO_MEM - File0ROMem ) / sizeof( unsigned int ), sizeof( unsigned int ) );
-
   attach_tree_ro_table( InputROTable, encode );
 
-  attach_tree_ro_table( FileSystemBaseROTable, get_ro_table( InputROTable, INPUT_FILESYSTEM ) );
-  attach_tree_ro_table( ArgsROTable, get_ro_table( InputROTable, INPUT_ARGS ) );
-  attach_blob_ro_mem( StdInROMem, get_ro_table( InputROTable, INPUT_STDIN ) );
-  fds[STDIN].size = byte_size_ro_mem( StdInROMem );
-  attach_tree_ro_table( EnvROTable, get_ro_table( InputROTable, INPUT_ENV ) );
+  // Load filesystem
+  filesys = entry_load_filesys( NULL, get_ro_table( InputROTable, INPUT_FILESYSTEM ) );
+  fd_table_init( &fds );
 
+  // Load standard I/O
+  entry* stdin = entry_from_blob( "stdin", get_ro_table( InputROTable, INPUT_STDIN ) );
+  entry* stdout = entry_create( "stdout", ENTRY_FILE );
+  entry* stderr = entry_create( "stderr", ENTRY_FILE );
+
+  // Attach standard I/O to file descriptors
+  fd_table_insert_at( &fds, stdin, STDIN );
+  fd_table_insert_at( &fds, stdout, STDOUT );
+  fd_table_insert_at( &fds, stderr, STDERR );
+
+  // Preload filesystem root
+  fd_table_insert( &fds, filesys );
+
+  // Load random seed
   attach_blob_ro_mem( ScratchROMem, get_ro_table( InputROTable, INPUT_RANDOM_SEED ) );
   random_seed = get_i32_ro_mem( ScratchROMem, 0 );
 
-  grow_rw_table( OutputRWTable, 5, create_blob_i32( 0 ) );
+  // Prepare output
+  grow_rw_table( OutputRWTable, 4, create_blob_i32( 0 ) );
 
+  // Run program
+  RAW_TRACE( "run_start", 10 );
   run_start();
+  RAW_TRACE( "\nrun_finish\n", 12 );
 
-  set_rw_table( OutputRWTable,
-                OUTPUT_FILESYSTEM,
-                create_tree_rw_table( FileSystemRWTable, size_rw_table( FileSystemRWTable ) ) );
-  set_rw_table( OutputRWTable, OUTPUT_STDOUT, create_blob_rw_mem( StdOutRWMem, fds[STDOUT].offset ) );
-  set_rw_table( OutputRWTable, OUTPUT_STDERR, create_blob_rw_mem( StdErrRWMem, fds[STDERR].offset ) );
-  set_rw_table( OutputRWTable, OUTPUT_TRACE, create_blob_rw_mem( StdTraceRWMem, trace_offset ) );
+  // Save filesystem
+  fd_table_destroy( &fds );
+  externref filesys_ref = entry_save_filesys( filesys );
+  entry_free( filesys );
+  set_rw_table( OutputRWTable, OUTPUT_FILESYSTEM, filesys_ref );
 
-  free( ro_mem_use );
+  // Save standard I/O
+  set_rw_table( OutputRWTable, OUTPUT_STDOUT, entry_to_blob( stdout ) );
+  set_rw_table( OutputRWTable, OUTPUT_STDERR, entry_to_blob( stderr ) );
 
-  return create_tree_rw_table( OutputRWTable, 5 );
+  // Destroy standard I/O
+  entry_free( stdin );
+  entry_free( stdout );
+  entry_free( stderr );
+
+  return create_tree_rw_table( OutputRWTable, 4 );
 }
 
 #pragma clang diagnostic pop

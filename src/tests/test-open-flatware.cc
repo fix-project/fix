@@ -51,6 +51,8 @@ int run_flatware( const string& name, Handle<Fix> elf, Handle<Fix> home )
   printf( "### TEST %s\n", name.c_str() );
   auto exe = flatware_input( *tester::rt, tester::Limits(), elf, home );
   auto result = tester::rt->get( tester::rt->execute( exe ).try_into<ValueTree>().value() ).value();
+  cout << tester::rt->get( handle::extract<Value>( result->at( 1 ) ).value().try_into<ValueTree>().value() ).value()->at( 0 )
+       << endl;
   uint32_t code = -1;
   memcpy( &code, handle::extract<Literal>( result->at( 0 ) ).value().data(), sizeof( uint32_t ) );
   printf( "%s returned %d\n", name.c_str(), code );

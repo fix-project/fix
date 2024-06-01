@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 2.8.12)
 cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0115 NEW)
+set(CMAKE_C_STANDARD 11)
 
 # defines functions link_libc, link_storage, link_wasi_stubs
 include(../util/cmake_helper_functions.cmake)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BASE_C_FLAGS "${CMAKE_C_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -Wextra -pedantic -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -std=c11 -Os -target wasm32 -mreference-types")
 
 set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
 set(CMAKE_C_COMPILER_TARGET "wasm32")
@@ -30,6 +31,8 @@ add_custom_target(
 add_library(filesys_obj OBJECT "filesys.c")
 add_library(c_flatware_obj OBJECT "c-flatware.c")
 add_library(asm_flatware_obj OBJECT "asm-flatware.c")
+add_library(linked_list_obj OBJECT "util/linked_list.c")
+add_library(hashmap_obj OBJECT "util/hashmap.c")
 
 add_dependencies(filesys_obj generate_flatware)
 add_dependencies(c_flatware_obj generate_flatware)
@@ -50,6 +53,8 @@ add_custom_command(
           ${CMAKE_BINARY_DIR}/util/CMakeFiles/fixpoint_util_obj.dir/fixpoint_util.c.o
           ${CMAKE_BINARY_DIR}/flatware/CMakeFiles/c_flatware_obj.dir/c-flatware.c.o
           ${CMAKE_BINARY_DIR}/flatware/CMakeFiles/asm_flatware_obj.dir/asm-flatware.c.o
+          ${CMAKE_BINARY_DIR}/flatware/CMakeFiles/linked_list_obj.dir/util/linked_list.c.o
+          ${CMAKE_BINARY_DIR}/flatware/CMakeFiles/hashmap_obj.dir/util/hashmap.c.o
           $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc.a
           -o c-flatware.wasm
           --no-entry

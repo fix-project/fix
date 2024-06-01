@@ -40,6 +40,8 @@ externref get_ro_table( int32_t table_id, int32_t index ) __attribute__( ( __exp
 
 void attach_tree_ro_table( int32_t table_id, externref name );
 
+externref get_rw_table( int32_t table_id, int32_t index );
+
 void set_rw_table( int32_t table_id, int32_t index, externref val );
 
 void set_i32_rw_mem( int32_t mem_id, int32_t index, int32_t val );

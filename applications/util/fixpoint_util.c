@@ -26,6 +26,11 @@ void attach_tree_ro_table( int32_t table_id, externref name )
   attach_tree_functions[table_id]( name );
 }
 
+externref get_rw_table( int32_t table_id, int32_t index )
+{
+  return get_rw_table_functions[table_id]( index );
+}
+
 void set_rw_table( int32_t table_id, int32_t index, externref val )
 {
   set_rw_table_functions[table_id]( index, val );
