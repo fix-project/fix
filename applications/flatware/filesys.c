@@ -91,6 +91,9 @@ static void entry_load_dir( entry* e, externref contents )
 
 externref entry_save_filesys( entry* e )
 {
+  if ( e == NULL ) {
+    return create_blob_rw_mem( ScratchROMem, 0 );
+  }
   int32_t name_len = (int32_t)strlen( e->name );
   if ( name_len > page_size_rw_mem( ScratchRWMem ) * WASM_RT_PAGESIZE ) {
     grow_rw_mem_pages( ScratchRWMem,

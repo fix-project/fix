@@ -337,22 +337,22 @@ int32_t fd_write( int32_t fd, int32_t iovs, int32_t iovs_len, int32_t retptr0 )
 
   // Iterate over buffers
   int32_t bytes_written = 0;
-  int32_t offset = f->stat.fs_flags & __WASI_FDFLAGS_APPEND ? f->entry->stat.size : f->offset;
+  uint64_t offset = f->stat.fs_flags & __WASI_FDFLAGS_APPEND ? f->entry->stat.size : f->offset;
   for ( int32_t i = 0; i < iovs_len; ++i ) {
     int32_t iobuf_offset = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_ciovec_t )
                                             + (int32_t)offsetof( __wasi_ciovec_t, buf ) );
     int32_t iobuf_len = get_i32_program( iovs + i * (int32_t)sizeof( __wasi_ciovec_t )
                                          + (int32_t)offsetof( __wasi_ciovec_t, buf_len ) );
 
-    if ( f->entry->stat.size < f->offset + iobuf_len && !entry_grow( f->entry, f->offset + iobuf_len ) ) {
+    if ( f->entry->stat.size < offset + iobuf_len && !entry_grow( f->entry, offset + iobuf_len ) ) {
       RAW_TRACE( "-> no space", 11 );
       return __WASI_ERRNO_NOSPC;
     }
 
-    program_mem_to_flatware_mem( (int32_t)f->entry->content + f->offset, iobuf_offset, iobuf_len );
+    program_mem_to_flatware_mem( (int32_t)f->entry->content + offset, iobuf_offset, iobuf_len );
 
     if ( fd == STDOUT || fd == STDERR ) {
-      flatware_mem_unsafe_io( (char*)f->entry->content + f->offset, iobuf_len );
+      flatware_mem_unsafe_io( (char*)f->entry->content + offset, iobuf_len );
     }
 
     offset += iobuf_len;
@@ -722,7 +722,7 @@ int32_t fd_pwrite( int32_t fd, int32_t iovs, int32_t iovs_len, int64_t offset, i
 
     program_mem_to_flatware_mem( (int32_t)f->entry->content + f->offset, iobuf_offset, iobuf_len );
 
-    if ( fd == STDOUT ) {
+    if ( fd == STDOUT || fd == STDERR ) {
       flatware_mem_unsafe_io( (char*)f->entry->content + f->offset, iobuf_len );
     }
 
