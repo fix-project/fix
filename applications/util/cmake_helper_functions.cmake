@@ -10,7 +10,7 @@ function(link_libc cc_obj_file cc_obj_rule cc_wasm_name)
             $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc.a
             $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc++abi.a
             $ENV{HOME}/wasm-toolchain/sysroot/lib/wasm32-wasi/libc++.a
-            $ENV{HOME}/wasm-toolchain/sysroot/lib/clang/18/lib/wasi/libclang_rt.builtins-wasm32.a
+            $ENV{HOME}/wasm-toolchain/sysroot/lib/clang/19/lib/wasi/libclang_rt.builtins-wasm32.a
             -o ${cc_wasm_name}
             --no-entry
             --allow-undefined
