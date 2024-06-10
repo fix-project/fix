@@ -7,10 +7,10 @@ include(../util/cmake_helper_functions.cmake)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BASE_C_FLAGS "${CMAKE_C_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -Wno-pre-c11-compat -Wno-unknown-warning-option -std=c17 -Os -mreference-types")
 
 set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
-set(CMAKE_C_COMPILER_TARGET "wasm32")
+set(CMAKE_C_COMPILER_TARGET "wasm32-wasi")
 
 add_link_options(-nostdlib -Wl,--no-entry -Wl,--allow-undefined)
 

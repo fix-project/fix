@@ -4,13 +4,11 @@ cmake_policy(SET CMP0048 NEW)
 cmake_policy(SET CMP0115 NEW)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BASE_C_FLAGS "${CMAKE_C_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -std=c17 -Os -target wasm32 -mreference-types")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Weverything -Werror -Wno-reserved-macro-identifier -Wno-reserved-identifier -Wno-unreachable-code -Wno-unused-command-line-argument -Wno-unused-but-set-variable -Wno-c++98-compat -Wno-pre-c11-compat -Wno-unknown-warning-option -std=c17 -Os -mreference-types")
 
 set(CMAKE_C_COMPILER $ENV{HOME}/wasm-toolchain/sysroot/bin/clang)
-set(CMAKE_C_COMPILER_TARGET "wasm32")
+set(CMAKE_C_COMPILER_TARGET "wasm32-wasi")
 
 set_source_files_properties("fixpoint_storage.h" "fixpoint_storage.wat" PROPERTIES GENERATED TRUE)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -18,6 +16,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_custom_command(
         OUTPUT fixpoint_storage.h fixpoint_storage.wat
         DEPENDS generate_fixpoint_storage
+        DEPENDS_EXPLICIT_ONLY
 )
 
 add_custom_target(
