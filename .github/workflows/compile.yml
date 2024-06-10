@@ -57,7 +57,7 @@ jobs:
       - name: compile
         run: cmake --build out --parallel 8
       - name: download bootstrap seed
-        run: gh release download v0.9 --pattern 'bootstrap.tar.gz' --repo 'fix-project/bootstrap'
+        run: gh release download v0.91 --pattern 'bootstrap.tar.gz' --repo 'fix-project/bootstrap'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: untar bootstrap seed
