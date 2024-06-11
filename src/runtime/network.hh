@@ -75,13 +75,9 @@ class Remote : public IRuntime
   std::queue<std::pair<std::pair<Handle<Relation>, std::optional<Handle<Object>>>, std::unique_ptr<DataProposal>>>
     proposed_proposals_ {};
 
-  SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> blobs_view_ {};
-  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash, handle::tree_equal>> trees_view_ {};
-  SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> relations_view_ {};
-
-  SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> loadable_blobs_view_ {};
-  SharedMutex<absl::flat_hash_set<Handle<ExpressionTree>, AbslHash, handle::tree_equal>> loadable_trees_view_ {};
-  SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> loadable_relations_view_ {};
+  FixTable<Named, std::atomic<bool>, AbslHash> blobs_view_ { 100000 };
+  FixTable<ExpressionTree, std::atomic<bool>, AbslHash, handle::tree_equal> trees_view_ { 100000 };
+  FixTable<Relation, std::atomic<bool>, AbslHash> relations_view_ { 100000 };
 
 public:
   Remote( EventLoop& events,
@@ -138,6 +134,10 @@ private:
   bool loaded( Handle<Named> handle );
   bool loaded( Handle<AnyTree> handle );
   bool loaded( Handle<Relation> handle );
+
+  void add_to_view( Handle<Named> handle );
+  void add_to_view( Handle<AnyTree> handle );
+  void add_to_view( Handle<Relation> handle );
 };
 
 class NetworkWorker

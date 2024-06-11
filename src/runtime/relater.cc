@@ -393,6 +393,7 @@ void Relater::put( Handle<Relation> name, Handle<Object> data )
         locked->put( name, data );
       }
     }
+    dynamic_pointer_cast<Executor>( local_ )->finish( name, data );
   }
 }
 

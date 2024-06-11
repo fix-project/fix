@@ -47,8 +47,7 @@ public:
     std::optional<std::shared_ptr<Program>> program;
 
     while ( true ) {
-      if ( programs_.read()->contains( combination->at( 1 ) ) ) {
-        program = programs_.read()->at( combination->at( 1 ) );
+      if ( program = programs_.get( combination->at( 1 ) ); program.has_value() ) {
         break;
       }
 
@@ -119,15 +118,15 @@ public:
         throw std::runtime_error( "Procedure is not runnable" );
       }
 
-      bool program_linked = programs_.read()->contains( function_tag );
+      bool program_linked = programs_.contains( function_tag );
       if ( !program_linked ) {
         auto program = function_name.value().visit<std::shared_ptr<Program>>(
           overload { [&]( Handle<Literal> f ) { return link_program( f.view() ); },
                      [&]( Handle<Named> f ) { return link_program( fixpoint::storage->get( f )->span() ); } } );
-        programs_.write()->emplace( function_tag, program );
+        programs_.insert( function_tag, program );
       }
 
-      program = programs_.read()->at( function_tag );
+      program = programs_.get( function_tag ).value();
     } else {
       fixpoint::current_procedure = combination->at( 1 );
     }
@@ -156,7 +155,7 @@ public:
   }
 
 private:
-  SharedMutex<absl::flat_hash_map<Handle<Fix>, std::shared_ptr<Program>>> programs_ {};
+  FixTable<Fix, std::shared_ptr<Program>> programs_ { 100000 };
   Handle<Fix> trusted_compiler_;
   Handle<Fix> trusted_compiler_fixed_point_;
   const Handle<Fix> runnable_ { Handle<Literal>( "Runnable" ).into<Fix>() };

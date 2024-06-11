@@ -1,7 +1,9 @@
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <stdatomic.h>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -72,7 +74,7 @@ void Remote::send_tree( Handle<AnyTree> handle, TreeData )
     } );
   } );
 
-  trees_view_.write()->insert( handle::upcast( handle ) );
+  add_to_view( handle );
 }
 
 void Remote::push_message( OutgoingMessage&& msg )
@@ -199,33 +201,60 @@ void Remote::put_force( Handle<Relation> name, Handle<Object> data )
 
 bool Remote::contains( Handle<Named> handle )
 {
-  return blobs_view_.read()->contains( handle ) || loadable_blobs_view_.read()->contains( handle );
+  return blobs_view_.contains( handle );
 }
 
 bool Remote::loaded( Handle<Named> handle )
 {
-  return blobs_view_.read()->contains( handle );
+  return blobs_view_.contains( handle ) && blobs_view_.get_ref( handle ).load( memory_order_acquire );
+}
+
+void Remote::add_to_view( Handle<Named> handle )
+{
+  if ( !blobs_view_.contains( handle ) ) {
+    blobs_view_.insert_no_value( handle );
+  }
+
+  blobs_view_.get_ref( handle ).store( true, memory_order_release );
 }
 
 bool Remote::contains( Handle<AnyTree> handle )
 {
-  return trees_view_.read()->contains( handle::upcast( handle ) )
-         || loadable_trees_view_.read()->contains( handle::upcast( handle ) );
+  return trees_view_.contains( handle::upcast( handle ) );
 }
 
 bool Remote::loaded( Handle<AnyTree> handle )
 {
-  return trees_view_.read()->contains( handle::upcast( handle ) );
+  return trees_view_.contains( handle::upcast( handle ) )
+         && trees_view_.get_ref( handle::upcast( handle ) ).load( memory_order_acquire );
+}
+
+void Remote::add_to_view( Handle<AnyTree> handle )
+{
+  if ( !trees_view_.contains( handle::upcast( handle ) ) ) {
+    trees_view_.insert_no_value( handle::upcast( handle ) );
+  }
+
+  trees_view_.get_ref( handle::upcast( handle ) ).store( true, memory_order_release );
 }
 
 bool Remote::contains( Handle<Relation> handle )
 {
-  return relations_view_.read()->contains( handle ) || loadable_relations_view_.read()->contains( handle );
+  return relations_view_.contains( handle );
 }
 
 bool Remote::loaded( Handle<Relation> handle )
 {
-  return relations_view_.read()->contains( handle );
+  return relations_view_.contains( handle ) && relations_view_.get_ref( handle ).load( memory_order_acquire );
+}
+
+void Remote::add_to_view( Handle<Relation> handle )
+{
+  if ( !relations_view_.contains( handle ) ) {
+    relations_view_.insert_no_value( handle );
+  }
+
+  relations_view_.get_ref( handle ).store( true, memory_order_release );
 }
 
 std::optional<Handle<AnyTree>> Remote::contains( Handle<AnyTreeRef> handle )
@@ -235,13 +264,10 @@ std::optional<Handle<AnyTree>> Remote::contains( Handle<AnyTreeRef> handle )
     []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); },
   } );
 
-  auto entry = trees_view_.read()->find( handle::upcast( tmp_tree ) );
+  auto entry = trees_view_.get_handle( handle::upcast( tmp_tree ) );
 
-  if ( entry == trees_view_.read()->end() ) {
-    entry = loadable_trees_view_.read()->find( handle::upcast( tmp_tree ) );
-    if ( entry == loadable_trees_view_.read()->end() ) {
-      return {};
-    }
+  if ( !entry.has_value() ) {
+    return {};
   }
 
   // Cast to same kind as Handle<AnyTreeRef>
@@ -362,8 +388,14 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
       for ( auto handle : payload.data ) {
         handle.visit<void>( overload {
-          [&]( Handle<Named> h ) { loadable_blobs_view_.write()->insert( h ); },
-          [&]( Handle<AnyTree> t ) { loadable_trees_view_.write()->insert( handle::upcast( t ) ); },
+          [&]( Handle<Named> h ) {
+            blobs_view_.insert_no_value( h );
+            blobs_view_.get_ref( h ).store( false, memory_order_release );
+          },
+          [&]( Handle<AnyTree> t ) {
+            trees_view_.insert_no_value( handle::upcast( t ) );
+            trees_view_.get_ref( handle::upcast( t ) ).store( false, memory_order_release );
+          },
           []( Handle<Literal> ) {},
           []( Handle<Relation> ) {},
         } );
@@ -377,7 +409,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       auto tree = parent.get( payload.handle );
       if ( tree ) {
         send_tree( payload.handle, tree.value() );
-        trees_view_.write()->insert( handle::upcast( payload.handle ) );
+        add_to_view( handle::upcast( payload.handle ) );
       }
       break;
     }
@@ -387,7 +419,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       auto blob = parent.get( payload.handle );
       if ( blob ) {
         send_blob( blob.value() );
-        blobs_view_.write()->insert( payload.handle );
+        add_to_view( payload.handle );
       }
       break;
     }
@@ -411,7 +443,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
         // Any handle proposed by the remote are considered "existing" on remote
         auto contained = std::visit( overload {
                                        [&]( Handle<Named> h ) {
-                                         blobs_view_.write()->insert( h );
+                                         add_to_view( h );
 
                                          if ( parent.contains( h ) ) {
                                            parent.get( h );
@@ -419,7 +451,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
                                          return parent.contains( h );
                                        },
                                        [&]( Handle<AnyTree> t ) {
-                                         trees_view_.write()->insert( handle::upcast( t ) );
+                                         add_to_view( t );
 
                                          if ( parent.contains( t ) ) {
                                            parent.get( t );
@@ -480,8 +512,8 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       // Any objects in this proposal are considered "exising" on the remote side
       for ( const auto& [h, _] : *proposed_proposals_.front().second ) {
         std::visit( overload {
-                      [&]( Handle<Named> h ) { blobs_view_.write()->insert( h ); },
-                      [&]( Handle<AnyTree> t ) { trees_view_.write()->insert( handle::upcast( t ) ); },
+                      [&]( Handle<Named> h ) { add_to_view( h ); },
+                      [&]( Handle<AnyTree> t ) { add_to_view( t ); },
                       []( Handle<Relation> ) {},
                       []( Handle<Literal> ) {},
                     },
@@ -492,7 +524,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
       if ( result ) {
         push_message( OutgoingMessage::to_message( ResultPayload { .task = todo, .result = *result } ) );
-        relations_view_.write()->insert( todo );
+        add_to_view( todo );
       } else {
         push_message( OutgoingMessage::to_message( RunPayload { .task = todo } ) );
       }
@@ -505,7 +537,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
           if ( pending_result ) {
             push_message(
               OutgoingMessage::to_message( ResultPayload { .task = pending_todo, .result = *pending_result } ) );
-            relations_view_.write()->insert( pending_todo );
+            add_to_view( pending_todo );
           } else {
             push_message( OutgoingMessage::to_message( RunPayload { .task = pending_todo } ) );
           }
@@ -624,7 +656,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
           if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {
             VLOG( 2 ) << "No proposal sending result directly";
             connection.push_message( OutgoingMessage::to_message( r ) );
-            connection.relations_view_.write()->insert( r.task );
+            connection.add_to_view( r.task );
           } else if ( connection.incomplete_proposal_->empty() ) {
             // Paylod should be send after last proposed_proposals_ is sent
             connection.proposed_proposals_.push(
