@@ -10,6 +10,12 @@ target_link_libraries(test-blake3 util glog)
 add_executable(test-storage test-storage.cc main.cc)
 target_link_libraries(test-storage storage)
 
+add_executable(test-hash-table test-hash-table.cc main.cc)
+target_link_libraries(test-hash-table storage)
+
+add_executable(hash-table-perf hash-table-perf.cc)
+target_link_libraries(hash-table-perf storage)
+
 add_executable(test-evaluator test-evaluator.cc main.cc)
 target_link_libraries(test-evaluator runtime)
 

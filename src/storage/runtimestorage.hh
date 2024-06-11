@@ -190,18 +190,6 @@ public:
    */
   std::unordered_set<Handle<Fix>> tags( Handle<Fix> handle );
 
-  BlobData wait( Handle<Named> handle )
-  {
-    blobs_.read().wait( [&] { return contains( handle ); } );
-    return get( handle );
-  }
-
-  TreeData wait( Handle<AnyTree> handle )
-  {
-    trees_.read().wait( [&] { return contains( handle ); } );
-    return get( handle );
-  }
-
   Handle<Object> wait( Handle<Relation> handle )
   {
     relations_.read().wait( [&] { return contains( handle ); } );
