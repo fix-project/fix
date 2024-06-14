@@ -1,5 +1,5 @@
 #include "handle.hh"
-#include "relater.hh"
+#include "scheduler.hh"
 #include "test.hh"
 
 using namespace std;
@@ -7,12 +7,14 @@ using namespace std;
 class RelaterTest
 {
 public:
-  static void relate( shared_ptr<Relater> rt, Handle<Relation> r ) { rt->relate( r ); }
+  static void relate( SketchGraphScheduler& sch, Handle<Relation> r ) { sch.relate( r ); }
 };
 
 void case0()
 {
   auto rt = make_shared<Relater>();
+  OnePassScheduler sch;
+  sch.set_relater( *rt.get() );
 
   auto thunk0 = Handle<Application>( handle::upcast( tree( *rt, Handle<Literal>( "zero" ) ) ) );
   auto thunk1 = Handle<Application>( handle::upcast( tree( *rt, Handle<Literal>( "one" ) ) ) );
@@ -22,7 +24,7 @@ void case0()
            thunk1 );
   auto thunk_tree = tree( *rt, thunk0, thunk2 );
 
-  RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
+  RelaterTest::relate( sch, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
 
   if ( works_.size() != 2 ) {
     fprintf( stderr, "Wrong number of leaf jobs" );
@@ -43,6 +45,8 @@ void case0()
 void case1()
 {
   auto rt = make_shared<Relater>();
+  OnePassScheduler sch;
+  sch.set_relater( *rt.get() );
 
   auto thunk0 = Handle<Application>( handle::upcast( tree( *rt, Handle<Literal>( "zero" ) ) ) );
   auto thunk1 = Handle<Application>( handle::upcast( tree( *rt, Handle<Literal>( "one" ) ) ) );
@@ -50,7 +54,7 @@ void case1()
   rt->put( Handle<Eval>( thunk0 ), Handle<Literal>( "zero" ) );
   auto thunk_tree = tree( *rt, thunk0, thunk1 );
 
-  RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
+  RelaterTest::relate( sch, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
 
   if ( works_.size() != 1 ) {
     fprintf( stderr, "Wrong number of leaf jobs" );
@@ -69,6 +73,8 @@ void case1()
 void case2()
 {
   auto rt = make_shared<Relater>();
+  OnePassScheduler sch;
+  sch.set_relater( *rt.get() );
 
   auto thunk0 = Handle<Identification>( tree( *rt, Handle<Literal>( "zero" ) ).unwrap<ValueTree>() );
   auto thunk1 = Handle<Application>( handle::upcast( tree( *rt, Handle<Literal>( "one" ) ) ) );
@@ -76,7 +82,7 @@ void case2()
   rt->put( Handle<Eval>( thunk0 ), Handle<Literal>( "zero" ) );
   auto thunk_tree = tree( *rt, thunk0, thunk1 );
 
-  RelaterTest::relate( rt, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
+  RelaterTest::relate( sch, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
 
   if ( works_.size() != 1 ) {
     fprintf( stderr, "Wrong number of leaf jobs" );
