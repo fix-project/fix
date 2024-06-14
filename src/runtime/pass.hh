@@ -11,6 +11,8 @@ class Pass;
 class BasePass;
 class SelectionPass;
 
+inline thread_local DependencyGraph sketch_graph_;
+
 class Pass
 {
 protected:
@@ -202,6 +204,8 @@ public:
 
 class FinalPass : public PrunedSelectionPass
 {
+  std::reference_wrapper<SketchGraphScheduler> sch_;
+
   virtual void leaf( Handle<AnyDataType> ) override;
   virtual void pre( Handle<Eval>, const absl::flat_hash_set<Handle<AnyDataType>>& ) override;
 
@@ -211,8 +215,10 @@ class FinalPass : public PrunedSelectionPass
 public:
   FinalPass( std::reference_wrapper<BasePass> base,
              std::reference_wrapper<Relater> relater,
+             std::reference_wrapper<SketchGraphScheduler> sch,
              std::unique_ptr<SelectionPass> prev )
     : PrunedSelectionPass( base, relater, move( prev ) )
+    , sch_( sch )
   {}
 };
 
@@ -230,6 +236,7 @@ public:
   };
 
   static void run( std::reference_wrapper<Relater> rt,
+                   std::reference_wrapper<SketchGraphScheduler> sch,
                    Handle<AnyDataType> top_level_job,
-                   std::vector<PassType> passes );
+                   const std::vector<PassType>& passes );
 };

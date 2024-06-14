@@ -22,8 +22,8 @@ target_link_libraries(test-evaluator runtime)
 add_executable(test-executor test-executor.cc main.cc)
 target_link_libraries(test-executor runtime)
 
-add_executable(test-relater test-relater.cc main.cc)
-target_link_libraries(test-relater runtime)
+add_executable(test-scheduler-relate test-scheduler-relate.cc main.cc)
+target_link_libraries(test-scheduler-relate runtime)
 
 add_executable(test-distributed test-distributed.cc main.cc)
 target_link_libraries(test-distributed runtime)

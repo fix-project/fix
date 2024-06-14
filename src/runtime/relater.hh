@@ -1,43 +1,34 @@
 #pragma once
 
 #include "dependency_graph.hh"
-#include "evaluator.hh"
 #include "handle.hh"
 #include "repository.hh"
 #include "runner.hh"
+#include "runtimestorage.hh"
 
-inline thread_local std::vector<Handle<AnyDataType>> works_;
 inline thread_local Handle<Relation> current_;
-inline thread_local DependencyGraph sketch_graph_;
 
 class Executor;
 class Scheduler;
-class HintScheduler;
+class SketchGraphScheduler;
 class BasePass;
 class RelaterTest;
 
-class Relater
-  : public MultiWorkerRuntime
-  , FixRuntime
+class Relater : public MultiWorkerRuntime
 {
   friend class Executor;
-  friend class HintScheduler;
+  friend class SketchGraphScheduler;
   friend class BasePass;
   friend class RelaterTest;
 
 private:
   SharedMutex<DependencyGraph> graph_ {};
-  FixEvaluator evaluator_;
   RuntimeStorage storage_ {};
   Repository repository_ {};
   std::shared_ptr<Scheduler> scheduler_ {};
 
   SharedMutex<std::vector<std::weak_ptr<IRuntime>>> remotes_ {};
   std::shared_ptr<IRuntime> local_ {};
-
-  // Return the list of doable works. After the function returns, graph_ is modified such that
-  // finishing all the doable works would recursivly finish the top level relation.
-  void relate( Handle<Relation> );
 
   template<FixType T>
   void get_from_repository( Handle<T> handle );
@@ -49,16 +40,6 @@ public:
 
   virtual void add_worker( std::shared_ptr<IRuntime> ) override;
   Handle<Value> execute( Handle<Relation> x );
-
-  virtual Result<Fix> load( Handle<AnyDataType> value ) override;
-  virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
-  virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
-  virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
-  virtual Result<Value> evalStrict( Handle<Object> expression ) override;
-  virtual Result<Object> evalShallow( Handle<Object> expression ) override;
-  virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree ) override;
-  virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree ) override;
-  virtual Result<ValueTree> mapLift( Handle<ValueTree> tree ) override;
 
   virtual std::optional<BlobData> get( Handle<Named> name ) override;
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;
@@ -72,6 +53,9 @@ public:
   virtual std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle ) override;
   virtual bool contains( const std::string_view label ) override;
   virtual Handle<Fix> labeled( const std::string_view label ) override;
+
+  Handle<AnyTreeRef> ref( Handle<AnyTree> );
+  Handle<AnyTree> unref( Handle<AnyTreeRef> );
 
   virtual std::optional<Info> get_info() override
   {
@@ -162,6 +146,7 @@ public:
     }
   }
 
+  RuntimeStorage& get_storage() { return storage_; }
   Repository& get_repository() { return repository_; }
   virtual std::unordered_set<Handle<AnyDataType>> data() const override { return repository_.data(); }
   virtual absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Handle<Relation> blocked ) override

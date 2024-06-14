@@ -1,5 +1,4 @@
 #include "relater.hh"
-#include "evaluator.hh"
 #include "executor.hh"
 #include "handle.hh"
 #include "handle_post.hh"
@@ -7,7 +6,6 @@
 #include "storage_exception.hh"
 #include "types.hh"
 #include <memory>
-#include <stdexcept>
 
 using namespace std;
 
@@ -54,240 +52,10 @@ void Relater::get_from_repository( Handle<T> handle )
 }
 
 Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<shared_ptr<Scheduler>> scheduler )
-  : evaluator_( *this )
-  , scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
+  : scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
 {
   scheduler_->set_relater( *this );
   local_ = make_shared<Executor>( *this, threads, runner );
-}
-
-Relater::Result<Fix> Relater::load( Handle<AnyDataType> handle )
-{
-  auto contained = handle.visit<bool>(
-    overload { [&]( Handle<Literal> ) { return true; }, [&]( auto h ) { return storage_.contains( h ); } } );
-
-  handle.visit<void>(
-    overload { []( Handle<Literal> ) {}, [&]( auto ) { sketch_graph_.add_dependency( current_, handle ); } } );
-
-  if ( contained ) {
-    return handle::fix( handle );
-  } else {
-    works_.push_back( handle );
-    return {};
-  }
-}
-
-Relater::Result<AnyTree> Relater::load( Handle<AnyTreeRef> handle )
-{
-  auto h = contains( handle ).or_else( [&]() -> optional<Handle<AnyTree>> {
-    for ( auto& remote : remotes_.read().get() ) {
-      auto locked_remote = remote.lock();
-      if ( auto h = locked_remote->contains( handle ); h.has_value() ) {
-        return h;
-      }
-    }
-    return {};
-  } );
-
-  if ( !h.has_value() ) {
-    throw HandleNotFound( handle::fix( handle ) );
-  }
-
-  auto d = h.value().visit<Handle<AnyDataType>>( []( auto h ) { return h; } );
-  sketch_graph_.add_dependency( current_, d );
-
-  if ( storage_.contains( h.value() ) ) {
-    return h.value();
-  } else {
-    works_.push_back( d );
-    return {};
-  }
-}
-
-Handle<AnyTreeRef> Relater::ref( Handle<AnyTree> tree )
-{
-  if ( !storage_.contains( tree ) ) {
-    throw HandleNotFound( handle::fix( tree ) );
-  }
-  return storage_.ref( tree );
-}
-
-Relater::Result<Object> Relater::apply( Handle<ObjectTree> combination )
-{
-  auto apply = Handle<Relation>( Handle<Apply>( combination ) );
-  if ( apply != current_ ) {
-    sketch_graph_.add_dependency( current_, apply );
-  }
-
-  if ( storage_.contains( apply ) ) {
-    return storage_.get( apply );
-  } else if ( contains( apply ) ) {
-    // Relation exists in repository
-    VLOG( 2 ) << "Relation existed " << apply;
-    return get( apply );
-  }
-
-  works_.push_back( Handle<Apply>( combination ) );
-  return {};
-}
-
-Relater::Result<Value> Relater::evalStrict( Handle<Object> expression )
-{
-  Handle<Eval> goal( expression );
-  optional<Handle<Value>> result;
-
-  if ( storage_.contains( goal ) ) {
-    result = storage_.get( goal ).unwrap<Value>();
-  } else if ( contains( goal ) ) {
-    VLOG( 2 ) << "Relation existed " << goal;
-    result = get( goal )->unwrap<Value>();
-  }
-
-  if ( result.has_value() ) {
-    if ( current_ != Handle<Relation>( goal ) && Handle<Object>( result.value() ) != expression ) {
-      sketch_graph_.add_dependency( current_, goal );
-    }
-    return result.value();
-  }
-
-  auto prev_current = current_;
-  current_ = goal;
-
-  result = evaluator_.evalStrict( expression );
-
-  current_ = prev_current;
-
-  if ( result.has_value() ) {
-    this->put( goal, result.value() );
-  }
-
-  if ( current_ != Handle<Relation>( goal )
-       && ( !result.has_value() || Handle<Object>( result.value() ) != expression ) ) {
-    sketch_graph_.add_dependency( current_, goal );
-  }
-
-  return result;
-}
-
-Relater::Result<Object> Relater::evalShallow( Handle<Object> expression )
-{
-  return evaluator_.evalShallow( expression );
-}
-
-Relater::Result<ValueTree> Relater::mapEval( Handle<ObjectTree> tree )
-{
-  bool ready = true;
-  bool toreplace = false;
-  auto data = storage_.get( tree );
-  for ( const auto& x : data->span() ) {
-    auto obj = x.unwrap<Expression>().unwrap<Object>();
-    auto result = evalStrict( obj );
-    if ( not result ) {
-      ready = false;
-    } else if ( !toreplace && Handle<Object>( result.value() ) != obj ) {
-      toreplace = true;
-    }
-  }
-  if ( not ready ) {
-    return {};
-  }
-
-  if ( toreplace ) {
-    auto values = OwnedMutTree::allocate( data->size() );
-    for ( size_t i = 0; i < data->size(); i++ ) {
-      auto x = data->at( i );
-      auto obj = x.unwrap<Expression>().unwrap<Object>();
-      values[i] = evalStrict( obj ).value();
-    }
-
-    if ( tree.is_tag() ) {
-      return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>().tag();
-    } else {
-      return storage_.create( std::make_shared<OwnedTree>( std::move( values ) ) ).unwrap<ValueTree>();
-    }
-  } else {
-    return Handle<ValueTree>( tree.content, tree.size(), tree.is_tag() );
-  }
-}
-
-Relater::Result<ObjectTree> Relater::mapReduce( Handle<ExpressionTree> tree )
-{
-  bool ready = true;
-  bool toreplace = false;
-  TreeData data = storage_.get( tree );
-  for ( const auto& x : data->span() ) {
-    auto exp = x.unwrap<Expression>();
-    auto result = evaluator_.reduce( exp );
-    if ( not result ) {
-      ready = false;
-    } else if ( !toreplace && x != Handle<Fix>( Handle<Expression>( result.value() ) ) ) {
-      toreplace = true;
-    }
-  }
-  if ( not ready ) {
-    return {};
-  }
-
-  if ( toreplace ) {
-    auto objs = OwnedMutTree::allocate( data->size() );
-    for ( size_t i = 0; i < data->size(); i++ ) {
-      auto exp = data->at( i ).unwrap<Expression>();
-      objs[i] = evaluator_.reduce( exp ).value();
-    }
-
-    if ( tree.is_tag() ) {
-      return handle::tree_unwrap<ObjectTree>( storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ) )
-        .tag();
-    } else {
-      return handle::tree_unwrap<ObjectTree>( storage_.create( std::make_shared<OwnedTree>( std::move( objs ) ) ) );
-    }
-  } else {
-    return Handle<ObjectTree>( tree.content, tree.size(), tree.is_tag() );
-  }
-}
-
-Relater::Result<ValueTree> Relater::mapLift( Handle<ValueTree> tree )
-{
-  bool ready = true;
-  bool toreplace = false;
-  auto data = storage_.get( tree );
-  for ( const auto& x : data->span() ) {
-    auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
-    auto result = evaluator_.lift( val );
-    if ( not result ) {
-      ready = false;
-    } else if ( !toreplace && result.value() != val ) {
-      toreplace = true;
-    }
-  }
-  if ( not ready ) {
-    return {};
-  }
-
-  if ( toreplace ) {
-    auto vals = OwnedMutTree::allocate( data->size() );
-    for ( size_t i = 0; i < data->size(); i++ ) {
-      auto x = data->at( i );
-      auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
-      vals[i] = evaluator_.lift( val ).value();
-    }
-
-    if ( tree.is_tag() ) {
-      return storage_.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>().tag();
-    } else {
-      return storage_.create( std::make_shared<OwnedTree>( std::move( vals ) ) ).unwrap<ValueTree>();
-    }
-  } else {
-    return tree;
-  }
-}
-
-void Relater::relate( Handle<Relation> goal )
-{
-  works_ = {};
-  sketch_graph_ = {};
-  current_ = goal;
-  evaluator_.relate( goal );
 }
 
 void Relater::add_worker( shared_ptr<IRuntime> rmt )
@@ -338,13 +106,7 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
     return storage_.get( name );
   }
 
-  relate( name );
-  if ( !works_.empty() ) {
-    scheduler_->schedule( works_, name );
-    return {};
-  } else {
-    return storage_.get( name );
-  }
+  return scheduler_->schedule( name );
 }
 
 void Relater::put( Handle<Named> name, BlobData data )
@@ -429,18 +191,29 @@ Handle<Fix> Relater::labeled( const std::string_view label )
   return storage_.labeled( label );
 }
 
-void Relater::merge_sketch_graph( Handle<Relation> r, absl::flat_hash_set<Handle<Relation>>& unblocked )
+Handle<AnyTreeRef> Relater::ref( Handle<AnyTree> tree )
 {
-  auto graph = graph_.write();
-
-  for ( auto d : sketch_graph_.get_forward_dependencies( r ) ) {
-    auto contained = d.visit<bool>(
-      overload { []( Handle<Literal> ) { return true; }, [&]( auto h ) { return storage_.contains( h ); } } );
-
-    if ( contained ) {
-      sketch_graph_.finish( d, unblocked );
-    } else {
-      graph->add_dependency( r, d );
-    }
+  if ( !storage_.contains( tree ) ) {
+    throw HandleNotFound( handle::fix( tree ) );
   }
+  return storage_.ref( tree );
+}
+
+Handle<AnyTree> Relater::unref( Handle<AnyTreeRef> tree )
+{
+  auto h = contains( tree ).or_else( [&]() -> optional<Handle<AnyTree>> {
+    for ( auto& remote : remotes_.read().get() ) {
+      auto locked_remote = remote.lock();
+      if ( auto h = locked_remote->contains( tree ); h.has_value() ) {
+        return h;
+      }
+    }
+    return {};
+  } );
+
+  if ( !h.has_value() ) {
+    throw HandleNotFound( handle::fix( tree ) );
+  }
+
+  return h.value();
 }

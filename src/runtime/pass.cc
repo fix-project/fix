@@ -4,6 +4,8 @@
 #include "handle_util.hh"
 #include "overload.hh"
 #include "relater.hh"
+#include "scheduler.hh"
+#include <functional>
 #include <limits>
 #include <stdexcept>
 
@@ -730,7 +732,7 @@ void FinalPass::pre( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataT
   }
 
   absl::flat_hash_set<Handle<Relation>> unblocked;
-  relater_.get().merge_sketch_graph( job, unblocked );
+  sch_.get().merge_sketch_graph( job, unblocked );
 
   for ( auto r : unblocked ) {
     if ( is_local( chosen_remotes_.at( r ).first ) ) {
@@ -739,7 +741,10 @@ void FinalPass::pre( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataT
   }
 }
 
-void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_level_job, vector<PassType> passes )
+void PassRunner::run( reference_wrapper<Relater> rt,
+                      reference_wrapper<SketchGraphScheduler> sch,
+                      Handle<AnyDataType> top_level_job,
+                      const vector<PassType>& passes )
 {
   BasePass base( rt );
   base.run( top_level_job );
@@ -791,6 +796,6 @@ void PassRunner::run( reference_wrapper<Relater> rt, Handle<AnyDataType> top_lev
 
   selection = make_unique<SendToRemotePass>( base, rt, move( selection.value() ) );
   dynamic_cast<SendToRemotePass*>( selection.value().get() )->send_remote_jobs( top_level_job );
-  FinalPass final( base, rt, move( selection.value() ) );
+  FinalPass final( base, rt, sch, move( selection.value() ) );
   final.run( top_level_job );
 }
