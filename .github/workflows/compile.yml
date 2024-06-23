@@ -32,7 +32,7 @@ jobs:
       - name: install deps
         run: sudo apt update && sudo apt-get install libboost-all-dev libgoogle-glog-dev software-properties-common -y
       - name: install g++ 13
-        run: sudo add-apt-repository 'ppa:ubuntu-toolchain-r/test' && sudo apt update && sudo apt-get install gcc-13 g++-13 -y
+        run: sudo add-apt-repository 'ppa:ubuntu-toolchain-r/test' && sudo apt update && sudo apt-get install gcc-13 g++-13 libc6-dev -y
       - name: install gh
         run: sudo apt install gh -y
       - shell: bash

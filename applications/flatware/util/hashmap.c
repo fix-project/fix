@@ -1,8 +1,5 @@
 /* Hash table.
 
-   This data structure is thoroughly documented in the Tour of
-   Pintos for Project 3.
-
    See hash.h for basic information. */
 
 #include "hashmap.h"

@@ -23,11 +23,7 @@ Handle<Fix> fs()
 {
   static string d = "040000";
   static string f = "100644";
-  static auto e = dirent(
-    ".",
-    d,
-    tester::Tree(
-      dirent( "fixpoint.txt", f, tester::Blob( "" ) ) ) );
+  static auto e = dirent( ".", d, tester::Tree( dirent( "fixpoint.txt", f, tester::Blob( "" ) ) ) );
 
   return e;
 }
