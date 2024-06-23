@@ -95,7 +95,7 @@ tree:4
 ## WASI Implementation Status
 
 - [x] `proc_exit`
-- [ ] `fd_close` (doesn't currently persist file changes)
+- [x] `fd_close`
 - [x] `fd_fdstat_get`
 - [x] `fd_seek`
 - [x] `fd_read`
@@ -105,17 +105,17 @@ tree:4
 - [x] `fd_prestat_dir_name`
 - [ ] `fd_advise` (no effect)
 - [x] `fd_allocate`
-- [ ] `fd_datasync`
+- [ ] `fd_datasync` (no effect)
 - [x] `fd_filestat_get`
 - [x] `fd_filestat_set_size`
-- [ ] `fd_filestat_set_times`
+- [x] `fd_filestat_set_times`
 - [x] `fd_pread`
-- [ ] `fd_pwrite`
-- [ ] `fd_readdir`
-- [ ] `fd_sync`
+- [x] `fd_pwrite`
+- [x] `fd_readdir`
+- [ ] `fd_sync` (no effect)
 - [x] `fd_tell`
-- [ ] `path_create_directory`
-- [ ] `path_filestat_get`
+- [x] `path_create_directory`
+- [x] `path_filestat_get`
 - [ ] `path_filestat_set_times`
 - [ ] `path_link`
 - [ ] `path_readlink`
@@ -127,7 +127,7 @@ tree:4
 - [x] `args_get`
 - [x] `environ_sizes_get`
 - [x] `environ_get`
-- [x] `path_open`
+- [ ] `path_open` (only supports existing files)
 - [x] `clock_res_get` (throws invalid argument error for all clocks as time is not implemented)
 - [ ] `clock_time_get` (note: will likely be implemented to return a constant from the input combination)
 - [ ] `poll_oneoff`

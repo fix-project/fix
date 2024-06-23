@@ -70,3 +70,6 @@ target_link_libraries(test-return-flatware runtime)
 add_executable(test-python-flatware test-python-flatware.cc main.cc)
 target_link_libraries(test-python-flatware runtime)
 
+add_executable(test-filesys-flatware test-filesys-flatware.cc main.cc)
+target_link_libraries(test-filesys-flatware runtime)
+
