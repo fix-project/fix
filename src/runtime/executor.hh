@@ -33,18 +33,13 @@ private:
   void run();
   void progress( Handle<AnyDataType> runnable_or_loadable );
 
-  /** @defgroup Implementation of FixRuntime
-   * @{
-   */
-
+public:
   std::optional<Handle<Fix>> load( Handle<AnyDataType> handle );
   Result<Object> apply( Handle<ObjectTree> combination );
 
-public:
   /** @defgroup Implementation of IRuntime
    * @{
    */
-
   virtual std::optional<BlobData> get( Handle<Named> name ) override;
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;
   virtual std::optional<Handle<Object>> get( Handle<Relation> name ) override;

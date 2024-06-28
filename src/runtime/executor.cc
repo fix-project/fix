@@ -7,6 +7,7 @@
 #include "executor.hh"
 #include "fixpointapi.hh"
 #include "overload.hh"
+#include "resource_limits.hh"
 #include "storage_exception.hh"
 
 template<typename T>
@@ -24,6 +25,7 @@ Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>
     threads_.emplace_back( [&]() {
       current_ = {};
       fixpoint::storage = &parent_.storage_;
+      resource_limits::available_bytes = 0;
       run();
     } );
   }
@@ -90,7 +92,10 @@ void Executor::progress( Handle<AnyDataType> runnable_or_loadable )
   runnable_or_loadable.visit<void>(
     overload { [&]( Handle<Relation> r ) {
                 r.visit<void>( overload { [&]( Handle<Apply> a ) { apply( a.unwrap<ObjectTree>() ); },
-                                          [&]( Handle<Eval> e ) { parent_.get( e ); } } );
+                                          [&]( Handle<Eval> e ) {
+                                            current_ = e;
+                                            parent_.get( e );
+                                          } } );
               },
                [&]( Handle<AnyTree> h ) { throw HandleNotFound( handle::upcast( h ) ); },
                [&]( auto h ) { throw HandleNotFound( h ); } } );
