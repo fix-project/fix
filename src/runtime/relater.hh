@@ -10,6 +10,7 @@ inline thread_local Handle<Relation> current_;
 
 class Executor;
 class Scheduler;
+class LocalScheduler;
 class SketchGraphScheduler;
 class BasePass;
 class RelaterTest;
@@ -17,6 +18,7 @@ class RelaterTest;
 class Relater : public MultiWorkerRuntime
 {
   friend class Executor;
+  friend class LocalScheduler;
   friend class SketchGraphScheduler;
   friend class BasePass;
   friend class RelaterTest;
@@ -153,8 +155,5 @@ public:
   {
     return graph_.read()->get_forward_dependencies( blocked );
   }
-
-  void merge_sketch_graph( Handle<Relation> r, absl::flat_hash_set<Handle<Relation>>& unblocked );
-
   std::shared_ptr<IRuntime> get_local() { return local_; }
 };

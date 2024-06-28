@@ -1,13 +1,24 @@
 #include "scheduler.hh"
+#include "executor.hh"
 #include "handle.hh"
 #include "overload.hh"
 #include "pass.hh"
 #include "relater.hh"
 #include "types.hh"
+#include <memory>
 #include <optional>
 #include <stdexcept>
 
 using namespace std;
+
+LocalScheduler::Result<Fix> LocalScheduler::load( Handle<AnyDataType> handle )
+{
+  handle.visit<void>( overload { []( Handle<Literal> ) {},
+                                 []( Handle<Relation> ) { throw std::runtime_error( "Invalid load()." ); },
+                                 [&]( auto h ) { relater_->get().get( h ); } } );
+
+  return handle::fix( handle );
+}
 
 SketchGraphScheduler::Result<Fix> SketchGraphScheduler::load( Handle<AnyDataType> handle )
 {
@@ -15,8 +26,9 @@ SketchGraphScheduler::Result<Fix> SketchGraphScheduler::load( Handle<AnyDataType
     = handle.visit<bool>( overload { [&]( Handle<Literal> ) { return true; },
                                      [&]( auto h ) { return relater_->get().get_storage().contains( h ); } } );
 
-  handle.visit<void>( overload {
-    []( Handle<Literal> ) {}, [&]( auto ) { sketch_graph_.add_dependency( current_schedule_step_, handle ); } } );
+  handle.visit<void>(
+    overload { []( Handle<Literal> ) {},
+               [&]( auto ) { sketch_graph_.add_dependency( current_schedule_step_.value(), handle ); } } );
 
   if ( contained ) {
     return handle::fix( handle );
@@ -26,12 +38,19 @@ SketchGraphScheduler::Result<Fix> SketchGraphScheduler::load( Handle<AnyDataType
   }
 }
 
+LocalScheduler::Result<AnyTree> LocalScheduler::load( Handle<AnyTreeRef> handle )
+{
+  auto h = relater_->get().unref( handle );
+  relater_->get().get( h );
+  return h;
+}
+
 SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::load( Handle<AnyTreeRef> handle )
 {
   auto h = relater_->get().unref( handle );
 
   auto d = h.visit<Handle<AnyDataType>>( []( auto h ) { return h; } );
-  sketch_graph_.add_dependency( current_schedule_step_, d );
+  sketch_graph_.add_dependency( current_schedule_step_.value(), d );
 
   if ( relater_->get().get_storage().contains( h ) ) {
     return h;
@@ -41,16 +60,38 @@ SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::load( Handle<AnyTree
   }
 }
 
+Handle<AnyTreeRef> LocalScheduler::ref( Handle<AnyTree> tree )
+{
+  return relater_->get().ref( tree );
+}
+
 Handle<AnyTreeRef> SketchGraphScheduler::ref( Handle<AnyTree> tree )
 {
   return relater_->get().ref( tree );
 }
 
+LocalScheduler::Result<Object> LocalScheduler::apply( Handle<ObjectTree> combination )
+{
+  auto apply = Handle<Relation>( Handle<Apply>( combination ) );
+  if ( relater_->get().contains( apply ) ) {
+    return relater_->get().get( apply ).value();
+  }
+
+  if ( !nested_ ) {
+    return dynamic_pointer_cast<Executor>( relater_->get().get_local() )->apply( combination );
+  } else {
+    relater_->get().graph_.write()->add_dependency( current_schedule_step_.value(), apply );
+    relater_->get().get_local()->get( apply );
+    return {};
+  }
+}
+
 SketchGraphScheduler::Result<Object> SketchGraphScheduler::apply( Handle<ObjectTree> combination )
 {
   auto apply = Handle<Relation>( Handle<Apply>( combination ) );
-  if ( apply != current_schedule_step_ ) {
-    sketch_graph_.add_dependency( current_schedule_step_, apply );
+  // XXX
+  if ( apply != current_schedule_step_.value() ) {
+    sketch_graph_.add_dependency( current_schedule_step_.value(), apply );
   }
 
   if ( relater_->get().contains( apply ) ) {
@@ -61,6 +102,36 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::apply( Handle<ObjectT
   return {};
 }
 
+LocalScheduler::Result<Value> LocalScheduler::evalStrict( Handle<Object> expression )
+{
+  Handle<Eval> goal( expression );
+  if ( relater_->get().contains( goal ) ) {
+    return relater_->get().get( goal )->unwrap<Value>();
+  }
+
+  auto prev_current = current_schedule_step_;
+  auto prev_nested = nested_;
+
+  current_schedule_step_ = goal;
+  nested_ = prev_current.has_value();
+
+  auto result = evaluator_.evalStrict( expression );
+
+  current_schedule_step_ = prev_current;
+  nested_ = prev_nested;
+
+  if ( !result ) {
+    if ( current_schedule_step_.has_value() ) {
+      relater_->get().graph_.write()->add_dependency( current_schedule_step_.value(), goal );
+    }
+    return {};
+  }
+
+  relater_->get().put( goal, *result );
+  return result;
+}
+
+// XXX: all walking of the tree happens on the same thread
 SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Object> expression )
 {
   Handle<Eval> goal( expression );
@@ -71,8 +142,8 @@ SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Obj
   }
 
   if ( result.has_value() ) {
-    if ( current_schedule_step_ != Handle<Relation>( goal ) && Handle<Object>( result.value() ) != expression ) {
-      sketch_graph_.add_dependency( current_schedule_step_, goal );
+    if ( current_schedule_step_.has_value() && Handle<Object>( result.value() ) != expression ) {
+      sketch_graph_.add_dependency( current_schedule_step_.value(), goal );
     }
     return result.value();
   }
@@ -88,17 +159,73 @@ SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Obj
     relater_->get().put( goal, result.value() );
   }
 
-  if ( current_schedule_step_ != Handle<Relation>( goal )
+  if ( current_schedule_step_.has_value()
        && ( !result.has_value() || Handle<Object>( result.value() ) != expression ) ) {
-    sketch_graph_.add_dependency( current_schedule_step_, goal );
+    sketch_graph_.add_dependency( current_schedule_step_.value(), goal );
   }
 
   return result;
 }
 
+LocalScheduler::Result<Object> LocalScheduler::evalShallow( Handle<Object> expression )
+{
+  return evaluator_.evalShallow( expression );
+}
+
 SketchGraphScheduler::Result<Object> SketchGraphScheduler::evalShallow( Handle<Object> expression )
 {
   return evaluator_.evalShallow( expression );
+}
+
+LocalScheduler::Result<ValueTree> LocalScheduler::mapEval( Handle<ObjectTree> tree )
+{
+  bool ready = true;
+  bool toreplace = false;
+  auto data = relater_->get().get( tree ).value();
+
+  auto prev_nested = nested_;
+  nested_ = true;
+
+  for ( const auto& x : data->span() ) {
+    auto obj = x.unwrap<Expression>().unwrap<Object>();
+    auto result = evalStrict( obj );
+
+    if ( not result ) {
+      ready = false;
+    } else if ( !toreplace && Handle<Object>( result.value() ) != obj ) {
+      toreplace = true;
+    }
+  }
+
+  nested_ = prev_nested;
+
+  if ( not ready ) {
+    return {};
+  }
+
+  if ( toreplace ) {
+    auto values = OwnedMutTree::allocate( data->size() );
+    for ( size_t i = 0; i < data->size(); i++ ) {
+      auto x = data->at( i );
+      auto obj = x.unwrap<Expression>().unwrap<Object>();
+      values[i] = evalStrict( obj ).value();
+    }
+
+    if ( tree.is_tag() ) {
+      return relater_->get()
+        .get_storage()
+        .create( std::make_shared<OwnedTree>( std::move( values ) ) )
+        .unwrap<ValueTree>()
+        .tag();
+    } else {
+      return relater_->get()
+        .get_storage()
+        .create( std::make_shared<OwnedTree>( std::move( values ) ) )
+        .unwrap<ValueTree>();
+    }
+  } else {
+    return Handle<ValueTree>( tree.content, tree.size(), tree.is_tag() );
+  }
 }
 
 SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapEval( Handle<ObjectTree> tree )
@@ -144,11 +271,15 @@ SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapEval( Handle<Ob
   }
 }
 
-SketchGraphScheduler::Result<ObjectTree> SketchGraphScheduler::mapReduce( Handle<ExpressionTree> tree )
+LocalScheduler::Result<ObjectTree> LocalScheduler::mapReduce( Handle<ExpressionTree> tree )
 {
   bool ready = true;
   bool toreplace = false;
   auto data = relater_->get().get( tree ).value();
+
+  auto prev_nested = nested_;
+  nested_ = true;
+
   for ( const auto& x : data->span() ) {
     auto exp = x.unwrap<Expression>();
     auto result = evaluator_.reduce( exp );
@@ -158,6 +289,9 @@ SketchGraphScheduler::Result<ObjectTree> SketchGraphScheduler::mapReduce( Handle
       toreplace = true;
     }
   }
+
+  nested_ = prev_nested;
+
   if ( not ready ) {
     return {};
   }
@@ -182,11 +316,55 @@ SketchGraphScheduler::Result<ObjectTree> SketchGraphScheduler::mapReduce( Handle
   }
 }
 
-SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapLift( Handle<ValueTree> tree )
+SketchGraphScheduler::Result<ObjectTree> SketchGraphScheduler::mapReduce( Handle<ExpressionTree> tree )
 {
   bool ready = true;
   bool toreplace = false;
   auto data = relater_->get().get( tree ).value();
+
+  for ( const auto& x : data->span() ) {
+    auto exp = x.unwrap<Expression>();
+    auto result = evaluator_.reduce( exp );
+    if ( not result ) {
+      ready = false;
+    } else if ( !toreplace && x != Handle<Fix>( Handle<Expression>( result.value() ) ) ) {
+      toreplace = true;
+    }
+  }
+
+  if ( not ready ) {
+    return {};
+  }
+
+  if ( toreplace ) {
+    auto objs = OwnedMutTree::allocate( data->size() );
+    for ( size_t i = 0; i < data->size(); i++ ) {
+      auto exp = data->at( i ).unwrap<Expression>();
+      objs[i] = evaluator_.reduce( exp ).value();
+    }
+
+    if ( tree.is_tag() ) {
+      return handle::tree_unwrap<ObjectTree>(
+               relater_->get().get_storage().create( std::make_shared<OwnedTree>( std::move( objs ) ) ) )
+        .tag();
+    } else {
+      return handle::tree_unwrap<ObjectTree>(
+        relater_->get().get_storage().create( std::make_shared<OwnedTree>( std::move( objs ) ) ) );
+    }
+  } else {
+    return Handle<ObjectTree>( tree.content, tree.size(), tree.is_tag() );
+  }
+}
+
+SketchGraphScheduler::Result<ValueTree> LocalScheduler::mapLift( Handle<ValueTree> tree )
+{
+  bool ready = true;
+  bool toreplace = false;
+  auto data = relater_->get().get( tree ).value();
+
+  auto prev_nested = nested_;
+  nested_ = true;
+
   for ( const auto& x : data->span() ) {
     auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
     auto result = evaluator_.lift( val );
@@ -196,6 +374,54 @@ SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapLift( Handle<Va
       toreplace = true;
     }
   }
+
+  nested_ = prev_nested;
+
+  if ( not ready ) {
+    return {};
+  }
+
+  if ( toreplace ) {
+    auto vals = OwnedMutTree::allocate( data->size() );
+    for ( size_t i = 0; i < data->size(); i++ ) {
+      auto x = data->at( i );
+      auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
+      vals[i] = evaluator_.lift( val ).value();
+    }
+
+    if ( tree.is_tag() ) {
+      return relater_->get()
+        .get_storage()
+        .create( std::make_shared<OwnedTree>( std::move( vals ) ) )
+        .unwrap<ValueTree>()
+        .tag();
+    } else {
+      return relater_->get()
+        .get_storage()
+        .create( std::make_shared<OwnedTree>( std::move( vals ) ) )
+        .unwrap<ValueTree>();
+    }
+  } else {
+    return tree;
+  }
+}
+
+SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapLift( Handle<ValueTree> tree )
+{
+  bool ready = true;
+  bool toreplace = false;
+  auto data = relater_->get().get( tree ).value();
+
+  for ( const auto& x : data->span() ) {
+    auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
+    auto result = evaluator_.lift( val );
+    if ( not result ) {
+      ready = false;
+    } else if ( !toreplace && result.value() != val ) {
+      toreplace = true;
+    }
+  }
+
   if ( not ready ) {
     return {};
   }
@@ -303,16 +529,20 @@ void SketchGraphScheduler::relate( Handle<Relation> top_level_job )
 {
   works_ = {};
   sketch_graph_ = {};
-  current_schedule_step_ = top_level_job;
 
   evaluator_.relate( top_level_job );
+}
+
+LocalScheduler::Result<Object> LocalScheduler::schedule( Handle<Relation> top_level_job )
+{
+  nested_ = false;
+  return evaluator_.relate( top_level_job );
 }
 
 SketchGraphScheduler::Result<Object> SketchGraphScheduler::schedule( Handle<Relation> top_level_job )
 {
   works_ = {};
   sketch_graph_ = {};
-  current_schedule_step_ = top_level_job;
 
   auto res = evaluator_.relate( top_level_job );
 

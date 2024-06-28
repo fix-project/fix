@@ -49,7 +49,8 @@ public:
 };
 
 inline thread_local std::vector<Handle<AnyDataType>> works_;
-inline thread_local Handle<Relation> current_schedule_step_;
+inline thread_local std::optional<Handle<Relation>> current_schedule_step_;
+inline thread_local bool nested_;
 
 class RelaterTest;
 

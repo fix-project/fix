@@ -88,7 +88,10 @@ void Executor::progress( Handle<AnyDataType> runnable_or_loadable )
   runnable_or_loadable.visit<void>(
     overload { [&]( Handle<Relation> r ) {
                 r.visit<void>( overload { [&]( Handle<Apply> a ) { apply( a.unwrap<ObjectTree>() ); },
-                                          [&]( Handle<Eval> e ) { parent_.get( e ); } } );
+                                          [&]( Handle<Eval> e ) {
+                                            current_ = e;
+                                            parent_.get( e );
+                                          } } );
               },
                [&]( Handle<AnyTree> h ) { throw HandleNotFound( handle::upcast( h ) ); },
                [&]( auto h ) { throw HandleNotFound( h ); } } );
