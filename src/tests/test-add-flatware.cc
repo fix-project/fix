@@ -4,16 +4,16 @@
 #include "relater.hh"
 #include "test.hh"
 
+using namespace std;
+
 namespace tester {
-auto rt = std::make_shared<Relater>();
+shared_ptr<Relater> rt;
 auto Limits = []() { return limits( *rt, 1024 * 1024, 1024, 1 ); };
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
 auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
 }
-
-using namespace std;
 
 uint32_t fix_add( char a, char b, Handle<Fix> add_elf )
 {
@@ -51,8 +51,10 @@ void check_add( uint8_t a, uint8_t b )
   check_add( a, b, add_flatware, "add-fixpoint" );
 }
 
-void test( void )
+void test( shared_ptr<Relater> rt )
 {
+  tester::rt = rt;
+
   for ( size_t i = 0; i < 32; i++ ) {
     check_add( random(), random() );
   }

@@ -5,9 +5,7 @@
 
 using namespace std;
 
-auto rt = make_shared<Relater>();
-
-void test( void )
+void test( shared_ptr<Relater> rt )
 {
   auto thunk = Handle<Application>(
     handle::upcast( tree( *rt,

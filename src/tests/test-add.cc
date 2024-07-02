@@ -6,9 +6,7 @@
 
 using namespace std;
 
-auto rt = make_shared<Relater>();
-
-uint32_t fix_add( uint32_t a, uint32_t b, Handle<Fix> add_elf )
+uint32_t fix_add( shared_ptr<Relater> rt, uint32_t a, uint32_t b, Handle<Fix> add_elf )
 {
   auto combination = tree( *rt,
                            limits( *rt, 1024 * 1024, 1024, 1 ).into<Fix>(),
@@ -30,9 +28,9 @@ uint32_t fix_add( uint32_t a, uint32_t b, Handle<Fix> add_elf )
   return x;
 }
 
-void check_add( uint32_t a, uint32_t b, Handle<Fix> add_elf, string name )
+void check_add( shared_ptr<Relater> rt, uint32_t a, uint32_t b, Handle<Fix> add_elf, string name )
 {
-  uint32_t sum_blob = fix_add( a, b, add_elf );
+  uint32_t sum_blob = fix_add( rt, a, b, add_elf );
   printf( "%s: %u + %u = %u\n", name.c_str(), a, b, sum_blob );
   if ( sum_blob != a + b ) {
     fprintf( stderr, "%s: got %u + %u = %u, expected %u.\n", name.c_str(), a, b, sum_blob, a + b );
@@ -40,19 +38,19 @@ void check_add( uint32_t a, uint32_t b, Handle<Fix> add_elf, string name )
   }
 }
 
-void check_add( uint32_t a, uint32_t b )
+void check_add( shared_ptr<Relater> rt, uint32_t a, uint32_t b )
 {
   static Handle<Fix> addblob = compile( *rt, file( *rt, "testing/wasm-examples/addblob.wasm" ) );
   static Handle<Fix> add_simple = compile( *rt, file( *rt, "testing/wasm-examples/add-simple.wasm" ) );
-  check_add( a, b, addblob, "addblob" );
-  check_add( a, b, add_simple, "add-simple" );
+  check_add( rt, a, b, addblob, "addblob" );
+  check_add( rt, a, b, add_simple, "add-simple" );
 }
 
-void test( void )
+void test( shared_ptr<Relater> rt )
 {
   for ( size_t i = 0; i < 32; i++ ) {
-    check_add( random(), random() );
+    check_add( rt, random(), random() );
   }
-  check_add( 0, 0 );
-  check_add( pow( 2, 32 ) - 5, pow( 2, 31 ) + 12 );
+  check_add( rt, 0, 0 );
+  check_add( rt, pow( 2, 32 ) - 5, pow( 2, 31 ) + 12 );
 }
