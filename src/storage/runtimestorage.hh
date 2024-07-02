@@ -4,10 +4,12 @@
 #include <stdio.h>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 
 #include "handle.hh"
 #include "handle_util.hh"
+#include "hash_table.hh"
 #include "mutex.hh"
 #include "object.hh"
 
@@ -31,15 +33,17 @@ class RuntimeStorage
 {
 private:
   friend class RuntimeWorker;
-  using BlobMap = absl::flat_hash_map<Handle<Named>, BlobData, AbslHash>;
-  using TreeMap = absl::flat_hash_map<Handle<ExpressionTree>, TreeData, AbslHash, handle::tree_equal>;
-  using RelationMap = absl::flat_hash_map<Handle<Fix>, Handle<Object>, AbslHash>;
+  using BlobMap = FixTable<Named, BlobData, AbslHash>;
+  using TreeMap = FixTable<ExpressionTree, TreeData, AbslHash, handle::tree_equal>;
+  using RelationMap = FixTable<Fix, Handle<Object>, AbslHash>;
+
   using PinMap = absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash>;
   using LabelMap = absl::flat_hash_map<std::string, Handle<Fix>>;
 
-  SharedMutex<BlobMap> blobs_ {};
-  SharedMutex<TreeMap> trees_ {};
-  SharedMutex<RelationMap> relations_ {};
+  BlobMap blobs_ { 1000000 };
+  TreeMap trees_ { 1000000 };
+  RelationMap relations_ { 1000000 };
+
   SharedMutex<PinMap> pins_ {};
   SharedMutex<LabelMap> labels_ {};
 
@@ -192,7 +196,12 @@ public:
 
   Handle<Object> wait( Handle<Relation> handle )
   {
-    relations_.read().wait( [&] { return contains( handle ); } );
+    using namespace std::chrono_literals;
+
+    while ( !relations_.contains( handle ) ) {
+      std::this_thread::sleep_for( 100ms );
+    }
+
     return get( handle );
   }
 };

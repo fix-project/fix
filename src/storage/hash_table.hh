@@ -1,3 +1,5 @@
+#pragma once
+
 #include "handle.hh"
 
 #include <atomic>
@@ -10,9 +12,9 @@ class FixTable
 {
   struct tEntry
   {
-    Handle<T> h {};
+    Handle<T> h { Handle<T>::forge( u8x32 {} ) };
     V v {};
-    std::atomic<bool> occupied {};
+    std::atomic<bool> occupied { false };
   };
 
   std::vector<tEntry> data_;
