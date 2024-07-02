@@ -80,8 +80,18 @@ LocalScheduler::Result<Object> LocalScheduler::apply( Handle<ObjectTree> combina
   if ( !nested_ ) {
     return dynamic_pointer_cast<Executor>( relater_->get().get_local() )->apply( combination );
   } else {
-    relater_->get().graph_.write()->add_dependency( current_schedule_step_.value(), apply );
+    {
+      auto graph = relater_->get().graph_.write();
+
+      if ( !relater_->get().contains( apply ) ) {
+        graph->add_dependency( current_schedule_step_.value(), apply );
+      } else {
+        return relater_->get().get( apply );
+      }
+    }
+
     relater_->get().get_local()->get( apply );
+
     return {};
   }
 }
@@ -122,7 +132,13 @@ LocalScheduler::Result<Value> LocalScheduler::evalStrict( Handle<Object> express
 
   if ( !result ) {
     if ( current_schedule_step_.has_value() ) {
-      relater_->get().graph_.write()->add_dependency( current_schedule_step_.value(), goal );
+      auto graph = relater_->get().graph_.write();
+
+      if ( !relater_->get().contains( goal ) ) {
+        graph->add_dependency( current_schedule_step_.value(), goal );
+      } else {
+        return relater_->get().get( goal )->unwrap<Value>();
+      }
     }
     return {};
   }
