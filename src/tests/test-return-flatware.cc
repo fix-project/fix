@@ -6,15 +6,17 @@
 using namespace std;
 
 namespace tester {
-auto rt = std::make_shared<Relater>();
+shared_ptr<Relater> rt;
 auto Limits = []() { return limits( *rt, 1024 * 1024, 1024, 1 ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
 auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
 }
 
-void test( void )
+void test( shared_ptr<Relater> rt )
 {
+  tester::rt = rt;
+
   auto res = tester::rt->execute( flatware_input(
     *tester::rt,
     tester::Limits(),

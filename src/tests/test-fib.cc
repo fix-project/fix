@@ -1,3 +1,4 @@
+#include <memory>
 #include <stdio.h>
 
 #include "relater.hh"
@@ -5,9 +6,7 @@
 
 using namespace std;
 
-auto rt = make_shared<Relater>();
-
-uint32_t fix_fib( uint32_t x )
+uint32_t fix_fib( shared_ptr<Relater> rt, uint32_t x )
 {
   static auto addblob = compile( *rt, file( *rt, "testing/wasm-examples/addblob.wasm" ) );
   static auto fib = compile( *rt, file( *rt, "testing/wasm-examples/fib.wasm" ) );
@@ -39,9 +38,9 @@ uint32_t fib( uint32_t x )
   return result;
 }
 
-void check_fib( uint32_t x )
+void check_fib( shared_ptr<Relater> rt, uint32_t x )
 {
-  uint32_t result = fix_fib( x );
+  uint32_t result = fix_fib( rt, x );
   printf( "fib(%u) = %u\n", x, result );
   if ( result != fib( x ) ) {
     fprintf( stderr, "got fib(%u) = %u, expected %u.\n", x, result, fib( x ) );
@@ -49,9 +48,9 @@ void check_fib( uint32_t x )
   }
 }
 
-void test( void )
+void test( shared_ptr<Relater> rt )
 {
   for ( ssize_t i = 15; i >= 0; i-- ) {
-    check_fib( i );
+    check_fib( rt, i );
   }
 }

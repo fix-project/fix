@@ -5,9 +5,7 @@
 
 using namespace std;
 
-auto rt = make_shared<Relater>();
-
-void test( void )
+void test( shared_ptr<Relater> rt )
 {
   array<std::string, 5> tasks = { "wasm-to-c-fix", "c-to-elf-fix", "link-elfs-fix", "compile", "map" };
   vector<Handle<Thunk>> wasm_names;
