@@ -120,8 +120,7 @@ public:
                     .and_then( [&]( auto x ) { return x.template try_into<ValueTree>(); } )
                     .transform( [&]( auto x ) { return fixpoint::storage->get( x ); } );
 
-    resource_limits::available_bytes
-      = limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 0 ) ); } )
+    resource_limits::available_bytes = limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 0 ) ); } )
           .transform( [&]( auto x ) { return uint64_t( x ); } )
           .value_or( 0 );
 

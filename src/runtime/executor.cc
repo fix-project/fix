@@ -7,6 +7,7 @@
 #include "executor.hh"
 #include "fixpointapi.hh"
 #include "overload.hh"
+#include "resource_limits.hh"
 #include "storage_exception.hh"
 
 template<typename T>
@@ -22,6 +23,7 @@ Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>
     threads_.emplace_back( [&]() {
       current_ = {};
       fixpoint::storage = &parent_.storage_;
+      resource_limits::available_bytes = 0;
       run();
     } );
   }
