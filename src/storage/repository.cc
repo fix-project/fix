@@ -265,9 +265,10 @@ bool Repository::contains( Handle<AnyTree> handle )
   return trees_.contains( handle );
 }
 
-bool Repository::contains( Handle<Relation> handle )
+bool Repository::contains( Handle<Relation> )
 {
-  return relations_.contains( handle );
+  return false;
+  // return relations_.contains( handle );
 }
 
 std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
