@@ -145,4 +145,45 @@ static inline Handle<ExpressionTree> upcast( Handle<AnyTree> tree )
   return tree.visit<Handle<ExpressionTree>>(
     []( auto t ) -> Handle<ExpressionTree> { return Handle<ExpressionTree>( t ); } );
 }
+
+[[maybe_unused]] static std::optional<Handle<ExpressionTree>> get_tree( Handle<Fix> fix )
+{
+  static const u8x32 zero { 0 };
+  static const Handle<Fix> empty_expression_tree = Handle<ExpressionTree>( zero, 0, false );
+  static const Handle<Fix> empty_object_tree = Handle<ObjectTree>( zero, 0, false );
+  static const Handle<Fix> empty_value_tree = Handle<ValueTree>( zero, 0, false );
+
+  static constexpr u8x32 mask
+    = { 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
+        0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
+        0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
+        0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000111, 0b11111111 };
+
+  Handle<Fix> masked = Handle<Fix>::forge( fix.content & mask );
+
+  if ( masked == empty_expression_tree or masked == empty_object_tree or masked == empty_value_tree ) {
+    return Handle<ExpressionTree>::forge( fix.content & ~mask );
+  } else {
+    return {};
+  }
+}
+
+[[maybe_unused]] static std::optional<Handle<Blob>> get_blob( Handle<Fix> fix )
+{
+  static constexpr u8x32 mask
+    = { 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
+        0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
+        0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000,
+        0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000011, 0b11111111 };
+
+  static const Handle<Fix> empty_blob = Handle<Literal>::nil();
+
+  Handle<Fix> masked = Handle<Fix>::forge( fix.content & mask );
+
+  if ( masked == empty_blob ) {
+    return Handle<Blob>::forge( fix.content & ~mask );
+  } else {
+    return {};
+  }
+}
 }
