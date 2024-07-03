@@ -25,7 +25,7 @@ struct AbslHash
   std::size_t operator()( Handle<T> const& handle ) const noexcept
   {
     u64x4 dwords = (u64x4)handle.content;
-    return absl::Hash<uint64_t> {}( dwords[0] );
+    return ( dwords[0] );
   }
 };
 
