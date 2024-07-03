@@ -199,7 +199,7 @@ public:
     using namespace std::chrono_literals;
 
     while ( !relations_.contains( handle ) ) {
-      std::this_thread::sleep_for( 100ms );
+      std::this_thread::sleep_for( 1ms );
     }
 
     return get( handle );
