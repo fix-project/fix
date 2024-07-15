@@ -16,7 +16,9 @@ using namespace std;
 
 Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>> runner )
   : parent_( parent )
-  , runner_( runner.has_value() ? runner.value() : make_shared<WasmRunner>( parent.labeled( "compile-elf" ) ) )
+  , runner_( runner.has_value() ? runner.value()
+                                : make_shared<WasmRunner>( parent.labeled( "compile-elf" ),
+                                                           parent.labeled( "compile-fixed-point" ) ) )
 {
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
