@@ -11,31 +11,52 @@
 
 using namespace std;
 
-LocalScheduler::Result<Fix> LocalScheduler::load( Handle<AnyDataType> handle )
+LocalScheduler::Result<Blob> LocalScheduler::load( Handle<Blob> handle )
 {
-  handle.visit<void>( overload { []( Handle<Literal> ) {},
-                                 []( Handle<Relation> ) { throw std::runtime_error( "Invalid load()." ); },
-                                 [&]( auto h ) { relater_->get().get( h ); } } );
+  handle.visit<void>( overload {
+    []( Handle<Literal> ) {},
+    [&]( Handle<Named> n ) { relater_->get().get( n ); },
+  } );
 
-  return handle::fix( handle );
+  return handle;
 }
 
-SketchGraphScheduler::Result<Fix> SketchGraphScheduler::load( Handle<AnyDataType> handle )
+LocalScheduler::Result<AnyTree> LocalScheduler::load( Handle<AnyTree> handle )
 {
-  auto contained
-    = handle.visit<bool>( overload { [&]( Handle<Literal> ) { return true; },
-                                     [&]( auto h ) { return relater_->get().get_storage().contains( h ); } } );
+  relater_->get().get( handle );
+  auto res = relater_->get().get_handle( handle ).value();
 
-  handle.visit<void>(
-    overload { []( Handle<Literal> ) {},
-               [&]( auto ) { sketch_graph_.add_dependency( current_schedule_step_.value(), handle ); } } );
+  return res;
+}
 
-  if ( contained ) {
-    return handle::fix( handle );
-  } else {
-    works_.push_back( handle );
-    return {};
-  }
+SketchGraphScheduler::Result<Blob> SketchGraphScheduler::load( Handle<Blob> handle )
+{
+  return handle.visit<Result<Blob>>( overload { []( Handle<Literal> l ) { return l; },
+                                                [&]( Handle<Named> n ) -> Result<Blob> {
+                                                  sketch_graph_.add_dependency( current_schedule_step_.value(), n );
+                                                  if ( relater_->get().get_storage().contains( n ) ) {
+                                                    return n;
+                                                  } else {
+                                                    works_.push_back( n );
+                                                    return {};
+                                                  }
+                                                } } );
+}
+
+SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::load( Handle<AnyTree> handle )
+{
+  handle = relater_->get().get_handle( handle ).value();
+
+  return handle.visit<Result<AnyTree>>( [&]( auto h ) -> Result<AnyTree> {
+    sketch_graph_.add_dependency( current_schedule_step_.value(), h );
+
+    if ( relater_->get().get_storage().contains( h ) ) {
+      return h;
+    } else {
+      works_.push_back( h );
+      return {};
+    }
+  } );
 }
 
 LocalScheduler::Result<AnyTree> LocalScheduler::load( Handle<AnyTreeRef> handle )

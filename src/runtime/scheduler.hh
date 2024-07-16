@@ -35,7 +35,8 @@ class LocalScheduler : public Scheduler
 public:
   LocalScheduler() {}
 
-  virtual Result<Fix> load( Handle<AnyDataType> value ) override;
+  virtual Result<Blob> load( Handle<Blob> value ) override;
+  virtual Result<AnyTree> load( Handle<AnyTree> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
@@ -71,7 +72,8 @@ public:
     , passes_( move( passes ) )
   {}
 
-  virtual Result<Fix> load( Handle<AnyDataType> value ) override;
+  virtual Result<Blob> load( Handle<Blob> value ) override;
+  virtual Result<AnyTree> load( Handle<AnyTree> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;

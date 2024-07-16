@@ -7,7 +7,6 @@
 #include "handle.hh"
 #include "hash_table.hh"
 #include "interface.hh"
-#include "mutex.hh"
 #include "object.hh"
 #include "runtimestorage.hh"
 
@@ -23,7 +22,7 @@ public:
   Repository( std::filesystem::path directory = std::filesystem::current_path() );
   static std::filesystem::path find( std::filesystem::path directory = std::filesystem::current_path() );
 
-  std::unordered_set<Handle<AnyDataType>> data() const;
+  std::unordered_set<Handle<AnyDataType>> data() const override;
   std::unordered_set<Handle<Relation>> relations() const;
   std::unordered_set<std::string> labels() const;
   std::unordered_map<Handle<Fix>, std::unordered_set<Handle<Fix>>> pins() const;
@@ -31,6 +30,7 @@ public:
   virtual std::optional<BlobData> get( Handle<Named> name ) override;
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;
   virtual std::optional<Handle<Object>> get( Handle<Relation> relation ) override;
+  virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name ) override;
 
   virtual void put( Handle<Named> name, BlobData data ) override;
   virtual void put( Handle<AnyTree> name, TreeData data ) override;

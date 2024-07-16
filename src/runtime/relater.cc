@@ -39,7 +39,7 @@ void Relater::get_from_repository( Handle<T> handle )
       for ( const auto& element : tree.value()->span() ) {
         get_from_repository( element );
       }
-      put( handle, tree.value() );
+      put( repository_.get_handle( handle ).value(), tree.value() );
     } else {
       auto named = handle::extract<Named>( handle ).value();
       if ( storage_.contains( named ) ) {
@@ -132,6 +132,24 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
   }
 
   return scheduler_->schedule( name );
+}
+
+optional<Handle<AnyTree>> Relater::get_handle( Handle<AnyTree> name )
+{
+  if ( storage_.contains( name ) ) {
+    return storage_.get_handle( name );
+  } else if ( repository_.contains( name ) ) {
+    return repository_.get_handle( name );
+  }
+
+  for ( auto& remote : remotes_.read().get() ) {
+    auto locked_remote = remote.lock();
+    if ( auto h = locked_remote->get_handle( name ); h.has_value() ) {
+      return h;
+    }
+  }
+
+  return {};
 }
 
 void Relater::put( Handle<Named> name, BlobData data )

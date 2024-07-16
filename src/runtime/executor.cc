@@ -170,6 +170,11 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   return {};
 }
 
+std::optional<Handle<AnyTree>> Executor::get_handle( Handle<AnyTree> )
+{
+  return {};
+}
+
 void Executor::put( Handle<Named> name, BlobData data )
 {
   parent_.put( name, data );

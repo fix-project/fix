@@ -81,7 +81,7 @@ public:
     if ( is_local() ) {
       return { local_name(), size(), is_tag() };
     } else {
-      return { hash(), size(), is_tag() };
+      return Handle<ObjectTree>::forge( content );
     }
   }
 
@@ -90,7 +90,7 @@ public:
     if ( is_local() ) {
       return { local_name(), size(), is_tag() };
     } else {
-      return { hash(), size(), is_tag() };
+      return Handle<ExpressionTree>::forge( content );
     }
   }
 

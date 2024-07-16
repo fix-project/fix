@@ -34,7 +34,7 @@ class RuntimeStorage
 private:
   friend class RuntimeWorker;
   using BlobMap = FixTable<Named, BlobData, AbslHash>;
-  using TreeMap = FixTable<ExpressionTree, TreeData, AbslHash, handle::tree_equal>;
+  using TreeMap = FixTable<AnyTree, TreeData, AbslHash, handle::any_tree_equal>;
   using RelationMap = FixTable<Fix, Handle<Object>, AbslHash>;
 
   using PinMap = absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash>;
@@ -135,6 +135,7 @@ public:
   // return the reffed Handle<AnyTree> if known
   std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle );
   Handle<AnyTreeRef> ref( Handle<AnyTree> tree );
+  std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name );
 
   /**
    * Call @p visitor for every Handle in the "minimum repo" of @p root, i.e., the set of Handles which are needed

@@ -76,7 +76,7 @@ class Remote : public IRuntime
     proposed_proposals_ {};
 
   FixTable<Named, std::atomic<bool>, AbslHash> blobs_view_ { 100000 };
-  FixTable<ExpressionTree, std::atomic<bool>, AbslHash, handle::tree_equal> trees_view_ { 100000 };
+  FixTable<AnyTree, std::atomic<bool>, AbslHash, handle::any_tree_equal> trees_view_ { 100000 };
   FixTable<Relation, std::atomic<bool>, AbslHash> relations_view_ { 100000 };
 
 public:
@@ -90,6 +90,7 @@ public:
   std::optional<BlobData> get( Handle<Named> name ) override;
   std::optional<TreeData> get( Handle<AnyTree> name ) override;
   std::optional<Handle<Object>> get( Handle<Relation> name ) override;
+  std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> handle ) override;
 
   void put( Handle<Named> name, BlobData data ) override;
   void put( Handle<AnyTree> name, TreeData data ) override;

@@ -9,7 +9,11 @@ public:
   template<typename T>
   using Result = std::optional<Handle<T>>;
 
-  virtual Result<Fix> load( Handle<AnyDataType> value ) = 0;
+  virtual Result<Blob> load( Handle<Blob> value ) = 0;
+  // load( Handle<ValueTree> ) -> Handle<ValueTree>
+  // load( Handle<ObjectTree> ) -> Handle<ObjectTree> or Handle<ValueTree>
+  // load( Handle<ExpressionTree> -> Handle<ExpressionTree> or Handle<ObjectTree> or Handle<ValueTree>
+  virtual Result<AnyTree> load( Handle<AnyTree> value ) = 0;
   virtual Result<AnyTree> load( Handle<AnyTreeRef> treeref ) = 0;
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) = 0;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) = 0;

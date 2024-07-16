@@ -111,25 +111,13 @@ std::optional<BlobData> Repository::get( Handle<Named> name )
 
 std::optional<TreeData> Repository::get( Handle<AnyTree> name )
 {
-  auto vtree = name.visit<Handle<Fix>>( []( auto h ) -> Handle<ValueTree> {
-    return { h.content, h.size(), h.is_tag() };
-  } );
-  auto otree = name.visit<Handle<Fix>>( []( auto h ) -> Handle<ObjectTree> {
-    return { h.content, h.size(), h.is_tag() };
-  } );
-  auto etree = name.visit<Handle<Fix>>( []( auto h ) -> Handle<ExpressionTree> {
-    return { h.content, h.size(), h.is_tag() };
-  } );
+  auto real_handle = trees_.get_handle( name ).value();
+  auto file_name = base16::encode( handle::fix( real_handle ).content );
+
   try {
-    VLOG( 1 ) << "loading " << handle::fix( name ).content << " from disk";
+    VLOG( 1 ) << "loading " << file_name << " from disk";
     assert( not handle::is_local( name ) );
-    if ( fs::exists( repo_ / "data" / base16::encode( vtree.content ) ) ) {
-      return make_shared<OwnedTree>( repo_ / "data" / base16::encode( vtree.content ) );
-    } else if ( fs::exists( repo_ / "data" / base16::encode( otree.content ) ) ) {
-      return make_shared<OwnedTree>( repo_ / "data" / base16::encode( otree.content ) );
-    } else {
-      return make_shared<OwnedTree>( repo_ / "data" / base16::encode( etree.content ) );
-    }
+    return make_shared<OwnedTree>( repo_ / "data" / file_name );
   } catch ( std::filesystem::filesystem_error& ) {
     throw HandleNotFound( handle::fix( name ) );
   }
@@ -272,9 +260,7 @@ bool Repository::contains( Handle<Relation> handle )
 
 std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
 {
-  auto tmp_tree = handle.visit<Handle<AnyTree>>(
-    overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
-               []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); } } );
+  auto tmp_tree = Handle<AnyTree>::forge( handle.content );
 
   auto entry = trees_.get_handle( tmp_tree );
 
@@ -282,13 +268,18 @@ std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
     return {};
   }
 
-  auto hash = entry.value().visit<u8x32>( []( auto e ) { return e.content; } );
-  auto size = entry.value().visit<size_t>( []( auto e ) { return e.size(); } );
+  auto tagged = handle.visit<bool>( []( auto h ) { return h.is_tag(); } );
 
-  return handle.visit<Handle<AnyTree>>( overload {
-    [&]( Handle<ValueTreeRef> v ) { return Handle<ValueTree>( hash, size, v.is_tag() ); },
-    [&]( Handle<ObjectTreeRef> o ) { return Handle<ObjectTree>( hash, size, o.is_tag() ); },
-  } );
+  if ( tagged ) {
+    return entry->visit<Handle<AnyTree>>( []( auto h ) { return h.tag(); } );
+  } else {
+    return entry;
+  }
+}
+
+std::optional<Handle<AnyTree>> Repository::get_handle( Handle<AnyTree> name )
+{
+  return trees_.get_handle( name );
 }
 
 #if 0

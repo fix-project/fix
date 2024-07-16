@@ -220,22 +220,21 @@ void Remote::add_to_view( Handle<Named> handle )
 
 bool Remote::contains( Handle<AnyTree> handle )
 {
-  return trees_view_.contains( handle::upcast( handle ) );
+  return trees_view_.contains( handle );
 }
 
 bool Remote::loaded( Handle<AnyTree> handle )
 {
-  return trees_view_.contains( handle::upcast( handle ) )
-         && trees_view_.get_ref( handle::upcast( handle ) ).load( memory_order_acquire );
+  return trees_view_.contains( handle ) && trees_view_.get_ref( handle ).load( memory_order_acquire );
 }
 
 void Remote::add_to_view( Handle<AnyTree> handle )
 {
-  if ( !trees_view_.contains( handle::upcast( handle ) ) ) {
-    trees_view_.insert_no_value( handle::upcast( handle ) );
+  if ( !trees_view_.contains( handle ) ) {
+    trees_view_.insert_no_value( handle );
   }
 
-  trees_view_.get_ref( handle::upcast( handle ) ).store( true, memory_order_release );
+  trees_view_.get_ref( handle ).store( true, memory_order_release );
 }
 
 bool Remote::contains( Handle<Relation> handle )
@@ -257,26 +256,27 @@ void Remote::add_to_view( Handle<Relation> handle )
   relations_view_.get_ref( handle ).store( true, memory_order_release );
 }
 
+std::optional<Handle<AnyTree>> Remote::get_handle( Handle<AnyTree> handle )
+{
+  return trees_view_.get_handle( handle );
+}
+
 std::optional<Handle<AnyTree>> Remote::contains( Handle<AnyTreeRef> handle )
 {
-  auto tmp_tree = handle.visit<Handle<AnyTree>>( overload {
-    []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
-    []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); },
-  } );
-
-  auto entry = trees_view_.get_handle( handle::upcast( tmp_tree ) );
+  auto tmp_tree = Handle<AnyTree>::forge( handle.content );
+  auto entry = trees_view_.get_handle( tmp_tree );
 
   if ( !entry.has_value() ) {
     return {};
   }
 
-  // Cast to same kind as Handle<AnyTreeRef>
-  auto res_tree = handle.visit<Handle<AnyTree>>( overload {
-    [&]( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( entry->content, entry->size(), r.is_tag() ); },
-    [&]( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( entry->content, entry->size(), r.is_tag() ); },
-  } );
+  auto tagged = handle.visit<bool>( []( auto h ) { return h.is_tag(); } );
 
-  return res_tree;
+  if ( tagged ) {
+    return entry->visit<Handle<AnyTree>>( []( auto h ) { return h.tag(); } );
+  } else {
+    return entry;
+  }
 }
 
 bool Remote::contains( __attribute__( ( unused ) ) const std::string_view label )
@@ -393,8 +393,8 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
             blobs_view_.get_ref( h ).store( false, memory_order_release );
           },
           [&]( Handle<AnyTree> t ) {
-            trees_view_.insert_no_value( handle::upcast( t ) );
-            trees_view_.get_ref( handle::upcast( t ) ).store( false, memory_order_release );
+            trees_view_.insert_no_value( t );
+            trees_view_.get_ref( t ).store( false, memory_order_release );
           },
           []( Handle<Literal> ) {},
           []( Handle<Relation> ) {},
@@ -409,7 +409,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       auto tree = parent.get( payload.handle );
       if ( tree ) {
         send_tree( payload.handle, tree.value() );
-        add_to_view( handle::upcast( payload.handle ) );
+        add_to_view( payload.handle );
       }
       break;
     }
