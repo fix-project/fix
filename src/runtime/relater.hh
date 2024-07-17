@@ -6,8 +6,6 @@
 #include "runner.hh"
 #include "runtimestorage.hh"
 
-inline thread_local Handle<Relation> current_;
-
 class Executor;
 class Scheduler;
 class LocalScheduler;
@@ -162,4 +160,6 @@ public:
     return graph_.read()->get_forward_dependencies( blocked );
   }
   std::shared_ptr<IRuntime> get_local() { return local_; }
+
+  std::optional<Handle<Object>> run( Handle<Relation> );
 };

@@ -34,7 +34,6 @@ private:
   void progress( Handle<AnyDataType> runnable_or_loadable );
 
 public:
-  std::optional<Handle<Fix>> load( Handle<AnyDataType> handle );
   Result<Object> apply( Handle<ObjectTree> combination );
 
   /** @defgroup Implementation of IRuntime

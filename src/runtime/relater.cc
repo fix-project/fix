@@ -266,3 +266,8 @@ Handle<AnyTree> Relater::unref( Handle<AnyTreeRef> tree )
 
   return h.value();
 }
+
+std::optional<Handle<Object>> Relater::run( Handle<Relation> r )
+{
+  return scheduler_->schedule( r );
+}
