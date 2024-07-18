@@ -40,9 +40,9 @@ private:
   using PinMap = absl::flat_hash_map<Handle<Fix>, std::unordered_set<Handle<Fix>>, AbslHash>;
   using LabelMap = absl::flat_hash_map<std::string, Handle<Fix>>;
 
-  BlobMap blobs_ { 1000000 };
-  TreeMap trees_ { 1000000 };
-  RelationMap relations_ { 1000000 };
+  BlobMap blobs_ { 100000 };
+  TreeMap trees_ { 100000 };
+  RelationMap relations_ { 100000 };
 
   SharedMutex<PinMap> pins_ {};
   SharedMutex<LabelMap> labels_ {};
@@ -193,15 +193,4 @@ public:
    * Return handles of tags that tag @p handle.
    */
   std::unordered_set<Handle<Fix>> tags( Handle<Fix> handle );
-
-  Handle<Object> wait( Handle<Relation> handle )
-  {
-    using namespace std::chrono_literals;
-
-    while ( !relations_.contains( handle ) ) {
-      std::this_thread::sleep_for( 1ms );
-    }
-
-    return get( handle );
-  }
 };

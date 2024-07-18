@@ -297,12 +297,7 @@ void Relater::add_worker( shared_ptr<IRuntime> rmt )
 
 Handle<Value> Relater::execute( Handle<Relation> r )
 {
-  get( r );
-  Handle<Object> current = storage_.wait( r );
-  while ( not current.contains<Value>() ) {
-    current = storage_.wait( Handle<Eval>( current ) );
-  }
-  return current.unwrap<Value>();
+  return dynamic_pointer_cast<Executor>( local_ )->execute( r );
 }
 
 optional<BlobData> Relater::get( Handle<Named> name )
