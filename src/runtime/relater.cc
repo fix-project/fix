@@ -297,7 +297,37 @@ void Relater::add_worker( shared_ptr<IRuntime> rmt )
 
 Handle<Value> Relater::execute( Handle<Relation> r )
 {
-  return dynamic_pointer_cast<Executor>( local_ )->execute( r );
+  if ( contains( r ) ) {
+    return get( r ).value().unwrap<Value>();
+  }
+
+  top_level = r;
+  bool expected = true;
+  if ( top_level_done_.compare_exchange_strong( expected, false ) ) {
+    if ( local_->get_info()->parallelism == 0 ) {
+      scheduler_->schedule( r );
+    } else {
+      local_->get( r );
+    }
+
+    top_level_done_.wait( false, std::memory_order_acquire );
+    return result;
+  } else {
+    throw std::runtime_error( "Unexpected top level value." );
+  }
+}
+
+bool Relater::finish_top_level( Handle<Relation> name, Handle<Object> value )
+{
+  if ( !top_level_done_.load( std::memory_order_acquire ) and name == top_level ) {
+    result = value.unwrap<Value>();
+    top_level_done_.store( true, std::memory_order_release );
+    top_level_done_.notify_all();
+
+    return true;
+  }
+
+  return false;
 }
 
 optional<BlobData> Relater::get( Handle<Named> name )
@@ -370,10 +400,16 @@ void Relater::put( Handle<AnyTree> name, TreeData data )
     }
   }
 }
+
 void Relater::put( Handle<Relation> name, Handle<Object> data )
 {
   if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
+
+    if ( finish_top_level( name, data ) ) {
+      return;
+    }
+
     absl::flat_hash_set<Handle<Relation>> unblocked;
     {
       auto graph = graph_.write();
@@ -388,7 +424,6 @@ void Relater::put( Handle<Relation> name, Handle<Object> data )
         locked->put( name, data );
       }
     }
-    dynamic_pointer_cast<Executor>( local_ )->finish( name, data );
   }
 }
 

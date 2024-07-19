@@ -26,6 +26,11 @@ class Relater
   friend class RelaterTest;
 
 private:
+  std::atomic<bool> top_level_done_ { true };
+  Handle<Relation> top_level {};
+  Handle<Value> result {};
+  bool finish_top_level( Handle<Relation>, Handle<Object> );
+
   SharedMutex<DependencyGraph> graph_ {};
   FixEvaluator evaluator_;
   RuntimeStorage storage_ {};
