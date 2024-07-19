@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "handle.hh"
+#include "hash_table.hh"
 #include "interface.hh"
 #include "mutex.hh"
 #include "object.hh"
@@ -14,9 +15,9 @@ class Repository : public IRuntime
 {
   std::filesystem::path repo_;
 
-  SharedMutex<absl::flat_hash_set<Handle<Named>, AbslHash>> blobs_ {};
-  SharedMutex<absl::flat_hash_set<Handle<AnyTree>, AbslHash, handle::any_tree_equal>> trees_ {};
-  SharedMutex<absl::flat_hash_set<Handle<Relation>, AbslHash>> relations_ {};
+  FixTable<Named, bool, AbslHash> blobs_ { 100000 };
+  FixTable<AnyTree, bool, AbslHash, handle::any_tree_equal> trees_ { 100000 };
+  FixTable<Relation, bool, AbslHash> relations_ { 100000 };
 
 public:
   Repository( std::filesystem::path directory = std::filesystem::current_path() );

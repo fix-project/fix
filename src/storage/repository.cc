@@ -16,13 +16,13 @@ Repository::Repository( std::filesystem::path directory )
 
   for ( auto h : data() ) {
     h.visit<void>( overload { []( Handle<Literal> ) {},
-                              [&]( Handle<Named> n ) { blobs_.write()->insert( n ); },
-                              [&]( Handle<AnyTree> t ) { trees_.write()->insert( t ); },
+                              [&]( Handle<Named> n ) { blobs_.insert( n, true ); },
+                              [&]( Handle<AnyTree> t ) { trees_.insert( t, true ); },
                               []( Handle<Relation> ) {} } );
   }
 
   for ( auto r : relations() ) {
-    relations_.write()->insert( r );
+    relations_.insert( r, true );
   }
 }
 
@@ -160,7 +160,7 @@ void Repository::put( Handle<Named> name, BlobData data )
     auto path = repo_ / "data" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
-    blobs_.write()->insert( name );
+    blobs_.insert( name, true );
     data->to_file( path );
   } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
@@ -176,7 +176,7 @@ void Repository::put( Handle<AnyTree> name, TreeData data )
     auto path = repo_ / "data" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
-    trees_.write()->insert( name );
+    trees_.insert( name, true );
     data->to_file( path );
   } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
@@ -194,7 +194,7 @@ void Repository::put( Handle<Relation> relation, Handle<Object> target )
     if ( fs::exists( path ) )
       return;
     VLOG( 1 ) << "linking to " << target.content;
-    relations_.write()->insert( relation );
+    relations_.insert( relation, true );
     fs::create_symlink( "../data/" + base16::encode( target.content ), path );
   } catch ( std::filesystem::filesystem_error& ) {
     throw RepositoryCorrupt( repo_ );
@@ -257,17 +257,17 @@ void Repository::pin( Handle<Fix> src, const std::unordered_set<Handle<Fix>>& ds
 
 bool Repository::contains( Handle<Named> handle )
 {
-  return blobs_.read()->contains( handle );
+  return blobs_.contains( handle );
 }
 
 bool Repository::contains( Handle<AnyTree> handle )
 {
-  return trees_.read()->contains( handle );
+  return trees_.contains( handle );
 }
 
 bool Repository::contains( Handle<Relation> handle )
 {
-  return relations_.read()->contains( handle );
+  return relations_.contains( handle );
 }
 
 std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
@@ -276,15 +276,14 @@ std::optional<Handle<AnyTree>> Repository::contains( Handle<AnyTreeRef> handle )
     overload { []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0, r.is_tag() ); },
                []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0, r.is_tag() ); } } );
 
-  auto trees = trees_.read();
-  auto entry = trees->find( tmp_tree );
+  auto entry = trees_.get_handle( tmp_tree );
 
-  if ( entry == trees->end() ) {
+  if ( !entry.has_value() ) {
     return {};
   }
 
-  auto hash = std::visit( []( auto e ) { return e.content; }, entry->get() );
-  auto size = std::visit( []( auto e ) { return e.size(); }, entry->get() );
+  auto hash = entry.value().visit<u8x32>( []( auto e ) { return e.content; } );
+  auto size = entry.value().visit<size_t>( []( auto e ) { return e.size(); } );
 
   return handle.visit<Handle<AnyTree>>( overload {
     [&]( Handle<ValueTreeRef> v ) { return Handle<ValueTree>( hash, size, v.is_tag() ); },

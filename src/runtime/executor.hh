@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <limits>
 #include <memory>
 #include <thread>
@@ -11,7 +12,6 @@
 #include "interface.hh"
 #include "relater.hh"
 #include "runner.hh"
-#include "runtimestorage.hh"
 
 class Executor : public IRuntime
 {
@@ -19,6 +19,10 @@ class Executor : public IRuntime
   Channel<Handle<AnyDataType>> todo_ {};
   Relater& parent_;
   std::shared_ptr<Runner> runner_ {};
+
+  std::atomic<bool> top_level_done_ { false };
+  Handle<Relation> top_level {};
+  Handle<Value> result {};
 
 public:
   Executor( Relater& parent,
@@ -37,12 +41,26 @@ public:
     }
 
     VLOG( 1 ) << "Relation does not exit " << x.content;
+
+    top_level = x;
+    top_level_done_ = false;
     todo_.move_push( x );
-    Handle<Object> current = parent_.storage_.wait( x );
-    while ( not current.contains<Value>() ) {
-      current = parent_.storage_.wait( Handle<Eval>( current ) );
+
+    top_level_done_.wait( false, std::memory_order_acquire );
+    return result;
+  }
+
+  bool finish( Handle<Relation> name, Handle<Object> value )
+  {
+    if ( name == top_level ) {
+      result = value.unwrap<Value>();
+      top_level_done_.store( true, std::memory_order_release );
+      top_level_done_.notify_all();
+
+      return true;
     }
-    return current.unwrap<Value>();
+
+    return false;
   }
 
 private:
