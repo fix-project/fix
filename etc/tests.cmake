@@ -26,7 +26,8 @@ add_test(NAME u_executor COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-exec
 add_test(NAME u_distributed COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-distributed)
 add_test(NAME u_blake3 WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-blake3)
 add_test(NAME u_dependency_graph COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-dependency-graph)
-add_test(NAME u_scheduler COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-scheduler)
+add_test(NAME u_pass_scheduler COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-pass-scheduler)
+add_test(NAME u_local_scheduler COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-local-scheduler)
 add_test(NAME u_relater COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-scheduler-relate)
 
 add_test(NAME t_add COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add)

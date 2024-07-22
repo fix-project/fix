@@ -31,8 +31,11 @@ target_link_libraries(test-distributed runtime)
 add_executable(test-dependency-graph test-dependency-graph.cc unit-test-main.cc)
 target_link_libraries(test-dependency-graph runtime)
 
-add_executable(test-scheduler test-scheduler.cc unit-test-main.cc)
-target_link_libraries(test-scheduler runtime)
+add_executable(test-pass-scheduler test-pass-scheduler.cc unit-test-main.cc)
+target_link_libraries(test-pass-scheduler runtime)
+
+add_executable(test-local-scheduler test-local-scheduler.cc unit-test-main.cc)
+target_link_libraries(test-local-scheduler runtime)
 
 # Fixpoint/Flatware Tests
 add_executable(test-add test-add.cc fixpoint-test-main.cc)
