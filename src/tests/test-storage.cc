@@ -65,5 +65,5 @@ void test( void )
   CHECK_EQ( ref.unwrap<ObjectTreeRef>().size(), 1 );
   auto unref = storage.contains( ref );
   CHECK( unref.has_value() );
-  CHECK_EQ( unref.value().unwrap<ObjectTree>(), apply.unwrap<ObjectTree>() );
+  CHECK_EQ( Handle<ObjectTree>( unref.value().unwrap<ValueTree>() ), apply.unwrap<ObjectTree>() );
 }

@@ -72,7 +72,7 @@ void test_add( void )
 
 void test_fib( void )
 {
-  auto fib3 = Handle<Eval>( application( fib, Handle<Literal>( 3 ) ) );
+  auto fib3 = Handle<Eval>( application( fib, Handle<Literal>( (uint64_t)3 ) ) );
 
   try {
     scheduler->schedule( fib3 );
