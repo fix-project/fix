@@ -64,7 +64,7 @@ class FixTable
 
     while ( true ) {
       if ( data_.at( idx ).occupied.compare_exchange_strong(
-             expected, static_cast<uint8_t>( SlotStatus::Claimed ), std::memory_order_release ) ) {
+             expected, static_cast<uint8_t>( SlotStatus::Claimed ), std::memory_order_acq_rel ) ) {
         return idx;
       } else {
         idx++;
@@ -100,7 +100,7 @@ public:
         uint8_t expected = static_cast<uint8_t>( SlotStatus::Claimed );
         if ( data_.at( empty_slot )
                .occupied.compare_exchange_strong(
-                 expected, static_cast<uint8_t>( SlotStatus::Occupied ), std::memory_order_release ) ) {
+                 expected, static_cast<uint8_t>( SlotStatus::Occupied ), std::memory_order_acq_rel ) ) {
           return;
         } else {
           throw std::runtime_error( "Unexpected occupied status" );
@@ -136,7 +136,7 @@ public:
         uint8_t expected = static_cast<uint8_t>( SlotStatus::Claimed );
         if ( data_.at( empty_slot )
                .occupied.compare_exchange_strong(
-                 expected, static_cast<uint8_t>( SlotStatus::Occupied ), std::memory_order_release ) ) {
+                 expected, static_cast<uint8_t>( SlotStatus::Occupied ), std::memory_order_acq_rel ) ) {
           return;
         } else {
           throw std::runtime_error( "Unexpected occupied status" );
