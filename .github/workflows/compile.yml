@@ -68,6 +68,8 @@ jobs:
         run: cmake --build out --target unit-test
       - name: fixpoint test
         run: cmake --build out --target fixpoint-check
+      - name: fixpoint local scheduler test
+        run: cmake --build out --target local-fixpoint-check
       - name: flatware test
         run: cmake --build out --target flatware-check
   typecheck-spec:

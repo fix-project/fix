@@ -3,6 +3,7 @@
 #include "interface.hh"
 #include "runtimes.hh"
 
+#include <functional>
 #include <glog/logging.h>
 
 #pragma GCC diagnostic ignored "-Wunused-function"
@@ -94,3 +95,6 @@ static Handle<Eval> flatware_input( IRuntime& rt,
                           random_seed.value_or( blob( rt, "abcd" ) ) );
   return Handle<Eval>( Handle<Application>( handle::upcast( input_tree ) ) );
 }
+
+static std::function<Handle<ValueTree>( IRuntime& )> standard_limits
+  = std::bind( limits, std::placeholders::_1, 1024 * 1024, 1024, 1 );

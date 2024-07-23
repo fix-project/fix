@@ -5,16 +5,16 @@
 #include "test.hh"
 #include "types.hh"
 
+using namespace std;
+
 namespace tester {
-auto rt = std::make_shared<Relater>();
+shared_ptr<Relater> rt;
 auto Limits = []() { return limits( *rt, 1024 * 1024, 1024, 1 ); };
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
 auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
 }
-
-using namespace std;
 
 static Handle<Fix> curry_compiled;
 static Handle<Fix> add_simple_compiled;
@@ -88,8 +88,10 @@ void test_curry_self()
   }
 }
 
-void test( void )
+void test( shared_ptr<Relater> rt )
 {
+  tester::rt = rt;
+
   curry_compiled = tester::Compile( tester::File( "applications-prefix/src/applications-build/curry/curry.wasm" ) );
   add_simple_compiled = tester::Compile( tester::File( "testing/wasm-examples/add-simple.wasm" ) );
 

@@ -9,6 +9,7 @@
 using namespace std;
 
 RuntimeStorage storage;
+size_t mapreduce_called = 0;
 
 /**
  * A single-threaded Fix Runtime which executes in a stackful manner.  Its evaluation functions are guaranteed to
@@ -30,8 +31,15 @@ public:
   Handle<Value> eval( Handle<Fix> target ) { return evaluator_.eval( target ).value(); }
 
 private:
-  virtual Result<Fix> load( Handle<AnyDataType> value ) { return handle::fix( value ); }
-  virtual Result<AnyTree> load( Handle<AnyTreeRef> ) { return {}; }
+  virtual Result<Blob> load( Handle<Blob> value ) { return value; }
+  virtual Result<AnyTree> load( Handle<AnyTree> value )
+  {
+
+    auto res = storage.get_handle( value );
+    // std::cout << "FakeRuntime::load " << value << " " << res << std::endl;
+    return res;
+  }
+  virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) { return storage.contains( value ); }
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> t )
   {
     return t.visit<Handle<AnyTreeRef>>( overload {
@@ -84,6 +92,8 @@ private:
 
   virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree )
   {
+    mapreduce_called++;
+
     auto exprs = storage.get( tree );
     auto objs = OwnedMutTree::allocate( exprs->size() );
     for ( size_t i = 0; i < exprs->size(); i++ ) {
@@ -140,6 +150,8 @@ void test( void )
   FakeRuntime rt;
   auto sum = rt.eval( application( add, 1_literal64, 2_literal64 ) );
   CHECK_EQ( sum, Handle<Value>( 3_literal64 ) );
+  CHECK_EQ( mapreduce_called, 0 );
   auto fib10 = rt.eval( application( fib, 10_literal64 ) );
   CHECK_EQ( fib10, Handle<Value>( 55_literal64 ) );
+  CHECK_EQ( mapreduce_called, 9 );
 }

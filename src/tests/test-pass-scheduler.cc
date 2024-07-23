@@ -34,6 +34,8 @@ public:
     return {};
   }
 
+  optional<Handle<AnyTree>> get_handle( Handle<AnyTree> handle ) override { return storage_.get_handle( handle ); }
+
   void put( Handle<Named> name, BlobData data ) override { storage_.create( data, name ); }
   void put( Handle<AnyTree> name, TreeData data ) override { storage_.create( data, name ); }
   void put( Handle<Relation> name, Handle<Object> data ) override { storage_.create( data, name ); }

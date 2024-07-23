@@ -43,6 +43,8 @@ public:
   virtual std::optional<Handle<Object>> get( Handle<Relation> name ) = 0;
   ///}@
 
+  virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> ) = 0;
+
   /**
    * Notifies this IRuntime that the data corresponding to @p name is @p data.  Each function has two variants, one
    * which provides a reference and once which provides move semantics.

@@ -28,7 +28,7 @@ Handle<AnyTree> RuntimeStorage::create( TreeData tree, std::optional<Handle<AnyT
 {
   auto handle = name.or_else( [&] -> decltype( name ) { return handle::create( tree ); } ).value();
   handle.visit<void>( overload {
-    [&]( auto name ) { trees_.insert( handle::upcast( name ).untag(), tree ); },
+    [&]( auto name ) { trees_.insert( name, tree ); },
   } );
   return handle;
 }
@@ -72,8 +72,7 @@ BlobData RuntimeStorage::get( Handle<Named> handle )
 TreeData RuntimeStorage::get( Handle<AnyTree> handle )
 {
   VLOG( 3 ) << "get " << handle;
-  auto generic = handle::upcast( handle ).untag();
-  auto res = trees_.get( generic );
+  auto res = trees_.get( handle );
   if ( res.has_value() ) {
     return res.value();
   } else {
@@ -325,7 +324,7 @@ bool RuntimeStorage::contains( Handle<Named> handle )
 
 bool RuntimeStorage::contains( Handle<AnyTree> handle )
 {
-  return trees_.contains( handle::upcast( handle ).untag() );
+  return trees_.contains( handle );
 }
 
 bool RuntimeStorage::contains( Handle<Relation> handle )
@@ -333,19 +332,27 @@ bool RuntimeStorage::contains( Handle<Relation> handle )
   return relations_.contains( handle );
 }
 
+std::optional<Handle<AnyTree>> RuntimeStorage::get_handle( Handle<AnyTree> name )
+{
+  return trees_.get_handle( name );
+}
+
 optional<Handle<AnyTree>> RuntimeStorage::contains( Handle<AnyTreeRef> handle )
 {
-  auto tmp_tree = handle.visit<Handle<AnyTree>>( overload {
-    []( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( r.content, 0 ); },
-    []( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( r.content, 0 ); },
-  } );
+  auto tmp_tree = Handle<AnyTree>::forge( handle.content );
+  auto entry = trees_.get_handle( tmp_tree );
 
-  return trees_.get_handle( handle::upcast( tmp_tree ) ).transform( [&]( Handle<ExpressionTree> t ) {
-    return handle.visit<Handle<AnyTree>>( overload {
-      [&]( Handle<ValueTreeRef> r ) { return Handle<ValueTree>( t.content, t.size(), r.is_tag() ); },
-      [&]( Handle<ObjectTreeRef> r ) { return Handle<ObjectTree>( t.content, t.size(), r.is_tag() ); },
-    } );
-  } );
+  if ( !entry.has_value() ) {
+    return {};
+  }
+
+  auto tagged = handle.visit<bool>( []( auto h ) { return h.is_tag(); } );
+
+  if ( tagged ) {
+    return entry->visit<Handle<AnyTree>>( []( auto h ) { return h.tag(); } );
+  } else {
+    return entry;
+  }
 }
 
 Handle<AnyTreeRef> RuntimeStorage::ref( Handle<AnyTree> handle )

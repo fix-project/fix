@@ -1,18 +1,19 @@
+#include <memory>
 #include <stdio.h>
 
 #include "relater.hh"
 #include "test.hh"
 
+using namespace std;
+
 namespace tester {
-auto rt = std::make_shared<Relater>();
+shared_ptr<Relater> rt;
 auto Limits = []() { return limits( *rt, 1024 * 1024 * 1024, 1024 * 1024, 1024 ); };
 auto Compile = []( Handle<Fix> wasm ) { return compile( *rt, wasm ); };
 auto File = []( std::filesystem::path path ) { return file( *rt, path ); };
 auto Tree = []( auto... args ) { return handle::upcast( tree( *rt, args... ) ); };
 auto Blob = []( std::string_view contents ) { return blob( *rt, contents ); };
 }
-
-using namespace std;
 
 Handle<Fix> dirent( string_view name, string_view permissions, Handle<Fix> content )
 {
@@ -27,8 +28,10 @@ Handle<Fix> fs()
   return e;
 }
 
-void test( void )
+void test( shared_ptr<Relater> rt )
 {
+  tester::rt = rt;
+
   auto python_exec = tester::Compile(
     tester::File( "applications-prefix/src/applications-build/flatware/examples/python/python-fixpoint.wasm" ) );
   auto input = flatware_input( *tester::rt,

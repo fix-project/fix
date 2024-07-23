@@ -7,6 +7,7 @@
 #include "executor.hh"
 #include "fixpointapi.hh"
 #include "overload.hh"
+#include "resource_limits.hh"
 #include "storage_exception.hh"
 
 template<typename T>
@@ -22,8 +23,8 @@ Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>
 {
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
-      current_ = {};
       fixpoint::storage = &parent_.storage_;
+      resource_limits::available_bytes = 0;
       run();
     } );
   }
@@ -82,46 +83,21 @@ void Executor::run()
 void Executor::progress( Handle<AnyDataType> runnable_or_loadable )
 {
   VLOG( 2 ) << "Progressing " << runnable_or_loadable;
-  // Load from repository if contains
-  auto loaded = load( runnable_or_loadable );
-  if ( loaded.has_value() )
-    return;
 
-  runnable_or_loadable.visit<void>(
-    overload { [&]( Handle<Relation> r ) {
-                r.visit<void>( overload { [&]( Handle<Apply> a ) { apply( a.unwrap<ObjectTree>() ); },
-                                          [&]( Handle<Eval> e ) { parent_.get( e ); } } );
-              },
-               [&]( Handle<AnyTree> h ) { throw HandleNotFound( handle::upcast( h ) ); },
-               [&]( auto h ) { throw HandleNotFound( h ); } } );
-}
-
-optional<Handle<Fix>> Executor::load( Handle<AnyDataType> handle )
-{
-  VLOG( 2 ) << "Loading " << handle;
-  return handle.visit<Result<Fix>>( overload { [&]( Handle<Literal> l ) { return l; },
-                                               [&]( Handle<AnyTree> t ) -> optional<Handle<Fix>> {
-                                                 if ( parent_.contains( t ) ) {
-                                                   parent_.get( t );
-                                                   return handle::fix( t );
-                                                 }
-                                                 throw HandleNotFound( handle::fix( t ) );
-                                               },
-                                               [&]( Handle<Named> n ) -> optional<Handle<Fix>> {
-                                                 if ( parent_.contains( n ) ) {
-                                                   parent_.get( n );
-                                                   return n;
-                                                 }
-                                                 throw HandleNotFound( n );
-                                               },
-                                               [&]( Handle<Relation> r ) -> optional<Handle<Fix>> {
-                                                 if ( parent_.contains( r ) ) {
-                                                   return parent_.get( r );
-                                                 }
-                                                 // Relation does not exist, return nullopt to trigger relation
-                                                 // handling
-                                                 return {};
-                                               } } );
+  runnable_or_loadable.visit<void>( overload {
+    []( Handle<Literal> ) { return; },
+    [&]( Handle<Named> n ) { parent_.get( n ); },
+    [&]( Handle<AnyTree> t ) { parent_.get( t ); },
+    [&]( Handle<Relation> r ) {
+      r.visit<void>( overload {
+        [&]( Handle<Apply> a ) {
+          auto result = apply( a.unwrap<ObjectTree>() );
+          put( a, result.value() );
+        },
+        [&]( Handle<Eval> e ) { parent_.run( e ); },
+      } );
+    },
+  } );
 }
 
 Result<Object> Executor::apply( Handle<ObjectTree> combination )
@@ -132,7 +108,6 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   TreeData tree = parent_.storage_.get( combination );
   auto result = runner_->apply( combination, tree );
 
-  put( goal, result );
   return result;
 }
 
@@ -162,6 +137,11 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   auto graph = parent_.graph_.write();
   if ( graph->start( name ) )
     todo_.move_push( Handle<AnyDataType>( name ) );
+  return {};
+}
+
+std::optional<Handle<AnyTree>> Executor::get_handle( Handle<AnyTree> )
+{
   return {};
 }
 

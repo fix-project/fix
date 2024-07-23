@@ -73,10 +73,16 @@ struct tree_equal
 
 struct any_tree_equal
 {
-  tree_equal te;
   constexpr bool operator()( const Handle<AnyTree>& lhs, const Handle<AnyTree>& rhs ) const
   {
-    return te( handle::upcast( lhs ), handle::upcast( rhs ) );
+    static constexpr u64x4 mask
+      = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0x0000000000000000 };
+    u64x4 pxor = (u64x4)( lhs.content ^ rhs.content ) & mask;
+#ifdef __AVX__
+    return _mm256_testz_si256( (__m256i)pxor, (__m256i)pxor );
+#else
+    return ( xored[0] | xored[1] | xored[2] | xored[3] ) == 0;
+#endif
   }
 };
 }

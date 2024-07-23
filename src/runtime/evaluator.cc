@@ -1,4 +1,5 @@
 #include <functional> // IWYU pragma: keep
+#include <stdexcept>
 
 #include "evaluator.hh"
 #include "overload.hh"
@@ -19,7 +20,15 @@ Result<Value> FixEvaluator::evalStrict( Handle<Object> x )
     [&]( Handle<Thunk> x ) { return force( x ).and_then( evalStrict ); },
     [&]( Handle<ObjectTree> x ) { return mapEval( x ); },
     [&]( Handle<ObjectTreeRef> x ) {
-      return load( x ).transform( []( auto h ) { return h.template unwrap<ObjectTree>(); } ).and_then( mapEval );
+      return load( x ).and_then( [&]( auto h ) -> Result<Value> {
+        return h.template visit<Result<Value>>( overload {
+          [&]( Handle<ValueTree> t ) { return lift( t ); },
+          [&]( Handle<ObjectTree> t ) { return mapEval( t ); },
+          []( Handle<ExpressionTree> ) -> Result<Value> {
+            throw std::runtime_error( "Invalid load() return type." );
+          },
+        } );
+      } );
     },
   } );
 }
@@ -51,7 +60,9 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
                      [&]( Handle<BlobRef> y ) {
                        return y.template unwrap<Blob>().visit<Result<Fix>>( [&]( auto z ) { return load( z ); } );
                      },
-                     [&]( Handle<ValueTree> y ) { return load( y ); },
+                     [&]( Handle<ValueTree> y ) {
+                       return load( y ).transform( []( auto h ) { return h.template unwrap<ValueTree>(); } );
+                     },
                      [&]( Handle<ValueTreeRef> y ) {
                        return load( y ).transform( []( auto h ) { return h.template unwrap<ValueTree>(); } );
                      } } )
@@ -59,8 +70,13 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
     },
     [&]( Handle<Application> x ) {
       return load( x.unwrap<ExpressionTree>() )
-        .and_then( []( auto h ) { return handle::extract<ExpressionTree>( h ); } )
-        .and_then( mapReduce )
+        .and_then( [&]( auto h ) {
+          return h.template visit<Result<ObjectTree>>( overload {
+            [&]( Handle<ExpressionTree> t ) { return mapReduce( t ); },
+            []( Handle<ObjectTree> t ) { return t; },
+            []( Handle<ValueTree> t ) { return Handle<ObjectTree>( t ); },
+          } );
+        } )
         .and_then( apply );
     },
     [&]( Handle<Selection> ) -> Handle<Object> { throw std::runtime_error( "unimplemented" ); },
@@ -122,14 +138,13 @@ Result<Value> FixEvaluator::lower( Handle<Value> x )
 Result<Object> FixEvaluator::relate( Handle<Fix> x )
 {
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
-  auto mapReduce = [&]( auto x ) { return rt_.mapReduce( x ); };
   auto apply = [&]( auto x ) { return rt_.apply( x ); };
   auto reduce = [&]( auto x ) { return this->reduce( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Relation> x ) {
       return x.visit<Result<Object>>( overload {
-        [&]( Handle<Apply> x ) { return mapReduce( x.unwrap<ExpressionTree>() ).and_then( apply ); },
+        [&]( Handle<Apply> x ) { return apply( x.unwrap<ObjectTree>() ); },
         [&]( Handle<Eval> x ) { return evalStrict( x.unwrap<Object>() ); },
       } );
     },
