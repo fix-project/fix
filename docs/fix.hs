@@ -27,7 +27,7 @@ type ValueTree = Tree Value
 -- | An Object is a Value which may or may not have been computed yet.  Uncomputed data are represented as Thunks.
 data Object = Thunk Thunk | Value Value | ObjectTree ObjectTree | ObjectTreeRef (Ref ObjectTree)
 -- | A Thunk is a Value which has yet to be evaluated.  It is either described as an Application (of a function to arguments), an Identification (of an already-computed Value), or a Selection (of a particular element or subrange of a large structure).  It is better to use Identification or Selection Thunks where possible than applying an equivalent function, as these special Thunks have a smaller data footprint.
-data Thunk = Application (Name ExpressionTree) | Identification (Name Value) | Selection (Name ObjectTree)
+data Thunk = Application (Name ExpressionTree) | Identification (Name Value) | Selection (Name ObjectTree, Int)
 -- | A Tree of Objects.
 type ObjectTree = Tree Object
 
@@ -41,7 +41,7 @@ type ExpressionTree = Tree Expression
 -- | Fix represents any Fix type, including both Expressions and Relations.
 data Fix = Expression Expression | Relation Relation
 -- | A Relation represents either the Application of a Tree or the Evaluation of an Object.
-data Relation = Apply ObjectTree | Eval Object
+data Relation = Step Thunk | Eval Object
 
 -- * Functions
 
@@ -92,8 +92,8 @@ think (Application x) = apply $ treeMap reduce $ load x
 think (Selection x) = select x
 
 -- | Select data as specified by an ObjectTree, without loading or evaluating the rest of the tree.
-select :: Name ObjectTree -> Object
-select = undefined -- TODO
+select :: (Name ObjectTree, Int) -> Object
+select (t, i) =  load $ (loadShallow t) !! i
 
 -- | Converts an Expression into an Object by executing any Encodes contained within the Expression.
 reduce :: Expression -> Object
@@ -120,7 +120,7 @@ lower (ValueTreeRef x) = ValueTreeRef x
 
 -- | Given a Relation, finds the "result", otherwise passes Expressions through unchanged.
 relate :: Fix -> Object
-relate (Relation (Apply x)) = apply x
+relate (Relation (Step x)) = think x
 relate (Relation (Eval x)) = Value $ evalStrict x
 relate (Expression x) = reduce x
 
