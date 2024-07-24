@@ -92,7 +92,7 @@ static inline Handle<Fix> get_root( Handle<AnyDataType> job )
 {
   return job.visit<Handle<Fix>>( overload { [&]( Handle<Relation> r ) {
                                              return r.visit<Handle<Fix>>(
-                                               overload { [&]( Handle<Apply> a ) { return a.unwrap<ObjectTree>(); },
+                                               overload { [&]( Handle<Step> s ) { return s.unwrap<Thunk>(); },
                                                           [&]( Handle<Eval> e ) { return e.unwrap<Object>(); } } );
                                            },
                                             [&]( Handle<AnyTree> h ) { return handle::fix( h ); },

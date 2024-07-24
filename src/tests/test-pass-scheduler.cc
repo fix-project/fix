@@ -1,6 +1,7 @@
 #include "handle.hh"
 #include "handle_post.hh"
 #include "interface.hh"
+#include "object.hh"
 #include "relater.hh"
 #include "runtimestorage.hh"
 #include "scheduler.hh"
@@ -38,7 +39,7 @@ public:
 
   void put( Handle<Named> name, BlobData data ) override { storage_.create( data, name ); }
   void put( Handle<AnyTree> name, TreeData data ) override { storage_.create( data, name ); }
-  void put( Handle<Relation> name, Handle<Object> data ) override { storage_.create( data, name ); }
+  void put( Handle<Relation>, Handle<Object> ) override {}
 
   bool contains( Handle<Named> handle ) override { return storage_.contains( handle ); }
   bool contains( Handle<AnyTree> handle ) override { return storage_.contains( handle ); }
@@ -58,18 +59,20 @@ void case_one( void )
   shared_ptr<FakeRuntime> fake_worker = make_shared<FakeRuntime>();
   fake_worker->parallelism_ = 10;
 
-  Handle<ValueTree> system_dep_tree = rt->labeled( "system-dep-tree" )
-                                        .try_into<Expression>()
-                                        .and_then( []( auto h ) { return h.template try_into<Object>(); } )
-                                        .and_then( []( auto h ) { return h.template try_into<Value>(); } )
-                                        .and_then( []( auto h ) { return h.template try_into<ValueTree>(); } )
-                                        .value();
-  Handle<ValueTree> clang_dep_tree = rt->labeled( "clang-dep-tree" )
-                                       .try_into<Expression>()
-                                       .and_then( []( auto h ) { return h.template try_into<Object>(); } )
-                                       .and_then( []( auto h ) { return h.template try_into<Value>(); } )
-                                       .and_then( []( auto h ) { return h.template try_into<ValueTree>(); } )
-                                       .value();
+  Handle<ValueTree> system_dep_tree = Handle<ValueTree>( 1,
+                                                         rt->labeled( "system-dep-tree" )
+                                                           .unwrap<Expression>()
+                                                           .unwrap<Object>()
+                                                           .unwrap<Value>()
+                                                           .unwrap<ValueTree>()
+                                                           .size() );
+  Handle<ValueTree> clang_dep_tree = Handle<ValueTree>( 2,
+                                                        rt->labeled( "clang-dep-tree" )
+                                                          .unwrap<Expression>()
+                                                          .unwrap<Object>()
+                                                          .unwrap<Value>()
+                                                          .unwrap<ValueTree>()
+                                                          .size() );
 
   fake_worker->put( system_dep_tree, make_shared<OwnedTree>( OwnedMutTree::allocate( 1 ) ) );
   fake_worker->put( clang_dep_tree, make_shared<OwnedTree>( OwnedMutTree::allocate( 1 ) ) );
@@ -142,6 +145,10 @@ void case_two( void )
 
   if ( fake_worker->todos_.size() != 1
        or fake_worker->todos_.front() != Handle<AnyDataType>( Handle<Relation>( task ) ) ) {
+    cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
+    for ( const auto& todo : fake_worker->todos_ ) {
+      cout << "Todo " << todo << endl;
+    }
     fprintf( stderr, "Case 2: Wrong post condition" );
     exit( 1 );
   }
@@ -345,6 +352,7 @@ void case_seven( void )
     auto job1 = Handle<AnyDataType>(
       Handle<Relation>( Handle<Eval>( Handle<Object>( Handle<Thunk>( Handle<Application>( handle::upcast(
         tree( *rt, limits( *rt, 1, 1, 10 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
+
     if ( ( ( fake_worker->todos_[0] == job0 or fake_worker->todos_[0] == job0_1 )
            and fake_worker->todos_[1] == job1 )
          or ( ( fake_worker->todos_[1] == job0 or fake_worker->todos_[1] == job0_1 )
@@ -534,7 +542,7 @@ void case_ten( void )
   for ( const auto& todo : fake_worker->todos_ ) {
     cout << "Todo " << todo << endl;
   }
-  fprintf( stderr, "Case 9: Wrong post condition" );
+  fprintf( stderr, "Case 10: Wrong post condition" );
   exit( 1 );
 }
 void test( void )

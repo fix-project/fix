@@ -101,7 +101,7 @@ std::optional<BlobData> Repository::get( Handle<Named> name )
 {
   Handle<Fix> fix( name );
   try {
-    VLOG( 1 ) << "loading " << fix.content << " from disk";
+    VLOG( 2 ) << "loading " << fix.content << " from disk";
     assert( not handle::is_local( fix ) );
     return make_shared<OwnedBlob>( repo_ / "data" / base16::encode( fix.content ) );
   } catch ( std::filesystem::filesystem_error& ) {
@@ -115,7 +115,7 @@ std::optional<TreeData> Repository::get( Handle<AnyTree> name )
   auto file_name = base16::encode( handle::fix( real_handle ).content );
 
   try {
-    VLOG( 1 ) << "loading " << file_name << " from disk";
+    VLOG( 2 ) << "loading " << file_name << " from disk";
     assert( not handle::is_local( name ) );
     return make_shared<OwnedTree>( repo_ / "data" / file_name );
   } catch ( std::filesystem::filesystem_error& ) {
@@ -127,7 +127,7 @@ std::optional<Handle<Object>> Repository::get( Handle<Relation> relation )
 {
   Handle<Fix> fix( relation );
   try {
-    VLOG( 1 ) << "loading " << fix.content << " from disk";
+    VLOG( 2 ) << "loading " << fix.content << " from disk";
     assert( not handle::is_local( fix ) );
     return Handle<Fix>::forge(
              base16::decode(
@@ -144,7 +144,7 @@ void Repository::put( Handle<Named> name, BlobData data )
   assert( not handle::is_local( name ) );
   try {
     Handle<Fix> fix( name );
-    VLOG( 1 ) << "writing " << fix.content << " to disk";
+    VLOG( 2 ) << "writing " << fix.content << " to disk";
     auto path = repo_ / "data" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
@@ -160,7 +160,7 @@ void Repository::put( Handle<AnyTree> name, TreeData data )
   assert( not handle::is_local( name ) );
   try {
     auto fix = name.visit<Handle<Fix>>( []( const auto x ) { return x; } );
-    VLOG( 1 ) << "writing " << fix.content << " to disk";
+    VLOG( 2 ) << "writing " << fix.content << " to disk";
     auto path = repo_ / "data" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
@@ -177,11 +177,11 @@ void Repository::put( Handle<Relation> relation, Handle<Object> target )
     assert( not handle::is_local( relation ) );
     assert( not handle::is_local( target ) );
     Handle<Fix> fix( relation );
-    VLOG( 1 ) << "writing " << fix.content << " to disk";
+    VLOG( 2 ) << "writing " << fix.content << " to disk";
     auto path = repo_ / "relations" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
-    VLOG( 1 ) << "linking to " << target.content;
+    VLOG( 2 ) << "linking to " << target.content;
     relations_.insert( relation, true );
     fs::create_symlink( "../data/" + base16::encode( target.content ), path );
   } catch ( std::filesystem::filesystem_error& ) {

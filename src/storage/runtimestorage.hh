@@ -113,7 +113,7 @@ public:
   Handle<Object> get( Handle<Relation> name );
 
   Handle<Value> get_relation( Handle<Eval> name ) { return get( name ).unwrap<Value>(); }
-  Handle<Object> get_relation( Handle<Apply> name ) { return get( name ); }
+  Handle<Object> get_relation( Handle<Step> name ) { return get( name ); }
 
   // Convert a Handle into the canonically-named version of that handle.
   template<FixType T>
