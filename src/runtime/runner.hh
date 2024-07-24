@@ -181,6 +181,7 @@ public:
                        .and_then( &Handle<Value>::try_into<Blob> )
                        .and_then( &Handle<Blob>::try_into<Literal> )
                        .value();
+    std::cout << procedure << std::endl;
     uint64_t addr( procedure );
     auto x = reinterpret_cast<Handle<Object> ( * )( Handle<ObjectTree> )>( addr );
     return x( handle );

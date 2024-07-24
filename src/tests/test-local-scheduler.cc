@@ -84,11 +84,8 @@ void test_fib( void )
   CHECK_EQ( fib_called, 1 );
   CHECK_EQ( exception_caught.has_value(), true );
 
-  auto fib2 = rt->get_handle(
-                  handle::extract<ExpressionTree>( application( fib, Handle<Literal>( (uint64_t)2 ) ) ).value() )
-                .value();
-  auto exc = rt->get_handle( handle::extract<ObjectTree>( exception_caught.value() ).value() ).value();
-  CHECK_EQ( exc, fib2 );
+  Handle<Fix> fib2 = Handle<Step>( Handle<Thunk>( application( fib, Handle<Literal>( (uint64_t)2 ) ) ) );
+  CHECK_EQ( exception_caught.value(), fib2 );
 }
 
 void test( void )

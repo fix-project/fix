@@ -14,6 +14,7 @@ Result<Value> FixEvaluator::evalStrict( Handle<Object> x )
   auto mapEval = [&]( auto x ) { return rt_.mapEval( x ); };
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
   auto load = [&]( auto x ) { return rt_.load( x ); };
+  auto force = [&]( auto x ) { return rt_.force( x ); };
 
   return x.visit<Result<Value>>( overload {
     [&]( Handle<Value> x ) { return lift( x ); },
@@ -35,8 +36,9 @@ Result<Value> FixEvaluator::evalStrict( Handle<Object> x )
 
 Result<Object> FixEvaluator::evalShallow( Handle<Object> x )
 {
-  auto evalShallow = [&]( auto x ) { return rt_.evalShallow( x ); };
+  auto evalShallow = [&]( auto x ) { return this->evalShallow( x ); };
   auto ref = [&]( auto x ) { return rt_.ref( x ); };
+  auto force = [&]( auto x ) { return rt_.force( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Value> x ) { return lower( x ); },
@@ -86,7 +88,7 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
 Result<Object> FixEvaluator::reduce( Handle<Expression> x )
 {
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
-  auto evalShallow = [&]( auto x ) { return rt_.evalShallow( x ); };
+  auto evalShallow = [&]( auto x ) { return this->evalShallow( x ); };
   auto mapReduce = [&]( auto x ) { return rt_.mapReduce( x ); };
 
   return x.visit<Result<Object>>( overload {
@@ -138,13 +140,13 @@ Result<Value> FixEvaluator::lower( Handle<Value> x )
 Result<Object> FixEvaluator::relate( Handle<Fix> x )
 {
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
-  auto apply = [&]( auto x ) { return rt_.apply( x ); };
+  auto force = [&]( auto x ) { return rt_.force( x ); };
   auto reduce = [&]( auto x ) { return this->reduce( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Relation> x ) {
       return x.visit<Result<Object>>( overload {
-        [&]( Handle<Apply> x ) { return apply( x.unwrap<ObjectTree>() ); },
+        [&]( Handle<Step> x ) { return force( x.unwrap<Thunk>() ); },
         [&]( Handle<Eval> x ) { return evalStrict( x.unwrap<Object>() ); },
       } );
     },

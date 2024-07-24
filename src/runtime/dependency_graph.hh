@@ -37,7 +37,7 @@ public:
    */
   bool start( Task task )
   {
-    VLOG( 1 ) << "starting " << task;
+    VLOG( 2 ) << "starting " << task;
     if ( contains( task ) )
       return false;
     running_.insert( task );
@@ -52,7 +52,7 @@ public:
    */
   void add_dependency( Task blocked, Handle<AnyDataType> runnable_or_loadable )
   {
-    VLOG( 1 ) << "adding dependency from " << blocked << " to " << runnable_or_loadable << " without running";
+    VLOG( 2 ) << "adding dependency from " << blocked << " to " << runnable_or_loadable << " without running";
     forward_dependencies_[blocked].insert( runnable_or_loadable );
     backward_dependencies_[runnable_or_loadable].insert( blocked );
     running_.erase( blocked );
@@ -66,7 +66,7 @@ public:
    */
   void finish( Handle<AnyDataType> task_or_object, absl::flat_hash_set<Task>& unblocked )
   {
-    VLOG( 1 ) << "finished " << task_or_object;
+    VLOG( 2 ) << "finished " << task_or_object;
     task_or_object.visit<void>( overload { [&]( Handle<Relation> r ) { running_.erase( r ); }, [&]( auto ) {} } );
     if ( backward_dependencies_.contains( task_or_object ) ) {
       for ( const auto dependent : backward_dependencies_[task_or_object] ) {

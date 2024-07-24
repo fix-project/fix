@@ -88,22 +88,13 @@ void Executor::progress( Handle<AnyDataType> runnable_or_loadable )
     []( Handle<Literal> ) { return; },
     [&]( Handle<Named> n ) { parent_.get( n ); },
     [&]( Handle<AnyTree> t ) { parent_.get( t ); },
-    [&]( Handle<Relation> r ) {
-      r.visit<void>( overload {
-        [&]( Handle<Apply> a ) {
-          auto result = apply( a.unwrap<ObjectTree>() );
-          put( a, result.value() );
-        },
-        [&]( Handle<Eval> e ) { parent_.run( e ); },
-      } );
-    },
+    [&]( Handle<Relation> r ) { parent_.run( r ); },
   } );
 }
 
 Result<Object> Executor::apply( Handle<ObjectTree> combination )
 {
   VLOG( 2 ) << "Apply " << combination;
-  Handle<Apply> goal( combination );
 
   TreeData tree = parent_.storage_.get( combination );
   auto result = runner_->apply( combination, tree );
