@@ -54,16 +54,21 @@ void test( void )
    */
 
   // TODO: reimplement visiting and add tests here
-  Handle<Apply> apply( storage.construct_tree<ObjectTree>( virgil ) );
+  Handle<ValueTree> tree = storage.construct_tree<ValueTree>( virgil );
+  CHECK( storage.contains( tree ) );
+
+  Handle<Step> apply = Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( tree ) ) );
   Handle<Object> target( caesar );
+
   storage.create( target, apply );
   CHECK( storage.contains( apply ) );
   CHECK_EQ( storage.get( apply ), target );
-  CHECK_EQ( apply.unwrap<ObjectTree>().size(), sizeof( Handle<Fix> ) + virgil.unwrap<Named>().size() );
+  CHECK_EQ( apply.unwrap<Thunk>().unwrap<Application>().unwrap<ExpressionTree>().size(),
+            sizeof( Handle<Fix> ) + virgil.unwrap<Named>().size() );
 
-  auto ref = storage.ref( apply.unwrap<ObjectTree>() );
-  CHECK_EQ( ref.unwrap<ObjectTreeRef>().size(), 1 );
+  auto ref = storage.ref( tree );
+  CHECK_EQ( ref.unwrap<ValueTreeRef>().size(), 1 );
   auto unref = storage.contains( ref );
   CHECK( unref.has_value() );
-  CHECK_EQ( Handle<ObjectTree>( unref.value().unwrap<ValueTree>() ), apply.unwrap<ObjectTree>() );
+  CHECK_EQ( unref.value().unwrap<ValueTree>(), tree );
 }

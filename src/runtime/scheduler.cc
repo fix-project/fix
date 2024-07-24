@@ -31,16 +31,18 @@ LocalScheduler::Result<AnyTree> LocalScheduler::load( Handle<AnyTree> handle )
 
 SketchGraphScheduler::Result<Blob> SketchGraphScheduler::load( Handle<Blob> handle )
 {
-  return handle.visit<Result<Blob>>( overload { []( Handle<Literal> l ) { return l; },
-                                                [&]( Handle<Named> n ) -> Result<Blob> {
-                                                  sketch_graph_.add_dependency( current_schedule_step_.value(), n );
-                                                  if ( relater_->get().get_storage().contains( n ) ) {
-                                                    return n;
-                                                  } else {
-                                                    works_.push_back( n );
-                                                    return {};
-                                                  }
-                                                } } );
+  return handle.visit<Result<Blob>>( overload {
+    []( Handle<Literal> l ) { return l; },
+    [&]( Handle<Named> n ) -> Result<Blob> {
+      sketch_graph_.add_dependency( current_schedule_step_.value(), n );
+      if ( relater_->get().contains( n ) ) {
+        relater_->get().get( n );
+        return n;
+      } else {
+        return {};
+      }
+    },
+  } );
 }
 
 SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::load( Handle<AnyTree> handle )
@@ -50,10 +52,10 @@ SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::load( Handle<AnyTree
   return handle.visit<Result<AnyTree>>( [&]( auto h ) -> Result<AnyTree> {
     sketch_graph_.add_dependency( current_schedule_step_.value(), h );
 
-    if ( relater_->get().get_storage().contains( h ) ) {
+    if ( relater_->get().contains( h ) ) {
+      relater_->get().get( h );
       return h;
     } else {
-      works_.push_back( h );
       return {};
     }
   } );
@@ -73,10 +75,10 @@ SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::load( Handle<AnyTree
   auto d = h.visit<Handle<AnyDataType>>( []( auto h ) { return h; } );
   sketch_graph_.add_dependency( current_schedule_step_.value(), d );
 
-  if ( relater_->get().get_storage().contains( h ) ) {
+  if ( relater_->get().contains( h ) ) {
+    relater_->get().get( h );
     return h;
   } else {
-    works_.push_back( d );
     return {};
   }
 }
@@ -93,7 +95,9 @@ Handle<AnyTreeRef> SketchGraphScheduler::ref( Handle<AnyTree> tree )
 
 LocalScheduler::Result<Object> LocalScheduler::apply( Handle<ObjectTree> combination )
 {
-  auto apply = Handle<Relation>( Handle<Apply>( combination ) );
+  Handle<Relation> apply
+    = Handle<Step>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
+
   if ( relater_->get().contains( apply ) ) {
     return relater_->get().get( apply ).value();
   }
@@ -101,35 +105,28 @@ LocalScheduler::Result<Object> LocalScheduler::apply( Handle<ObjectTree> combina
   if ( !nested_ ) {
     return dynamic_pointer_cast<Executor>( relater_->get().get_local() )->apply( combination );
   } else {
-    {
-      auto graph = relater_->get().graph_.write();
-
-      if ( !relater_->get().contains( apply ) ) {
-        graph->add_dependency( current_schedule_step_.value(), apply );
-      } else {
-        return relater_->get().get( apply );
-      }
-    }
-
-    relater_->get().get_local()->get( apply );
-
     return {};
   }
 }
 
 SketchGraphScheduler::Result<Object> SketchGraphScheduler::apply( Handle<ObjectTree> combination )
 {
-  auto apply = Handle<Relation>( Handle<Apply>( combination ) );
+  Handle<Relation> apply
+    = Handle<Step>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
+
   // XXX
-  if ( apply != current_schedule_step_.value() ) {
-    sketch_graph_.add_dependency( current_schedule_step_.value(), apply );
-  }
+  // if ( apply != current_schedule_step_.value() ) {
+  //  sketch_graph_.add_dependency( current_schedule_step_.value(), apply );
+  //}
 
   if ( relater_->get().contains( apply ) ) {
     return relater_->get().get( apply ).value();
   }
 
-  works_.push_back( Handle<Apply>( combination ) );
+  if ( !nested_ ) {
+    return dynamic_pointer_cast<Executor>( relater_->get().get_local() )->apply( combination );
+  }
+
   return {};
 }
 
@@ -164,11 +161,9 @@ LocalScheduler::Result<Value> LocalScheduler::evalStrict( Handle<Object> express
     return {};
   }
 
-  relater_->get().put( goal, *result );
   return result;
 }
 
-// XXX: all walking of the tree happens on the same thread
 SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Object> expression )
 {
   Handle<Eval> goal( expression );
@@ -186,11 +181,15 @@ SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Obj
   }
 
   auto prev_current = current_schedule_step_;
+  auto prev_nested = nested_;
+
   current_schedule_step_ = goal;
+  nested_ = prev_current.has_value();
 
   result = evaluator_.evalStrict( expression );
 
   current_schedule_step_ = prev_current;
+  nested_ = prev_nested;
 
   if ( result.has_value() ) {
     relater_->get().put( goal, result.value() );
@@ -204,14 +203,62 @@ SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Obj
   return result;
 }
 
-LocalScheduler::Result<Object> LocalScheduler::evalShallow( Handle<Object> expression )
+LocalScheduler::Result<Object> LocalScheduler::force( Handle<Thunk> thunk )
 {
-  return evaluator_.evalShallow( expression );
+  Handle<Step> goal( thunk );
+  if ( relater_->get().contains( goal ) ) {
+    return relater_->get().get( goal );
+  }
+
+  auto prev_current = current_schedule_step_;
+
+  current_schedule_step_ = goal;
+
+  auto result = evaluator_.force( thunk );
+
+  current_schedule_step_ = prev_current;
+
+  if ( !result ) {
+    if ( current_schedule_step_.has_value() ) {
+      auto graph = relater_->get().graph_.write();
+
+      if ( !relater_->get().contains( goal ) ) {
+        graph->add_dependency( current_schedule_step_.value(), goal );
+      } else {
+        return relater_->get().get( goal );
+      }
+    }
+
+    if ( relater_->get().graph_.read()->get_forward_dependencies( goal ).empty() ) {
+      relater_->get().get_local()->get( goal );
+    }
+
+    return {};
+  }
+
+  return result;
 }
 
-SketchGraphScheduler::Result<Object> SketchGraphScheduler::evalShallow( Handle<Object> expression )
+SketchGraphScheduler::Result<Object> SketchGraphScheduler::force( Handle<Thunk> thunk )
 {
-  return evaluator_.evalShallow( expression );
+  Handle<Step> goal( thunk );
+
+  if ( current_schedule_step_.has_value() ) {
+    sketch_graph_.add_dependency( current_schedule_step_.value(), goal );
+  }
+
+  if ( relater_->get().contains( goal ) ) {
+    return relater_->get().get( goal );
+  }
+
+  auto prev_current = current_schedule_step_;
+  current_schedule_step_ = goal;
+
+  auto result = evaluator_.force( thunk );
+
+  current_schedule_step_ = prev_current;
+
+  return result;
 }
 
 LocalScheduler::Result<ValueTree> LocalScheduler::mapEval( Handle<ObjectTree> tree )
@@ -270,6 +317,10 @@ SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapEval( Handle<Ob
   bool ready = true;
   bool toreplace = false;
   auto data = relater_->get().get( tree ).value();
+
+  auto prev_nested = nested_;
+  nested_ = true;
+
   for ( const auto& x : data->span() ) {
     auto obj = x.unwrap<Expression>().unwrap<Object>();
     auto result = evalStrict( obj );
@@ -279,6 +330,9 @@ SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapEval( Handle<Ob
       toreplace = true;
     }
   }
+
+  nested_ = prev_nested;
+
   if ( not ready ) {
     return {};
   }
@@ -359,6 +413,9 @@ SketchGraphScheduler::Result<ObjectTree> SketchGraphScheduler::mapReduce( Handle
   bool toreplace = false;
   auto data = relater_->get().get( tree ).value();
 
+  auto prev_nested = nested_;
+  nested_ = true;
+
   for ( const auto& x : data->span() ) {
     auto exp = x.unwrap<Expression>();
     auto result = evaluator_.reduce( exp );
@@ -368,6 +425,8 @@ SketchGraphScheduler::Result<ObjectTree> SketchGraphScheduler::mapReduce( Handle
       toreplace = true;
     }
   }
+
+  nested_ = prev_nested;
 
   if ( not ready ) {
     return {};
@@ -393,7 +452,7 @@ SketchGraphScheduler::Result<ObjectTree> SketchGraphScheduler::mapReduce( Handle
   }
 }
 
-SketchGraphScheduler::Result<ValueTree> LocalScheduler::mapLift( Handle<ValueTree> tree )
+LocalScheduler::Result<ValueTree> LocalScheduler::mapLift( Handle<ValueTree> tree )
 {
   bool ready = true;
   bool toreplace = false;
@@ -449,6 +508,9 @@ SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapLift( Handle<Va
   bool toreplace = false;
   auto data = relater_->get().get( tree ).value();
 
+  auto prev_nested = nested_;
+  nested_ = true;
+
   for ( const auto& x : data->span() ) {
     auto val = x.unwrap<Expression>().unwrap<Object>().unwrap<Value>();
     auto result = evaluator_.lift( val );
@@ -458,6 +520,8 @@ SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapLift( Handle<Va
       toreplace = true;
     }
   }
+
+  nested_ = prev_nested;
 
   if ( not ready ) {
     return {};
@@ -521,50 +585,77 @@ void SketchGraphScheduler::merge_all_sketch_graph( Handle<Relation> job,
 
   for ( auto d : relater_.value().get().get_forward_dependencies( job ) ) {
     d.visit<void>( overload {
-      [&]( Handle<Relation> r ) {
-        r.visit<void>( overload {
-          [&]( Handle<Eval> e ) { merge_all_sketch_graph( e, unblocked ); },
-          []( Handle<Apply> ) {},
-        } );
-      },
+      [&]( Handle<Relation> r ) { merge_all_sketch_graph( r, unblocked ); },
       []( auto ) {},
     } );
   }
 }
 
-void SketchGraphScheduler::run_passes( vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job )
+optional<Handle<Object>> SketchGraphScheduler::run_passes( Handle<Relation> top_level_job )
 {
   VLOG( 1 ) << "HintScheduler input: " << top_level_job << endl;
+
   // If all dependencies are resolved, the job should have been completed
-  if ( leaf_jobs.empty() ) {
-    throw runtime_error( "Invalid run_passes() invocation." );
-    return;
-  }
+  // if ( leaf_jobs.empty() ) {
+  //  throw runtime_error( "Invalid run_passes() invocation." );
+  //  return {};
+  //}
 
   if ( relater_->get().remotes_.read()->size() == 0 ) {
     absl::flat_hash_set<Handle<Relation>> unblocked;
     merge_all_sketch_graph( top_level_job, unblocked );
 
-    for ( auto leaf_job : leaf_jobs ) {
-      leaf_job.visit<void>( overload {
-        [&]( Handle<Literal> ) {},
-        [&]( auto h ) { relater_->get().get_local()->get( h ); },
-      } );
+    // for ( auto leaf_job : leaf_jobs ) {
+    //   leaf_job.visit<void>( overload {
+    //     [&]( Handle<Literal> ) {},
+    //     [&]( auto h ) { relater_->get().get_local()->get( h ); },
+    //   } );
+    // }
+
+    if ( unblocked.size() == 1 ) {
+      auto r = *unblocked.begin();
+      auto thunk = r.visit<optional<Handle<Thunk>>>( overload { [&]( Handle<Eval> ) -> optional<Handle<Thunk>> {
+                                                                 relater_->get().get_local()->get( r );
+                                                                 return {};
+                                                               },
+                                                                [&]( Handle<Step> s ) -> optional<Handle<Thunk>> {
+                                                                  if ( top_level_job == r ) {
+                                                                    return s.unwrap<Thunk>();
+                                                                  } else {
+                                                                    relater_->get().get_local()->get( r );
+                                                                    return {};
+                                                                  }
+                                                                } } );
+
+      if ( thunk.has_value() ) {
+        nested_ = false;
+        go_for_it_ = true;
+
+        return evaluator_.force( thunk.value() );
+      }
+    } else {
+      for ( auto job : unblocked ) {
+        relater_->get().get_local()->get( job );
+      }
     }
 
-    for ( auto job : unblocked ) {
-      relater_->get().get_local()->get( job );
-    }
-
-    return;
+    return {};
   }
 
-  PassRunner::run( relater_.value(), *this, top_level_job, passes_ );
+  auto thunk = PassRunner::run( relater_.value(), *this, top_level_job, passes_ );
+
+  if ( thunk.has_value() ) {
+    nested_ = false;
+    go_for_it_ = true;
+
+    return evaluator_.force( thunk.value() );
+  }
+
+  return {};
 }
 
 void SketchGraphScheduler::relate( Handle<Relation> top_level_job )
 {
-  works_ = {};
   sketch_graph_ = {};
 
   evaluator_.relate( top_level_job );
@@ -573,20 +664,33 @@ void SketchGraphScheduler::relate( Handle<Relation> top_level_job )
 LocalScheduler::Result<Object> LocalScheduler::schedule( Handle<Relation> top_level_job )
 {
   nested_ = false;
-  return evaluator_.relate( top_level_job );
+  auto result = evaluator_.relate( top_level_job );
+
+  if ( result.has_value() ) {
+    relater_->get().put( top_level_job, *result );
+  }
+
+  return result;
 }
 
 SketchGraphScheduler::Result<Object> SketchGraphScheduler::schedule( Handle<Relation> top_level_job )
 {
-  works_ = {};
+  nested_ = false;
+  go_for_it_ = false;
+
   sketch_graph_ = {};
 
   auto res = evaluator_.relate( top_level_job );
 
   if ( res.has_value() ) {
+    relater_->get().put( top_level_job, *res );
     return res;
   } else {
-    run_passes( works_, top_level_job );
+    auto res = run_passes( top_level_job );
+    if ( res.has_value() ) {
+      relater_->get().put( top_level_job, *res );
+    }
+
     return {};
   }
 }

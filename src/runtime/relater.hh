@@ -91,7 +91,7 @@ public:
         std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, target->get() );
 
         auto lhs = handle.template visit<Handle<Object>>(
-          overload { []( Handle<Apply> h ) { return h.unwrap<ObjectTree>(); },
+          overload { []( Handle<Step> s ) { return s.unwrap<Thunk>(); },
                      []( Handle<Eval> h ) { return h.unwrap<Object>(); } } );
         std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, lhs.get() );
 

@@ -17,8 +17,10 @@ public:
   virtual Result<AnyTree> load( Handle<AnyTreeRef> treeref ) = 0;
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) = 0;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) = 0;
+
+  virtual Result<Object> force( Handle<Thunk> ) = 0;
   virtual Result<Value> evalStrict( Handle<Object> expression ) = 0;
-  virtual Result<Object> evalShallow( Handle<Object> expression ) = 0;
+
   virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree ) = 0;
   virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree ) = 0;
   virtual Result<ValueTree> mapLift( Handle<ValueTree> tree ) = 0;

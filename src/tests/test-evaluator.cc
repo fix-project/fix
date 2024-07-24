@@ -51,10 +51,13 @@ private:
 
   virtual Result<Object> apply( Handle<ObjectTree> combination )
   {
-    Handle<Apply> apply( combination );
+    Handle<Step> apply
+      = Handle<Step>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
+
     if ( storage.contains( apply ) ) {
       return storage.get_relation( apply );
     }
+
     auto span = storage.get( combination );
     Handle<Value> function = span->at( 0 )
                                .try_into<Expression>()
@@ -79,7 +82,8 @@ private:
     storage.create( result, eval );
     return result;
   }
-  virtual Result<Object> evalShallow( Handle<Object> obj ) { return evaluator_.evalShallow( obj ); };
+
+  virtual Result<Object> force( Handle<Thunk> thunk ) { return evaluator_.force( thunk ); };
   virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree )
   {
     auto objs = storage.get( tree );
