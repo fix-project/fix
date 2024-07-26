@@ -1,8 +1,6 @@
 #pragma once
 
-#include <concurrentqueue/concurrentqueue.h>
-#include <condition_variable>
-#include <mutex>
+#include <concurrentqueue/blockingconcurrentqueue.h>
 #include <optional>
 
 class ChannelClosed : public std::exception
@@ -18,11 +16,8 @@ public:
 template<typename T>
 class Channel
 {
-  moodycamel::ConcurrentQueue<T> data_ {};
-  std::mutex mutex_ {};
-  std::condition_variable cv_ {};
-  bool shutdown_ = false;
-  size_t size_ = 0;
+  moodycamel::BlockingConcurrentQueue<T> data_ {};
+  std::atomic<bool> shutdown_ = false;
 
 public:
   Channel() {};
@@ -35,46 +30,35 @@ public:
 
   void push( T&& item )
   {
-    std::unique_lock lock( mutex_ );
     if ( shutdown_ ) {
       throw ChannelClosed {};
     }
     data_.enqueue( std::move( item ) );
-    ++size_;
-    cv_.notify_one();
   }
 
   void move_push( T&& item )
   {
-    std::unique_lock lock( mutex_ );
     if ( shutdown_ ) {
       throw ChannelClosed {};
     }
     data_.enqueue( std::move( item ) );
-    ++size_;
-    cv_.notify_one();
   }
 
   void push( T item )
   {
-    std::unique_lock lock( mutex_ );
     if ( shutdown_ ) {
       throw ChannelClosed {};
     }
     data_.enqueue( std::move( item ) );
-    ++size_;
-    cv_.notify_one();
   }
 
   std::optional<T> pop()
   {
-    std::unique_lock lock( mutex_ );
     if ( shutdown_ ) {
       throw ChannelClosed();
     }
     T item;
     if ( data_.try_dequeue( item ) ) {
-      --size_;
       return item;
     }
     return {};
@@ -82,17 +66,14 @@ public:
 
   T pop_or_wait()
   {
-    std::unique_lock lock( mutex_ );
     while ( true ) {
-      cv_.wait( lock, [&] { return size_ != 0; } );
+      T item;
+      data_.wait_dequeue( item );
       if ( shutdown_ ) {
+        data_.enqueue( item );
         throw ChannelClosed();
       }
-      T item;
-      if ( data_.try_dequeue( item ) ) {
-        --size_;
-        return item;
-      }
+      return item;
     }
   }
 
@@ -105,10 +86,8 @@ public:
 
   void close()
   {
-    std::unique_lock lock( mutex_ );
     shutdown_ = true;
-    ++size_;
-    cv_.notify_all();
+    data_.enqueue( T() );
   }
 
   ~Channel() { close(); }
