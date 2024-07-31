@@ -27,7 +27,7 @@ type ValueTree = Tree Value
 -- | An Object is a Value which may or may not have been computed yet.  Uncomputed data are represented as Thunks.
 data Object = Thunk Thunk | Value Value | ObjectTree ObjectTree | ObjectTreeRef (Ref ObjectTree)
 -- | A Thunk is a Value which has yet to be evaluated.  It is either described as an Application (of a function to arguments), an Identification (of an already-computed Value), or a Selection (of a particular element or subrange of a large structure).  It is better to use Identification or Selection Thunks where possible than applying an equivalent function, as these special Thunks have a smaller data footprint.
-data Thunk = Application (Name ExpressionTree) | Identification (Name Value) | Selection (Name ObjectTree, Int)
+data Thunk = Application (Name ExpressionTree) | Identification (Name Value) | Selection (Name ObjectTree)
 -- | A Tree of Objects.
 type ObjectTree = Tree Object
 
@@ -69,6 +69,10 @@ name = undefined
 apply :: ObjectTree -> Object
 apply _ = undefined
 
+-- | Select data as specified by an ObjectTree, without loading or evaluating the rest of the tree.
+select :: ObjectTree -> Object
+select _ = undefined
+
 -- ** Evaluation Rules
 
 -- | Evaluate an Object by repeatedly replacing Thunks with their Values, producing a concrete value (not a Ref).
@@ -89,11 +93,7 @@ evalShallow (ObjectTreeRef x) = ObjectTreeRef x
 think :: Thunk -> Object
 think (Identification x) = Value $ load x
 think (Application x) = apply $ treeMap reduce $ load x
-think (Selection x) = select x
-
--- | Select data as specified by an ObjectTree, without loading or evaluating the rest of the tree.
-select :: (Name ObjectTree, Int) -> Object
-select (t, i) =  load $ (loadShallow t) !! i
+think (Selection x) = select $ treeMap evalShallow $ Tree $ loadShallow x
 
 -- | Converts an Expression into an Object by executing any Encodes contained within the Expression.
 reduce :: Expression -> Object
