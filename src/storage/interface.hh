@@ -44,6 +44,7 @@ public:
   ///}@
 
   virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> ) = 0;
+  virtual std::optional<TreeData> get_shallow( Handle<AnyTree> name ) = 0;
 
   /**
    * Notifies this IRuntime that the data corresponding to @p name is @p data.  Each function has two variants, one

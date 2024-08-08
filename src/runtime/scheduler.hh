@@ -38,13 +38,16 @@ public:
   virtual Result<Blob> load( Handle<Blob> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTree> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
+  virtual Result<AnyTree> loadShallow( Handle<AnyTree> ) override;
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
+  virtual Result<Object> select( Handle<ObjectTree> ) override;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
   virtual Result<Value> evalStrict( Handle<Object> expression ) override;
   virtual Result<Object> force( Handle<Thunk> thunk ) override;
   virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree ) override;
   virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree ) override;
   virtual Result<ValueTree> mapLift( Handle<ValueTree> tree ) override;
+  virtual Result<ObjectTree> mapEvalShallow( Handle<ObjectTree> ) override;
 
   virtual Result<Object> schedule( Handle<Relation> top_level_job ) override;
 };
@@ -75,13 +78,16 @@ public:
   virtual Result<Blob> load( Handle<Blob> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTree> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
+  virtual Result<AnyTree> loadShallow( Handle<AnyTree> ) override { return {}; };
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
+  virtual Result<Object> select( Handle<ObjectTree> ) override { return {}; };
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
   virtual Result<Value> evalStrict( Handle<Object> expression ) override;
   virtual Result<Object> force( Handle<Thunk> thunk ) override;
   virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree ) override;
   virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree ) override;
   virtual Result<ValueTree> mapLift( Handle<ValueTree> tree ) override;
+  virtual Result<ObjectTree> mapEvalShallow( Handle<ObjectTree> ) override { return {}; };
 
   virtual Result<Object> schedule( Handle<Relation> top_level_job ) override;
 

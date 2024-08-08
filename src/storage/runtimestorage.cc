@@ -27,9 +27,14 @@ Handle<Blob> RuntimeStorage::create( BlobData blob, std::optional<Handle<Blob>> 
 Handle<AnyTree> RuntimeStorage::create( TreeData tree, std::optional<Handle<AnyTree>> name )
 {
   auto handle = name.or_else( [&] -> decltype( name ) { return handle::create( tree ); } ).value();
-  handle.visit<void>( overload {
-    [&]( auto name ) { trees_.insert( name, tree ); },
-  } );
+  trees_.insert( handle, tree );
+  return handle;
+}
+
+Handle<AnyTree> RuntimeStorage::create_tree_shallow( TreeData tree, std::optional<Handle<AnyTree>> name )
+{
+  auto handle = name.or_else( [&] -> decltype( name ) { return handle::create( tree ); } ).value();
+  tree_refs_.insert( handle, tree );
   return handle;
 }
 
@@ -73,6 +78,17 @@ TreeData RuntimeStorage::get( Handle<AnyTree> handle )
 {
   VLOG( 3 ) << "get " << handle;
   auto res = trees_.get( handle );
+  if ( res.has_value() ) {
+    return res.value();
+  } else {
+    throw HandleNotFound( handle::fix( handle ) );
+  }
+}
+
+TreeData RuntimeStorage::get_shallow( Handle<AnyTree> handle )
+{
+  VLOG( 3 ) << "get shallow " << handle;
+  auto res = trees_.get( handle ).or_else( [&]() { return tree_refs_.get( handle ); } );
   if ( res.has_value() ) {
     return res.value();
   } else {
@@ -330,6 +346,11 @@ bool RuntimeStorage::contains( Handle<AnyTree> handle )
 bool RuntimeStorage::contains( Handle<Relation> handle )
 {
   return relations_.contains( handle );
+}
+
+bool RuntimeStorage::contains_shallow( Handle<AnyTree> handle )
+{
+  return trees_.contains( handle ) || tree_refs_.contains( handle );
 }
 
 std::optional<Handle<AnyTree>> RuntimeStorage::get_handle( Handle<AnyTree> name )

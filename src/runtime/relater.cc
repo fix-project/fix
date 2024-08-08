@@ -122,6 +122,19 @@ optional<TreeData> Relater::get( Handle<AnyTree> name )
   throw HandleNotFound( handle::fix( name ) );
 }
 
+optional<TreeData> Relater::get_shallow( Handle<AnyTree> name )
+{
+  if ( storage_.contains_shallow( name ) ) {
+    return storage_.get_shallow( name );
+  } else if ( repository_.contains( name ) ) {
+    auto tree = repository_.get_shallow( name ).value();
+    storage_.create_tree_shallow( tree, name );
+    return tree;
+  }
+
+  throw HandleNotFound( handle::fix( name ) );
+}
+
 optional<Handle<Object>> Relater::get( Handle<Relation> name )
 {
   if ( storage_.contains( name ) ) {

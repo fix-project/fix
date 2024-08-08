@@ -23,6 +23,10 @@ public:
   optional<TreeData> get( Handle<AnyTree> name ) override { return storage_.get( name ); };
   optional<Handle<Object>> get( Handle<Relation> name ) override { return storage_.get( name ); };
   optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name ) override { return storage_.get_handle( name ); };
+  virtual std::optional<TreeData> get_shallow( Handle<AnyTree> name ) override
+  {
+    return storage_.get_shallow( name );
+  };
 
   void put( Handle<Named> name, BlobData data ) override { storage_.create( data, name ); }
   void put( Handle<AnyTree> name, TreeData data ) override { storage_.create( data, name ); }

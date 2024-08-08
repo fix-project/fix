@@ -13,10 +13,12 @@ target_link_libraries(test-storage storage)
 add_executable(test-hash-table test-hash-table.cc unit-test-main.cc)
 target_link_libraries(test-hash-table storage)
 
+add_executable(test-bptree test-bptree.cc unit-test-main.cc bptree.cc)
+
 add_executable(hash-table-perf hash-table-perf.cc)
 target_link_libraries(hash-table-perf storage)
 
-add_executable(test-evaluator test-evaluator.cc unit-test-main.cc)
+add_executable(test-evaluator test-evaluator.cc unit-test-main.cc bptree.cc)
 target_link_libraries(test-evaluator runtime)
 
 add_executable(test-executor test-executor.cc unit-test-main.cc)
@@ -34,7 +36,7 @@ target_link_libraries(test-dependency-graph runtime)
 add_executable(test-pass-scheduler test-pass-scheduler.cc unit-test-main.cc)
 target_link_libraries(test-pass-scheduler runtime)
 
-add_executable(test-local-scheduler test-local-scheduler.cc unit-test-main.cc)
+add_executable(test-local-scheduler test-local-scheduler.cc unit-test-main.cc bptree.cc)
 target_link_libraries(test-local-scheduler runtime)
 
 # Fixpoint/Flatware Tests

@@ -89,6 +89,7 @@ public:
 
   std::optional<BlobData> get( Handle<Named> name ) override;
   std::optional<TreeData> get( Handle<AnyTree> name ) override;
+  std::optional<TreeData> get_shallow( Handle<AnyTree> ) override { return {}; }
   std::optional<Handle<Object>> get( Handle<Relation> name ) override;
   std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> handle ) override;
 

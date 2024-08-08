@@ -1,7 +1,9 @@
 #include <iostream>
 
 #include <glog/logging.h>
+#include <stdexcept>
 
+#include "bptree-helper.hh"
 #include "evaluator.hh"
 #include "overload.hh"
 #include "runtimestorage.hh"
@@ -39,7 +41,10 @@ private:
     // std::cout << "FakeRuntime::load " << value << " " << res << std::endl;
     return res;
   }
+
   virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) { return storage.contains( value ); }
+  virtual Result<AnyTree> loadShallow( Handle<AnyTree> value ) { return load( value ); }
+
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> t )
   {
     return t.visit<Handle<AnyTreeRef>>( overload {
@@ -47,6 +52,56 @@ private:
       []( Handle<ObjectTree> t ) { return t.into<ObjectTreeRef>( 0 ); },
       []( Handle<ValueTree> t ) { return t.into<ValueTreeRef>( 0 ); },
     } );
+  }
+
+  virtual Result<Object> select( Handle<ObjectTree> combination )
+  {
+    Handle<Relation> select = Handle<Step>( Handle<Thunk>( Handle<Selection>( combination ) ) );
+
+    if ( storage.contains( select ) ) {
+      return storage.get( select );
+    }
+
+    auto tree = storage.get( combination );
+
+    auto h = tree->at( 0 ).unwrap<Expression>().unwrap<Object>();
+    auto size = handle::size( h );
+    auto i = size_t(
+      tree->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+
+    if ( i >= size ) {
+      LOG( INFO ) << "Selecting " << i << " from" << h;
+      throw std::runtime_error( "Select OOB" );
+    }
+
+    // h is one of BlobRef, ValueTreeRef or ObjectTreeRef
+    auto result = h.visit<Result<Object>>( overload {
+      [&]( Handle<ObjectTreeRef> x ) {
+        return loadShallow( storage.contains( x ).value() )
+          .transform( [&]( Handle<AnyTree> x ) { return storage.get( x ); } )
+          .transform( [&]( TreeData d ) { return d->span()[i].unwrap<Expression>().unwrap<Object>(); } );
+      },
+      [&]( Handle<Value> v ) {
+        return v.visit<Result<Object>>( overload {
+          [&]( Handle<Literal> l ) { return Handle<Literal>( l.view().substr( i, 1 ) ); },
+          [&]( Handle<BlobRef> x ) {
+            return load( x.unwrap<Blob>() )
+              .transform( [&]( Handle<Blob> x ) { return storage.get( x.unwrap<Named>() ); } )
+              .transform( [&]( BlobData b ) { return Handle<Literal>( b->span()[i] ); } );
+          },
+          [&]( Handle<ValueTreeRef> x ) {
+            return loadShallow( storage.contains( x ).value() )
+              .transform( [&]( Handle<AnyTree> x ) { return storage.get( x ); } )
+              .transform( [&]( TreeData d ) { return d->span()[i].unwrap<Expression>().unwrap<Object>(); } );
+          },
+          []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
+        } );
+      },
+      []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
+    } );
+
+    return result;
+    return {};
   }
 
   virtual Result<Object> apply( Handle<ObjectTree> combination )
@@ -115,12 +170,33 @@ private:
     }
     return storage.create( std::make_shared<OwnedTree>( std::move( new_vals ) ) ).unwrap<ValueTree>();
   }
+
+  virtual Result<ObjectTree> mapEvalShallow( Handle<ObjectTree> tree )
+  {
+    auto objs = storage.get( tree );
+    auto vals = OwnedMutTree::allocate( objs->size() );
+    for ( size_t i = 0; i < objs->size(); i++ ) {
+      vals[i] = evaluator_.evalShallow( objs->at( i ).unwrap<Expression>().unwrap<Object>() ).value();
+    }
+    return storage.create( std::make_shared<OwnedTree>( std::move( vals ) ) )
+      .visit<Handle<ObjectTree>>( overload {
+        []( Handle<ValueTree> v ) { return Handle<ObjectTree>( v ); },
+        []( Handle<ObjectTree> o ) { return o; },
+        []( Handle<ExpressionTree> ) -> Handle<ObjectTree> { throw runtime_error( "Unreachable" ); },
+      } );
+  }
 };
 
 template<FixHandle... Args>
 Handle<Application> application( Handle<Object> ( *f )( Handle<Object> ), Args... args )
 {
   return storage.construct_tree<ExpressionTree>( Handle<Literal>( (uint64_t)f ), args... );
+}
+
+template<FixHandle Arg>
+Handle<Selection> selection( Arg arg, uint64_t i )
+{
+  return storage.construct_tree<ObjectTree>( arg, Handle<Literal>( (uint64_t)i ) );
 }
 
 Handle<Object> add( Handle<Object> combination )
@@ -149,6 +225,47 @@ Handle<Object> fib( Handle<Object> combination )
   }
 }
 
+Handle<Object> bptree_get( Handle<Object> combination )
+{
+  auto data = storage.get( combination.unwrap<ObjectTree>() );
+  uint64_t key(
+    data->at( 3 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+  LOG( INFO ) << "finding bptree key " << key;
+
+  vector<uint64_t> keys;
+  data->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().visit<void>(
+    overload { [&]( Handle<Literal> l ) {
+                auto ptr = reinterpret_cast<const uint64_t*>( l.data() );
+                keys.assign( ptr, ptr + l.size() / sizeof( uint64_t ) );
+              },
+               [&]( Handle<Named> n ) {
+                 auto d = storage.get( n );
+                 auto ptr = reinterpret_cast<const uint64_t*>( d->span().data() );
+                 keys.assign( ptr, ptr + d->span().size() / sizeof( uint64_t ) );
+               } } );
+
+  auto childrenordata = data->at( 2 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<ValueTreeRef>();
+  bool isleaf = ( keys.size() + 1 == childrenordata.size() );
+
+  if ( isleaf ) {
+    LOG( INFO ) << "is leaf ";
+    auto pos = upper_bound( keys.begin(), keys.end(), key );
+    auto idx = pos - keys.begin() - 1;
+    if ( pos != keys.begin() && *( pos - 1 ) == key ) {
+      return selection( childrenordata, idx + 1 );
+    } else {
+      return Handle<Literal>( "Not found." );
+    }
+  } else {
+    LOG( INFO ) << "not leaf ";
+    size_t idx = upper_bound( keys.begin(), keys.end(), key ) - keys.begin();
+    auto nextlevel = selection( childrenordata, idx + 1 );
+    auto keysentry = selection( nextlevel, 0 );
+    return application(
+      bptree_get, Handle<Strict>( keysentry ), Handle<Shallow>( nextlevel ), Handle<Literal>( key ) );
+  }
+}
+
 void test( void )
 {
   FakeRuntime rt;
@@ -158,4 +275,13 @@ void test( void )
   auto fib10 = rt.eval( application( fib, 10_literal64 ) );
   CHECK_EQ( fib10, Handle<Value>( 55_literal64 ) );
   CHECK_EQ( mapreduce_called, 9 );
+
+  BPTree bptree( 4 );
+  for ( size_t i = 0; i < 10; i++ ) {
+    bptree.insert( i, to_string( i ) );
+  }
+
+  auto t = bptree::to_storage( storage, bptree );
+  auto select1 = rt.eval( application( bptree_get, Handle<Strict>( selection( t, 0 ) ), t, 1_literal64 ) );
+  CHECK_EQ( select1, Handle<Value>( Handle<Literal>( to_string( 1 ) ) ) );
 }

@@ -4,7 +4,9 @@
 #include "overload.hh"
 #include "pass.hh"
 #include "relater.hh"
+#include "storage_exception.hh"
 #include "types.hh"
+#include "wasm-rt.h"
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -24,6 +26,14 @@ LocalScheduler::Result<Blob> LocalScheduler::load( Handle<Blob> handle )
 LocalScheduler::Result<AnyTree> LocalScheduler::load( Handle<AnyTree> handle )
 {
   relater_->get().get( handle );
+  auto res = relater_->get().get_handle( handle ).value();
+
+  return res;
+}
+
+LocalScheduler::Result<AnyTree> LocalScheduler::loadShallow( Handle<AnyTree> handle )
+{
+  relater_->get().get_shallow( handle );
   auto res = relater_->get().get_handle( handle ).value();
 
   return res;
@@ -114,11 +124,6 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::apply( Handle<ObjectT
   Handle<Relation> apply
     = Handle<Step>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
 
-  // XXX
-  // if ( apply != current_schedule_step_.value() ) {
-  //  sketch_graph_.add_dependency( current_schedule_step_.value(), apply );
-  //}
-
   if ( relater_->get().contains( apply ) ) {
     return relater_->get().get( apply ).value();
   }
@@ -128,6 +133,54 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::apply( Handle<ObjectT
   }
 
   return {};
+}
+
+LocalScheduler::Result<Object> LocalScheduler::select( Handle<ObjectTree> combination )
+{
+  Handle<Relation> select = Handle<Step>( Handle<Thunk>( Handle<Selection>( combination ) ) );
+
+  if ( relater_->get().contains( select ) ) {
+    return relater_->get().get( select ).value();
+  }
+
+  auto tree = relater_->get().get( combination ).value();
+
+  auto h = tree->at( 0 ).unwrap<Expression>().unwrap<Object>();
+  auto size = handle::size( h );
+  auto i = size_t(
+    tree->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+
+  if ( i >= size ) {
+    throw std::runtime_error( "Select OOB" );
+  }
+
+  // h is one of BlobRef, ValueTreeRef or ObjectTreeRef
+  auto result = h.visit<Result<Object>>( overload {
+    [&]( Handle<ObjectTreeRef> x ) {
+      return loadShallow( relater_->get().unref( x ) )
+        .and_then( [&]( Handle<AnyTree> x ) { return relater_->get().get_shallow( x ); } )
+        .transform( [&]( TreeData d ) { return d->span()[i].unwrap<Expression>().unwrap<Object>(); } );
+    },
+    [&]( Handle<Value> v ) {
+      return v.visit<Result<Object>>( overload {
+        [&]( Handle<Literal> l ) { return Handle<Literal>( l.view().substr( i, 1 ) ); },
+        [&]( Handle<BlobRef> x ) {
+          return load( x.unwrap<Blob>() )
+            .and_then( [&]( Handle<Blob> x ) { return relater_->get().get( x.unwrap<Named>() ); } )
+            .transform( [&]( BlobData b ) { return Handle<Literal>( b->span()[i] ); } );
+        },
+        [&]( Handle<ValueTreeRef> x ) {
+          return loadShallow( relater_->get().unref( x ) )
+            .and_then( [&]( Handle<AnyTree> x ) { return relater_->get().get_shallow( x ); } )
+            .transform( [&]( TreeData d ) { return d->span()[i].unwrap<Expression>().unwrap<Object>(); } );
+        },
+        []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
+      } );
+    },
+    []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
+  } );
+
+  return result;
 }
 
 LocalScheduler::Result<Value> LocalScheduler::evalStrict( Handle<Object> expression )
@@ -552,6 +605,62 @@ SketchGraphScheduler::Result<ValueTree> SketchGraphScheduler::mapLift( Handle<Va
   }
 }
 
+LocalScheduler::Result<ObjectTree> LocalScheduler::mapEvalShallow( Handle<ObjectTree> tree )
+{
+  bool ready = true;
+  bool toreplace = false;
+  auto data = relater_->get().get_shallow( tree ).value();
+
+  auto prev_nested = nested_;
+  nested_ = true;
+
+  for ( const auto& x : data->span() ) {
+    auto val = x.unwrap<Expression>().unwrap<Object>();
+    auto result = evaluator_.evalShallow( val );
+    if ( not result ) {
+      ready = false;
+    } else if ( !toreplace && result.value() != val ) {
+      toreplace = true;
+    }
+  }
+
+  nested_ = prev_nested;
+
+  if ( not ready ) {
+    return {};
+  }
+
+  if ( toreplace ) {
+    auto vals = OwnedMutTree::allocate( data->size() );
+    for ( size_t i = 0; i < data->size(); i++ ) {
+      auto x = data->at( i );
+      auto val = x.unwrap<Expression>().unwrap<Object>();
+      vals[i] = evaluator_.evalShallow( val ).value();
+    }
+
+    if ( tree.is_tag() ) {
+      return relater_->get()
+        .get_storage()
+        .create( std::make_shared<OwnedTree>( std::move( vals ) ) )
+        .visit<Handle<ObjectTree>>( overload {
+          []( Handle<ValueTree> t ) { return t.into<ObjectTree>(); },
+          []( Handle<ObjectTree> t ) { return t; },
+          []( Handle<ExpressionTree> ) -> Handle<ObjectTree> { throw std::runtime_error( "Unreachable" ); } } )
+        .tag();
+    } else {
+      return relater_->get()
+        .get_storage()
+        .create( std::make_shared<OwnedTree>( std::move( vals ) ) )
+        .visit<Handle<ObjectTree>>( overload {
+          []( Handle<ValueTree> t ) { return t.into<ObjectTree>(); },
+          []( Handle<ObjectTree> t ) { return t; },
+          []( Handle<ExpressionTree> ) -> Handle<ObjectTree> { throw std::runtime_error( "Unreachable" ); } } );
+    }
+  } else {
+    return tree;
+  }
+}
+
 void SketchGraphScheduler::merge_sketch_graph( Handle<Relation> r,
                                                absl::flat_hash_set<Handle<Relation>>& unblocked )
 {
@@ -595,22 +704,9 @@ optional<Handle<Object>> SketchGraphScheduler::run_passes( Handle<Relation> top_
 {
   VLOG( 1 ) << "HintScheduler input: " << top_level_job << endl;
 
-  // If all dependencies are resolved, the job should have been completed
-  // if ( leaf_jobs.empty() ) {
-  //  throw runtime_error( "Invalid run_passes() invocation." );
-  //  return {};
-  //}
-
   if ( relater_->get().remotes_.read()->size() == 0 ) {
     absl::flat_hash_set<Handle<Relation>> unblocked;
     merge_all_sketch_graph( top_level_job, unblocked );
-
-    // for ( auto leaf_job : leaf_jobs ) {
-    //   leaf_job.visit<void>( overload {
-    //     [&]( Handle<Literal> ) {},
-    //     [&]( auto h ) { relater_->get().get_local()->get( h ); },
-    //   } );
-    // }
 
     if ( unblocked.size() == 1 ) {
       auto r = *unblocked.begin();

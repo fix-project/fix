@@ -43,6 +43,7 @@ public:
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;
   virtual std::optional<Handle<Object>> get( Handle<Relation> name ) override;
   virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name ) override;
+  virtual std::optional<TreeData> get_shallow( Handle<AnyTree> name ) override;
   virtual void put( Handle<Named> name, BlobData data ) override;
   virtual void put( Handle<AnyTree> name, TreeData data ) override;
   virtual void put( Handle<Relation> name, Handle<Object> data ) override;
