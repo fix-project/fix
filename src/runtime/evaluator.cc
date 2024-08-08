@@ -51,8 +51,11 @@ Result<Object> FixEvaluator::evalShallow( Handle<Object> x )
 Result<Object> FixEvaluator::force( Handle<Thunk> x )
 {
   auto mapReduce = [&]( auto x ) { return rt_.mapReduce( x ); };
+  auto mapEvalShallow = [&]( auto x ) { return rt_.mapEvalShallow( x ); };
   auto apply = [&]( auto x ) { return rt_.apply( x ); };
   auto load = [&]( auto x ) { return rt_.load( x ); };
+  auto loadShallow = [&]( auto x ) { return rt_.loadShallow( x ); };
+  auto select = [&]( auto x ) { return rt_.select( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Identification> x ) {
@@ -81,7 +84,19 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
         } )
         .and_then( apply );
     },
-    [&]( Handle<Selection> ) -> Handle<Object> { throw std::runtime_error( "unimplemented" ); },
+    [&]( Handle<Selection> x ) {
+      return loadShallow( x.unwrap<ObjectTree>() )
+        .and_then( [&]( auto h ) {
+          return h.template visit<Result<ObjectTree>>( overload {
+            [&]( Handle<ObjectTree> t ) { return mapEvalShallow( t ); },
+            []( Handle<ValueTree> t ) { return t.into<ObjectTree>(); },
+            []( Handle<ExpressionTree> ) -> Result<ObjectTree> {
+              throw std::runtime_error( "Invalid loadShallow return type" );
+            },
+          } );
+        } )
+        .and_then( select );
+    },
   } );
 }
 
@@ -130,7 +145,12 @@ Result<Value> FixEvaluator::lower( Handle<Value> x )
   auto ref = [&]( auto x ) { return rt_.ref( x ); };
 
   return x.visit<Result<Value>>( overload {
-    [&]( Handle<Blob> x ) { return Handle<BlobRef>( x ); },
+    [&]( Handle<Blob> x ) {
+      return x.visit<Handle<Value>>( overload {
+        []( Handle<Literal> l ) { return l; },
+        []( Handle<Named> n ) { return Handle<BlobRef>( Handle<Blob>( n ) ); },
+      } );
+    },
     [&]( Handle<ValueTree> x ) { return ref( x ).unwrap<ValueTreeRef>(); },
     [&]( Handle<BlobRef> x ) { return x; },
     [&]( Handle<ValueTreeRef> x ) { return x; },

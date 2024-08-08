@@ -123,6 +123,11 @@ std::optional<TreeData> Repository::get( Handle<AnyTree> name )
   }
 }
 
+std::optional<TreeData> Repository::get_shallow( Handle<AnyTree> name )
+{
+  return get( name );
+}
+
 std::optional<Handle<Object>> Repository::get( Handle<Relation> relation )
 {
   Handle<Fix> fix( relation );

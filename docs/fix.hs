@@ -120,7 +120,7 @@ lower (ValueTreeRef x) = ValueTreeRef x
 
 -- | Given a Relation, finds the "result", otherwise passes Expressions through unchanged.
 relate :: Fix -> Object
-relate (Relation (Step x)) = think x
+relate (Relation (Think x)) = think x
 relate (Relation (Eval x)) = Value $ evalStrict x
 relate (Expression x) = reduce x
 

@@ -36,6 +36,7 @@ public:
   }
 
   optional<Handle<AnyTree>> get_handle( Handle<AnyTree> handle ) override { return storage_.get_handle( handle ); }
+  optional<TreeData> get_shallow( Handle<AnyTree> handle ) override { return storage_.get_shallow( handle ); }
 
   void put( Handle<Named> name, BlobData data ) override { storage_.create( data, name ); }
   void put( Handle<AnyTree> name, TreeData data ) override { storage_.create( data, name ); }
