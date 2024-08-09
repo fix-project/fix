@@ -24,7 +24,7 @@ link_libc("${CMAKE_BINARY_DIR}/count-words/CMakeFiles/count_words_obj.dir/count_
 
 # link fixpoint_storage, which defines wat tables and memories
 add_custom_command(
-        OUTPUT "count_words_partial.wasm"
+        OUTPUT "count_words.wasm"
         DEPENDS count_words_unlinked.wasm
                 support.wasm
   COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
@@ -34,19 +34,6 @@ add_custom_command(
         support.wasm
         -m wasi_command
         -n support
-        -o "count_words_partial.wasm"
-)
-add_custom_command(
-        OUTPUT "count_words.wasm"
-        DEPENDS count_words_partial.wasm
-                applications-util
-                ../util/fixpoint_storage.wasm
-  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
-        --enable-multi-memory
-        --enable-exceptions
-        count_words_partial.wasm
-        ../util/fixpoint_storage.wasm
-        -n fixpoint_storage
         -o "count_words.wasm"
 )
 
@@ -62,7 +49,7 @@ link_libc("${CMAKE_BINARY_DIR}/count-words/CMakeFiles/merge_counts_obj.dir/merge
 
 # link fixpoint_storage, which defines wat tables and memories
 add_custom_command(
-        OUTPUT "merge_counts_partial.wasm"
+        OUTPUT "merge_counts.wasm"
         DEPENDS merge_counts_unlinked.wasm
                 support.wasm
   COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
@@ -72,19 +59,6 @@ add_custom_command(
         support.wasm
         -m wasi_command
         -n support
-        -o "merge_counts_partial.wasm"
-)
-add_custom_command(
-        OUTPUT "merge_counts.wasm"
-        DEPENDS merge_counts_partial.wasm
-                applications-util
-                ../util/fixpoint_storage.wasm
-  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
-        --enable-multi-memory
-        --enable-exceptions
-        merge_counts_partial.wasm
-        ../util/fixpoint_storage.wasm
-        -n fixpoint_storage
         -o "merge_counts.wasm"
 )
 

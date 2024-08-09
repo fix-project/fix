@@ -11,8 +11,6 @@ void out( const char* s )
 
 __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply( externref combination )
 {
-  externref nil = create_blob_rw_mem_0( 0 );
-
   attach_tree_ro_table_0( combination );
 
   /* auto rlimits = get_ro_table_0( 0 ); */
