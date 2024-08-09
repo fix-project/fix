@@ -166,10 +166,10 @@ u8x32 create_identification_thunk( u8x32 handle )
   return h->into<Fix>().content;
 }
 
-u8x32 create_selection_thunk( u8x32 handle )
+u8x32 create_selection_thunk( u8x32 handle, uint32_t idx )
 {
-  auto h = handle::extract<ObjectTree>( Handle<Fix>::forge( handle ) ).transform( []( auto h ) {
-    return h.template into<Selection>().template into<Thunk>();
+  auto h = handle::extract<Object>( Handle<Fix>::forge( handle ) ).transform( [&]( auto h ) {
+    return Handle<Selection>( storage->construct_tree<ObjectTree>( h, Handle<Literal>( (uint64_t)idx ) ) );
   } );
 
   check( h );
