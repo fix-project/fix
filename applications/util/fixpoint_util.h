@@ -8,10 +8,16 @@ const static int WASM_RT_PAGESIZE = 65536;
 
 extern externref create_blob_i32( int32_t number )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_blob_i32" ) ) );
+extern externref create_blob_i64( int64_t number )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_blob_i64" ) ) );
 extern externref create_application_thunk( externref pointer )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_application_thunk" ) ) );
+extern externref create_selection_thunk( externref pointer, uint32_t idx )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_selection_thunk" ) ) );
 extern externref create_strict_encode( externref pointer )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_strict_encode" ) ) );
+extern externref create_shallow_encode( externref pointer )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_shallow_encode" ) ) );
 extern externref create_tag( externref object, externref blob )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_tag" ) ) );
 
