@@ -1,0 +1,15 @@
+(module
+  (import "wasi_command" "memory" (memory $program_mem 0))
+  (memory $ro_mem_0 (export "ro_mem_0") 0)
+  (memory $rw_mem_0 (export "rw_mem_0") 0)
+  (table $ro_table_0 (export "ro_table_0") 0 externref)
+  (table $rw_table_0 (export "rw_table_0") 5 externref)
+  (func (export "get_ro_table_0") (param $index i32) (result externref)
+        (table.get $ro_table_0 (local.get $index)))
+  (func (export "set_rw_table_0") (param $index i32) (param $val externref)
+        (table.set $rw_table_0 (local.get $index) (local.get $val)))
+  (func (export "ro_mem_0_to_program_mem") (param $dest i32) (param $src i32) (param $len i32)
+        (memory.copy $ro_mem_0 $program_mem
+          (local.get $dest)
+          (local.get $src)
+          (local.get $len))))

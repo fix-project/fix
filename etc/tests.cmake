@@ -44,6 +44,7 @@ add_test(NAME t_self_host WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} COMMAND ${CMAK
 
 add_test(NAME l_add COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add -s local)
 add_test(NAME l_fib COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib -s local)
+add_test(NAME l_bptree COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-bptree-get -s local)
 add_test(NAME l_trap COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh local)
 add_test(NAME l_resource_limits COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-resource-limits.sh local)
 add_test(NAME l_map COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-map -s local)
