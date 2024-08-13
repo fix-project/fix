@@ -15,7 +15,7 @@
 class Executor : public IRuntime
 {
   std::vector<std::thread> threads_ {};
-  Channel<Handle<AnyDataType>> todo_ {};
+  Channel<Handle<Relation>> todo_ {};
   Relater& parent_;
   std::shared_ptr<Runner> runner_ {};
 
@@ -31,7 +31,7 @@ private:
   using Result = FixEvaluator::Result<T>;
 
   void run();
-  void progress( Handle<AnyDataType> runnable_or_loadable );
+  void progress( Handle<Relation> runnable );
 
 public:
   Result<Object> apply( Handle<ObjectTree> combination );
