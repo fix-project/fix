@@ -35,6 +35,7 @@ public:
 
   virtual void put( Handle<Named> name, BlobData data ) override;
   virtual void put( Handle<AnyTree> name, TreeData data ) override;
+  virtual void put_shallow( Handle<AnyTree> name, TreeData data ) override;
   virtual void put( Handle<Relation> name, Handle<Object> data ) override;
 
   Handle<Fix> labeled( const std::string_view label ) override;
@@ -45,6 +46,7 @@ public:
 
   virtual bool contains( Handle<Named> name ) override;
   virtual bool contains( Handle<AnyTree> name ) override;
+  virtual bool contains_shallow( Handle<AnyTree> name ) override;
   virtual bool contains( Handle<Relation> name ) override;
   virtual std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> name ) override;
 

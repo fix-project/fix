@@ -21,7 +21,7 @@ Pass::Pass( reference_wrapper<Relater> relater )
   , local_( relater.get().get_local() )
 {}
 
-void Pass::run( Handle<AnyDataType> job )
+void Pass::run( Handle<Dependee> job )
 {
   job.visit<void>( overload {
     [&]( Handle<Relation> r ) {
@@ -32,7 +32,6 @@ void Pass::run( Handle<AnyDataType> job )
       }
       relation_post( r, sketch_graph_.get_forward_dependencies( r ) );
     },
-    []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
     [&]( auto h ) {
       all( h );
       data( h );
@@ -40,7 +39,7 @@ void Pass::run( Handle<AnyDataType> job )
   } );
 }
 
-void PrunedSelectionPass::run( Handle<AnyDataType> job )
+void PrunedSelectionPass::run( Handle<Dependee> job )
 {
   if ( !chosen_remotes_.contains( job ) ) {
     throw std::runtime_error( "Chosen remotes has no info about job" );
@@ -62,7 +61,6 @@ void PrunedSelectionPass::run( Handle<AnyDataType> job )
       }
       relation_post( r, sketch_graph_.get_forward_dependencies( r ) );
     },
-    []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
     [&]( auto h ) {
       all( h );
       data( h );
@@ -74,11 +72,20 @@ BasePass::BasePass( reference_wrapper<Relater> relater )
   : Pass( relater )
 {}
 
-void BasePass::data( Handle<AnyDataType> job )
+void BasePass::data( Handle<Dependee> job )
 {
   job.visit<void>( overload {
     []( Handle<Relation> ) { throw std::runtime_error( "Unreachable" ); },
-    []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
+    [&]( Handle<ValueTreeRef> ref ) {
+      tasks_info_[job].output_size = ref.size() * sizeof( Handle<Fix> );
+      tasks_info_[job].output_fan_out = 0;
+      tasks_info_[job].ep = false;
+    },
+    [&]( Handle<ObjectTreeRef> ref ) {
+      tasks_info_[job].output_size = ref.size() * sizeof( Handle<Fix> );
+      tasks_info_[job].output_fan_out = 0;
+      tasks_info_[job].ep = false;
+    },
     [&]( auto h ) {
       tasks_info_[job].output_size = handle::byte_size( h );
       tasks_info_[job].output_fan_out = 0;
@@ -87,7 +94,7 @@ void BasePass::data( Handle<AnyDataType> job )
   } );
 }
 
-void BasePass::relation_post( Handle<Relation> job, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void BasePass::relation_post( Handle<Relation> job, const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
   if ( dependencies.empty() ) {
     if ( !relater_.get().contains( job ) ) {
@@ -148,7 +155,11 @@ void BasePass::relation_post( Handle<Relation> job, const absl::flat_hash_set<Ha
           tasks_info_[job].ep = false;
           // return { out, 1, false };
         },
-        []( Handle<Selection> ) { throw std::runtime_error( "Unimplemented" ); },
+        [&]( Handle<Selection> ) {
+          tasks_info_[job].output_size = sizeof( Handle<Fix> );
+          tasks_info_[job].output_fan_out = 0;
+          tasks_info_[job].ep = false;
+        },
       } );
     },
     [&]( Handle<Eval> e ) {
@@ -173,26 +184,39 @@ void BasePass::relation_post( Handle<Relation> job, const absl::flat_hash_set<Ha
   } );
 }
 
-size_t BasePass::absent_size( std::shared_ptr<IRuntime> worker, Handle<AnyDataType> job )
+size_t BasePass::absent_size( std::shared_ptr<IRuntime> worker, Handle<Dependee> job )
 {
   auto root = job::get_root( job );
 
-  size_t contained_size = 0;
-  relater_.get().early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
-    auto contained = handle.visit<bool>( overload {
-      [&]( Handle<Literal> ) { return true; },
-      [&]( auto h ) { return worker->contains( h ); },
-    } );
-    if ( contained ) {
-      contained_size += handle::byte_size( handle );
-    }
+  size_t absent = job.visit<size_t>(
+    overload { [&]( Handle<AnyTreeRef> r ) -> size_t {
+                relater_.get().unref( r );
+                if ( worker->contains_shallow( relater_.get().unref( r ) ) ) {
+                  return 0;
+                } else {
+                  return r.visit<size_t>( []( auto x ) { return x.size(); } ) * sizeof( Handle<Fix> );
+                }
+              },
+               [&]( auto ) {
+                 size_t contained_size = 0;
+                 relater_.get().early_stop_visit_minrepo( root, [&]( Handle<AnyDataType> handle ) -> bool {
+                   auto contained = handle.visit<bool>( overload {
+                     []( Handle<Literal> ) { return true; },
+                     [&]( auto h ) { return worker->contains( h ); },
+                   } );
+                   if ( contained ) {
+                     contained_size += handle::byte_size( handle );
+                   }
 
-    return contained;
-  } );
-  return handle::byte_size( root ) - contained_size;
+                   return contained;
+                 } );
+                 return handle::byte_size( root ) - contained_size;
+               } } );
+
+  return absent;
 }
 
-void BasePass::all( Handle<AnyDataType> job )
+void BasePass::all( Handle<Dependee> job )
 {
   {
     auto local = relater_.get().local_;
@@ -201,12 +225,21 @@ void BasePass::all( Handle<AnyDataType> job )
       VLOG( 2 ) << "local absent_size " << job << " " << tasks_info_[job].absent_size.at( local );
 
       job.visit<void>( overload {
+        [&]( Handle<ValueTreeRef> ref ) {
+          if ( local->contains_shallow( relater_.get().unref( ref ) ) ) {
+            tasks_info_[job].contains.insert( local );
+          }
+        },
+        [&]( Handle<ObjectTreeRef> ref ) {
+          if ( local->contains_shallow( relater_.get().unref( ref ) ) ) {
+            tasks_info_[job].contains.insert( local );
+          }
+        },
         [&]( auto r ) {
           if ( local->contains( r ) ) {
             tasks_info_[job].contains.insert( local );
           }
         },
-        []( Handle<Literal> ) {},
       } );
     }
   }
@@ -218,12 +251,21 @@ void BasePass::all( Handle<AnyDataType> job )
       VLOG( 2 ) << "remote absent_size " << job << " " << tasks_info_[job].absent_size.at( locked_remote )
                 << locked_remote;
       job.visit<void>( overload {
+        [&]( Handle<ValueTreeRef> ref ) {
+          if ( locked_remote->contains_shallow( relater_.get().unref( ref ) ) ) {
+            tasks_info_[job].contains.insert( locked_remote );
+          }
+        },
+        [&]( Handle<ObjectTreeRef> ref ) {
+          if ( locked_remote->contains_shallow( relater_.get().unref( ref ) ) ) {
+            tasks_info_[job].contains.insert( locked_remote );
+          }
+        },
         [&]( auto r ) {
           if ( locked_remote->contains( r ) ) {
             tasks_info_[job].contains.insert( locked_remote );
           }
         },
-        []( Handle<Literal> ) {},
       } );
     }
   }
@@ -250,7 +292,7 @@ PrunedSelectionPass::PrunedSelectionPass( std::reference_wrapper<BasePass> base,
 {}
 
 void MinAbsentMaxParallelism::relation_post( Handle<Relation> job,
-                                             const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+                                             const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
   if ( dependencies.empty() )
     return;
@@ -320,7 +362,7 @@ void MinAbsentMaxParallelism::relation_post( Handle<Relation> job,
   }
 }
 
-void ChildBackProp::run( Handle<AnyDataType> job )
+void ChildBackProp::run( Handle<Dependee> job )
 {
   job.visit<void>( overload {
     [&]( Handle<Relation> r ) {
@@ -335,12 +377,11 @@ void ChildBackProp::run( Handle<AnyDataType> job )
 
       relation_post( r, sketch_graph_.get_forward_dependencies( r ) );
     },
-    []( Handle<Literal> ) { throw std::runtime_error( "Unreachable" ); },
     [&]( auto d ) { data( d ); },
   } );
 }
 
-void ChildBackProp::all( Handle<AnyDataType> job )
+void ChildBackProp::all( Handle<Dependee> job )
 {
   VLOG( 2 ) << "ChildBackProp::independent " << job;
 
@@ -378,7 +419,6 @@ void ChildBackProp::all( Handle<AnyDataType> job )
           score = -curr_output_size;
         }
       },
-      []( Handle<Literal> ) {},
     } );
 
     if ( !chosen_remote.has_value() ) {
@@ -430,8 +470,7 @@ void ChildBackProp::all( Handle<AnyDataType> job )
   }
 }
 
-void ChildBackProp::relation_post( Handle<Relation> job,
-                                   const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
   auto s = chosen_remotes_.at( job ).second;
 
@@ -481,15 +520,14 @@ void ChildBackProp::relation_post( Handle<Relation> job,
   }
 }
 
-void ChildBackProp::relation_pre( Handle<Relation> job,
-                                  const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void ChildBackProp::relation_pre( Handle<Relation> job, const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
   for ( const auto& d : dependencies ) {
-    dependees_[d].insert( Handle<AnyDataType>( Handle<Relation>( job ) ) );
+    dependees_[d].insert( Handle<Relation>( job ) );
   }
 }
 
-void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
   bool any_ep = false;
   for ( auto d : dependencies ) {
@@ -502,7 +540,7 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
     return;
 
   size_t assigned = 0;
-  multimap<int64_t, Handle<AnyDataType>, greater<int64_t>> scores;
+  multimap<int64_t, Handle<Dependee>, greater<int64_t>> scores;
 
   for ( auto d : dependencies ) {
     if ( chosen_remotes_.contains( d ) and is_local( chosen_remotes_.at( d ).first ) ) {
@@ -545,7 +583,7 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
   }
 }
 
-void RandomSelection::all( Handle<AnyDataType> job )
+void RandomSelection::all( Handle<Dependee> job )
 {
   // XXX
   const auto& absent_size = base_.get().get_absent_size( job );
@@ -562,7 +600,7 @@ void RandomSelection::all( Handle<AnyDataType> job )
   }
 }
 
-void SendToRemotePass::all( Handle<AnyDataType> job )
+void SendToRemotePass::all( Handle<Dependee> job )
 {
   if ( !is_local( chosen_remotes_.at( job ).first ) ) {
     VLOG( 1 ) << "Run job remotely " << job << endl;
@@ -570,8 +608,7 @@ void SendToRemotePass::all( Handle<AnyDataType> job )
   }
 }
 
-void SendToRemotePass::relation_pre( Handle<Relation>,
-                                     const absl::flat_hash_set<Handle<AnyDataType>>& dependencies )
+void SendToRemotePass::relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
   for ( auto d : dependencies ) {
     const auto& contains = base_.get().get_contains( d );
@@ -588,10 +625,9 @@ void SendToRemotePass::relation_pre( Handle<Relation>,
   }
 }
 
-void SendToRemotePass::send_job_dependencies( shared_ptr<IRuntime> rt, Handle<AnyDataType> job )
+void SendToRemotePass::send_job_dependencies( shared_ptr<IRuntime> rt, Handle<Dependee> job )
 {
   auto remote_contained = job.visit<bool>( overload {
-    []( Handle<Literal> ) { return true; },
     [&]( Handle<Relation> x ) { return rt->contains( x ); },
     // Leave whether to send data to not to Remote's decision
     []( auto ) { return false; },
@@ -602,24 +638,27 @@ void SendToRemotePass::send_job_dependencies( shared_ptr<IRuntime> rt, Handle<An
   }
 
   job.visit<void>( overload {
-    []( Handle<Literal> ) {},
     [&]( Handle<Relation> r ) {
       if ( relater_.get().contains( r ) ) {
         remote_data_[rt].insert( r );
       } else {
-        // TODO: this may be wrong
-        auto data = handle::data( r.visit<Handle<Object>>( overload {
-          []( Handle<Eval> e ) { return e.unwrap<Object>(); },
-          []( Handle<Step> s ) { return s.unwrap<Thunk>(); },
-        } ) );
+        auto data = r.visit<optional<Handle<AnyDataType>>>(
+          overload { []( Handle<Eval> e ) { return handle::data( e.unwrap<Object>() ); },
+                     []( Handle<Step> ) -> optional<Handle<AnyDataType>> { return {}; } } );
 
         if ( data.has_value() ) {
-          remote_data_[rt].insert( data.value() );
+          data.value().visit<void>(
+            overload { []( Handle<Literal> ) {}, [&]( auto h ) { remote_data_[rt].insert( h ); } } );
         }
 
         for ( auto d : sketch_graph_.get_forward_dependencies( r ) ) {
           send_job_dependencies( rt, d );
         }
+      }
+    },
+    [&]( Handle<AnyTreeRef> ref ) {
+      if ( relater_.get().contains_shallow( relater_.get().unref( ref ) ) ) {
+        ref.visit<void>( [&]( auto r ) { remote_data_[rt].insert( r ); } );
       }
     },
     [&]( auto d ) {
@@ -630,11 +669,11 @@ void SendToRemotePass::send_job_dependencies( shared_ptr<IRuntime> rt, Handle<An
   } );
 }
 
-void SendToRemotePass::send_remote_jobs( Handle<AnyDataType> root )
+void SendToRemotePass::send_remote_jobs( Handle<Dependee> root )
 {
   this->run( root );
 
-  vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<AnyDataType>>::const_iterator>> iterators {};
+  vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<Dependee>>::const_iterator>> iterators {};
   for ( const auto& [rt, handles] : remote_jobs_ ) {
     iterators.push_back( make_pair( rt, handles.begin() ) );
     for ( auto h : handles ) {
@@ -645,8 +684,15 @@ void SendToRemotePass::send_remote_jobs( Handle<AnyDataType> root )
   for ( const auto& [rt, data] : remote_data_ ) {
     for ( auto d : data ) {
       d.visit<void>( overload {
-        []( Handle<Literal> ) {},
         [&]( Handle<Relation> r ) { rt->put_force( r, relater_.get().get( r ).value() ); },
+        [&]( Handle<ObjectTreeRef> r ) {
+          auto tree = relater_.get().unref( r );
+          rt->put_shallow( tree, relater_.get().get_shallow( tree ).value() );
+        },
+        [&]( Handle<ValueTreeRef> r ) {
+          auto tree = relater_.get().unref( r );
+          rt->put_shallow( tree, relater_.get().get_shallow( tree ).value() );
+        },
         [&]( auto x ) { rt->put( x, relater_.get().get( x ).value() ); },
       } );
     }
@@ -659,11 +705,12 @@ void SendToRemotePass::send_remote_jobs( Handle<AnyDataType> root )
     if ( it != remote_jobs_.at( r ).end() ) {
       auto h = *it;
       h.visit<void>( overload {
-        []( Handle<Literal> ) {},
         [&]( Handle<Relation> d ) {
           r->get( d );
           sketch_graph_.erase_forward_dependencies( d );
         },
+        [&]( Handle<ObjectTreeRef> ref ) { r->get_shallow( relater_.get().unref( ref ) ); },
+        [&]( Handle<ValueTreeRef> ref ) { r->get_shallow( relater_.get().unref( ref ) ); },
         [&]( auto d ) { r->get( d ); },
       } );
       it++;
@@ -678,19 +725,19 @@ void SendToRemotePass::send_remote_jobs( Handle<AnyDataType> root )
   }
 }
 
-void FinalPass::data( Handle<AnyDataType> job )
+void FinalPass::data( Handle<Dependee> job )
 {
   VLOG( 1 ) << "Run job " << ( is_local( chosen_remotes_.at( job ).first ) ? "locally " : "remotely " ) << job
             << endl;
   if ( is_local( chosen_remotes_.at( job ).first ) ) {
     job.visit<void>( overload {
-      []( Handle<Literal> ) {},
-      [&]( auto h ) { chosen_remotes_.at( job ).first->get( h ); },
+      [&]( Handle<Relation> h ) { chosen_remotes_.at( job ).first->get( h ); },
+      []( auto ) { throw std::runtime_error( "Unreachable" ); },
     } );
   }
 }
 
-void FinalPass::relation_pre( Handle<Relation> job, const absl::flat_hash_set<Handle<AnyDataType>>& )
+void FinalPass::relation_pre( Handle<Relation> job, const absl::flat_hash_set<Handle<Dependee>>& )
 {
   if ( relater_.get().contains( job ) ) {
     sketch_graph_.erase_forward_dependencies( job );
@@ -715,7 +762,7 @@ void FinalPass::relation_pre( Handle<Relation> job, const absl::flat_hash_set<Ha
 
 optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
                                          reference_wrapper<SketchGraphScheduler> sch,
-                                         Handle<AnyDataType> top_level_job,
+                                         Handle<Dependee> top_level_job,
                                          const vector<PassType>& passes )
 {
   BasePass base( rt );
@@ -778,7 +825,7 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
                                                          return {};
                                                        },
                                                         [&]( Handle<Step> s ) -> optional<Handle<Thunk>> {
-                                                          if ( top_level_job == Handle<AnyDataType>( r ) ) {
+                                                          if ( top_level_job == Handle<Dependee>( r ) ) {
                                                             return s.unwrap<Thunk>();
                                                           } else {
                                                             return {};

@@ -89,17 +89,19 @@ public:
 
   std::optional<BlobData> get( Handle<Named> name ) override;
   std::optional<TreeData> get( Handle<AnyTree> name ) override;
-  std::optional<TreeData> get_shallow( Handle<AnyTree> ) override { return {}; }
+  std::optional<TreeData> get_shallow( Handle<AnyTree> ) override;
   std::optional<Handle<Object>> get( Handle<Relation> name ) override;
   std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> handle ) override;
 
   void put( Handle<Named> name, BlobData data ) override;
   void put( Handle<AnyTree> name, TreeData data ) override;
+  void put_shallow( Handle<AnyTree> name, TreeData data ) override;
   void put( Handle<Relation> name, Handle<Object> data ) override;
   void put_force( Handle<Relation> name, Handle<Object> data ) override;
 
   bool contains( Handle<Named> handle ) override;
   bool contains( Handle<AnyTree> handle ) override;
+  bool contains_shallow( Handle<AnyTree> handle ) override;
   bool contains( Handle<Relation> handle ) override;
   std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle ) override;
   bool contains( const std::string_view label ) override;

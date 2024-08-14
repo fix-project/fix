@@ -137,6 +137,11 @@ void Executor::put( Handle<AnyTree> name, TreeData data )
   parent_.put( name, data );
 }
 
+void Executor::put_shallow( Handle<AnyTree> name, TreeData data )
+{
+  parent_.put_shallow( name, data );
+}
+
 void Executor::put( Handle<Relation> name, Handle<Object> data )
 {
   parent_.put( name, data );
@@ -150,6 +155,11 @@ bool Executor::contains( Handle<Named> handle )
 bool Executor::contains( Handle<AnyTree> handle )
 {
   return parent_.contains( handle );
+}
+
+bool Executor::contains_shallow( Handle<AnyTree> handle )
+{
+  return parent_.contains_shallow( handle );
 }
 
 bool Executor::contains( Handle<Relation> handle )

@@ -126,7 +126,7 @@ optional<TreeData> Relater::get_shallow( Handle<AnyTree> name )
 {
   if ( storage_.contains_shallow( name ) ) {
     return storage_.get_shallow( name );
-  } else if ( repository_.contains( name ) ) {
+  } else if ( repository_.contains_shallow( name ) ) {
     auto tree = repository_.get_shallow( name ).value();
     storage_.create_tree_shallow( tree, name );
     return tree;
@@ -179,6 +179,7 @@ void Relater::put( Handle<Named> name, BlobData data )
     }
   }
 }
+
 void Relater::put( Handle<AnyTree> name, TreeData data )
 {
   if ( !storage_.contains( name ) ) {
@@ -187,6 +188,21 @@ void Relater::put( Handle<AnyTree> name, TreeData data )
     {
       auto graph = graph_.write();
       name.visit<void>( [&]( auto h ) { graph->finish( h, unblocked ); } );
+    }
+    for ( auto x : unblocked ) {
+      local_->get( x );
+    }
+  }
+}
+
+void Relater::put_shallow( Handle<AnyTree> name, TreeData data )
+{
+  if ( !storage_.contains_shallow( name ) ) {
+    storage_.create_tree_shallow( data, name );
+    absl::flat_hash_set<Handle<Relation>> unblocked;
+    {
+      auto graph = graph_.write();
+      storage_.ref( name ).visit<void>( [&]( auto h ) { graph->finish( h, unblocked ); } );
     }
     for ( auto x : unblocked ) {
       local_->get( x );
@@ -228,6 +244,11 @@ bool Relater::contains( Handle<Named> handle )
 bool Relater::contains( Handle<AnyTree> handle )
 {
   return storage_.contains( handle ) || repository_.contains( handle );
+}
+
+bool Relater::contains_shallow( Handle<AnyTree> handle )
+{
+  return storage_.contains_shallow( handle ) || repository_.contains_shallow( handle );
 }
 
 bool Relater::contains( Handle<Relation> handle )
