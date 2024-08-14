@@ -56,6 +56,7 @@ public:
   ///@{
   virtual void put( Handle<Named> name, BlobData data ) = 0;
   virtual void put( Handle<AnyTree> name, TreeData data ) = 0;
+  virtual void put_shallow( Handle<AnyTree> name, TreeData data ) = 0;
   virtual void put( Handle<Relation> name, Handle<Object> data ) = 0;
   ///@}
 
@@ -100,6 +101,7 @@ public:
   ///@{
   virtual bool contains( Handle<Named> handle ) = 0;
   virtual bool contains( Handle<AnyTree> handle ) = 0;
+  virtual bool contains_shallow( Handle<AnyTree> handle ) = 0;
   virtual bool contains( Handle<Relation> handle ) = 0;
   ///}@
 
@@ -151,7 +153,7 @@ public:
   // Return the list of data presening in .fix repository
   virtual std::unordered_set<Handle<AnyDataType>> data() const { return {}; };
   // Return the list of forward dependencies
-  virtual absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Handle<Relation> ) { return {}; }
+  virtual absl::flat_hash_set<Handle<Dependee>> get_forward_dependencies( Handle<Relation> ) { return {}; }
 };
 
 class MultiWorkerRuntime : public IRuntime

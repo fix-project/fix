@@ -65,6 +65,7 @@ class SketchGraphScheduler : public Scheduler
 private:
   std::vector<PassRunner::PassType> passes_;
   virtual Result<Object> run_passes( Handle<Relation> top_level_job );
+  bool loadShallow( Handle<AnyTree>, Handle<AnyTreeRef> );
 
 protected:
   void relate( Handle<Relation> top_level_job );
@@ -78,16 +79,16 @@ public:
   virtual Result<Blob> load( Handle<Blob> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTree> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
-  virtual Result<AnyTree> loadShallow( Handle<AnyTree> ) override { return {}; };
+  virtual Result<AnyTree> loadShallow( Handle<AnyTree> ) override;
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
-  virtual Result<Object> select( Handle<ObjectTree> ) override { return {}; };
+  virtual Result<Object> select( Handle<ObjectTree> ) override;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
   virtual Result<Value> evalStrict( Handle<Object> expression ) override;
   virtual Result<Object> force( Handle<Thunk> thunk ) override;
   virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree ) override;
   virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree ) override;
   virtual Result<ValueTree> mapLift( Handle<ValueTree> tree ) override;
-  virtual Result<ObjectTree> mapEvalShallow( Handle<ObjectTree> ) override { return {}; };
+  virtual Result<ObjectTree> mapEvalShallow( Handle<ObjectTree> ) override;
 
   virtual Result<Object> schedule( Handle<Relation> top_level_job ) override;
 

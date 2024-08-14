@@ -33,6 +33,7 @@ add_test(NAME u_relater COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-sched
 
 add_test(NAME t_add COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add)
 add_test(NAME t_fib COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib)
+add_test(NAME t_bptree COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-bptree-get)
 add_test(NAME t_trap COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh)
 add_test(NAME t_resource_limits COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-resource-limits.sh)
 add_test(NAME t_map COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-map)

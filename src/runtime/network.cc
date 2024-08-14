@@ -65,12 +65,8 @@ void Remote::send_tree( Handle<AnyTree> handle, TreeData )
     h.visit<void>( overload {
       []( Handle<Literal> ) {},
       []( Handle<Relation> ) {},
-      [&]( Handle<AnyTree> t ) {
-        push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } );
-      },
-      [&]( Handle<Named> b ) {
-        push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
-      },
+      [&]( Handle<AnyTree> t ) { push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } ); },
+      [&]( Handle<Named> b ) { push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } ); },
     } );
   } );
 
@@ -98,6 +94,14 @@ optional<BlobData> Remote::get( Handle<Named> name )
 optional<TreeData> Remote::get( Handle<AnyTree> name )
 {
   RequestTreePayload payload { .handle = name };
+  msg_q_.enqueue( make_pair( index_, move( payload ) ) );
+
+  return {};
+}
+
+optional<TreeData> Remote::get_shallow( Handle<AnyTree> name )
+{
+  RequestShallowTreePayload payload { .handle = name };
   msg_q_.enqueue( make_pair( index_, move( payload ) ) );
 
   return {};
@@ -147,6 +151,13 @@ void Remote::put( Handle<AnyTree> name, TreeData )
         },
       } );
     } );
+  }
+}
+
+void Remote::put_shallow( Handle<AnyTree> name, TreeData data )
+{
+  if ( !loaded( name ) ) {
+    msg_q_.enqueue( make_pair( index_, ShallowTreeDataPayload( name, data ) ) );
   }
 }
 
@@ -226,6 +237,11 @@ bool Remote::contains( Handle<AnyTree> handle )
 bool Remote::loaded( Handle<AnyTree> handle )
 {
   return trees_view_.contains( handle ) && trees_view_.get_ref( handle ).load( memory_order_acquire );
+}
+
+bool Remote::contains_shallow( Handle<AnyTree> handle )
+{
+  return contains( handle );
 }
 
 void Remote::add_to_view( Handle<AnyTree> handle )
@@ -407,7 +423,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::REQUESTTREE: {
       auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
       auto tree = parent.get( payload.handle );
-      if ( tree ) {
+      if ( tree && !trees_view_.contains( payload.handle ) ) {
         send_tree( payload.handle, tree.value() );
         add_to_view( payload.handle );
       }
@@ -417,9 +433,18 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::REQUESTBLOB: {
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
       auto blob = parent.get( payload.handle );
-      if ( blob ) {
+      if ( blob && !blobs_view_.contains( payload.handle ) ) {
         send_blob( blob.value() );
         add_to_view( payload.handle );
+      }
+      break;
+    }
+
+    case Opcode::REQUESTSHALLOWTREE: {
+      auto payload = parse<RequestShallowTreePayload>( std::get<string>( msg.payload() ) );
+      auto tree = parent.get_shallow( payload.handle );
+      if ( tree ) {
+        push_message( { Opcode::SHALLOWTREEDATA, tree.value() } );
       }
       break;
     }
@@ -431,6 +456,11 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::TREEDATA: {
       parent.create( msg.get_tree() );
+      break;
+    }
+
+    case Opcode::SHALLOWTREEDATA: {
+      parent.put_shallow( handle::create( msg.get_tree() ), msg.get_tree() );
       break;
     }
 
@@ -610,6 +640,10 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
               visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
             connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
           }
+        },
+        [&]( ShallowTreeDataPayload t ) {
+          // XXX
+          connection.push_message( { Opcode::SHALLOWTREEDATA, t.data } );
         },
         [&]( RunPayload r ) {
           if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {

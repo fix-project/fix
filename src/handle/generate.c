@@ -400,8 +400,10 @@ int main( int argc, char** argv )
   const Type* anytree = make_sum( "AnyTree", 3, vtree, otree, etree );
   const Type* anytreeref = make_sum( "AnyTreeRef", 2, vref, oref );
   const Type* anydatatype = make_sum( "AnyDataType", 6, literal, named, vtree, otree, etree, relation );
+  const Type* dependee = make_sum( "Dependee", 7, named, vtree, otree, etree, relation, vref, oref );
   serialize( anytree );
   serialize( anytreeref );
   serialize( anydatatype );
+  serialize( dependee );
   printf( "#include \"handle_post.hh\" // IWYU pragma: keep\n\n" );
 }

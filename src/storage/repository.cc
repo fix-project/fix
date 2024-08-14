@@ -176,6 +176,11 @@ void Repository::put( Handle<AnyTree> name, TreeData data )
   }
 }
 
+void Repository::put_shallow( Handle<AnyTree>, TreeData )
+{
+  throw std::runtime_error( "Unimplemented" );
+}
+
 void Repository::put( Handle<Relation> relation, Handle<Object> target )
 {
   try {
@@ -256,6 +261,11 @@ bool Repository::contains( Handle<Named> handle )
 bool Repository::contains( Handle<AnyTree> handle )
 {
   return trees_.contains( handle );
+}
+
+bool Repository::contains_shallow( Handle<AnyTree> handle )
+{
+  return contains( handle );
 }
 
 bool Repository::contains( Handle<Relation> handle )

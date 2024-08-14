@@ -30,10 +30,12 @@ public:
 
   void put( Handle<Named> name, BlobData data ) override { storage_.create( data, name ); }
   void put( Handle<AnyTree> name, TreeData data ) override { storage_.create( data, name ); }
+  void put_shallow( Handle<AnyTree> name, TreeData data ) override { storage_.create_tree_shallow( data, name ); }
   void put( Handle<Relation> name, Handle<Object> data ) override { storage_.create( data, name ); }
 
   bool contains( Handle<Named> handle ) override { return storage_.contains( handle ); }
   bool contains( Handle<AnyTree> handle ) override { return storage_.contains( handle ); }
+  bool contains_shallow( Handle<AnyTree> handle ) override { return storage_.contains_shallow( handle ); }
   bool contains( Handle<Relation> handle ) override { return storage_.contains( handle ); }
 
   virtual void add_worker( std::shared_ptr<IRuntime> ) override {}

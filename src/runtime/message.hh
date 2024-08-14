@@ -21,9 +21,11 @@ public:
     REQUESTINFO,
     INFO,
     REQUESTTREE,
+    REQUESTSHALLOWTREE,
     REQUESTBLOB,
     BLOBDATA,
     TREEDATA,
+    SHALLOWTREEDATA,
     PROPOSE_TRANSFER,
     ACCEPT_TRANSFER,
     COUNT,
@@ -34,9 +36,11 @@ public:
                                                                                        "REQUESTINFO",
                                                                                        "INFO",
                                                                                        "REQUESTTREE",
+                                                                                       "REQUESTSHALLOWTREE",
                                                                                        "REQUESTBLOB",
                                                                                        "BLOBDATA",
                                                                                        "TREEDATA",
+                                                                                       "SHALLOWTREEDATA",
                                                                                        "PROPOSE_TRANSFER",
                                                                                        "ACCEPT_TRANSFER" };
 
@@ -101,6 +105,17 @@ struct RequestTreePayload
   size_t payload_length() const { return sizeof( u8x32 ); }
 };
 
+struct RequestShallowTreePayload
+{
+  Handle<AnyTree> handle {};
+
+  static RequestShallowTreePayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::REQUESTSHALLOWTREE;
+  size_t payload_length() const { return sizeof( u8x32 ); }
+};
+
 struct InfoPayload
 {
   uint32_t parallelism {};
@@ -141,6 +156,17 @@ using AcceptTransferPayload = TransferPayload<Message::Opcode::ACCEPT_TRANSFER>;
 using BlobDataPayload = std::pair<Handle<Named>, BlobData>;
 using TreeDataPayload = std::pair<Handle<AnyTree>, TreeData>;
 
+struct ShallowTreeDataPayload
+{
+  Handle<AnyTree> handle;
+  TreeData data;
+
+  ShallowTreeDataPayload( Handle<AnyTree> handle, TreeData data )
+    : handle( handle )
+    , data( data )
+  {}
+};
+
 using MessagePayload = std::variant<RunPayload,
                                     ResultPayload,
                                     InfoPayload,
@@ -148,8 +174,10 @@ using MessagePayload = std::variant<RunPayload,
                                     AcceptTransferPayload,
                                     RequestBlobPayload,
                                     RequestTreePayload,
+                                    RequestShallowTreePayload,
                                     BlobDataPayload,
-                                    TreeDataPayload>;
+                                    TreeDataPayload,
+                                    ShallowTreeDataPayload>;
 
 class IncomingMessage : public Message
 {
