@@ -43,6 +43,8 @@ public:
   void dfs_visit( std::function<void( Node* )> visitor );
   std::optional<std::string> get( size_t key );
   std::shared_ptr<Node> get_root() { return root_; }
+
+  size_t get_degree() const { return degree_; }
 };
 
 std::pair<std::shared_ptr<Node>, size_t> Node::split()

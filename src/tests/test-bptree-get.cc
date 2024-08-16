@@ -77,7 +77,7 @@ void test( shared_ptr<Relater> rt )
     key_set.insert( idx );
   }
 
-  auto bptree_fix = bptree::to_rt( *rt, tree );
+  auto bptree_fix = bptree::to_storage( rt->get_storage(), tree );
 
   Handle<Fix> bptree_elf
     = compile( *rt, file( *rt, "applications-prefix/src/applications-build/bptree-get/bptree-get.wasm" ) );

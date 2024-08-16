@@ -27,11 +27,13 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
   attach_blob_ro_mem_0( keys_h );
   size_t size = byte_size_ro_mem_0();
   size_t num_of_keys = size / sizeof( uint64_t );
+
+  bool isleaf;
   uint64_t* keys = (uint64_t*)malloc( size );
-  ro_mem_0_to_program_mem( keys, 0, size );
+  ro_mem_0_to_program_mem( &isleaf, 0, 1 );
+  ro_mem_0_to_program_mem( keys, 1, size - 1 );
 
   externref childrenordata_h = get_ro_table_0( 3 );
-  bool isleaf = ( num_of_keys + 1 == get_length( childrenordata_h ) );
 
   size_t idx = upper_bound( keys, num_of_keys, key );
   if ( isleaf ) {

@@ -82,20 +82,22 @@ Handle<Object> bptree_get( Handle<ObjectTree> combination )
     data->at( 3 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
   LOG( INFO ) << "finding bptree key " << key;
 
+  bool isleaf;
   vector<uint64_t> keys;
   data->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().visit<void>(
     overload { [&]( Handle<Literal> l ) {
-                auto ptr = reinterpret_cast<const uint64_t*>( l.data() );
+                isleaf = l.data()[0];
+                auto ptr = reinterpret_cast<const uint64_t*>( l.data() + 1 );
                 keys.assign( ptr, ptr + l.size() / sizeof( uint64_t ) );
               },
                [&]( Handle<Named> n ) {
                  auto d = rt->get( n ).value();
-                 auto ptr = reinterpret_cast<const uint64_t*>( d->span().data() );
+                 isleaf = d->span().data()[0];
+                 auto ptr = reinterpret_cast<const uint64_t*>( d->span().data() + 1 );
                  keys.assign( ptr, ptr + d->span().size() / sizeof( uint64_t ) );
                } } );
 
   auto childrenordata = data->at( 2 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<ValueTreeRef>();
-  bool isleaf = ( keys.size() + 1 == childrenordata.size() );
 
   if ( isleaf ) {
     LOG( INFO ) << "is leaf ";
@@ -152,7 +154,7 @@ void test_bptree_get( void )
   for ( size_t i = 0; i < 4; i++ ) {
     bptree.insert( i, to_string( i ) );
   }
-  auto t = bptree::to_rt( *rt, bptree );
+  auto t = bptree::to_storage( rt->get_storage(), bptree );
 
   auto select1 = scheduler->schedule(
     Handle<Eval>( application( bptree_get, Handle<Strict>( selection( t, 0 ) ), t, 1_literal64 ) ) );
@@ -163,9 +165,6 @@ void test_bptree_get( void )
   CHECK_EQ( select1.value().unwrap<Value>(), Handle<Value>( Handle<Literal>( to_string( 1 ) ) ) );
   CHECK_EQ( select7.has_value(), true );
   CHECK_EQ( select7.value().unwrap<Value>(), Handle<Value>( Handle<Literal>( "Not found." ) ) );
-
-  bptree.insert( 4, "4" );
-  t = bptree::to_rt( *rt, bptree );
 }
 
 void test( void )
