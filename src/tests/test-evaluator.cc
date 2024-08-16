@@ -232,20 +232,22 @@ Handle<Object> bptree_get( Handle<Object> combination )
     data->at( 3 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
   LOG( INFO ) << "finding bptree key " << key;
 
+  bool isleaf;
   vector<uint64_t> keys;
   data->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().visit<void>(
     overload { [&]( Handle<Literal> l ) {
-                auto ptr = reinterpret_cast<const uint64_t*>( l.data() );
+                isleaf = static_cast<bool>( l.data()[0] );
+                auto ptr = reinterpret_cast<const uint64_t*>( l.data() + 1 );
                 keys.assign( ptr, ptr + l.size() / sizeof( uint64_t ) );
               },
                [&]( Handle<Named> n ) {
                  auto d = storage.get( n );
-                 auto ptr = reinterpret_cast<const uint64_t*>( d->span().data() );
+                 isleaf = static_cast<bool>( d->span().data()[0] );
+                 auto ptr = reinterpret_cast<const uint64_t*>( d->span().data() + 1 );
                  keys.assign( ptr, ptr + d->span().size() / sizeof( uint64_t ) );
                } } );
 
   auto childrenordata = data->at( 2 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<ValueTreeRef>();
-  bool isleaf = ( keys.size() + 1 == childrenordata.size() );
 
   if ( isleaf ) {
     LOG( INFO ) << "is leaf ";
