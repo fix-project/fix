@@ -11,19 +11,19 @@ class BPTree;
 
 class Node
 {
-  std::vector<size_t> keys_ {};
+  std::vector<int> keys_ {};
   std::vector<std::shared_ptr<Node>> children_ {};
   std::vector<std::string> data_ {};
   bool isleaf_ { true };
 
   friend class BPTree;
 
-  std::pair<std::shared_ptr<Node>, size_t> split();
+  std::pair<std::shared_ptr<Node>, int> split();
   void dfs_visit( std::function<void( Node* )> visitor );
 
 public:
   Node() {}
-  const std::vector<size_t>& get_keys() const { return keys_; }
+  const std::vector<int>& get_keys() const { return keys_; }
   const std::vector<std::string>& get_data() const { return data_; }
   const std::vector<std::shared_ptr<Node>> get_children() const { return children_; }
   bool is_leaf() const { return isleaf_; }
@@ -39,20 +39,20 @@ public:
     : degree_( degree )
   {}
 
-  void insert( size_t key, std::string value );
+  void insert( int key, std::string value );
   void dfs_visit( std::function<void( Node* )> visitor );
-  std::optional<std::string> get( size_t key );
+  std::optional<std::string> get( int key );
   std::shared_ptr<Node> get_root() { return root_; }
 
   size_t get_degree() const { return degree_; }
 };
 
-std::pair<std::shared_ptr<Node>, size_t> Node::split()
+std::pair<std::shared_ptr<Node>, int> Node::split()
 {
   auto res = std::make_shared<Node>();
 
   size_t cutoff = keys_.size() / 2;
-  size_t middle_key = keys_[cutoff];
+  auto middle_key = keys_[cutoff];
 
   res->isleaf_ = isleaf_;
 
@@ -75,7 +75,7 @@ std::pair<std::shared_ptr<Node>, size_t> Node::split()
   return { res, middle_key };
 }
 
-void BPTree::insert( size_t key, std::string value )
+void BPTree::insert( int key, std::string value )
 {
   std::shared_ptr<Node> cursor = root_;
   std::deque<std::shared_ptr<Node>> path;
@@ -124,7 +124,7 @@ void BPTree::insert( size_t key, std::string value )
   return;
 }
 
-std::optional<std::string> BPTree::get( size_t key )
+std::optional<std::string> BPTree::get( int key )
 {
   std::shared_ptr<Node> cursor = root_;
 

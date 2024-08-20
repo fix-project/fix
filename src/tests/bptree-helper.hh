@@ -1,19 +1,24 @@
 #include "bptree.hh"
+#include "handle.hh"
+#include "object.hh"
 #include "test.hh"
 #include <memory>
 
 namespace bptree {
-static Handle<Value> to_storage_keys( RuntimeStorage& storage, Node* node )
+static Handle<Blob> to_storage_keys( RuntimeStorage& storage, Node* node )
 {
   const auto& keys = node->get_keys();
-  auto blob = OwnedMutBlob::allocate( keys.size() * sizeof( uint64_t ) + 1 );
+  auto blob = OwnedMutBlob::allocate( keys.size() * sizeof( int ) + 1 );
   blob[0] = node->is_leaf();
-  memcpy( blob.data() + 1, keys.data(), keys.size() * sizeof( uint64_t ) );
+  memcpy( blob.data() + 1, keys.data(), keys.size() * sizeof( int ) );
   return storage.create( std::make_shared<OwnedBlob>( std::move( blob ) ) );
 }
 
 static std::deque<Handle<ValueTreeRef>> to_storage_leaves( RuntimeStorage& storage, BPTree& bptree )
 {
+  static auto nil
+    = storage.create( std::make_shared<OwnedTree>( OwnedMutTree::allocate( 0 ) ) ).unwrap<ValueTree>();
+
   std::deque<Node*> leaf_nodes;
   bptree.dfs_visit( [&]( Node* node ) {
     if ( node->is_leaf() ) {
@@ -27,8 +32,12 @@ static std::deque<Handle<ValueTreeRef>> to_storage_leaves( RuntimeStorage& stora
     auto node = leaf_nodes.back();
     leaf_nodes.pop_back();
 
-    auto tree = OwnedMutTree::allocate( 1 + bptree.get_degree() + ( last.has_value() ? 1 : 0 ) );
-    tree[0] = to_storage_keys( storage, node );
+    auto tree = OwnedMutTree::allocate( 1 + bptree.get_degree() + 1 );
+    tree[0] = to_storage_keys( storage, node )
+                .visit<Handle<Value>>( overload {
+                  []( Handle<Literal> l ) { return l; },
+                  []( Handle<Named> n ) { return Handle<BlobRef>( n ); },
+                } );
 
     size_t i = 1;
     for ( const auto& data : node->get_data() ) {
@@ -39,11 +48,13 @@ static std::deque<Handle<ValueTreeRef>> to_storage_leaves( RuntimeStorage& stora
     }
 
     for ( ; i <= bptree.get_degree(); i++ ) {
-      tree[i] = Handle<Literal>( "" );
+      tree[i] = Handle<ValueTreeRef>( nil, 0 );
     }
 
     if ( last.has_value() ) {
       tree[i] = last.value();
+    } else {
+      tree[i] = Handle<ValueTreeRef>( nil, 0 );
     }
 
     last = storage.ref( storage.create( std::make_shared<OwnedTree>( std::move( tree ) ) ) ).unwrap<ValueTreeRef>();

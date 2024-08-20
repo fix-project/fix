@@ -11,8 +11,8 @@ void test( void )
 
   std::random_device rd;
   std::mt19937 gen( rd() );
-  std::uniform_int_distribution<size_t> distrib( 1, 256 );
-  std::unordered_set<size_t> key_set {};
+  std::uniform_int_distribution<int> distrib( 1, 256 );
+  std::unordered_set<int> key_set {};
 
   for ( size_t i = 0; i < 256; i++ ) {
     auto idx = distrib( gen );
@@ -27,7 +27,7 @@ void test( void )
     key_set.insert( idx );
   }
 
-  size_t last = 0;
+  int last = 0;
 
   tree.dfs_visit( [&]( Node* node ) {
     if ( node->is_leaf() ) {

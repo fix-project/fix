@@ -14,3 +14,6 @@ externref get_ro_table_0( int32_t index )
 int32_t byte_size_ro_mem_0( void ) __attribute__( ( import_module( "fixpoint" ), import_name( "size_ro_mem_0" ) ) );
 void set_rw_table_0( int32_t index, externref pointer )
   __attribute__( ( import_module( "support" ), import_name( "set_rw_table_0" ) ) );
+int32_t grow_rw_table_0( int32_t size, externref pointer )
+  __attribute__( ( import_module( "support" ), import_name( "grow_rw_table_0" ) ) );
+int32_t size_ro_table_0( void ) __attribute__( ( import_module( "support" ), import_name( "size_ro_table_0" ) ) );

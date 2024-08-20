@@ -14,6 +14,8 @@ extern externref create_application_thunk( externref pointer )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_application_thunk" ) ) );
 extern externref create_selection_thunk( externref pointer, uint32_t idx )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_selection_thunk" ) ) );
+extern externref create_selection_thunk_range( externref pointer, uint32_t begin_idx, uint32_t end_idx )
+  __attribute__( ( import_module( "fixpoint" ), import_name( "create_selection_thunk_range" ) ) );
 extern externref create_strict_encode( externref pointer )
   __attribute__( ( import_module( "fixpoint" ), import_name( "create_strict_encode" ) ) );
 extern externref create_shallow_encode( externref pointer )

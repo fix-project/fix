@@ -78,23 +78,22 @@ Handle<Object> bptree_get( Handle<ObjectTree> combination )
   bptree_get_called++;
 
   auto data = rt->get( combination ).value();
-  uint64_t key(
-    data->at( 3 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+  int key( data->at( 3 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
   LOG( INFO ) << "finding bptree key " << key;
 
   bool isleaf;
-  vector<uint64_t> keys;
+  vector<int> keys;
   data->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().visit<void>(
     overload { [&]( Handle<Literal> l ) {
                 isleaf = l.data()[0];
-                auto ptr = reinterpret_cast<const uint64_t*>( l.data() + 1 );
-                keys.assign( ptr, ptr + l.size() / sizeof( uint64_t ) );
+                auto ptr = reinterpret_cast<const int*>( l.data() + 1 );
+                keys.assign( ptr, ptr + l.size() / sizeof( int ) );
               },
                [&]( Handle<Named> n ) {
                  auto d = rt->get( n ).value();
                  isleaf = d->span().data()[0];
-                 auto ptr = reinterpret_cast<const uint64_t*>( d->span().data() + 1 );
-                 keys.assign( ptr, ptr + d->span().size() / sizeof( uint64_t ) );
+                 auto ptr = reinterpret_cast<const int*>( d->span().data() + 1 );
+                 keys.assign( ptr, ptr + d->span().size() / sizeof( int ) );
                } } );
 
   auto childrenordata = data->at( 2 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<ValueTreeRef>();
@@ -157,9 +156,9 @@ void test_bptree_get( void )
   auto t = bptree::to_storage( rt->get_storage(), bptree );
 
   auto select1 = scheduler->schedule(
-    Handle<Eval>( application( bptree_get, Handle<Strict>( selection( t, 0 ) ), t, 1_literal64 ) ) );
+    Handle<Eval>( application( bptree_get, Handle<Strict>( selection( t, 0 ) ), t, 1_literal32 ) ) );
   auto select7 = scheduler->schedule(
-    Handle<Eval>( application( bptree_get, Handle<Strict>( selection( t, 0 ) ), t, 7_literal64 ) ) );
+    Handle<Eval>( application( bptree_get, Handle<Strict>( selection( t, 0 ) ), t, 7_literal32 ) ) );
 
   CHECK_EQ( select1.has_value(), true );
   CHECK_EQ( select1.value().unwrap<Value>(), Handle<Value>( Handle<Literal>( to_string( 1 ) ) ) );
