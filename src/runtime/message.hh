@@ -132,6 +132,18 @@ struct InfoPayload
   }
 };
 
+struct ShallowTreeDataPayload
+{
+  Handle<AnyTree> handle {};
+  TreeData data {};
+
+  static ShallowTreeDataPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::SHALLOWTREEDATA;
+  size_t payload_length() const { return sizeof( u8x32 ) + data->span().size_bytes(); }
+};
+
 template<Message::Opcode O>
 struct TransferPayload
 {
@@ -156,17 +168,6 @@ using AcceptTransferPayload = TransferPayload<Message::Opcode::ACCEPT_TRANSFER>;
 using BlobDataPayload = std::pair<Handle<Named>, BlobData>;
 using TreeDataPayload = std::pair<Handle<AnyTree>, TreeData>;
 
-struct ShallowTreeDataPayload
-{
-  Handle<AnyTree> handle;
-  TreeData data;
-
-  ShallowTreeDataPayload( Handle<AnyTree> handle, TreeData data )
-    : handle( handle )
-    , data( data )
-  {}
-};
-
 using MessagePayload = std::variant<RunPayload,
                                     ResultPayload,
                                     InfoPayload,
@@ -181,6 +182,7 @@ using MessagePayload = std::variant<RunPayload,
 
 class IncomingMessage : public Message
 {
+  std::optional<Handle<Fix>> handle_ {};
   std::variant<std::string, OwnedMutBlob, OwnedMutTree> payload_;
 
 public:
@@ -226,6 +228,7 @@ private:
 
   std::string incomplete_header_ {};
 
+  std::optional<Handle<Fix>> incomplete_handle_ {};
   std::variant<std::string, OwnedMutBlob, OwnedMutTree> incomplete_payload_ {};
   size_t completed_payload_length_ {};
 

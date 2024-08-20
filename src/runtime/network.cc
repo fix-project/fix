@@ -460,7 +460,8 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::SHALLOWTREEDATA: {
-      parent.put_shallow( handle::create( msg.get_tree() ), msg.get_tree() );
+      auto payload = parse<ShallowTreeDataPayload>( std::get<string>( msg.payload() ) );
+      parent.put_shallow( payload.handle, payload.data );
       break;
     }
 
@@ -640,10 +641,6 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
               visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
             connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
           }
-        },
-        [&]( ShallowTreeDataPayload t ) {
-          // XXX
-          connection.push_message( { Opcode::SHALLOWTREEDATA, t.data } );
         },
         [&]( RunPayload r ) {
           if ( connection.incomplete_proposal_->empty() && connection.proposed_proposals_.empty() ) {

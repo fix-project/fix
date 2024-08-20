@@ -1,8 +1,10 @@
 #include <filesystem>
 #include <glog/logging.h>
+#include <memory>
 
 #include "base16.hh"
 #include "handle_post.hh"
+#include "object.hh"
 #include "repository.hh"
 #include "storage_exception.hh"
 
@@ -15,10 +17,13 @@ Repository::Repository( std::filesystem::path directory )
   VLOG( 1 ) << "using repository " << repo_;
 
   for ( auto h : data() ) {
-    h.visit<void>( overload { []( Handle<Literal> ) {},
-                              [&]( Handle<Named> n ) { blobs_.insert( n, true ); },
-                              [&]( Handle<AnyTree> t ) { trees_.insert( t, true ); },
-                              []( Handle<Relation> ) {} } );
+    h.visit<void>( overload {
+      []( Handle<Literal> ) {},
+      [&]( Handle<Named> n ) { blobs_.insert( n, true ); },
+      [&]( Handle<AnyTree> t ) {
+        trees_.insert( t, filesystem::file_size( repo_ / "data" / base16::encode( handle::fix( t ).content ) ) );
+      },
+      []( Handle<Relation> ) {} } );
   }
 
   for ( auto r : relations() ) {
@@ -125,7 +130,47 @@ std::optional<TreeData> Repository::get( Handle<AnyTree> name )
 
 std::optional<TreeData> Repository::get_shallow( Handle<AnyTree> name )
 {
-  return get( name );
+  auto t = get( name );
+
+  if ( t.has_value() ) {
+    optional<OwnedMutTree> newtree;
+    for ( size_t i = 0; i < t.value()->span().size(); i++ ) {
+      optional<Handle<Fix>> new_entry;
+      t.value()->span()[i].unwrap<Expression>().unwrap<Object>().visit<void>( overload {
+        [&]( Handle<Value> x ) {
+          x.visit<void>( overload {
+            [&]( Handle<Blob> x ) {
+              x.visit<void>( overload {
+                [&]( Handle<Named> x ) { new_entry = Handle<BlobRef>( x ); },
+                []( Handle<Literal> ) {},
+              } );
+            },
+            [&]( Handle<ValueTree> x ) { new_entry = x.into<ValueTreeRef>( trees_.get( x ).value() ); },
+            []( Handle<BlobRef> ) {},
+            []( Handle<ValueTreeRef> ) {},
+          } );
+        },
+        [&]( Handle<ObjectTree> x ) { new_entry = x.into<ObjectTreeRef>( trees_.get( x ).value() ); },
+        []( Handle<Thunk> ) {},
+        []( Handle<ObjectTreeRef> ) {},
+      } );
+
+      if ( new_entry.has_value() ) {
+        if ( !newtree.has_value() ) {
+          newtree = OwnedMutTree::allocate( t.value()->span().size() );
+          std::copy( t.value()->span().begin(), t.value()->span().end(), newtree.value().span().begin() );
+        }
+
+        newtree.value()[i] = new_entry.value();
+      }
+    }
+
+    if ( newtree.has_value() ) {
+      return make_shared<OwnedTree>( std::move( newtree.value() ) );
+    }
+  }
+
+  return t;
 }
 
 std::optional<Handle<Object>> Repository::get( Handle<Relation> relation )
