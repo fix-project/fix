@@ -176,6 +176,17 @@ u8x32 create_selection_thunk( u8x32 handle, uint32_t idx )
   return h->into<Fix>().content;
 }
 
+u8x32 create_selection_thunk_range( u8x32 handle, uint32_t begin_idx, uint32_t end_idx )
+{
+  auto h = handle::extract<Object>( Handle<Fix>::forge( handle ) ).transform( [&]( auto h ) {
+    return Handle<Selection>( storage->construct_tree<ObjectTree>(
+      h, Handle<Literal>( (uint64_t)begin_idx ), Handle<Literal>( (uint64_t)end_idx ) ) );
+  } );
+
+  check( h );
+  return h->into<Fix>().content;
+}
+
 uint32_t get_length( u8x32 handle )
 {
   auto fix = Handle<Fix>::forge( handle );

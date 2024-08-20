@@ -228,23 +228,22 @@ Handle<Object> fib( Handle<Object> combination )
 Handle<Object> bptree_get( Handle<Object> combination )
 {
   auto data = storage.get( combination.unwrap<ObjectTree>() );
-  uint64_t key(
-    data->at( 3 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+  int key( data->at( 3 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
   LOG( INFO ) << "finding bptree key " << key;
 
   bool isleaf;
-  vector<uint64_t> keys;
+  vector<int> keys;
   data->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().visit<void>(
     overload { [&]( Handle<Literal> l ) {
                 isleaf = static_cast<bool>( l.data()[0] );
-                auto ptr = reinterpret_cast<const uint64_t*>( l.data() + 1 );
-                keys.assign( ptr, ptr + l.size() / sizeof( uint64_t ) );
+                auto ptr = reinterpret_cast<const int*>( l.data() + 1 );
+                keys.assign( ptr, ptr + l.size() / sizeof( int ) );
               },
                [&]( Handle<Named> n ) {
                  auto d = storage.get( n );
                  isleaf = static_cast<bool>( d->span().data()[0] );
-                 auto ptr = reinterpret_cast<const uint64_t*>( d->span().data() + 1 );
-                 keys.assign( ptr, ptr + d->span().size() / sizeof( uint64_t ) );
+                 auto ptr = reinterpret_cast<const int*>( d->span().data() + 1 );
+                 keys.assign( ptr, ptr + d->span().size() / sizeof( int ) );
                } } );
 
   auto childrenordata = data->at( 2 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<ValueTreeRef>();
@@ -279,11 +278,11 @@ void test( void )
   CHECK_EQ( mapreduce_called, 9 );
 
   BPTree bptree( 4 );
-  for ( size_t i = 0; i < 10; i++ ) {
+  for ( int i = 0; i < 10; i++ ) {
     bptree.insert( i, to_string( i ) );
   }
 
   auto t = bptree::to_storage( storage, bptree );
-  auto select1 = rt.eval( application( bptree_get, Handle<Strict>( selection( t, 0 ) ), t, 1_literal64 ) );
+  auto select1 = rt.eval( application( bptree_get, Handle<Strict>( selection( t, 0 ) ), t, 1_literal32 ) );
   CHECK_EQ( select1, Handle<Value>( Handle<Literal>( to_string( 1 ) ) ) );
 }
