@@ -6,6 +6,8 @@
 #include "types.hh"
 
 #include <glog/logging.h>
+#include <memory>
+#include <span>
 
 using namespace std;
 
@@ -96,17 +98,15 @@ size_t IncomingMessage::expected_payload_length( string_view header )
 
 OutgoingMessage OutgoingMessage::to_message( MessagePayload&& payload )
 {
-  return std::visit(
-    overload {
-      []( BlobDataPayload b ) -> OutgoingMessage { return { Opcode::BLOBDATA, b.second }; },
-      []( TreeDataPayload t ) -> OutgoingMessage { return { Opcode::TREEDATA, t.second }; },
-      []( ShallowTreeDataPayload s ) -> OutgoingMessage { return { Opcode::SHALLOWTREEDATA, s.data }; },
-      []( auto&& p ) -> OutgoingMessage {
-        using T = std::decay_t<decltype( p )>;
-        return { T::OPCODE, serialize( p ) };
-      },
-    },
-    payload );
+  return std::visit( overload {
+                       []( BlobDataPayload b ) -> OutgoingMessage { return { Opcode::BLOBDATA, b.second }; },
+                       []( TreeDataPayload t ) -> OutgoingMessage { return { Opcode::TREEDATA, t.second }; },
+                       []( auto&& p ) -> OutgoingMessage {
+                         using T = std::decay_t<decltype( p )>;
+                         return { T::OPCODE, serialize( p ) };
+                       },
+                     },
+                     payload );
 }
 
 void MessageParser::complete_message()
@@ -145,7 +145,8 @@ size_t MessageParser::parse( string_view buf )
             case Message::Opcode::REQUESTTREE:
             case Message::Opcode::REQUESTBLOB:
             case Message::Opcode::PROPOSE_TRANSFER:
-            case Message::Opcode::ACCEPT_TRANSFER: {
+            case Message::Opcode::ACCEPT_TRANSFER:
+            case Message::Opcode::SHALLOWTREEDATA: {
               incomplete_payload_ = "";
               get<string>( incomplete_payload_ ).resize( expected_payload_length_.value() );
               break;
@@ -296,6 +297,23 @@ void InfoPayload::serialize( Serializer& serializer ) const
   for ( const auto& h : data ) {
     serializer.integer( h.content );
   }
+}
+
+ShallowTreeDataPayload ShallowTreeDataPayload::parse( Parser& parser )
+{
+  ShallowTreeDataPayload payload;
+  payload.handle = parse_handle<AnyTree>( parser );
+  auto tree = OwnedMutTree::allocate( parser.input().size() / sizeof( Handle<Fix> ) );
+  parser.string( { reinterpret_cast<char*>( tree.span().data() ), tree.span().size_bytes() } );
+  payload.data = make_shared<OwnedTree>( std::move( tree ) );
+  return payload;
+}
+
+void ShallowTreeDataPayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
+  serializer.string(
+    string_view( reinterpret_cast<const char*>( data->span().data() ), data->span().size_bytes() ) );
 }
 
 template<Message::Opcode O>

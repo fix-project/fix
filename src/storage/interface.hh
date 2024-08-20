@@ -127,8 +127,10 @@ public:
   {
     if ( visited.contains( handle ) )
       return;
-    if constexpr ( std::same_as<T, Literal> )
+    if constexpr ( std::same_as<T, Literal> ) {
+      visitor( handle );
       return;
+    }
 
     if constexpr ( Handle<T>::is_fix_sum_type ) {
       if constexpr ( not( std::same_as<T, Thunk> or std::same_as<T, Encode> or std::same_as<T, BlobRef> ) )
