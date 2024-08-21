@@ -1,12 +1,11 @@
 #include "scheduler.hh"
 #include "executor.hh"
 #include "handle.hh"
+#include "object.hh"
 #include "overload.hh"
 #include "pass.hh"
 #include "relater.hh"
-#include "storage_exception.hh"
 #include "types.hh"
-#include "wasm-rt.h"
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -166,23 +165,14 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::apply( Handle<ObjectT
   return {};
 }
 
-LocalScheduler::Result<Object> LocalScheduler::select( Handle<ObjectTree> combination )
+LocalScheduler::Result<Object> LocalScheduler::select_single( Handle<Object> h, size_t i )
 {
-  Handle<Relation> select = Handle<Step>( Handle<Thunk>( Handle<Selection>( combination ) ) );
-
-  if ( relater_->get().contains( select ) ) {
-    return relater_->get().get( select ).value();
-  }
-
-  auto tree = relater_->get().get( combination ).value();
-
-  auto h = tree->at( 0 ).unwrap<Expression>().unwrap<Object>();
-  auto size = handle::size( h );
-  auto i = size_t(
-    tree->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
-
-  if ( i >= size ) {
-    throw std::runtime_error( "Select OOB" );
+  if ( i >= handle::size( h ) ) {
+    static auto nil = relater_->get()
+                        .get_storage()
+                        .create( make_shared<OwnedTree>( OwnedMutTree::allocate( 0 ) ) )
+                        .unwrap<ValueTree>();
+    return nil;
   }
 
   // h is one of BlobRef, ValueTreeRef or ObjectTreeRef
@@ -214,7 +204,77 @@ LocalScheduler::Result<Object> LocalScheduler::select( Handle<ObjectTree> combin
   return result;
 }
 
-SketchGraphScheduler::Result<Object> SketchGraphScheduler::select( Handle<ObjectTree> combination )
+LocalScheduler::Result<Object> LocalScheduler::select_range( Handle<Object> h, size_t begin_idx, size_t end_idx )
+{
+  if ( begin_idx >= handle::size( h ) || end_idx >= handle::size( h ) || begin_idx > end_idx ) {
+    static auto nil = relater_->get()
+                        .get_storage()
+                        .create( make_shared<OwnedTree>( OwnedMutTree::allocate( 0 ) ) )
+                        .unwrap<ValueTree>();
+    return nil;
+  }
+
+  // h is one of BlobRef, ValueTreeRef or ObjectTreeRef
+  auto result = h.visit<Result<Object>>( overload {
+    [&]( Handle<ObjectTreeRef> x ) {
+      return loadShallow( relater_->get().unref( x ) )
+        .and_then( [&]( Handle<AnyTree> x ) { return relater_->get().get_shallow( x ); } )
+        .transform( [&]( TreeData d ) {
+          auto newtree = OwnedMutTree::allocate( end_idx - begin_idx );
+          auto subspan = d->span().subspan( begin_idx, end_idx - begin_idx );
+          copy( subspan.begin(), subspan.end(), newtree.span().begin() );
+          return relater_->get()
+            .get_storage()
+            .create( make_shared<OwnedTree>( std::move( newtree ) ) )
+            .visit<Handle<ObjectTree>>( overload {
+              []( Handle<ExpressionTree> ) -> Handle<ObjectTree> {
+                throw std::runtime_error( "Invalid tree creation result" );
+              },
+              []( Handle<ObjectTree> x ) { return x; },
+              []( Handle<ValueTree> x ) { return Handle<ObjectTree>( x ); },
+            } );
+        } );
+    },
+    [&]( Handle<Value> v ) {
+      return v.visit<Result<Object>>( overload {
+        [&]( Handle<Literal> l ) { return Handle<Literal>( l.view().substr( begin_idx, end_idx - begin_idx ) ); },
+        [&]( Handle<BlobRef> x ) {
+          return load( x.unwrap<Blob>() )
+            .and_then( [&]( Handle<Blob> x ) { return relater_->get().get( x.unwrap<Named>() ); } )
+            .transform( [&]( BlobData b ) -> Handle<Value> {
+              auto subspan = b->span().subspan( begin_idx, end_idx - begin_idx );
+              if ( subspan.size() <= Handle<Literal>::MAXIMUM_LENGTH ) {
+                return Handle<Literal>( string_view( subspan ) );
+              } else {
+                auto newblob = OwnedMutBlob::allocate( end_idx - begin_idx );
+                std::copy( subspan.begin(), subspan.end(), newblob.data() );
+                return relater_->get().get_storage().create( make_shared<OwnedBlob>( std::move( newblob ) ) );
+              }
+            } );
+        },
+        [&]( Handle<ValueTreeRef> x ) {
+          return loadShallow( relater_->get().unref( x ) )
+            .and_then( [&]( Handle<AnyTree> x ) { return relater_->get().get_shallow( x ); } )
+            .transform( [&]( TreeData d ) {
+              auto newtree = OwnedMutTree::allocate( end_idx - begin_idx );
+              auto subspan = d->span().subspan( begin_idx, end_idx - begin_idx );
+              copy( subspan.begin(), subspan.end(), newtree.span().begin() );
+              return relater_->get()
+                .get_storage()
+                .create( make_shared<OwnedTree>( std::move( newtree ) ) )
+                .unwrap<ValueTree>();
+            } );
+        },
+        []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
+      } );
+    },
+    []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
+  } );
+
+  return result;
+}
+
+LocalScheduler::Result<Object> LocalScheduler::select( Handle<ObjectTree> combination )
 {
   Handle<Relation> select = Handle<Step>( Handle<Thunk>( Handle<Selection>( combination ) ) );
 
@@ -225,15 +285,31 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::select( Handle<Object
   auto tree = relater_->get().get( combination ).value();
 
   auto h = tree->at( 0 ).unwrap<Expression>().unwrap<Object>();
-  auto size = handle::size( h );
-  auto i = size_t(
-    tree->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
 
-  if ( i >= size ) {
-    throw std::runtime_error( "Select OOB" );
+  if ( tree->size() == 2 ) {
+    auto i = size_t(
+      tree->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+
+    return select_single( h, i );
+  } else {
+    auto begin_idx = size_t(
+      tree->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+    auto end_idx = size_t(
+      tree->at( 2 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+    return select_range( h, begin_idx, end_idx );
+  }
+}
+
+SketchGraphScheduler::Result<Object> SketchGraphScheduler::select_single( Handle<Object> h, size_t i )
+{
+  if ( i >= handle::size( h ) ) {
+    static auto nil = relater_->get()
+                        .get_storage()
+                        .create( make_shared<OwnedTree>( OwnedMutTree::allocate( 0 ) ) )
+                        .unwrap<ValueTree>();
+    return nil;
   }
 
-  // h is one of BlobRef, ValueTreeRef or ObjectTreeRef
   auto result = h.visit<Result<Object>>( overload {
     [&]( Handle<ObjectTreeRef> x ) -> Result<Object> {
       auto unreffed = relater_->get().unref( x );
@@ -270,6 +346,110 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::select( Handle<Object
   } );
 
   return result;
+}
+
+SketchGraphScheduler::Result<Object> SketchGraphScheduler::select_range( Handle<Object> h,
+                                                                         size_t begin_idx,
+                                                                         size_t end_idx )
+{
+  if ( begin_idx >= handle::size( h ) || end_idx >= handle::size( h ) || begin_idx > end_idx ) {
+    static auto nil = relater_->get()
+                        .get_storage()
+                        .create( make_shared<OwnedTree>( OwnedMutTree::allocate( 0 ) ) )
+                        .unwrap<ValueTree>();
+    return nil;
+  }
+
+  auto result = h.visit<Result<Object>>( overload {
+    [&]( Handle<ObjectTreeRef> x ) -> Result<Object> {
+      auto unreffed = relater_->get().unref( x );
+      if ( loadShallow( unreffed, x ) ) {
+        return relater_->get().get_shallow( unreffed ).transform( [&]( TreeData d ) {
+          auto newtree = OwnedMutTree::allocate( end_idx - begin_idx );
+          auto subspan = d->span().subspan( begin_idx, end_idx - begin_idx );
+          copy( subspan.begin(), subspan.end(), newtree.span().begin() );
+          return relater_->get()
+            .get_storage()
+            .create( make_shared<OwnedTree>( std::move( newtree ) ) )
+            .visit<Handle<ObjectTree>>( overload {
+              []( Handle<ExpressionTree> ) -> Handle<ObjectTree> {
+                throw std::runtime_error( "Invalid tree creation result" );
+              },
+              []( Handle<ObjectTree> x ) { return x; },
+              []( Handle<ValueTree> x ) { return Handle<ObjectTree>( x ); },
+            } );
+        } );
+      } else {
+        return {};
+      }
+    },
+    [&]( Handle<Value> v ) {
+      return v.visit<Result<Object>>( overload {
+        [&]( Handle<Literal> l ) { return Handle<Literal>( l.view().substr( begin_idx, end_idx - begin_idx ) ); },
+        [&]( Handle<BlobRef> x ) {
+          return load( x.unwrap<Blob>() )
+            .and_then( [&]( Handle<Blob> x ) { return relater_->get().get( x.unwrap<Named>() ); } )
+            .transform( [&]( BlobData b ) -> Handle<Value> {
+              auto subspan = b->span().subspan( begin_idx, end_idx - begin_idx );
+              if ( subspan.size() <= Handle<Literal>::MAXIMUM_LENGTH ) {
+                return Handle<Literal>( string_view( subspan ) );
+              } else {
+                auto newblob = OwnedMutBlob::allocate( end_idx - begin_idx );
+                std::copy( subspan.begin(), subspan.end(), newblob.data() );
+                return relater_->get().get_storage().create( make_shared<OwnedBlob>( std::move( newblob ) ) );
+              }
+            } );
+        },
+        [&]( Handle<ValueTreeRef> x ) -> Result<Object> {
+          auto unreffed = relater_->get().unref( x );
+          if ( loadShallow( unreffed, x ) ) {
+            return relater_->get().get_shallow( unreffed ).transform( [&]( TreeData d ) {
+              auto newtree = OwnedMutTree::allocate( end_idx - begin_idx );
+              auto subspan = d->span().subspan( begin_idx, end_idx - begin_idx );
+              copy( subspan.begin(), subspan.end(), newtree.span().begin() );
+              return relater_->get()
+                .get_storage()
+                .create( make_shared<OwnedTree>( std::move( newtree ) ) )
+                .unwrap<ValueTree>();
+            } );
+          } else {
+            return {};
+          }
+        },
+        []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
+
+      } );
+    },
+    []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
+  } );
+
+  return result;
+}
+
+SketchGraphScheduler::Result<Object> SketchGraphScheduler::select( Handle<ObjectTree> combination )
+{
+  Handle<Relation> select = Handle<Step>( Handle<Thunk>( Handle<Selection>( combination ) ) );
+
+  if ( relater_->get().contains( select ) ) {
+    return relater_->get().get( select ).value();
+  }
+
+  auto tree = relater_->get().get( combination ).value();
+
+  auto h = tree->at( 0 ).unwrap<Expression>().unwrap<Object>();
+
+  if ( tree->size() == 2 ) {
+    auto i = size_t(
+      tree->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+
+    return select_single( h, i );
+  } else {
+    auto begin_idx = size_t(
+      tree->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+    auto end_idx = size_t(
+      tree->at( 2 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+    return select_range( h, begin_idx, end_idx );
+  }
 }
 
 LocalScheduler::Result<Value> LocalScheduler::evalStrict( Handle<Object> expression )

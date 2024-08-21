@@ -32,6 +32,10 @@ public:
 
 class LocalScheduler : public Scheduler
 {
+private:
+  Result<Object> select_single( Handle<Object>, size_t );
+  Result<Object> select_range( Handle<Object>, size_t begin_idx, size_t end_idx );
+
 public:
   LocalScheduler() {}
 
@@ -66,6 +70,8 @@ private:
   std::vector<PassRunner::PassType> passes_;
   virtual Result<Object> run_passes( Handle<Relation> top_level_job );
   bool loadShallow( Handle<AnyTree>, Handle<AnyTreeRef> );
+  Result<Object> select_single( Handle<Object>, size_t );
+  Result<Object> select_range( Handle<Object>, size_t begin_idx, size_t end_idx );
 
 protected:
   void relate( Handle<Relation> top_level_job );
