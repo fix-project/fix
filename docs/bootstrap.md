@@ -24,7 +24,7 @@ After building, copy `./.fix/` to the source directory of Fix.
 ## Way 1: Fetch from Release
 Either
 ```
-wget https://github.com/fix-project/bootstrap/releases/download/v0.92/bootstrap.tar.gz
+wget https://github.com/fix-project/bootstrap/releases/download/v0.93/bootstrap.tar.gz
 ```
 or use `gh`
 ```
