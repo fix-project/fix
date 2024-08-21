@@ -16,7 +16,7 @@ class FakeRuntime : public IRuntime
 {
 public:
   RuntimeStorage storage_ {};
-  vector<Handle<AnyDataType>> todos_ {};
+  vector<Handle<Dependee>> todos_ {};
   uint32_t parallelism_ {};
 
   optional<BlobData> get( Handle<Named> name ) override
@@ -34,9 +34,13 @@ public:
     todos_.push_back( name );
     return {};
   }
+  optional<TreeData> get_shallow( Handle<AnyTree> handle ) override
+  {
+    storage_.ref( handle ).visit<void>( [&]( auto h ) { todos_.push_back( h ); } );
+    return {};
+  }
 
   optional<Handle<AnyTree>> get_handle( Handle<AnyTree> handle ) override { return storage_.get_handle( handle ); }
-  optional<TreeData> get_shallow( Handle<AnyTree> handle ) override { return storage_.get_shallow( handle ); }
 
   void put( Handle<Named> name, BlobData data ) override { storage_.create( data, name ); }
   void put( Handle<AnyTree> name, TreeData data ) override { storage_.create( data, name ); }
@@ -47,6 +51,10 @@ public:
   bool contains( Handle<AnyTree> handle ) override { return storage_.contains( handle ); }
   bool contains_shallow( Handle<AnyTree> handle ) override { return storage_.contains_shallow( handle ); }
   bool contains( Handle<Relation> handle ) override { return storage_.contains( handle ); }
+  virtual std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> ref ) override
+  {
+    return storage_.contains( ref );
+  }
 
   virtual std::optional<Info> get_info() override { return Info { .parallelism = parallelism_, .link_speed = 10 }; }
 };
@@ -90,7 +98,7 @@ void case_one( void )
   rt->get( task );
 
   if ( fake_worker->todos_.size() != 1
-       or fake_worker->todos_.front() != Handle<AnyDataType>( Handle<Relation>( task ) ) ) {
+       or fake_worker->todos_.front() != Handle<Dependee>( Handle<Relation>( task ) ) ) {
     fprintf( stderr, "Todo size %zu", fake_worker->todos_.size() );
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -147,7 +155,7 @@ void case_two( void )
   rt->get( task );
 
   if ( fake_worker->todos_.size() != 1
-       or fake_worker->todos_.front() != Handle<AnyDataType>( Handle<Relation>( task ) ) ) {
+       or fake_worker->todos_.front() != Handle<Dependee>( Handle<Relation>( task ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -180,9 +188,9 @@ void case_three( void )
 
   if ( fake_worker->todos_.size() != 1
        or ( fake_worker->todos_.front()
-              != Handle<AnyDataType>( Handle<Relation>(
+              != Handle<Dependee>( Handle<Relation>(
                 Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
-            and fake_worker->todos_.front() != Handle<AnyDataType>( handle.unwrap<Named>() ) ) ) {
+            and fake_worker->todos_.front() != Handle<Dependee>( handle.unwrap<Named>() ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -215,9 +223,9 @@ void case_four( void )
 
   if ( fake_worker->todos_.size() != 1
        or ( fake_worker->todos_.front()
-              != Handle<AnyDataType>( Handle<Relation>(
+              != Handle<Dependee>( Handle<Relation>(
                 Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
-            and fake_worker->todos_.front() != Handle<AnyDataType>( handle.unwrap<Named>() ) ) ) {
+            and fake_worker->todos_.front() != Handle<Dependee>( handle.unwrap<Named>() ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -256,9 +264,9 @@ void case_five( void )
 
   if ( fake_worker->todos_.size() != 1
        or ( fake_worker->todos_.front()
-              != Handle<AnyDataType>( Handle<Relation>(
+              != Handle<Dependee>( Handle<Relation>(
                 Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
-            and fake_worker->todos_.front() != Handle<AnyDataType>( handle.unwrap<Named>() ) ) ) {
+            and fake_worker->todos_.front() != Handle<Dependee>( handle.unwrap<Named>() ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -301,9 +309,9 @@ void case_six( void )
 
   if ( fake_worker->todos_.size() != 1
        or ( fake_worker->todos_.front()
-              != Handle<AnyDataType>( Handle<Relation>(
+              != Handle<Dependee>( Handle<Relation>(
                 Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
-            and fake_worker->todos_.front() != Handle<AnyDataType>( handle.unwrap<Named>() ) ) ) {
+            and fake_worker->todos_.front() != Handle<Dependee>( handle.unwrap<Named>() ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -348,11 +356,11 @@ void case_seven( void )
 
   if ( fake_worker->todos_.size() == 2 ) {
     // get( Blob 1 )
-    auto job0 = Handle<AnyDataType>(
+    auto job0 = Handle<Dependee>(
       Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) );
-    auto job0_1 = Handle<AnyDataType>( handle.unwrap<Named>() );
+    auto job0_1 = Handle<Dependee>( handle.unwrap<Named>() );
     // Handle<Application( { 1, 1, 10 }, Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) )
-    auto job1 = Handle<AnyDataType>(
+    auto job1 = Handle<Dependee>(
       Handle<Relation>( Handle<Eval>( Handle<Object>( Handle<Thunk>( Handle<Application>( handle::upcast(
         tree( *rt, limits( *rt, 1, 1, 10 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
 
@@ -412,7 +420,7 @@ void case_eight( void )
                                      .unwrap<ObjectTree>() );
 
   if ( fake_worker->todos_.size() != 1
-       or fake_worker->todos_.front() != Handle<AnyDataType>( Handle<Relation>( remote_task ) ) ) {
+       or fake_worker->todos_.front() != Handle<Dependee>( Handle<Relation>( remote_task ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -464,10 +472,10 @@ void case_nine( void )
 
   if ( fake_worker->todos_.size() == 2 ) {
     // get( Blob 1 )
-    auto job0 = Handle<AnyDataType>(
+    auto job0 = Handle<Dependee>(
       Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle1.unwrap<Named>() ) ) ) ) );
     // get( Blob 2 )
-    auto job1 = Handle<AnyDataType>(
+    auto job1 = Handle<Dependee>(
       Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle2.unwrap<Named>() ) ) ) ) );
     // Handle<Application( { 1, 1, 10 }, Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) )
     if ( ( fake_worker->todos_[0] == job0 and fake_worker->todos_[1] == job1 )
@@ -526,13 +534,13 @@ void case_ten( void )
 
   if ( fake_worker->todos_.size() == 2 ) {
     // get( Blob 1 )
-    auto job0 = Handle<AnyDataType>(
-      Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Application>( handle::upcast( tree(
+    auto job0
+      = Handle<Dependee>( Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Application>( handle::upcast( tree(
         *rt,
         limits( *rt, 1, 1, 1 ),
         Handle<Strict>( handle::extract<Identification>( make_identification( handle1 ) ).value() ) ) ) ) ) ) ) );
     // get( Blob 2 )
-    auto job1 = Handle<AnyDataType>(
+    auto job1 = Handle<Dependee>(
       Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle2.unwrap<Named>() ) ) ) ) );
     // Handle<Application( { 1, 1, 10 }, Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) )
     if ( ( fake_worker->todos_[0] == job0 and fake_worker->todos_[1] == job1 )
@@ -548,6 +556,132 @@ void case_ten( void )
   fprintf( stderr, "Case 10: Wrong post condition" );
   exit( 1 );
 }
+
+// Work: Handle<Eval>( Handle<ObjectTree>
+//   ( Handle<Selection>( Tree, 0, 7 ),
+//     Handle<Selection>( Handle<Selection>( Tree, 7 ), 0, 7 ),
+//     Handle<Selection>( Handle<Selection>( Handle<Selection>( Tree, 7 ), 7 ), 0, 7 )
+//   )
+//)
+//
+// Machine 0: 5 parallelism
+// Machine 1: 5 parallelism + Tree ( 8 entries )
+//
+// Expected: Machine 1: get_shallow( Tree )
+void case_eleven( void )
+{
+  shared_ptr<Relater> rt = make_shared<Relater>( 5, make_shared<PointerRunner>(), make_shared<HintScheduler>() );
+  shared_ptr<FakeRuntime> fake_worker = make_shared<FakeRuntime>();
+  fake_worker->parallelism_ = 5;
+
+  Handle<ValueTree> tree0 = Handle<ValueTree>( 1, 1048576 );
+  Handle<ValueTreeRef> ref = Handle<ValueTreeRef>( tree0, 8 );
+  fake_worker->put( tree0, make_shared<OwnedTree>( OwnedMutTree::allocate( 8 ) ) );
+  rt->add_worker( fake_worker );
+
+  auto task = tree(
+    *rt,
+    Handle<Selection>( Handle<ObjectTree>(
+      tree( *rt, ref, Handle<Literal>( (uint64_t)0 ), Handle<Literal>( (uint64_t)7 ) ).unwrap<ValueTree>() ) ),
+    Handle<Selection>( tree( *rt,
+                             Handle<Selection>( Handle<ObjectTree>(
+                               tree( *rt, ref, Handle<Literal>( (uint64_t)7 ) ).unwrap<ValueTree>() ) ),
+                             Handle<Literal>( (uint64_t)0 ),
+                             Handle<Literal>( (uint64_t)7 ) )
+                         .unwrap<ObjectTree>() ),
+    Handle<Selection>(
+      tree( *rt,
+            Handle<Selection>( tree( *rt,
+                                     Handle<Selection>( Handle<ObjectTree>(
+                                       tree( *rt, ref, Handle<Literal>( (uint64_t)7 ) ).unwrap<ValueTree>() ) ),
+                                     Handle<Literal>( (uint64_t)7 ) )
+                                 .unwrap<ObjectTree>() ),
+            Handle<Literal>( (uint64_t)0 ),
+            Handle<Literal>( (uint64_t)7 ) )
+        .unwrap<ObjectTree>() ) );
+
+  rt->get( Handle<Eval>( task.unwrap<ObjectTree>() ) );
+
+  if ( fake_worker->todos_.size() == 1 ) {
+    // get_shallow( Tree 0 )
+    auto job0 = Handle<Dependee>( ref );
+    if ( fake_worker->todos_[0] == job0 ) {
+      return;
+    }
+  }
+
+  cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
+  for ( const auto& todo : fake_worker->todos_ ) {
+    cout << "Todo " << todo << endl;
+  }
+  fprintf( stderr, "Case 11: Wrong post condition" );
+  exit( 1 );
+}
+
+// Work: Handle<Eval>( Handle<ObjectTree>
+//   ( Handle<Selection>( Tree, 0, 255 ),
+//     Handle<Selection>( Handle<Selection>( Tree, 255 ), 0, 255 ),
+//     Handle<Selection>( Handle<Selection>( Handle<Selection>( Tree, 255 ), 255 ), 0, 255 )
+//   )
+//)
+//
+// Machine 0: 5 parallelism
+// Machine 1: 5 parallelism + Tree ( 256 entries )
+//
+// Expected: Machine 1 : get_shallow( Tree ), Handle<Selection>( Tree, 255 )
+void case_twelve( void )
+{
+  shared_ptr<Relater> rt = make_shared<Relater>( 5, make_shared<PointerRunner>(), make_shared<HintScheduler>() );
+  shared_ptr<FakeRuntime> fake_worker = make_shared<FakeRuntime>();
+  fake_worker->parallelism_ = 5;
+
+  Handle<ValueTree> tree0 = Handle<ValueTree>( 1, 1048576 );
+  Handle<ValueTreeRef> ref = Handle<ValueTreeRef>( tree0, 256 );
+  fake_worker->put( tree0, make_shared<OwnedTree>( OwnedMutTree::allocate( 256 ) ) );
+  rt->add_worker( fake_worker );
+
+  auto task = tree(
+    *rt,
+    Handle<Selection>( Handle<ObjectTree>(
+      tree( *rt, ref, Handle<Literal>( (uint64_t)0 ), Handle<Literal>( (uint64_t)255 ) ).unwrap<ValueTree>() ) ),
+    Handle<Selection>( tree( *rt,
+                             Handle<Selection>( Handle<ObjectTree>(
+                               tree( *rt, ref, Handle<Literal>( (uint64_t)255 ) ).unwrap<ValueTree>() ) ),
+                             Handle<Literal>( (uint64_t)0 ),
+                             Handle<Literal>( (uint64_t)255 ) )
+                         .unwrap<ObjectTree>() ),
+    Handle<Selection>(
+      tree( *rt,
+            Handle<Selection>( tree( *rt,
+                                     Handle<Selection>( Handle<ObjectTree>(
+                                       tree( *rt, ref, Handle<Literal>( (uint64_t)255 ) ).unwrap<ValueTree>() ) ),
+                                     Handle<Literal>( (uint64_t)255 ) )
+                                 .unwrap<ObjectTree>() ),
+            Handle<Literal>( (uint64_t)0 ),
+            Handle<Literal>( (uint64_t)255 ) )
+        .unwrap<ObjectTree>() ) );
+
+  rt->get( Handle<Eval>( task.unwrap<ObjectTree>() ) );
+
+  if ( fake_worker->todos_.size() == 2 ) {
+    // get_shallow( Tree )
+    auto job0 = Handle<Dependee>( ref );
+    // get( Tree, 255 )
+    auto job1 = Handle<Dependee>( Handle<Step>( Handle<Selection>(
+      Handle<ObjectTree>( tree( *rt, ref, Handle<Literal>( (uint64_t)255 ) ).unwrap<ValueTree>() ) ) ) );
+    if ( ( fake_worker->todos_[0] == job0 and fake_worker->todos_[1] == job1 )
+         or ( fake_worker->todos_[1] == job0 and fake_worker->todos_[0] == job1 ) ) {
+      return;
+    }
+  }
+
+  cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
+  for ( const auto& todo : fake_worker->todos_ ) {
+    cout << "Todo " << todo << endl;
+  }
+  fprintf( stderr, "Case 12: Wrong post condition" );
+  exit( 1 );
+}
 void test( void )
 {
   case_one();
@@ -560,4 +694,6 @@ void test( void )
   case_eight();
   case_nine();
   case_ten();
+  case_eleven();
+  case_twelve();
 }

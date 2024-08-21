@@ -7,6 +7,7 @@
 #include "scheduler.hh"
 #include <functional>
 #include <limits>
+#include <ostream>
 #include <stdexcept>
 
 using namespace std;
@@ -138,7 +139,23 @@ void BasePass::relation_post( Handle<Relation> job, const absl::flat_hash_set<Ha
 
             tasks_info_[job].output_size = curr_output_size;
             tasks_info_[job].output_fan_out = curr_fan_out;
+
+            if ( ep ) {
+              size_t input_size = 0;
+              for ( const auto& dependency : dependencies ) {
+                if ( !tasks_info_.contains( dependency ) ) {
+                  throw std::runtime_error( "Task info does not contain dependency" );
+                }
+                input_size += tasks_info_.at( dependency ).output_size;
+              }
+
+              if ( input_size / curr_output_size > 20 ) {
+                ep = false;
+              }
+            }
+
             tasks_info_[job].ep = ep;
+
           } else {
             tasks_info_[job].output_size = 1;
             tasks_info_[job].output_fan_out = 1;
@@ -155,10 +172,42 @@ void BasePass::relation_post( Handle<Relation> job, const absl::flat_hash_set<Ha
           tasks_info_[job].ep = false;
           // return { out, 1, false };
         },
-        [&]( Handle<Selection> ) {
-          tasks_info_[job].output_size = sizeof( Handle<Fix> );
-          tasks_info_[job].output_fan_out = 0;
-          tasks_info_[job].ep = false;
+        [&]( Handle<Selection> s ) {
+          if ( relater_.get().contains_shallow( s.unwrap<ObjectTree>() ) ) {
+            auto d = relater_.get().get_shallow( s.unwrap<ObjectTree>() ).value();
+
+            if ( d->span().size() == 2 ) {
+              tasks_info_[job].output_size = sizeof( Handle<Fix> );
+            } else {
+              auto begin_idx = size_t(
+                d->at( 1 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+              auto end_idx = size_t(
+                d->at( 2 ).unwrap<Expression>().unwrap<Object>().unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+              tasks_info_[job].output_size = ( end_idx - begin_idx ) * sizeof( Handle<Fix> );
+            }
+            tasks_info_[job].output_fan_out = 0;
+            tasks_info_[job].ep = false;
+
+            for ( auto dependency : dependencies ) {
+              bool check = dependency.visit<bool>( overload {
+                []( Handle<BlobRef> ) { return true; },
+                [&]( Handle<ValueTreeRef> t ) {
+                  return !handle::any_tree_equal()( Handle<AnyTree>::forge( t.content ), s.unwrap<ObjectTree>() );
+                },
+                [&]( Handle<ObjectTreeRef> t ) {
+                  return !handle::any_tree_equal()( Handle<AnyTree>::forge( t.content ), s.unwrap<ObjectTree>() );
+                },
+                []( auto ) { return false; } } );
+
+              if ( check && tasks_info_.at( dependency ).output_size / tasks_info_.at( job ).output_size < 20 ) {
+                tasks_info_[job].ep = true;
+              }
+            }
+          } else {
+            tasks_info_[job].output_size = sizeof( Handle<Fix> );
+            tasks_info_[job].output_fan_out = 0;
+            tasks_info_[job].ep = false;
+          }
         },
       } );
     },
@@ -472,6 +521,10 @@ void ChildBackProp::all( Handle<Dependee> job )
 
 void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
+  if ( base_.get().get_ep( job ) ) {
+    return;
+  }
+
   auto s = chosen_remotes_.at( job ).second;
 
   bool undo = job.visit<bool>( overload {
