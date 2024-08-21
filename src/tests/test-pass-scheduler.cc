@@ -667,7 +667,7 @@ void case_twelve( void )
     // get_shallow( Tree )
     auto job0 = Handle<Dependee>( ref );
     // get( Tree, 255 )
-    auto job1 = Handle<Dependee>( Handle<Step>( Handle<Selection>(
+    auto job1 = Handle<Dependee>( Handle<Think>( Handle<Selection>(
       Handle<ObjectTree>( tree( *rt, ref, Handle<Literal>( (uint64_t)255 ) ).unwrap<ValueTree>() ) ) ) );
     if ( ( fake_worker->todos_[0] == job0 and fake_worker->todos_[1] == job1 )
          or ( fake_worker->todos_[1] == job0 and fake_worker->todos_[0] == job1 ) ) {

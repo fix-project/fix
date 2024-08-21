@@ -17,7 +17,7 @@ void test( void )
   Handle application = Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( otree ) ) );
 
   auto eval = []( auto x ) { return Handle<Eval>( x ); };
-  auto step = []( auto x ) { return Handle<Step>( x ); };
+  auto step = []( auto x ) { return Handle<Think>( x ); };
 
   absl::flat_hash_set<DependencyGraph::Task> ready;
   CHECK( graph.start( step( application ) ) );

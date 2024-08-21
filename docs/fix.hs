@@ -41,7 +41,7 @@ type ExpressionTree = Tree Expression
 -- | Fix represents any Fix type, including both Expressions and Relations.
 data Fix = Expression Expression | Relation Relation
 -- | A Relation represents either the Application of a Tree or the Evaluation of an Object.
-data Relation = Step Thunk | Eval Object
+data Relation = Think Thunk | Eval Object
 
 -- * Functions
 

@@ -143,7 +143,7 @@ void test_fib( void )
   CHECK_EQ( fib_called, 1 );
   CHECK_EQ( exception_caught.has_value(), true );
 
-  Handle<Fix> fib2 = Handle<Step>( Handle<Thunk>( application( fib, Handle<Literal>( (uint64_t)2 ) ) ) );
+  Handle<Fix> fib2 = Handle<Think>( Handle<Thunk>( application( fib, Handle<Literal>( (uint64_t)2 ) ) ) );
   CHECK_EQ( exception_caught.value(), fib2 );
 }
 

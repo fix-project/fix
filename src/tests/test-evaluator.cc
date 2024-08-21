@@ -56,7 +56,7 @@ private:
 
   virtual Result<Object> select( Handle<ObjectTree> combination )
   {
-    Handle<Relation> select = Handle<Step>( Handle<Thunk>( Handle<Selection>( combination ) ) );
+    Handle<Relation> select = Handle<Think>( Handle<Thunk>( Handle<Selection>( combination ) ) );
 
     if ( storage.contains( select ) ) {
       return storage.get( select );
@@ -106,8 +106,8 @@ private:
 
   virtual Result<Object> apply( Handle<ObjectTree> combination )
   {
-    Handle<Step> apply
-      = Handle<Step>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
+    Handle<Think> apply
+      = Handle<Think>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
 
     if ( storage.contains( apply ) ) {
       return storage.get_relation( apply );

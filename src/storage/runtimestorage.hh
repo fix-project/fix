@@ -118,7 +118,7 @@ public:
   std::shared_ptr<OwnedTree> get_shallow( Handle<AnyTree> name );
 
   Handle<Value> get_relation( Handle<Eval> name ) { return get( name ).unwrap<Value>(); }
-  Handle<Object> get_relation( Handle<Step> name ) { return get( name ); }
+  Handle<Object> get_relation( Handle<Think> name ) { return get( name ); }
 
   // Convert a Handle into the canonically-named version of that handle.
   template<FixType T>

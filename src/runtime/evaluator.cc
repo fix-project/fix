@@ -166,7 +166,7 @@ Result<Object> FixEvaluator::relate( Handle<Fix> x )
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Relation> x ) {
       return x.visit<Result<Object>>( overload {
-        [&]( Handle<Step> x ) { return force( x.unwrap<Thunk>() ); },
+        [&]( Handle<Think> x ) { return force( x.unwrap<Thunk>() ); },
         [&]( Handle<Eval> x ) { return evalStrict( x.unwrap<Object>() ); },
       } );
     },
