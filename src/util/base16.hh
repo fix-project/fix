@@ -9,7 +9,7 @@
 
 namespace base16 {
 
-static const std::string base16_chars = "0123456789abcdef";
+static constexpr char base16_chars[] = "0123456789abcdef";
 
 static uint8_t pos_of_char( const unsigned char chr )
 {
