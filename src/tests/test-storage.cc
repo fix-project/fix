@@ -57,7 +57,7 @@ void test( void )
   Handle<ValueTree> tree = storage.construct_tree<ValueTree>( virgil );
   CHECK( storage.contains( tree ) );
 
-  Handle<Step> apply = Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( tree ) ) );
+  Handle<Think> apply = Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( tree ) ) );
   Handle<Object> target( caesar );
 
   storage.create( target, apply );

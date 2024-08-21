@@ -136,7 +136,7 @@ Handle<AnyTreeRef> SketchGraphScheduler::ref( Handle<AnyTree> tree )
 LocalScheduler::Result<Object> LocalScheduler::apply( Handle<ObjectTree> combination )
 {
   Handle<Relation> apply
-    = Handle<Step>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
+    = Handle<Think>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
 
   if ( relater_->get().contains( apply ) ) {
     return relater_->get().get( apply ).value();
@@ -152,7 +152,7 @@ LocalScheduler::Result<Object> LocalScheduler::apply( Handle<ObjectTree> combina
 SketchGraphScheduler::Result<Object> SketchGraphScheduler::apply( Handle<ObjectTree> combination )
 {
   Handle<Relation> apply
-    = Handle<Step>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
+    = Handle<Think>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
 
   if ( relater_->get().contains( apply ) ) {
     return relater_->get().get( apply ).value();
@@ -276,7 +276,7 @@ LocalScheduler::Result<Object> LocalScheduler::select_range( Handle<Object> h, s
 
 LocalScheduler::Result<Object> LocalScheduler::select( Handle<ObjectTree> combination )
 {
-  Handle<Relation> select = Handle<Step>( Handle<Thunk>( Handle<Selection>( combination ) ) );
+  Handle<Relation> select = Handle<Think>( Handle<Thunk>( Handle<Selection>( combination ) ) );
 
   if ( relater_->get().contains( select ) ) {
     return relater_->get().get( select ).value();
@@ -428,7 +428,7 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::select_range( Handle<
 
 SketchGraphScheduler::Result<Object> SketchGraphScheduler::select( Handle<ObjectTree> combination )
 {
-  Handle<Relation> select = Handle<Step>( Handle<Thunk>( Handle<Selection>( combination ) ) );
+  Handle<Relation> select = Handle<Think>( Handle<Thunk>( Handle<Selection>( combination ) ) );
 
   if ( relater_->get().contains( select ) ) {
     return relater_->get().get( select ).value();
@@ -527,7 +527,7 @@ SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Obj
 
 LocalScheduler::Result<Object> LocalScheduler::force( Handle<Thunk> thunk )
 {
-  Handle<Step> goal( thunk );
+  Handle<Think> goal( thunk );
   if ( relater_->get().contains( goal ) ) {
     return relater_->get().get( goal );
   }
@@ -563,7 +563,7 @@ LocalScheduler::Result<Object> LocalScheduler::force( Handle<Thunk> thunk )
 
 SketchGraphScheduler::Result<Object> SketchGraphScheduler::force( Handle<Thunk> thunk )
 {
-  Handle<Step> goal( thunk );
+  Handle<Think> goal( thunk );
 
   if ( current_schedule_step_.has_value() ) {
     sketch_graph_.add_dependency( current_schedule_step_.value(), goal );
@@ -1041,7 +1041,7 @@ optional<Handle<Object>> SketchGraphScheduler::run_passes( Handle<Relation> top_
           relater_->get().get_local()->get( r );
           return {};
         },
-        [&]( Handle<Step> s ) -> optional<Handle<Thunk>> {
+        [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
           if ( top_level_job == r ) {
             return s.unwrap<Thunk>();
           } else {

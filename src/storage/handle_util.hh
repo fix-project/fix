@@ -92,7 +92,7 @@ static inline Handle<Fix> get_root( Handle<Dependee> job )
 {
   return job.visit<Handle<Fix>>( overload { [&]( Handle<Relation> r ) {
                                              return r.visit<Handle<Fix>>(
-                                               overload { [&]( Handle<Step> s ) { return s.unwrap<Thunk>(); },
+                                               overload { [&]( Handle<Think> s ) { return s.unwrap<Thunk>(); },
                                                           [&]( Handle<Eval> e ) { return e.unwrap<Object>(); } } );
                                            },
                                             [&]( auto h ) { return h; } } );

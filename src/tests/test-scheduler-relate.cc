@@ -20,7 +20,7 @@ void case0()
   auto thunk1 = Handle<Application>( handle::upcast( tree( *rt, Handle<Literal>( "one" ) ) ) );
   auto thunk2 = Handle<Application>( handle::upcast( tree( *rt, Handle<Literal>( "two" ) ) ) );
 
-  rt->put( Handle<Step>( thunk0 ), thunk1 );
+  rt->put( Handle<Think>( thunk0 ), thunk1 );
   auto thunk_tree = tree( *rt, thunk0, thunk2 );
 
   RelaterTest::relate( sch, Handle<Eval>( thunk_tree.unwrap<ObjectTree>() ) );
@@ -30,8 +30,8 @@ void case0()
   //   exit( 1 );
   // }
 
-  // auto apply1 = Handle<AnyDataType>( Handle<Relation>( Handle<Step>( thunk1 ) ) );
-  // auto apply2 = Handle<AnyDataType>( Handle<Relation>( Handle<Step>( thunk2 ) ) );
+  // auto apply1 = Handle<AnyDataType>( Handle<Relation>( Handle<Think>( thunk1 ) ) );
+  // auto apply2 = Handle<AnyDataType>( Handle<Relation>( Handle<Think>( thunk2 ) ) );
 
   // if ( !( works_[0] == apply1 && works_[1] == apply2 ) && !( works_[0] == apply2 && works_[1] == apply1 ) ) {
   //   fprintf( stderr, "Wrong leaf jobs" );
@@ -58,7 +58,7 @@ void case1()
   //   exit( 1 );
   // }
 
-  // auto apply1 = Handle<AnyDataType>( Handle<Relation>( Handle<Step>( thunk1 ) ) );
+  // auto apply1 = Handle<AnyDataType>( Handle<Relation>( Handle<Think>( thunk1 ) ) );
 
   // if ( !( works_[0] == apply1 ) ) {
   //   fprintf( stderr, "Wrong leaf jobs" );
@@ -85,7 +85,7 @@ void case2()
   //   exit( 1 );
   // }
 
-  // auto apply1 = Handle<AnyDataType>( Handle<Relation>( Handle<Step>( thunk1 ) ) );
+  // auto apply1 = Handle<AnyDataType>( Handle<Relation>( Handle<Think>( thunk1 ) ) );
 
   // if ( !( works_[0] == apply1 ) ) {
   //   fprintf( stderr, "Wrong leaf jobs" );

@@ -109,7 +109,7 @@ void BasePass::relation_post( Handle<Relation> job, const absl::flat_hash_set<Ha
   }
 
   job.visit<void>( overload {
-    [&]( Handle<Step> s ) {
+    [&]( Handle<Think> s ) {
       s.unwrap<Thunk>().visit<void>( overload {
         [&]( Handle<Application> a ) {
           if ( relater_.get().contains( a.unwrap<ExpressionTree>() ) ) {
@@ -528,7 +528,7 @@ void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_s
   auto s = chosen_remotes_.at( job ).second;
 
   bool undo = job.visit<bool>( overload {
-    [&]( Handle<Step> ) { return s == 0; },
+    [&]( Handle<Think> ) { return s == 0; },
     [&]( Handle<Eval> e ) {
       return e.unwrap<Object>().visit<bool>( overload {
         [&]( Handle<Value> v ) {
@@ -697,7 +697,7 @@ void SendToRemotePass::send_job_dependencies( shared_ptr<IRuntime> rt, Handle<De
       } else {
         auto data = r.visit<optional<Handle<AnyDataType>>>(
           overload { []( Handle<Eval> e ) { return handle::data( e.unwrap<Object>() ); },
-                     []( Handle<Step> ) -> optional<Handle<AnyDataType>> { return {}; } } );
+                     []( Handle<Think> ) -> optional<Handle<AnyDataType>> { return {}; } } );
 
         if ( data.has_value() ) {
           data.value().visit<void>(
@@ -877,7 +877,7 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
                                                          rt.get().get_local()->get( r );
                                                          return {};
                                                        },
-                                                        [&]( Handle<Step> s ) -> optional<Handle<Thunk>> {
+                                                        [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
                                                           if ( top_level_job == Handle<Dependee>( r ) ) {
                                                             return s.unwrap<Thunk>();
                                                           } else {

@@ -370,9 +370,9 @@ int main( int argc, char** argv )
   const Type* encode = make_sum( "Encode", 2, strict, shallow );
   const Type* expression = make_sum( "Expression", 3, object, encode, etree );
 
-  const Type* step = make_wrapper( "Step", thunk );
+  const Type* think = make_wrapper( "Think", thunk );
   const Type* eval = make_wrapper( "Eval", object );
-  const Type* relation = make_sum( "Relation", 2, step, eval );
+  const Type* relation = make_sum( "Relation", 2, think, eval );
   const Type* fix = make_sum( "Fix", 2, expression, relation );
 
   fprintf( stderr, "Fix Handles currently need %lu bits.\n", fix->bits );
