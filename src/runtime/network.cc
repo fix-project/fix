@@ -413,7 +413,10 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
             trees_view_.get_ref( t ).store( false, memory_order_release );
           },
           []( Handle<Literal> ) {},
-          []( Handle<Relation> ) {},
+          [&]( Handle<Relation> r ) {
+            relations_view_.insert_no_value( r );
+            relations_view_.get_ref( r ).store( false, memory_order_release );
+          },
         } );
       }
 
@@ -489,8 +492,8 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
                                          }
                                          return parent.contains( t );
                                        },
-                                       [&]( Handle<Literal> ) { return true; },
-                                       [&]( Handle<Relation> ) { return true; },
+                                       []( Handle<Literal> ) { return true; },
+                                       []( Handle<Relation> ) { return true; },
                                      },
                                      //[&]( auto ) -> bool { VLOG( 1 ) << handle::fix( *it );
                                      // throw std::runtime_error( "Invalid propose transfer payload." ); } },

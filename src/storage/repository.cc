@@ -1,3 +1,4 @@
+#include <concepts>
 #include <filesystem>
 #include <glog/logging.h>
 #include <memory>
@@ -23,11 +24,7 @@ Repository::Repository( std::filesystem::path directory )
       [&]( Handle<AnyTree> t ) {
         trees_.insert( t, filesystem::file_size( repo_ / "data" / base16::encode( handle::fix( t ).content ) ) );
       },
-      []( Handle<Relation> ) {} } );
-  }
-
-  for ( auto r : relations() ) {
-    relations_.insert( r, true );
+      [&]( Handle<Relation> r ) { relations_.insert( r, true ); } } );
   }
 }
 
@@ -51,6 +48,10 @@ std::unordered_set<Handle<AnyDataType>> Repository::data() const
     for ( const auto& datum : fs::directory_iterator( repo_ / "data" ) ) {
       result.insert(
         handle::data( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) ).value() );
+    }
+
+    for ( const auto& relation : relations() ) {
+      result.insert( relation );
     }
     return result;
   } catch ( std::filesystem::filesystem_error& ) {
