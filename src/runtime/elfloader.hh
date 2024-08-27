@@ -30,7 +30,7 @@ struct Elf_Info
   std::span<const Elf64_Shdr> sheader;
 
   // Map from function/variable name to st_value
-  std::map<std::string, uint64_t> func_map;
+  std::map<std::string, std::pair<uint64_t, unsigned short>> func_map;
 
   // Map from section idx to the offset of section in program memory
   std::map<uint64_t, uint64_t> idx_to_offset;

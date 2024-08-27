@@ -149,7 +149,12 @@ Elf_Info load_program( std::span<const char> program_content )
           }
 
           string name = string( res.symstrs.data() + symtb_entry.st_name );
-          res.func_map[name] = symtb_entry.st_value;
+          if ( name == "initProgram" or name == "w2c_function_0x5Ffixpoint_apply" or name == "wasm2c_function_free"
+               or name == "get_instance_size" ) {
+            res.func_map[name] = { symtb_entry.st_value, symtb_entry.st_shndx };
+            if ( res.func_map.size() == 4 )
+              break;
+          }
         }
       }
     }
@@ -254,9 +259,14 @@ shared_ptr<Program> link_program( span<const char> program_content )
   }
   // cout << "Linking program at program_mem " << program_mem << endl;
   shared_ptr<char> code( static_cast<char*>( program_mem ), free );
-  uint64_t init_entry = elf_info.func_map.at( "initProgram" );
-  uint64_t main_entry = elf_info.func_map.at( "w2c_function_0x5Ffixpoint_apply" );
-  uint64_t cleanup_entry = elf_info.func_map.at( "wasm2c_function_free" );
-  uint64_t instance_size_entry = elf_info.func_map.at( "get_instance_size" );
+  auto& init_location = elf_info.func_map.at( "initProgram" );
+  uint64_t init_entry = init_location.first + elf_info.idx_to_offset.at( init_location.second );
+  auto& main_location = elf_info.func_map.at( "w2c_function_0x5Ffixpoint_apply" );
+  uint64_t main_entry = main_location.first + elf_info.idx_to_offset.at( main_location.second );
+  auto& cleanup_location = elf_info.func_map.at( "wasm2c_function_free" );
+  uint64_t cleanup_entry = cleanup_location.first + elf_info.idx_to_offset.at( cleanup_location.second );
+  auto& instance_size_location = elf_info.func_map.at( "get_instance_size" );
+  uint64_t instance_size_entry
+    = instance_size_location.first + elf_info.idx_to_offset.at( instance_size_location.second );
   return make_shared<Program>( code, init_entry, main_entry, cleanup_entry, instance_size_entry );
 }
