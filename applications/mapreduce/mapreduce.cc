@@ -1,5 +1,6 @@
 extern "C" {
 #include "fixpoint_util.h"
+#include "support.h"
 }
 #include <cassert>
 
