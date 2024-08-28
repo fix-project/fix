@@ -43,7 +43,7 @@ shared_ptr<Client> Client::init( const Address& address )
   runtime->network_worker_.emplace( runtime->relater_ );
   runtime->network_worker_->start();
   runtime->network_worker_->connect( address );
-  runtime->network_worker_->get_remote( address );
+  runtime->server_ = runtime->network_worker_->get_remote( address );
   return runtime;
 }
 

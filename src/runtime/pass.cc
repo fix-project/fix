@@ -881,6 +881,7 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
                                                           if ( top_level_job == Handle<Dependee>( r ) ) {
                                                             return s.unwrap<Thunk>();
                                                           } else {
+                                                            rt.get().get_local()->get( r );
                                                             return {};
                                                           }
                                                         } } );

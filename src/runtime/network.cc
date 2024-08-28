@@ -447,7 +447,8 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       auto payload = parse<RequestShallowTreePayload>( std::get<string>( msg.payload() ) );
       auto tree = parent.get_shallow( payload.handle );
       if ( tree ) {
-        push_message( { Opcode::SHALLOWTREEDATA, tree.value() } );
+        push_message( OutgoingMessage::to_message(
+          ShallowTreeDataPayload { .handle = payload.handle, .data = tree.value() } ) );
       }
       break;
     }

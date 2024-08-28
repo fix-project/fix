@@ -41,6 +41,7 @@ class Client : public FrontendRT
 protected:
   Relater relater_ { 0 };
   std::optional<NetworkWorker> network_worker_ {};
+  std::shared_ptr<IRuntime> server_ {};
 
 public:
   Client() {}
@@ -48,7 +49,9 @@ public:
 
   static std::shared_ptr<Client> init( const Address& address );
   virtual Handle<Value> execute( Handle<Relation> x ) override;
+
   IRuntime& get_rt() { return relater_; }
+  std::shared_ptr<IRuntime>& get_server() { return server_; }
 };
 
 class Server
