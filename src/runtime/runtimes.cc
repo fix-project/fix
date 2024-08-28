@@ -78,5 +78,15 @@ shared_ptr<Server> Server::init( const Address& address,
 
 Handle<Value> Client::execute( Handle<Relation> x )
 {
+  relater_.visit_full( x, [&]( Handle<AnyDataType> h ) {
+    h.visit<void>( overload { []( Handle<Literal> ) {},
+                              []( Handle<Relation> ) {},
+                              [&]( auto h ) {
+                                if ( relater_.contains( h ) ) {
+                                  server_->put( h, relater_.get( h ).value() );
+                                }
+                              } } );
+  } );
+
   return relater_.execute( x );
 }

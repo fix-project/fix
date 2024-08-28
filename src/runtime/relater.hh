@@ -90,8 +90,10 @@ public:
       }
 
       if constexpr ( std::same_as<T, Relation> ) {
-        auto target = get( handle );
-        std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, target->get() );
+        if ( contains( handle ) ) {
+          auto target = get( handle ).value();
+          std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, target.get() );
+        }
 
         auto lhs = handle.template visit<Handle<Object>>(
           overload { []( Handle<Think> s ) { return s.unwrap<Thunk>(); },
@@ -108,9 +110,11 @@ public:
       return;
     } else {
       if constexpr ( FixTreeType<T> ) {
-        auto tree = get( handle );
-        for ( const auto& element : tree.value()->span() ) {
-          visit_full( element, visitor, visited );
+        if ( contains( handle ) ) {
+          auto tree = get( handle ).value();
+          for ( const auto& element : tree->span() ) {
+            visit_full( element, visitor, visited );
+          }
         }
       }
       VLOG( 3 ) << "visiting " << handle;

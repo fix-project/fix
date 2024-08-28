@@ -14,9 +14,9 @@ class Repository : public IRuntime
 {
   std::filesystem::path repo_;
 
-  FixTable<Named, bool, AbslHash> blobs_ { 100000 };
-  FixTable<AnyTree, size_t, AbslHash, handle::any_tree_equal> trees_ { 100000 };
-  FixTable<Relation, bool, AbslHash> relations_ { 100000 };
+  FixTable<Named, bool, AbslHash> blobs_ { 1000000 };
+  FixTable<AnyTree, size_t, AbslHash, handle::any_tree_equal> trees_ { 1000000 };
+  FixTable<Relation, bool, AbslHash> relations_ { 1000000 };
 
 public:
   Repository( std::filesystem::path directory = std::filesystem::current_path() );
