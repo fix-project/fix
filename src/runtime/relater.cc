@@ -6,6 +6,7 @@
 #include "storage_exception.hh"
 #include "types.hh"
 #include <memory>
+#include <stdexcept>
 
 using namespace std;
 
@@ -73,7 +74,8 @@ Handle<Value> Relater::execute( Handle<Relation> r )
   bool expected = true;
   if ( top_level_done_.compare_exchange_strong( expected, false ) ) {
     if ( local_->get_info()->parallelism == 0 ) {
-      scheduler_->schedule( r );
+      remotes_.read()->front().lock()->get( r );
+      // scheduler_->schedule( r );
     } else {
       local_->get( r );
     }
@@ -202,7 +204,11 @@ void Relater::put_shallow( Handle<AnyTree> name, TreeData data )
     absl::flat_hash_set<Handle<Relation>> unblocked;
     {
       auto graph = graph_.write();
-      storage_.ref( name ).visit<void>( [&]( auto h ) { graph->finish( h, unblocked ); } );
+      name.visit<void>( overload {
+        [&]( Handle<ValueTree> t ) { graph->finish( Handle<ValueTreeRef>( t, data->size() ), unblocked ); },
+        [&]( Handle<ObjectTree> t ) { graph->finish( Handle<ObjectTreeRef>( t, data->size() ), unblocked ); },
+        []( Handle<ExpressionTree> ) { throw runtime_error( "Unreachable" ); },
+      } );
     }
     for ( auto x : unblocked ) {
       local_->get( x );

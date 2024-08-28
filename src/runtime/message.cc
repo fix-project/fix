@@ -135,7 +135,19 @@ size_t MessageParser::parse( string_view buf )
         expected_payload_length_ = IncomingMessage::expected_payload_length( incomplete_header_ );
 
         if ( expected_payload_length_.value() == 0 ) {
-          assert( Message::opcode( incomplete_header_ ) == Message::Opcode::REQUESTINFO );
+          switch ( Message::opcode( incomplete_header_ ) ) {
+            case Message::Opcode::TREEDATA:
+              incomplete_payload_ = OwnedMutTree::allocate( 0 );
+              break;
+
+            case Message::Opcode::BLOBDATA: {
+              incomplete_payload_ = OwnedMutBlob::allocate( 0 );
+              break;
+            }
+
+            default:
+              break;
+          }
           complete_message();
         } else {
           switch ( Message::opcode( incomplete_header_ ) ) {
@@ -144,6 +156,7 @@ size_t MessageParser::parse( string_view buf )
             case Message::Opcode::RESULT:
             case Message::Opcode::REQUESTTREE:
             case Message::Opcode::REQUESTBLOB:
+            case Message::Opcode::REQUESTSHALLOWTREE:
             case Message::Opcode::PROPOSE_TRANSFER:
             case Message::Opcode::ACCEPT_TRANSFER:
             case Message::Opcode::SHALLOWTREEDATA: {

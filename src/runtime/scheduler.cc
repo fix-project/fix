@@ -580,6 +580,10 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::force( Handle<Thunk> 
 
   current_schedule_step_ = prev_current;
 
+  if ( result.has_value() ) {
+    relater_->get().put( goal, result.value() );
+  }
+
   return result;
 }
 
