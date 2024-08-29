@@ -1,5 +1,6 @@
 #include <stdint.h>
 
+typedef char __attribute__( ( address_space( 10 ) ) ) * externref;
 extern void fixpoint_unsafe_io( const char* s, int32_t size )
   __attribute__( ( import_module( "fixpoint" ), import_name( "memory_unsafe_io" ) ) );
 
