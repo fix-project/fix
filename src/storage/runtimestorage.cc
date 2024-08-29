@@ -104,12 +104,12 @@ TreeData RuntimeStorage::get_shallow( Handle<AnyTree> handle )
                   []( Handle<Literal> ) {},
                 } );
               },
-              [&]( Handle<ValueTree> x ) { new_entry = ref( x ).unwrap<ValueTree>(); },
+              [&]( Handle<ValueTree> x ) { new_entry = ref( x ).unwrap<ValueTreeRef>(); },
               []( Handle<BlobRef> ) {},
               []( Handle<ValueTreeRef> ) {},
             } );
           },
-          [&]( Handle<ObjectTree> x ) { new_entry = ref( x ).unwrap<ObjectTree>(); },
+          [&]( Handle<ObjectTree> x ) { new_entry = ref( x ).unwrap<ObjectTreeRef>(); },
           []( Handle<Thunk> ) {},
           []( Handle<ObjectTreeRef> ) {},
         } );

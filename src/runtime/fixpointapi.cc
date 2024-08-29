@@ -10,15 +10,7 @@
 
 using namespace std;
 
-template<typename T>
-void check( optional<T> t )
-{
-  if ( t ) {
-    return;
-  } else {
-    throw std::runtime_error( "Invalid handle" );
-  }
-}
+#define check( t ) ( !t ? throw std::runtime_error( std::string( __PRETTY_FUNCTION__ ) + ": invalid handle" ) : 0 )
 
 namespace fixpoint {
 void attach_tree( u8x32 handle, wasm_rt_externref_table_t* target_table )

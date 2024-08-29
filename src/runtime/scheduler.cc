@@ -206,7 +206,9 @@ LocalScheduler::Result<Object> LocalScheduler::select_single( Handle<Object> h, 
 
 LocalScheduler::Result<Object> LocalScheduler::select_range( Handle<Object> h, size_t begin_idx, size_t end_idx )
 {
-  if ( begin_idx >= handle::size( h ) || end_idx >= handle::size( h ) || begin_idx > end_idx ) {
+  begin_idx = std::min( begin_idx, handle::size( h ) );
+  end_idx = std::min( end_idx, handle::size( h ) );
+  if ( begin_idx == handle::size( h ) || begin_idx >= end_idx ) {
     static auto nil = relater_->get()
                         .get_storage()
                         .create( make_shared<OwnedTree>( OwnedMutTree::allocate( 0 ) ) )
@@ -309,7 +311,6 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::select_single( Handle
                         .unwrap<ValueTree>();
     return nil;
   }
-
   auto result = h.visit<Result<Object>>( overload {
     [&]( Handle<ObjectTreeRef> x ) -> Result<Object> {
       auto unreffed = relater_->get().unref( x );
@@ -352,7 +353,9 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::select_range( Handle<
                                                                          size_t begin_idx,
                                                                          size_t end_idx )
 {
-  if ( begin_idx >= handle::size( h ) || end_idx >= handle::size( h ) || begin_idx > end_idx ) {
+  begin_idx = std::min( begin_idx, handle::size( h ) );
+  end_idx = std::min( end_idx, handle::size( h ) );
+  if ( begin_idx == handle::size( h ) || begin_idx >= end_idx ) {
     static auto nil = relater_->get()
                         .get_storage()
                         .create( make_shared<OwnedTree>( OwnedMutTree::allocate( 0 ) ) )

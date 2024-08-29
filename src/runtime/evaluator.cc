@@ -1,4 +1,5 @@
 #include <functional> // IWYU pragma: keep
+#include <iostream>
 #include <stdexcept>
 
 #include "evaluator.hh"

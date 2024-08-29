@@ -1,3 +1,5 @@
+#pragma clang diagnostic ignored "-Wignored-attributes"
+
 #include "fixpoint_util.h"
 #include "support.h"
 
