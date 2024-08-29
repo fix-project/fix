@@ -176,6 +176,8 @@ public:
 
   void start() { network_thread_ = std::thread( std::bind( &NetworkWorker::run_loop, this ) ); }
 
+  void join() { network_thread_.join(); }
+
   void stop()
   {
     should_exit_ = true;

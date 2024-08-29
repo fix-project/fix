@@ -109,8 +109,7 @@ int main( int argc, char* argv[] )
   auto server = Server::init( listen_address, scheduler, peer_address );
   cout << "Server initialized" << endl;
 
-  while ( true )
-    ;
+  server->join();
 
   return 0;
 }
