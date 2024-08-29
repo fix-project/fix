@@ -295,27 +295,30 @@ void BasePass::all( Handle<Dependee> job )
 
   for ( const auto& remote : relater_.get().remotes_.read().get() ) {
     auto locked_remote = remote.lock();
-    if ( locked_remote->get_info().has_value() and locked_remote->get_info()->parallelism > 0 ) {
-      tasks_info_[job].absent_size.insert( { locked_remote, absent_size( locked_remote, job ) } );
-      VLOG( 2 ) << "remote absent_size " << job << " " << tasks_info_[job].absent_size.at( locked_remote )
-                << locked_remote;
-      job.visit<void>( overload {
-        [&]( Handle<ValueTreeRef> ref ) {
-          if ( locked_remote->contains_shallow( relater_.get().unref( ref ) ) ) {
-            tasks_info_[job].contains.insert( locked_remote );
-          }
-        },
-        [&]( Handle<ObjectTreeRef> ref ) {
-          if ( locked_remote->contains_shallow( relater_.get().unref( ref ) ) ) {
-            tasks_info_[job].contains.insert( locked_remote );
-          }
-        },
-        [&]( auto r ) {
-          if ( locked_remote->contains( r ) ) {
-            tasks_info_[job].contains.insert( locked_remote );
-          }
-        },
-      } );
+    if ( locked_remote ) {
+      auto info = locked_remote->get_info();
+      if ( info.has_value() and info->parallelism > 0 ) {
+        tasks_info_[job].absent_size.insert( { locked_remote, absent_size( locked_remote, job ) } );
+        VLOG( 2 ) << "remote absent_size " << job << " " << tasks_info_[job].absent_size.at( locked_remote )
+                  << locked_remote;
+        job.visit<void>( overload {
+          [&]( Handle<ValueTreeRef> ref ) {
+            if ( locked_remote->contains_shallow( relater_.get().unref( ref ) ) ) {
+              tasks_info_[job].contains.insert( locked_remote );
+            }
+          },
+          [&]( Handle<ObjectTreeRef> ref ) {
+            if ( locked_remote->contains_shallow( relater_.get().unref( ref ) ) ) {
+              tasks_info_[job].contains.insert( locked_remote );
+            }
+          },
+          [&]( auto r ) {
+            if ( locked_remote->contains( r ) ) {
+              tasks_info_[job].contains.insert( locked_remote );
+            }
+          },
+        } );
+      }
     }
   }
 }
@@ -799,7 +802,7 @@ void FinalPass::relation_pre( Handle<Relation> job, const absl::flat_hash_set<Ha
   absl::flat_hash_set<Handle<Relation>> unblocked;
   sch_.get().merge_sketch_graph( job, unblocked );
 
-  if ( unblocked.size() == 1 ) {
+  if ( unblocked.size() == 1 && !todo_.has_value() ) {
     auto todo = *unblocked.begin();
     if ( is_local( chosen_remotes_.at( todo ).first ) ) {
       todo_ = todo;
