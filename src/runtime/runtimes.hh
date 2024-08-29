@@ -68,5 +68,6 @@ public:
   static std::shared_ptr<Server> init( const Address& address,
                                        std::shared_ptr<Scheduler> scheduler,
                                        const std::vector<Address> peer_servers = {} );
+  void join();
   ~Server();
 };
