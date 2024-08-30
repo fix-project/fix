@@ -1,4 +1,5 @@
 #include <cmath>
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -80,9 +81,9 @@ int main( int argc, char* argv[] )
                     } );
 
   const size_t TOTAL_SIZE = handle::size( haystack );
-  const size_t LEAF_SIZE = 1024 * 1024;
+  const size_t LEAF_SIZE = 1024 * 1024 * 1024;
   const size_t LEAVES = std::ceil( TOTAL_SIZE / (double)LEAF_SIZE );
-  cout << "running as " << LEAVES << " parallel counts" << endl;
+  cerr << "Running as " << LEAVES << " parallel counts" << endl;
   auto args = OwnedMutTree::allocate( LEAVES );
   for ( size_t i = 0; i < LEAVES; i++ ) {
     auto selection = OwnedMutTree::allocate( 3 );
@@ -108,11 +109,37 @@ int main( int argc, char* argv[] )
   application[6] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, true );
 
   auto handle = rt.create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ExpressionTree>();
+  struct timespec before, after;
+  struct timespec before_real, after_real;
+  if ( clock_gettime( CLOCK_REALTIME, &before_real ) ) {
+    perror( "clock_gettime" );
+    exit( 1 );
+  }
+  if ( clock_gettime( CLOCK_PROCESS_CPUTIME_ID, &before ) ) {
+    perror( "clock_gettime" );
+    exit( 1 );
+  }
   auto res = client->execute( Handle<Eval>( Handle<Object>( Handle<Application>( handle::upcast( handle ) ) ) ) );
+  if ( clock_gettime( CLOCK_PROCESS_CPUTIME_ID, &after ) ) {
+    perror( "clock_gettime" );
+    exit( 1 );
+  }
+  if ( clock_gettime( CLOCK_REALTIME, &after_real ) ) {
+    perror( "clock_gettime" );
+    exit( 1 );
+  }
+
+  double delta = after.tv_sec - before.tv_sec + (double)( after.tv_nsec - before.tv_nsec ) * 1e-9;
+  double delta_real
+    = after_real.tv_sec - before_real.tv_sec + (double)( after_real.tv_nsec - before_real.tv_nsec ) * 1e-9;
 
   // print the result
-  cerr << "Result:\n" << res << endl;
-  cerr << "Result:\n" << res.content << endl;
+  cerr << "Result: " << res << endl;
+  cerr << "Handle: " << res.content << endl;
+  cerr << "CPU Time: " << delta << " seconds" << endl;
+  cerr << "Real Time: " << delta_real << " seconds" << endl;
+  uint64_t count = uint64_t( handle::extract<Literal>( res ).value() );
+  cerr << "Count: " << count << endl;
 
   return 0;
 }

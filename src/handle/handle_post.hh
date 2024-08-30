@@ -44,6 +44,24 @@ static inline std::optional<Handle<AnyDataType>> data( Handle<T> handle )
 }
 
 template<typename T>
+static inline Handle<AnyDataType> inner_data( Handle<T> handle )
+{
+  if constexpr ( std::same_as<T, Relation> ) {
+    return handle;
+  } else if constexpr ( std::same_as<T, ValueTreeRef> ) {
+    return Handle<ValueTree>( handle );
+  } else if constexpr ( std::same_as<T, ObjectTreeRef> ) {
+    return Handle<ObjectTree>( handle );
+  } else if constexpr ( std::same_as<T, ObjectTreeRef> or std::same_as<T, BlobRef> or std::same_as<T, Thunk> ) {
+    return {};
+  } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
+    return handle;
+  } else {
+    return std::visit( []( const auto x ) { return data( x ); }, handle.get() );
+  }
+}
+
+template<typename T>
 static inline bool is_local( Handle<T> handle )
 {
   if constexpr ( not Handle<T>::is_fix_sum_type ) {
