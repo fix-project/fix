@@ -559,12 +559,14 @@ void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_s
     } else {
       optional<shared_ptr<IRuntime>> remote;
       for ( auto d : dependencies ) {
-        if ( !remote.has_value() ) {
-          remote = chosen_remotes_.at( d ).first;
-        } else {
-          if ( remote.value() != chosen_remotes_.at( d ).first ) {
-            remote.reset();
-            break;
+        if ( chosen_remotes_.contains( d ) ) {
+          if ( !remote.has_value() ) {
+            remote = chosen_remotes_.at( d ).first;
+          } else {
+            if ( remote.value() != chosen_remotes_.at( d ).first ) {
+              remote.reset();
+              break;
+            }
           }
         }
       }

@@ -633,17 +633,20 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
       overload {
         [&]( BlobDataPayload b ) {
           if ( !connection.loaded( b.first ) ) {
-            VLOG( 2 ) << "Adding " << b.first << " to proposal";
-            connection.incomplete_proposal_->emplace( b.first, b.second );
-            connection.proposal_size_ += b.second->size();
+            VLOG( 2 ) << "Adding " << b.first << " to proposal " << remote_idx;
+            if ( connection.incomplete_proposal_->emplace( b.first, b.second ).second ) {
+              connection.proposal_size_ += b.second->size();
+            }
           }
         },
         [&]( TreeDataPayload t ) {
           if ( !connection.loaded( t.first ) ) {
-            VLOG( 2 ) << "Adding " << t.first << " to proposal";
-            connection.incomplete_proposal_->emplace(
-              visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
-            connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
+            VLOG( 2 ) << "Adding " << t.first << " to proposal " << remote_idx;
+            if ( connection.incomplete_proposal_
+                   ->emplace( visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second )
+                   .second ) {
+              connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
+            }
           }
         },
         [&]( RunPayload r ) {
@@ -655,7 +658,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             connection.proposed_proposals_.push( { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
                                                    make_unique<Remote::DataProposal>() } );
           } else if ( connection.proposal_size_ < 1048576 ) {
-            // Proposal too small, sending directly
+            VLOG( 2 ) << "Proposal too small, sending directly " << remote_idx;
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
               h.visit<void>( overload {

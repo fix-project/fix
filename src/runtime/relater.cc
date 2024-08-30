@@ -146,12 +146,13 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
     return storage_.get( name );
   }
 
-  return scheduler_->schedule( name );
+  local_->get( name );
+  return {};
 }
 
 optional<Handle<AnyTree>> Relater::get_handle( Handle<AnyTree> name )
 {
-  if ( storage_.contains( name ) ) {
+  if ( storage_.contains( name ) || storage_.contains_shallow( name ) ) {
     return storage_.get_handle( name );
   } else if ( repository_.contains( name ) ) {
     return repository_.get_handle( name );
