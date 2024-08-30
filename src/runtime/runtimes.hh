@@ -9,10 +9,9 @@
 
 class FrontendRT
 {
-  virtual Handle<Value> execute( Handle<Relation> ) = 0;
-
 public:
   virtual ~FrontendRT() {}
+  virtual Handle<Value> execute( Handle<Relation> ) = 0;
 };
 
 class ReadOnlyRT : public FrontendRT

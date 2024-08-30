@@ -32,33 +32,36 @@ Handle<Thunk> compile( IRuntime& rt, std::string_view file )
 
 int main( int argc, char* argv[] )
 {
-  /* if ( argc != 4 ) { */
-  /*   cerr << "Usage: fixpoint-client-wikipedia needle-string haystack-label +[address]:[port]" << endl; */
-  /*   exit( 1 ); */
-  /* } */
-  if ( argc != 3 ) {
-    cerr << "Usage: fixpoint-client-wikipedia needle-string haystack-label" << endl;
+  if ( argc != 3 && argc != 4 ) {
+    cerr << "Usage: fixpoint-client-wikipedia needle-string haystack-label [address:port]" << endl;
     exit( 1 );
   }
 
   auto needle_string = std::string( argv[1] );
   auto haystack_label = std::string( argv[2] );
 
-  /* std::shared_ptr<Client> client; */
-  /* if ( argv[3][0] == '+' ) { */
-  /*   string addr( &argv[3][1] ); */
-  /*   if ( addr.find( ':' ) == string::npos ) { */
-  /*     throw runtime_error( "invalid argument " + addr ); */
-  /*   } */
-  /*   Address address( addr.substr( 0, addr.find( ':' ) ), stoi( addr.substr( addr.find( ':' ) + 1 ) ) ); */
-  /*   client = Client::init( address ); */
-  /* } else { */
-  /*   exit( 1 ); */
-  /* } */
-
-  shared_ptr<Scheduler> scheduler = make_shared<HintScheduler>();
-  auto client = std::make_shared<Relater>( std::thread::hardware_concurrency(), std::nullopt, scheduler );
-  IRuntime& rt = *client;
+  /* auto ro_rt = [&] { */
+  /*   auto client = ReadOnlyRT::init(); */
+  /*   std::shared_ptr<FrontendRT> frontend = dynamic_pointer_cast<FrontendRT>( client ); */
+  /*   return make_pair( frontend, std::reference_wrapper( client->get_rt() ) ); */
+  /* }; */
+  auto rw_rt = [&] {
+    auto client = ReadWriteRT::init();
+    std::shared_ptr<FrontendRT> frontend = dynamic_pointer_cast<FrontendRT>( client );
+    return make_pair( frontend, std::reference_wrapper( client->get_rt() ) );
+  };
+  auto client_rt = [&] {
+    std::shared_ptr<Client> client;
+    string addr( argv[3] );
+    if ( addr.find( ':' ) == string::npos ) {
+      throw runtime_error( "invalid argument " + addr );
+    }
+    Address address( addr.substr( 0, addr.find( ':' ) ), stoi( addr.substr( addr.find( ':' ) + 1 ) ) );
+    client = Client::init( address );
+    std::shared_ptr<FrontendRT> frontend = dynamic_pointer_cast<FrontendRT>( client );
+    return make_pair( frontend, std::reference_wrapper( client->get_rt() ) );
+  };
+  auto [client, rt] = argc == 3 ? rw_rt() : client_rt();
 
   auto mapreduce = client->execute(
     Handle<Eval>( compile( rt, "build/applications-prefix/src/applications-build/mapreduce/mapreduce.wasm" ) ) );
@@ -136,7 +139,9 @@ int main( int argc, char* argv[] )
   // print the result
   cerr << "Result: " << res << endl;
   cerr << "Handle: " << res.content << endl;
-  cerr << "CPU Time: " << delta << " seconds" << endl;
+  if ( argc == 3 ) {
+    cerr << "CPU Time: " << delta << " seconds" << endl;
+  }
   cerr << "Real Time: " << delta_real << " seconds" << endl;
   uint64_t count = uint64_t( handle::extract<Literal>( res ).value() );
   cerr << "Count: " << count << endl;
