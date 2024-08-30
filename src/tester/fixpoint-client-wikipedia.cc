@@ -86,7 +86,8 @@ int main( int argc, char* argv[] )
   const size_t TOTAL_SIZE = handle::size( haystack );
   const size_t LEAF_SIZE = 1024 * 1024 * 1024;
   const size_t LEAVES = std::ceil( TOTAL_SIZE / (double)LEAF_SIZE );
-  cerr << "Running as " << LEAVES << " parallel counts" << endl;
+  cerr << "Running " << LEAVES << " parallel maps." << endl;
+  cerr << "Precomputing selections." << endl;
   auto args = OwnedMutTree::allocate( LEAVES );
   for ( size_t i = 0; i < LEAVES; i++ ) {
     auto selection = OwnedMutTree::allocate( 3 );
@@ -95,6 +96,8 @@ int main( int argc, char* argv[] )
     selection[2] = Handle<Literal>( std::min( LEAF_SIZE * ( i + 1 ), TOTAL_SIZE ) );
     auto handle = rt.create( make_shared<OwnedTree>( std::move( selection ) ) ).unwrap<ValueTree>();
     auto select = Handle<Selection>( Handle<ObjectTree>( handle ) );
+    // force this to execute and be cached
+    client->execute( Handle<Think>( select ) );
 
     auto arg_tree = OwnedMutTree::allocate( 2 );
     arg_tree[0] = needle;
@@ -112,6 +115,7 @@ int main( int argc, char* argv[] )
   application[6] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, true );
 
   auto handle = rt.create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ExpressionTree>();
+  cerr << "Executing." << endl;
   struct timespec before, after;
   struct timespec before_real, after_real;
   if ( clock_gettime( CLOCK_REALTIME, &before_real ) ) {
