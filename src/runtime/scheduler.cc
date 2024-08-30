@@ -282,7 +282,7 @@ LocalScheduler::Result<Object> LocalScheduler::select( Handle<ObjectTree> combin
     return relater_->get().get( select ).value();
   }
 
-  auto tree = relater_->get().get( combination ).value();
+  auto tree = relater_->get().get_shallow( combination ).value();
 
   auto h = tree->at( 0 ).unwrap<Expression>().unwrap<Object>();
 
@@ -434,7 +434,7 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::select( Handle<Object
     return relater_->get().get( select ).value();
   }
 
-  auto tree = relater_->get().get( combination ).value();
+  auto tree = relater_->get().get_shallow( combination ).value();
 
   auto h = tree->at( 0 ).unwrap<Expression>().unwrap<Object>();
 

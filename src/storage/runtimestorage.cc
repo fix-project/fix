@@ -399,13 +399,13 @@ bool RuntimeStorage::contains_shallow( Handle<AnyTree> handle )
 
 std::optional<Handle<AnyTree>> RuntimeStorage::get_handle( Handle<AnyTree> name )
 {
-  return trees_.get_handle( name );
+  return trees_.get_handle( name ).or_else( [&]() { return tree_refs_.get_handle( name ); } );
 }
 
 optional<Handle<AnyTree>> RuntimeStorage::contains( Handle<AnyTreeRef> handle )
 {
   auto tmp_tree = Handle<AnyTree>::forge( handle.content );
-  auto entry = trees_.get_handle( tmp_tree );
+  auto entry = get_handle( tmp_tree );
 
   if ( !entry.has_value() ) {
     return {};
