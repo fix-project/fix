@@ -27,33 +27,24 @@ void test( shared_ptr<Relater> rt )
   auto merge_counts
     = tester::Compile( tester::File( "applications-prefix/src/applications-build/count-words/merge_counts.wasm" ) );
 
-  auto blob = tester::Blob( "the quick brown fox jumps over the lazy dog" );
-  auto blob2 = tester::Blob( "it was the best of times, it was the worst of times" );
-  auto tree = tester::Tree( blob, blob2 );
+  auto goal = tester::Blob( "the" );
+  auto blob0 = tester::Blob( "the quick brown fox jumps over the lazy dog" );
+  auto blob1 = tester::Blob( "it was the best of times, it was the worst of times" );
+
+  auto arg0 = tester::Tree( goal, blob0 );
+  auto arg1 = tester::Tree( goal, blob1 );
+
+  auto tree = tester::Tree( arg0, arg1 );
   auto thunk = Handle<Thunk>( tester::Tree(
     tester::Limits(), mapreduce, count_words, merge_counts, tree, tester::Limits(), tester::Limits() ) );
   auto result = tester::rt->execute( Handle<Eval>( thunk ) );
 
-  auto x = result.unwrap<Blob>().unwrap<Named>();
-  auto y = tester::rt->get( x ).value();
+  auto x = uint64_t( result.unwrap<Blob>().unwrap<Literal>() );
+  uint64_t y = 4;
 
-  uint64_t actual_counts[256] = { 0 };
-  for ( char c : tester::rt->get( blob.unwrap<Named>() ).value()->span() ) {
-    actual_counts[static_cast<uint8_t>( c )]++;
-  }
-  for ( char c : tester::rt->get( blob2.unwrap<Named>() ).value()->span() ) {
-    actual_counts[static_cast<uint8_t>( c )]++;
-  }
-
-  for ( size_t i = 0; i < 256; i++ ) {
-    if ( actual_counts[i] != reinterpret_cast<const uint64_t*>( y->span().data() )[i] ) {
-      fprintf( stderr,
-               "%ld: got %ld, expected %ld.\n",
-               i,
-               reinterpret_cast<const uint64_t*>( y->span().data() )[i],
-               actual_counts[i] );
-      exit( 1 );
-    }
+  if ( x != y ) {
+    fprintf( stderr, "got %ld, expected %ld.\n", x, y );
+    exit( 1 );
   }
 
   exit( 0 );
