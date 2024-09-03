@@ -44,14 +44,6 @@ externref mapreduce( externref mapper,
   }
 }
 
-struct rlimits
-{
-  uint64_t memory;
-  uint64_t output_size;
-  uint64_t output_fanout;
-};
-static_assert( sizeof( rlimits ) == 24 );
-
 /**
  * @brief Applies a mapper and a reducer to a Tree, producing a single combined output.
  * @details The mapper is the second argument.
