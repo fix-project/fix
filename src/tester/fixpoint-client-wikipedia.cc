@@ -135,16 +135,16 @@ int main( int argc, char* argv[] )
 
   auto tree = rt.create( make_shared<OwnedTree>( std::move( args ) ) ).unwrap<ValueTree>();
 
-  auto application = OwnedMutTree::allocate( 7 );
-  application[0] = make_limits( rt, 1024 * 1024 * 1024, 1024 * 1024, 1, false );
-  application[1] = mapreduce;
-  application[2] = mapper;
-  application[3] = reducer;
-  application[4] = Handle<ValueTreeRef>( tree, LEAVES );
-  application[5] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, false );
-  application[6] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, true );
+  auto toplevel = OwnedMutTree::allocate( 7 );
+  toplevel[0] = make_limits( rt, 1024 * 1024 * 1024, 1024 * 1024, 1, false );
+  toplevel[1] = mapreduce;
+  toplevel[2] = mapper;
+  toplevel[3] = reducer;
+  toplevel[4] = Handle<ValueTreeRef>( tree, LEAVES );
+  toplevel[5] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, false );
+  toplevel[6] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, true );
 
-  auto handle = rt.create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ValueTree>();
+  auto handle = rt.create( make_shared<OwnedTree>( std::move( toplevel ) ) ).unwrap<ValueTree>();
   cerr << "Executing." << endl;
   struct timespec before, after;
   struct timespec before_real, after_real;
