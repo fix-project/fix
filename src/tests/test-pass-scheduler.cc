@@ -95,7 +95,7 @@ void case_one( void )
                                                Handle<Strict>( Handle<Identification>( system_dep_tree ) ),
                                                Handle<Strict>( Handle<Identification>( clang_dep_tree ) ) ) ) ) );
 
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
        or fake_worker->todos_.front() != Handle<Dependee>( Handle<Relation>( task ) ) ) {
@@ -152,7 +152,7 @@ void case_two( void )
   auto task = Handle<Eval>( Handle<Application>(
     handle::upcast( tree( *rt, 1_literal32, Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) );
 
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
        or fake_worker->todos_.front() != Handle<Dependee>( Handle<Relation>( task ) ) ) {
@@ -184,7 +184,7 @@ void case_three( void )
           Handle<Strict>(
             handle::extract<Identification>( make_identification( rt->labeled( "c-to-elf-fix-wasm" ) ) ).value() ),
           Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) );
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
        or ( fake_worker->todos_.front()
@@ -219,7 +219,7 @@ void case_four( void )
           Handle<Strict>(
             handle::extract<Identification>( make_identification( rt->labeled( "c-to-elf-fix-wasm" ) ) ).value() ),
           Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) );
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
        or ( fake_worker->todos_.front()
@@ -260,7 +260,7 @@ void case_five( void )
           Handle<Strict>( Handle<Application>( handle::upcast( tree(
             *rt, limits( *rt, 1, 3000, 1 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
 
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
        or ( fake_worker->todos_.front()
@@ -305,7 +305,7 @@ void case_six( void )
     Handle<Strict>( Handle<Application>( handle::upcast(
       tree( *rt, limits( *rt, 1, 3000, 10 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
 
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
        or ( fake_worker->todos_.front()
@@ -352,7 +352,7 @@ void case_seven( void )
     Handle<Strict>( Handle<Application>( handle::upcast(
       tree( *rt, limits( *rt, 1, 1, 10 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
 
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() == 2 ) {
     // get( Blob 1 )
@@ -412,7 +412,7 @@ void case_eight( void )
             .unwrap<ObjectTree>() )
       .unwrap<ObjectTree>() );
 
-  rt->get( task );
+  rt->run( task );
 
   auto remote_task = Handle<Eval>( tree( *rt,
                                          handle::extract<Identification>( make_identification( handle1 ) ).value(),
@@ -468,7 +468,7 @@ void case_nine( void )
         .unwrap<ObjectTree>() )
       .unwrap<ObjectTree>() );
 
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() == 2 ) {
     // get( Blob 1 )
@@ -530,7 +530,7 @@ void case_ten( void )
         .unwrap<ObjectTree>() )
       .unwrap<ObjectTree>() );
 
-  rt->get( task );
+  rt->run( task );
 
   if ( fake_worker->todos_.size() == 2 ) {
     // get( Blob 1 )
@@ -600,7 +600,7 @@ void case_eleven( void )
             Handle<Literal>( (uint64_t)7 ) )
         .unwrap<ObjectTree>() ) );
 
-  rt->get( Handle<Eval>( task.unwrap<ObjectTree>() ) );
+  rt->run( Handle<Eval>( task.unwrap<ObjectTree>() ) );
 
   if ( fake_worker->todos_.size() == 1 ) {
     // get_shallow( Tree 0 )
@@ -661,7 +661,7 @@ void case_twelve( void )
             Handle<Literal>( (uint64_t)255 ) )
         .unwrap<ObjectTree>() ) );
 
-  rt->get( Handle<Eval>( task.unwrap<ObjectTree>() ) );
+  rt->run( Handle<Eval>( task.unwrap<ObjectTree>() ) );
 
   if ( fake_worker->todos_.size() == 2 ) {
     // get_shallow( Tree )
