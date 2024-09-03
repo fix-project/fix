@@ -3,13 +3,13 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "handle.hh"
 #include "handle_post.hh"
 #include "object.hh"
 #include "runtimes.hh"
-#include "scheduler.hh"
 #include "tester-utils.hh"
 #include "types.hh"
 
@@ -28,6 +28,23 @@ Handle<Thunk> compile( IRuntime& rt, std::string_view file )
   application[2] = wasm;
   auto handle = rt.create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ExpressionTree>();
   return Handle<Application>( handle::upcast( handle ) );
+}
+
+void progress( double x )
+{
+  x = std::clamp( x, 0.0, 1.0 );
+  struct winsize w;
+  ioctl( STDOUT_FILENO, TIOCGWINSZ, &w );
+  cerr << "\r";
+  cerr << "[";
+  for ( int i = 0; i < w.ws_col - 2; i++ ) {
+    if ( i / (double)( w.ws_col - 2 ) < x ) {
+      cerr << "#";
+    } else {
+      cerr << " ";
+    }
+  }
+  cerr << "]";
 }
 
 int main( int argc, char* argv[] )
@@ -83,13 +100,24 @@ int main( int argc, char* argv[] )
                       [&]( auto ) -> Handle<BlobRef> { throw runtime_error( "haystack label was not a blob" ); },
                     } );
 
+#define KiB 1024
+#define MiB ( 1024 * KiB )
+#define GiB ( 1024 * MiB )
+
   const size_t TOTAL_SIZE = handle::size( haystack );
-  const size_t LEAF_SIZE = 1024 * 1024 * 1024;
+#define SIZE 1
+#if SIZE == 1
+  const size_t LEAF_SIZE = 100 * MiB;
+#elif SIZE == 2
+  const size_t LEAF_SIZE = 1 * GiB;
+#endif
   const size_t LEAVES = std::ceil( TOTAL_SIZE / (double)LEAF_SIZE );
   cerr << "Running " << LEAVES << " parallel maps." << endl;
   cerr << "Precomputing selections." << endl;
+  progress( 0 );
   auto args = OwnedMutTree::allocate( LEAVES );
   for ( size_t i = 0; i < LEAVES; i++ ) {
+    progress( i / (double)LEAVES );
     auto selection = OwnedMutTree::allocate( 3 );
     selection[0] = haystack;
     selection[1] = Handle<Literal>( LEAF_SIZE * i );
@@ -97,24 +125,26 @@ int main( int argc, char* argv[] )
     auto handle = rt.create( make_shared<OwnedTree>( std::move( selection ) ) ).unwrap<ValueTree>();
     auto select = Handle<Selection>( Handle<ObjectTree>( handle ) );
     // force this to execute and be cached
-    client->execute( Handle<Think>( select ) );
+    auto ref = client->execute( Handle<Think>( select ) );
 
     auto arg_tree = OwnedMutTree::allocate( 2 );
     arg_tree[0] = needle;
-    arg_tree[1] = Handle<Shallow>( select );
-    args[i] = rt.create( make_shared<OwnedTree>( std::move( arg_tree ) ) ).unwrap<ExpressionTree>();
+    arg_tree[1] = ref;
+    args[i] = rt.create( make_shared<OwnedTree>( std::move( arg_tree ) ) ).unwrap<ValueTree>();
   }
+
+  auto tree = rt.create( make_shared<OwnedTree>( std::move( args ) ) ).unwrap<ValueTree>();
 
   auto application = OwnedMutTree::allocate( 7 );
   application[0] = make_limits( rt, 1024 * 1024 * 1024, 1024 * 1024, 1, false );
   application[1] = mapreduce;
   application[2] = mapper;
   application[3] = reducer;
-  application[4] = rt.create( make_shared<OwnedTree>( std::move( args ) ) ).unwrap<ExpressionTree>();
+  application[4] = Handle<ValueTreeRef>( tree, LEAVES );
   application[5] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, false );
   application[6] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, true );
 
-  auto handle = rt.create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ExpressionTree>();
+  auto handle = rt.create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ValueTree>();
   cerr << "Executing." << endl;
   struct timespec before, after;
   struct timespec before_real, after_real;
