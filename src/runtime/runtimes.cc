@@ -93,42 +93,39 @@ void Client::send_job( Handle<T> handle, unordered_set<Handle<Fix>> visited )
     return;
 
   if constexpr ( Handle<T>::is_fix_sum_type ) {
-    if constexpr ( std::same_as<T, BlobRef> ) {
-      std::visit( [&]( const auto x ) { send_job( x, visited ); }, handle.get() );
-    }
+    std::visit( [&]( auto x ) { send_job( x, visited ); }, handle.get() );
   } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
-    std::visit( [&]( const auto x ) { send_job( x, visited ); }, handle.get() );
+    if ( relater_.contains( handle ).has_value() ) {
+      std::visit( [&]( auto x ) { send_job( x, visited ); }, relater_.contains( handle ).value().get() );
+    }
   } else {
-    if ( server_->contains( handle ) ) {
-      // Load the data on the server side
-      server_->put( handle, {} );
+    if constexpr ( std::same_as<T, Literal> ) {
+      return;
     } else {
-      if constexpr ( FixTreeType<T> ) {
-        if ( contains( handle ) ) {
-          auto tree = get( handle ).value();
-          for ( const auto& element : tree->span() ) {
-            send_job( element, visited );
+      if ( server_->contains( handle ) ) {
+        // Load the data on the server side
+        server_->put( handle, {} );
+      } else {
+        if constexpr ( FixTreeType<T> ) {
+          if ( relater_.contains( handle ) ) {
+            auto tree = relater_.get( handle ).value();
+            for ( const auto& element : tree->span() ) {
+              send_job( element, visited );
+            }
           }
         }
+
+        if ( relater_.contains( handle ) ) {
+          server_->put( handle, relater_.get( handle ).value() );
+        }
       }
-      server_->put( handle, relater_.get( handle ).value() );
+      visited.insert( handle );
     }
-    visited.insert( handle );
   }
 }
 
 Handle<Value> Client::execute( Handle<Relation> x )
 {
   send_job( x );
-  relater_.visit_full( x, [&]( Handle<AnyDataType> h ) {
-    h.visit<void>( overload { []( Handle<Literal> ) {},
-                              []( Handle<Relation> ) {},
-                              [&]( auto h ) {
-                                if ( relater_.contains( h ) ) {
-                                  server_->put( h, relater_.get( h ).value() );
-                                }
-                              } } );
-  } );
-
   return relater_.execute( x );
 }
