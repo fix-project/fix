@@ -156,6 +156,8 @@ size_t MessageParser::parse( string_view buf )
             case Message::Opcode::RESULT:
             case Message::Opcode::REQUESTTREE:
             case Message::Opcode::REQUESTBLOB:
+            case Message::Opcode::LOADBLOB:
+            case Message::Opcode::LOADTREE:
             case Message::Opcode::REQUESTSHALLOWTREE:
             case Message::Opcode::PROPOSE_TRANSFER:
             case Message::Opcode::ACCEPT_TRANSFER:
@@ -327,6 +329,30 @@ void ShallowTreeDataPayload::serialize( Serializer& serializer ) const
   serializer.integer( handle.content );
   serializer.string(
     string_view( reinterpret_cast<const char*>( data->span().data() ), data->span().size_bytes() ) );
+}
+
+LoadBlobPayload LoadBlobPayload::parse( Parser& parser )
+{
+  LoadBlobPayload payload;
+  payload.handle = parse_handle<Blob>( parser );
+  return payload;
+}
+
+void LoadBlobPayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
+}
+
+LoadTreePayload LoadTreePayload::parse( Parser& parser )
+{
+  LoadTreePayload payload;
+  payload.handle = parse_handle<AnyTree>( parser );
+  return payload;
+}
+
+void LoadTreePayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
 }
 
 template<Message::Opcode O>
