@@ -69,7 +69,7 @@ class Remote : public IRuntime
 
   bool dead_ { false };
 
-  using DataProposal = absl::flat_hash_map<Handle<AnyDataType>, std::variant<BlobData, TreeData>, AbslHash>;
+  using DataProposal = std::vector<std::pair<Handle<AnyDataType>, std::variant<BlobData, TreeData>>>;
   std::unique_ptr<DataProposal> incomplete_proposal_ { std::make_unique<DataProposal>() };
   size_t proposal_size_ {};
   std::queue<std::pair<std::pair<Handle<Relation>, std::optional<Handle<Object>>>, std::unique_ptr<DataProposal>>>

@@ -585,13 +585,15 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
                       [&]( Handle<Named> n ) {
                         if ( !contains( n ) ) {
                           push_message( { Opcode::BLOBDATA,
-                                          std::get<BlobData>( proposed_proposals_.front().second->at( h ) ) } );
+                                          parent.get( n ).value() } );
+                          add_to_view( n );
                         }
                       },
                       [&]( Handle<AnyTree> t ) {
                         if ( !contains( t ) ) {
                           push_message( { Opcode::TREEDATA,
-                                          std::get<TreeData>( proposed_proposals_.front().second->at( h ) ) } );
+                                          parent.get( t ).value() } );
+                          add_to_view( t );
                         }
                       },
                       []( Handle<Literal> ) {},
@@ -690,19 +692,15 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
         [&]( BlobDataPayload b ) {
           if ( !connection.contains( b.first ) ) {
             VLOG( 2 ) << "Adding " << b.first << " to proposal " << remote_idx;
-            if ( connection.incomplete_proposal_->emplace( b.first, b.second ).second ) {
-              connection.proposal_size_ += b.second->size();
-            }
+            connection.incomplete_proposal_->push_back( { b.first, b.second } );
+            connection.proposal_size_ += b.second->size();
           }
         },
         [&]( TreeDataPayload t ) {
           if ( !connection.contains( t.first ) ) {
             VLOG( 2 ) << "Adding " << t.first << " to proposal " << remote_idx;
-            if ( connection.incomplete_proposal_
-                   ->emplace( visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second )
-                   .second ) {
-              connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
-            }
+            connection.incomplete_proposal_->push_back( { visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second } );
+            connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
           }
         },
         [&]( RunPayload r ) {
