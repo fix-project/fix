@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdlib>
 #include <ctime>
 #include <iostream>
 #include <memory>
@@ -131,6 +132,11 @@ int main( int argc, char* argv[] )
     arg_tree[0] = needle;
     arg_tree[1] = ref;
     args[i] = rt.create( make_shared<OwnedTree>( std::move( arg_tree ) ) ).unwrap<ValueTree>();
+  }
+
+  if ( needle_string.empty() ) {
+    cerr << "No search query provided." << endl;
+    exit( EXIT_FAILURE );
   }
 
   auto tree = rt.create( make_shared<OwnedTree>( std::move( args ) ) ).unwrap<ValueTree>();
