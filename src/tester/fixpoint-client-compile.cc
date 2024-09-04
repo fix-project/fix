@@ -32,14 +32,12 @@ int main( int argc, char* argv[] )
                           .unwrap<Object>()
                           .unwrap<Value>()
                           .unwrap<ValueTree>();
-  rt->get_rt().get( compile_encode );
 
-  auto target = Handle<Strict>( Handle<Identification>(
-    rt->get_rt().labeled( argv[2] ).unwrap<Expression>().unwrap<Object>().unwrap<Value>() ) );
+  auto target = rt->get_rt().labeled( argv[2] ).unwrap<Expression>().unwrap<Object>().unwrap<Value>();
 
   auto application = OwnedMutTree::allocate( 3 );
   application[0] = make_limits( rt->get_rt(), 1024 * 1024 * 1024, 1024 * 1024, 1 );
-  application[1] = compile_encode;
+  application[1] = Handle<Strict>( Handle<Identification>( compile_encode ) );
   application[2] = target;
 
   auto handle = rt->get_rt().create( make_shared<OwnedTree>( std::move( application ) ) ).unwrap<ValueTree>();

@@ -115,9 +115,18 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
       h.visit<void>( overload {
         []( Handle<Literal> ) {},
         []( Handle<Relation> ) {},
-        [&]( auto x ) {
-          if ( !loaded( x ) ) {
+        [&]( Handle<Named> x ) {
+          if ( !contains( x ) ) {
             msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadBlobPayload( x ) ) );
+          }
+        },
+        [&]( auto x ) {
+          if ( !contains( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadTreePayload( x ) ) );
           }
         },
       } );
@@ -132,25 +141,38 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
 
 void Remote::put( Handle<Named> name, BlobData data )
 {
-  if ( !loaded( name ) ) {
+  if ( !contains( name ) ) {
     msg_q_.enqueue( make_pair( index_, make_pair( name, data ) ) );
+  } else if ( !loaded( name ) ) {
+    msg_q_.enqueue( make_pair( index_, LoadBlobPayload( name ) ) );
   }
 }
 
 void Remote::put( Handle<AnyTree> name, TreeData )
 {
-  if ( !loaded( name ) ) {
+  if ( !contains( name ) ) {
     parent_.value().get().visit_minrepo( handle::upcast( name ), [&]( Handle<AnyDataType> h ) {
       h.visit<void>( overload {
         []( Handle<Literal> ) {},
         []( Handle<Relation> ) {},
-        [&]( auto x ) {
-          if ( !loaded( x ) ) {
+        [&]( Handle<Named> x ) {
+          if ( !contains( x ) ) {
             msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadBlobPayload( x ) ) );
+          }
+        },
+        [&]( auto x ) {
+          if ( !contains( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadTreePayload( x ) ) );
           }
         },
       } );
     } );
+  } else if ( !loaded( name ) ) {
+    msg_q_.enqueue( make_pair( index_, LoadTreePayload( name ) ) );
   }
 }
 
@@ -171,9 +193,18 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
         h.visit<void>( overload {
           []( Handle<Literal> ) {},
           []( Handle<Relation> ) {},
-          [&]( auto x ) {
-            if ( !loaded( x ) ) {
+          [&]( Handle<Named> x ) {
+            if ( !contains( x ) ) {
               msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+            } else if ( !loaded( x ) ) {
+              msg_q_.enqueue( make_pair( index_, LoadBlobPayload( x ) ) );
+            }
+          },
+          [&]( auto x ) {
+            if ( !contains( x ) ) {
+              msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+            } else if ( !loaded( x ) ) {
+              msg_q_.enqueue( make_pair( index_, LoadTreePayload( x ) ) );
             }
           },
         } );
@@ -195,9 +226,18 @@ void Remote::put_force( Handle<Relation> name, Handle<Object> data )
       h.visit<void>( overload {
         []( Handle<Literal> ) {},
         []( Handle<Relation> ) {},
-        [&]( auto x ) {
-          if ( !loaded( x ) ) {
+        [&]( Handle<Named> x ) {
+          if ( !contains( x ) ) {
             msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadBlobPayload( x ) ) );
+          }
+        },
+        [&]( auto x ) {
+          if ( !contains( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadTreePayload( x ) ) );
           }
         },
       } );
@@ -463,6 +503,22 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       break;
     }
 
+    case Opcode::LOADBLOB: {
+      auto payload = parse<LoadBlobPayload>( std::get<string>( msg.payload() ) );
+      if ( parent.contains( payload.handle.unwrap<Named>() ) ) {
+        parent.get( payload.handle.unwrap<Named>() );
+      }
+      break;
+    }
+
+    case Opcode::LOADTREE: {
+      auto payload = parse<LoadTreePayload>( std::get<string>( msg.payload() ) );
+      if ( parent.contains( payload.handle ) ) {
+        parent.get( payload.handle );
+      }
+      break;
+    }
+
     case Opcode::SHALLOWTREEDATA: {
       auto payload = parse<ShallowTreeDataPayload>( std::get<string>( msg.payload() ) );
       parent.put_shallow( payload.handle, payload.data );
@@ -632,7 +688,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
     visit(
       overload {
         [&]( BlobDataPayload b ) {
-          if ( !connection.loaded( b.first ) ) {
+          if ( !connection.contains( b.first ) ) {
             VLOG( 2 ) << "Adding " << b.first << " to proposal " << remote_idx;
             if ( connection.incomplete_proposal_->emplace( b.first, b.second ).second ) {
               connection.proposal_size_ += b.second->size();
@@ -640,7 +696,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
           }
         },
         [&]( TreeDataPayload t ) {
-          if ( !connection.loaded( t.first ) ) {
+          if ( !connection.contains( t.first ) ) {
             VLOG( 2 ) << "Adding " << t.first << " to proposal " << remote_idx;
             if ( connection.incomplete_proposal_
                    ->emplace( visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second )
@@ -732,6 +788,19 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                 std::move( connection.incomplete_proposal_ ) } );
             connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
             connection.proposal_size_ = 0;
+          }
+        },
+        [&]( LoadBlobPayload&& payload ) {
+          auto named = payload.handle.unwrap<Named>();
+          if ( connection.contains( named ) && !connection.loaded( named ) ) {
+            connection.add_to_view( named );
+            connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+          }
+        },
+        [&]( LoadTreePayload&& payload ) {
+          if ( connection.contains( payload.handle ) && !connection.loaded( payload.handle ) ) {
+            connection.add_to_view( payload.handle );
+            connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
           }
         },
         [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },

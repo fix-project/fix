@@ -3,6 +3,7 @@
 #include "overload.hh"
 #include "types.hh"
 #include <thread>
+#include <unordered_set>
 
 using namespace std;
 
@@ -83,8 +84,42 @@ shared_ptr<Server> Server::init( const Address& address,
   return runtime;
 }
 
+template<FixType T>
+void Client::send_job( Handle<T> handle, unordered_set<Handle<Fix>> visited )
+{
+  if ( visited.contains( handle ) )
+    return;
+  if constexpr ( std::same_as<T, Literal> )
+    return;
+
+  if constexpr ( Handle<T>::is_fix_sum_type ) {
+    if constexpr ( std::same_as<T, BlobRef> ) {
+      std::visit( [&]( const auto x ) { send_job( x, visited ); }, handle.get() );
+    }
+  } else if constexpr ( std::same_as<T, ValueTreeRef> or std::same_as<T, ObjectTreeRef> ) {
+    std::visit( [&]( const auto x ) { send_job( x, visited ); }, handle.get() );
+  } else {
+    if ( server_->contains( handle ) ) {
+      // Load the data on the server side
+      server_->put( handle, {} );
+    } else {
+      if constexpr ( FixTreeType<T> ) {
+        if ( contains( handle ) ) {
+          auto tree = get( handle ).value();
+          for ( const auto& element : tree->span() ) {
+            send_job( element, visited );
+          }
+        }
+      }
+      server_->put( handle, relater_.get( handle ).value() );
+    }
+    visited.insert( handle );
+  }
+}
+
 Handle<Value> Client::execute( Handle<Relation> x )
 {
+  send_job( x );
   relater_.visit_full( x, [&]( Handle<AnyDataType> h ) {
     h.visit<void>( overload { []( Handle<Literal> ) {},
                               []( Handle<Relation> ) {},

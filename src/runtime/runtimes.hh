@@ -43,6 +43,9 @@ protected:
   std::optional<NetworkWorker> network_worker_ {};
   std::shared_ptr<IRuntime> server_ {};
 
+  template<FixType T>
+  void send_job( Handle<T> handle, std::unordered_set<Handle<Fix>> visited = {} );
+
 public:
   Client() {}
   ~Client();

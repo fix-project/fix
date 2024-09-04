@@ -119,12 +119,12 @@ void BasePass::relation_post( Handle<Relation> job, const absl::flat_hash_set<Ha
 
             auto curr_output_size
               = limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 1 ) ); } )
-                  .transform( [&]( auto x ) { return uint64_t( x ); } )
+                  .transform( [&]( auto x ) { return x.size() == 4 ? uint32_t( x ) : uint64_t( x ); } )
                   .value_or( 1 );
 
             auto curr_fan_out
               = max( limits.and_then( [&]( auto x ) { return handle::extract<Literal>( x->at( 2 ) ); } )
-                       .transform( [&]( auto x ) { return uint64_t( x ); } )
+                       .transform( [&]( auto x ) { return x.size() == 4 ? uint32_t( x ) : uint64_t( x ); } )
                        .value_or( 1 ),
                      // XXX
                      dependencies.size() );

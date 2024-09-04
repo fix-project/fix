@@ -25,6 +25,8 @@ public:
     REQUESTBLOB,
     BLOBDATA,
     TREEDATA,
+    LOADBLOB,
+    LOADTREE,
     SHALLOWTREEDATA,
     PROPOSE_TRANSFER,
     ACCEPT_TRANSFER,
@@ -40,6 +42,8 @@ public:
                                                                                        "REQUESTBLOB",
                                                                                        "BLOBDATA",
                                                                                        "TREEDATA",
+                                                                                       "LOADBLOB",
+                                                                                       "LOADTREE",
                                                                                        "SHALLOWTREEDATA",
                                                                                        "PROPOSE_TRANSFER",
                                                                                        "ACCEPT_TRANSFER" };
@@ -144,6 +148,28 @@ struct ShallowTreeDataPayload
   size_t payload_length() const { return sizeof( u8x32 ) + data->span().size_bytes(); }
 };
 
+struct LoadBlobPayload
+{
+  Handle<Blob> handle {};
+
+  static LoadBlobPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::LOADBLOB;
+  size_t payload_length() const { return sizeof( u8x32 ); }
+};
+
+struct LoadTreePayload
+{
+  Handle<AnyTree> handle {};
+
+  static LoadTreePayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::LOADTREE;
+  size_t payload_length() const { return sizeof( u8x32 ); }
+};
+
 template<Message::Opcode O>
 struct TransferPayload
 {
@@ -178,6 +204,8 @@ using MessagePayload = std::variant<RunPayload,
                                     RequestShallowTreePayload,
                                     BlobDataPayload,
                                     TreeDataPayload,
+                                    LoadBlobPayload,
+                                    LoadTreePayload,
                                     ShallowTreeDataPayload>;
 
 class IncomingMessage : public Message
