@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <fstream>
 #include <memory>
@@ -73,8 +74,14 @@ int main( int argc, char* argv[] )
 
   auto combination
     = rt->get_rt().create( make_shared<OwnedTree>( std::move( parallel_tree ) ) ).unwrap<ObjectTree>();
+
+  auto start = chrono::steady_clock::now();
   auto res = rt->execute( Handle<Eval>( combination ) );
+  auto end = chrono::steady_clock::now();
+  chrono::duration<double> diff = end - start;
+
   cout << "Result:\n" << res << endl;
+  cout << "Duration [seconds]: " << diff << endl;
 
   return 0;
 }
