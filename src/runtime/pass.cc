@@ -621,8 +621,7 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
       break;
     }
 
-    size_t local_jobs = max( dependencies.size() / ( available_remotes.size() + 1 ),
-                             static_cast<size_t>( std::thread::hardware_concurrency() ) );
+    size_t local_jobs = std::thread::hardware_concurrency();
 
     size_t remote_idx = 0;
     for ( const auto& [_, d] : scores ) {
