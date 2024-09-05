@@ -710,7 +710,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             // Payload should be sent after last proposed_proposals_ is sent
             connection.proposed_proposals_.push( { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
                                                    make_unique<Remote::DataProposal>() } );
-          } else if ( connection.proposal_size_ < 1048576 ) {
+          } else if ( connection.proposal_size_ < 1048576 && connection.proposed_proposals_.empty() ) {
             VLOG( 2 ) << "Proposal too small, sending directly " << remote_idx;
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
@@ -753,7 +753,7 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             connection.proposed_proposals_.push(
               { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
                 make_unique<Remote::DataProposal>() } );
-          } else if ( connection.proposal_size_ < 1048576 ) {
+          } else if ( connection.proposal_size_ < 1048576 && connection.proposed_proposals_.empty() ) {
             // Proposal too small, sending directly
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
