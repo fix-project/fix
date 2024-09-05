@@ -232,7 +232,8 @@ uint32_t is_equal( u8x32 lhs, u8x32 rhs )
 
 uint32_t is_blob( u8x32 handle )
 {
-  return handle::extract<Blob>( Handle<Fix>::forge( handle ) ).has_value();
+  return handle::extract<Blob>( Handle<Fix>::forge( handle ) ).has_value()
+         || handle::extract<BlobRef>( Handle<Fix>::forge( handle ) ).has_value();
 }
 
 uint32_t is_tree( u8x32 handle )
