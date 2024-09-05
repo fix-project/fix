@@ -584,15 +584,13 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
         std::visit( overload {
                       [&]( Handle<Named> n ) {
                         if ( !contains( n ) ) {
-                          push_message( { Opcode::BLOBDATA,
-                                          parent.get( n ).value() } );
+                          push_message( { Opcode::BLOBDATA, parent.get( n ).value() } );
                           add_to_view( n );
                         }
                       },
                       [&]( Handle<AnyTree> t ) {
                         if ( !contains( t ) ) {
-                          push_message( { Opcode::TREEDATA,
-                                          parent.get( t ).value() } );
+                          push_message( { Opcode::TREEDATA, parent.get( t ).value() } );
                           add_to_view( t );
                         }
                       },
@@ -699,7 +697,8 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
         [&]( TreeDataPayload t ) {
           if ( !connection.contains( t.first ) ) {
             VLOG( 2 ) << "Adding " << t.first << " to proposal " << remote_idx;
-            connection.incomplete_proposal_->push_back( { visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second } );
+            connection.incomplete_proposal_->push_back(
+              { visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second } );
             connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
           }
         },
