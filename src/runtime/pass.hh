@@ -40,7 +40,7 @@ class BasePass : public Pass
 private:
   struct TaskInfo
   {
-    std::unordered_map<std::shared_ptr<IRuntime>, size_t> absent_size {};
+    std::unordered_map<std::shared_ptr<IRuntime>, size_t> present_size {};
     std::unordered_set<std::shared_ptr<IRuntime>> contains {};
     size_t output_size {};
     size_t output_fan_out {};
@@ -58,12 +58,14 @@ private:
   // Calculate absent size from a root
   size_t absent_size( std::shared_ptr<IRuntime> worker, Handle<Dependee> job );
 
+  std::vector<std::shared_ptr<IRuntime>> available_remotes_ {};
+
 public:
   BasePass( std::reference_wrapper<Relater> relater );
 
-  const std::unordered_map<std::shared_ptr<IRuntime>, size_t>& get_absent_size( const Handle<Dependee> task ) const
+  const std::unordered_map<std::shared_ptr<IRuntime>, size_t>& get_present_size( const Handle<Dependee> task ) const
   {
-    return tasks_info_.at( task ).absent_size;
+    return tasks_info_.at( task ).present_size;
   }
 
   const std::unordered_set<std::shared_ptr<IRuntime>>& get_contains( const Handle<Dependee> task ) const
@@ -76,13 +78,15 @@ public:
   size_t get_fan_out( const Handle<Dependee> task ) const { return tasks_info_.at( task ).output_fan_out; }
 
   bool get_ep( const Handle<Dependee> task ) const { return tasks_info_.at( task ).ep; }
+
+  const std::vector<std::shared_ptr<IRuntime>>& get_available_remotes() const { return available_remotes_; }
 };
 
 class SelectionPass : public Pass
 {
 protected:
   std::reference_wrapper<BasePass> base_;
-  absl::flat_hash_map<Handle<Dependee>, std::pair<std::shared_ptr<IRuntime>, int64_t>> chosen_remotes_;
+  absl::flat_hash_map<Handle<Dependee>, std::pair<std::shared_ptr<IRuntime>, size_t>> chosen_remotes_;
 
 public:
   SelectionPass( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater );
@@ -91,7 +95,7 @@ public:
                  std::reference_wrapper<Relater> relater,
                  std::unique_ptr<SelectionPass> prev );
 
-  absl::flat_hash_map<Handle<Dependee>, std::pair<std::shared_ptr<IRuntime>, int64_t>>&& release()
+  absl::flat_hash_map<Handle<Dependee>, std::pair<std::shared_ptr<IRuntime>, size_t>>&& release()
   {
     return std::move( chosen_remotes_ );
   };
@@ -135,10 +139,10 @@ class ChildBackProp : public SelectionPass
   absl::flat_hash_map<Handle<Dependee>, absl::flat_hash_set<Handle<Relation>>> dependees_ {};
 
   virtual void all( Handle<Dependee> ) override;
-  virtual void relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override;
   virtual void relation_post( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override;
 
   virtual void data( Handle<Dependee> ) override {}
+  virtual void relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override {};
 
 public:
   ChildBackProp( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater )
