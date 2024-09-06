@@ -113,9 +113,9 @@ void serialize_enum( const Type* type, unsigned offset, unsigned tag_bits )
 
 void serialize_constructors( const Type* type, const unsigned offset )
 {
-  printf( "\tinline Handle<%s>() : content() {}\n", type->name );
+  printf( "\tinline Handle() : content() {}\n" );
   printf( "private:\n" );
-  printf( "\tinline Handle<%s>(const u8x32 &content) : content(content) {}\n", type->name );
+  printf( "\tinline Handle(const u8x32 &content) : content(content) {}\n" );
   printf( "public:\n" );
   printf( "\tstatic inline Handle<%s> forge(const u8x32 &content) {return "
           "{content};}\n\n",
@@ -123,14 +123,13 @@ void serialize_constructors( const Type* type, const unsigned offset )
 
   if ( type->num_options == 1 ) {
     const Type* option = type->options[0];
-    printf( "\tinline Handle<%s>(const Handle<%s> &base) : "
+    printf( "\tinline Handle(const Handle<%s> &base) : "
             "content(base.content) {}\n\n",
-            type->name,
             option->name );
   } else {
     for ( unsigned i = 0; i < type->num_options; i++ ) {
       const Type* option = type->options[i];
-      printf( "\tinline Handle<%s>(const Handle<%s> &base) : content(base.content){\n", type->name, option->name );
+      printf( "\tinline Handle(const Handle<%s> &base) : content(base.content){\n", option->name );
       printf( "\t\tu64x4 words = (u64x4)content;\n" );
       unsigned long long mask = i << offset;
       printf( "\t\twords[3] |= 0x%016lx;\n", __builtin_bswap64( mask ) );
@@ -144,10 +143,9 @@ void serialize_constructors( const Type* type, const unsigned offset )
     // wrapper types cause ambiguous implicit conversions, so we don't allow it
     if ( option->num_options != 1 ) {
       printf( "\ttemplate<FixType T>\n" );
-      printf( "\tinline Handle<%s>(const Handle<T> &base) requires std::convertible_to<Handle<T>, "
+      printf( "\tinline Handle(const Handle<T> &base) requires std::convertible_to<Handle<T>, "
               "Handle<%s>>: "
               "Handle(Handle<%s>(base)) {}\n\n",
-              type->name,
               option->name,
               option->name );
     }
