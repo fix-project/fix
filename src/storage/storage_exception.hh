@@ -21,7 +21,7 @@ class RepositoryNotFound : public StorageException
 public:
   RepositoryNotFound( std::filesystem::path path )
     : StorageException(
-      std::format( "Could not find fix repository in {} or any parent directory.", std::string( path ) ) )
+        std::format( "Could not find fix repository in {} or any parent directory.", std::string( path ) ) )
   {}
 };
 

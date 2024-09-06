@@ -61,7 +61,7 @@ ReadOnlyFile::ReadOnlyFile( FileDescriptor&& fd )
 
 ReadOnlyFile::ReadOnlyFile( const string& filename )
   : ReadOnlyFile(
-    FileDescriptor { CheckSystemCall( "open( \"" + filename + "\" )", open( filename.c_str(), O_RDONLY ) ) } )
+      FileDescriptor { CheckSystemCall( "open( \"" + filename + "\" )", open( filename.c_str(), O_RDONLY ) ) } )
 {}
 
 ReadWriteFile::ReadWriteFile( FileDescriptor&& fd )

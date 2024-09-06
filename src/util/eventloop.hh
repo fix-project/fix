@@ -102,10 +102,8 @@ public:
     const CallbackT& cancel = [] {},
     const InterestT& recover = [] { return false; } );
 
-  RuleHandle add_rule(
-    const size_t category_id,
-    const CallbackT& callback,
-    const InterestT& interest = [] { return true; } );
+  RuleHandle
+  add_rule( const size_t category_id, const CallbackT& callback, const InterestT& interest = [] { return true; } );
 
   //! Calls [poll(2)](\ref man2::poll) and then executes callback for each ready fd.
   Result wait_next_event( const int timeout_ms );
