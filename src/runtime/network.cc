@@ -65,8 +65,12 @@ void Remote::send_tree( Handle<AnyTree> handle, TreeData )
     h.visit<void>( overload {
       []( Handle<Literal> ) {},
       []( Handle<Relation> ) {},
-      [&]( Handle<AnyTree> t ) { push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } ); },
-      [&]( Handle<Named> b ) { push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } ); },
+      [&]( Handle<AnyTree> t ) {
+        push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } );
+      },
+      [&]( Handle<Named> b ) {
+        push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
+      },
     } );
   } );
 
@@ -314,8 +318,8 @@ Remote::Remote( EventLoop& events,
     [&] { return tx_data_.can_read(); },
     [&] { this->clean_up(); } ) );
 
-  install_rule(
-    events.add_rule( categories.rx_parse_msg, [&] { read_from_rb(); }, [&] { return rx_data_.can_read(); } ) );
+  install_rule( events.add_rule(
+    categories.rx_parse_msg, [&] { read_from_rb(); }, [&] { return rx_data_.can_read(); } ) );
 
   install_rule( events.add_rule(
     categories.tx_serialize_msg,

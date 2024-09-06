@@ -54,7 +54,9 @@ void OutgoingMessage::serialize_header( string& out )
 string_view OutgoingMessage::payload()
 {
   return std::visit( overload {
-                       []( BlobData& b ) -> string_view { return { b->data(), b->size() }; },
+                       []( BlobData& b ) -> string_view {
+                         return { b->data(), b->size() };
+                       },
                        []( TreeData& t ) -> string_view {
                          return { reinterpret_cast<const char*>( t->data() ), t->span().size_bytes() };
                        },
@@ -95,8 +97,12 @@ size_t IncomingMessage::expected_payload_length( string_view header )
 OutgoingMessage OutgoingMessage::to_message( MessagePayload&& payload )
 {
   return std::visit( overload {
-                       []( BlobDataPayload b ) -> OutgoingMessage { return { Opcode::BLOBDATA, b.second }; },
-                       []( TreeDataPayload t ) -> OutgoingMessage { return { Opcode::TREEDATA, t.second }; },
+                       []( BlobDataPayload b ) -> OutgoingMessage {
+                         return { Opcode::BLOBDATA, b.second };
+                       },
+                       []( TreeDataPayload t ) -> OutgoingMessage {
+                         return { Opcode::TREEDATA, t.second };
+                       },
                        []( auto&& p ) -> OutgoingMessage {
                          using T = std::decay_t<decltype( p )>;
                          return { T::OPCODE, serialize( p ) };

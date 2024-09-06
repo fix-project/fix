@@ -192,7 +192,9 @@ void BasePass::post( Handle<Eval> job, const absl::flat_hash_set<Handle<AnyDataT
         [&]( Handle<Selection> ) -> tuple<size_t, size_t, bool> { throw std::runtime_error( "Unimplemented" ); },
       } );
     },
-    [&]( auto ) -> tuple<size_t, size_t, bool> { return { output_size, output_fan_out, false }; },
+    [&]( auto ) -> tuple<size_t, size_t, bool> {
+      return { output_size, output_fan_out, false };
+    },
   } );
 
   tasks_info_[job].output_size = get<0>( outs );

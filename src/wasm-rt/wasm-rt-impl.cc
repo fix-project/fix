@@ -484,11 +484,11 @@ void wasm_rt_free_memory( wasm_rt_memory_t* memory )
       return 0;                                                                                                    \
     }                                                                                                              \
     if ( resource_limits::available_bytes < ( delta * sizeof( wasm_rt_##type##_t ) ) ) {                           \
-      return ( uint32_t ) - 1;                                                                                     \
+      return (uint32_t)-1;                                                                                         \
     }                                                                                                              \
     resource_limits::available_bytes -= delta * sizeof( wasm_rt_##type##_t );                                      \
     if ( ( new_elems < old_elems ) || ( new_elems > table->max_size ) ) {                                          \
-      return ( uint32_t ) - 1;                                                                                     \
+      return (uint32_t)-1;                                                                                         \
     }                                                                                                              \
     void* ptr = aligned_alloc( alignof( wasm_rt_##type##_t ), new_elems * sizeof( wasm_rt_##type##_t ) );          \
     if ( ptr == NULL ) {                                                                                           \
