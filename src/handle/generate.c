@@ -113,9 +113,9 @@ void serialize_enum( const Type* type, unsigned offset, unsigned tag_bits )
 
 void serialize_constructors( const Type* type, const unsigned offset )
 {
-  printf( "\tinline Handle() : content() {}\n");
+  printf( "\tinline Handle() : content() {}\n" );
   printf( "private:\n" );
-  printf( "\tinline Handle(const u8x32 &content) : content(content) {}\n");
+  printf( "\tinline Handle(const u8x32 &content) : content(content) {}\n" );
   printf( "public:\n" );
   printf( "\tstatic inline Handle<%s> forge(const u8x32 &content) {return "
           "{content};}\n\n",
