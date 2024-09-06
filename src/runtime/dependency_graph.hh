@@ -40,6 +40,8 @@ public:
     VLOG( 2 ) << "starting " << task;
     if ( contains( task ) )
       return false;
+    if ( !forward_dependencies_[task].empty() )
+      return false;
     running_.insert( task );
     return true;
   }

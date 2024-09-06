@@ -584,13 +584,14 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
     }
   }
 
+  VLOG( 2 ) << "InOutSource::assigned " << assigned;
   if ( local_->get_info()->parallelism < assigned ) {
     const std::vector<shared_ptr<IRuntime>>& available_remotes = base_.get().get_available_remotes();
 
     size_t remote_required = 0;
     size_t acc_parallelism = local_->get_info()->parallelism;
     while ( remote_required < available_remotes.size() ) {
-      acc_parallelism += available_remotes[remote_required - 1]->get_info()->parallelism;
+      acc_parallelism += available_remotes[remote_required]->get_info()->parallelism;
       remote_required += 1;
       if ( acc_parallelism > assigned )
         break;

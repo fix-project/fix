@@ -715,11 +715,13 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
               h.visit<void>( overload {
-                [&]( Handle<Named> ) {
+                [&]( Handle<Named> x ) {
                   connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                  connection.add_to_view( x );
                 },
-                [&]( Handle<AnyTree> ) {
+                [&]( Handle<AnyTree> x ) {
                   connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                  connection.add_to_view( x );
                 },
                 []( Handle<Literal> ) {},
                 []( Handle<Relation> ) {},
@@ -758,17 +760,20 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
               h.visit<void>( overload {
-                [&]( Handle<Named> ) {
+                [&]( Handle<Named> x ) {
                   connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                  connection.add_to_view( x );
                 },
-                [&]( Handle<AnyTree> ) {
+                [&]( Handle<AnyTree> x ) {
                   connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                  connection.add_to_view( x );
                 },
                 []( Handle<Literal> ) {},
                 []( Handle<Relation> ) {},
               } );
             }
             connection.push_message( OutgoingMessage::to_message( r ) );
+            connection.add_to_view( r.task );
             connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
             connection.proposal_size_ = 0;
           } else {

@@ -59,10 +59,10 @@ class FixTable
 
   size_t find_first_unoccupied( size_t idx )
   {
-    uint8_t expected = static_cast<uint8_t>( SlotStatus::Empty );
     auto init_idx = idx;
 
     while ( true ) {
+      uint8_t expected = static_cast<uint8_t>( SlotStatus::Empty );
       if ( data_.at( idx ).occupied.compare_exchange_strong(
              expected, static_cast<uint8_t>( SlotStatus::Claimed ), std::memory_order_acq_rel ) ) {
         return idx;
@@ -103,7 +103,7 @@ public:
                  expected, static_cast<uint8_t>( SlotStatus::Occupied ), std::memory_order_acq_rel ) ) {
           return;
         } else {
-          throw std::runtime_error( "Unexpected occupied status" );
+          throw std::runtime_error( "Unexpected occupied status " + std::to_string( expected ) );
         }
       }
 
