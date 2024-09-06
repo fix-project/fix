@@ -43,6 +43,7 @@ class NetworkWorker;
 class Remote : public IRuntime
 {
   friend class NetworkWorker;
+  static constexpr size_t STORAGE_SIZE = 65536;
 
   TCPSocket socket_;
 
@@ -50,8 +51,8 @@ class Remote : public IRuntime
   std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent_;
   size_t index_;
 
-  RingBuffer rx_data_ { 8192 };
-  RingBuffer tx_data_ { 8192 };
+  RingBuffer rx_data_ { STORAGE_SIZE };
+  RingBuffer tx_data_ { STORAGE_SIZE };
 
   MessageParser rx_messages_ {};
   std::queue<OutgoingMessage> tx_messages_ {};
