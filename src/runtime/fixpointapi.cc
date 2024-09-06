@@ -10,15 +10,7 @@
 
 using namespace std;
 
-template<typename T>
-void check( optional<T> t )
-{
-  if ( t ) {
-    return;
-  } else {
-    throw std::runtime_error( "Invalid handle" );
-  }
-}
+#define check( t ) ( !t ? throw std::runtime_error( std::string( __PRETTY_FUNCTION__ ) + ": invalid handle" ) : 0 )
 
 namespace fixpoint {
 void attach_tree( u8x32 handle, wasm_rt_externref_table_t* target_table )
@@ -166,10 +158,21 @@ u8x32 create_identification_thunk( u8x32 handle )
   return h->into<Fix>().content;
 }
 
-u8x32 create_selection_thunk( u8x32 handle )
+u8x32 create_selection_thunk( u8x32 handle, uint32_t idx )
 {
-  auto h = handle::extract<ObjectTree>( Handle<Fix>::forge( handle ) ).transform( []( auto h ) {
-    return h.template into<Selection>().template into<Thunk>();
+  auto h = handle::extract<Object>( Handle<Fix>::forge( handle ) ).transform( [&]( auto h ) {
+    return Handle<Selection>( storage->construct_tree<ObjectTree>( h, Handle<Literal>( (uint64_t)idx ) ) );
+  } );
+
+  check( h );
+  return h->into<Fix>().content;
+}
+
+u8x32 create_selection_thunk_range( u8x32 handle, uint32_t begin_idx, uint32_t end_idx )
+{
+  auto h = handle::extract<Object>( Handle<Fix>::forge( handle ) ).transform( [&]( auto h ) {
+    return Handle<Selection>( storage->construct_tree<ObjectTree>(
+      h, Handle<Literal>( (uint64_t)begin_idx ), Handle<Literal>( (uint64_t)end_idx ) ) );
   } );
 
   check( h );
@@ -221,7 +224,8 @@ uint32_t is_equal( u8x32 lhs, u8x32 rhs )
 
 uint32_t is_blob( u8x32 handle )
 {
-  return handle::extract<Blob>( Handle<Fix>::forge( handle ) ).has_value();
+  return handle::extract<Blob>( Handle<Fix>::forge( handle ) ).has_value()
+         || handle::extract<BlobRef>( Handle<Fix>::forge( handle ) ).has_value();
 }
 
 uint32_t is_tree( u8x32 handle )

@@ -41,8 +41,9 @@ u8x32 create_application_thunk( u8x32 handle );
 // Return Handle<Identification>, traps if handle is not Handle<Value>
 u8x32 create_identification_thunk( u8x32 handle );
 
-// Return Handle<Selection>, traps if handle is not Handle<ObjectTree>
+// Return Handle<Selection>, traps if handle is not Handle<Object>
 u8x32 create_selection_thunk( u8x32 handle, uint32_t idx );
+u8x32 create_selection_thunk_range( u8x32 handle, uint32_t begin_idx, uint32_t end_idx );
 
 // Traps if handle is not Handle<AnyTree> or Handle<AnyTreeRef> or Handle<Blob> or Handle<BlobRef>
 uint32_t get_length( u8x32 handle );

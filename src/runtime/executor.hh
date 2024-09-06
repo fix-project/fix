@@ -15,7 +15,7 @@
 class Executor : public IRuntime
 {
   std::vector<std::thread> threads_ {};
-  Channel<Handle<AnyDataType>> todo_ {};
+  Channel<Handle<Relation>> todo_ {};
   Relater& parent_;
   std::shared_ptr<Runner> runner_ {};
 
@@ -31,7 +31,7 @@ private:
   using Result = FixEvaluator::Result<T>;
 
   void run();
-  void progress( Handle<AnyDataType> runnable_or_loadable );
+  void progress( Handle<Relation> runnable );
 
 public:
   Result<Object> apply( Handle<ObjectTree> combination );
@@ -43,11 +43,14 @@ public:
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;
   virtual std::optional<Handle<Object>> get( Handle<Relation> name ) override;
   virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name ) override;
+  virtual std::optional<TreeData> get_shallow( Handle<AnyTree> name ) override;
   virtual void put( Handle<Named> name, BlobData data ) override;
   virtual void put( Handle<AnyTree> name, TreeData data ) override;
+  virtual void put_shallow( Handle<AnyTree> name, TreeData data ) override;
   virtual void put( Handle<Relation> name, Handle<Object> data ) override;
   virtual bool contains( Handle<Named> handle ) override;
   virtual bool contains( Handle<AnyTree> handle ) override;
+  virtual bool contains_shallow( Handle<AnyTree> handle ) override;
   virtual bool contains( Handle<Relation> handle ) override;
   virtual Handle<Fix> labeled( const std::string_view label ) override;
   virtual bool contains( const std::string_view label ) override;

@@ -44,24 +44,40 @@ static inline std::optional<Handle<AnyDataType>> data( Handle<T> handle )
 }
 
 template<typename T>
-static inline bool is_local( Handle<T> handle )
+static inline Handle<AnyDataType> inner_data( Handle<T> handle )
 {
-  return std::visit(
-    []( auto x ) {
-      if constexpr ( std::same_as<decltype( x ), Handle<Relation>> ) {
-        return x.template visit<bool>( []( const auto x ) { return is_local( x ); } );
-      } else {
-        return x.is_local();
-      }
-    },
-    data( handle ).value().get() );
+  if constexpr ( std::same_as<T, Relation> ) {
+    return handle;
+  } else if constexpr ( std::same_as<T, ValueTreeRef> ) {
+    return Handle<ValueTree>( handle );
+  } else if constexpr ( std::same_as<T, ObjectTreeRef> ) {
+    return Handle<ObjectTree>( handle );
+  } else if constexpr ( std::same_as<T, ObjectTreeRef> or std::same_as<T, BlobRef> or std::same_as<T, Thunk> ) {
+    return {};
+  } else if constexpr ( not Handle<T>::is_fix_sum_type ) {
+    return handle;
+  } else {
+    return std::visit( []( const auto x ) { return data( x ); }, handle.get() );
+  }
 }
 
+template<typename T>
+static inline bool is_local( Handle<T> handle )
+{
+  if constexpr ( not Handle<T>::is_fix_sum_type ) {
+    return handle.is_local();
+  } else {
+    return std::visit( []( const auto x ) { return is_local( x ); }, handle.get() );
+  }
+}
+
+#if 0
 template<typename T>
 static inline size_t local_name( Handle<T> handle )
 {
   return std::visit( []( const auto x ) { return x.local_name(); }, data( handle ).value().get() );
 }
+#endif
 
 template<typename T>
 static inline size_t size( Handle<T> handle )

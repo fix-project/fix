@@ -65,12 +65,8 @@ void Remote::send_tree( Handle<AnyTree> handle, TreeData )
     h.visit<void>( overload {
       []( Handle<Literal> ) {},
       []( Handle<Relation> ) {},
-      [&]( Handle<AnyTree> t ) {
-        push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } );
-      },
-      [&]( Handle<Named> b ) {
-        push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } );
-      },
+      [&]( Handle<AnyTree> t ) { push_message( { Opcode::TREEDATA, parent_.value().get().get( t ).value() } ); },
+      [&]( Handle<Named> b ) { push_message( { Opcode::BLOBDATA, parent_.value().get().get( b ).value() } ); },
     } );
   } );
 
@@ -103,6 +99,14 @@ optional<TreeData> Remote::get( Handle<AnyTree> name )
   return {};
 }
 
+optional<TreeData> Remote::get_shallow( Handle<AnyTree> name )
+{
+  RequestShallowTreePayload payload { .handle = name };
+  msg_q_.enqueue( make_pair( index_, move( payload ) ) );
+
+  return {};
+}
+
 optional<Handle<Object>> Remote::get( Handle<Relation> name )
 {
   if ( !contains( name ) ) {
@@ -111,9 +115,18 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
       h.visit<void>( overload {
         []( Handle<Literal> ) {},
         []( Handle<Relation> ) {},
-        [&]( auto x ) {
-          if ( !loaded( x ) ) {
+        [&]( Handle<Named> x ) {
+          if ( !contains( x ) ) {
             msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadBlobPayload( x ) ) );
+          }
+        },
+        [&]( auto x ) {
+          if ( !contains( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadTreePayload( x ) ) );
           }
         },
       } );
@@ -128,25 +141,45 @@ optional<Handle<Object>> Remote::get( Handle<Relation> name )
 
 void Remote::put( Handle<Named> name, BlobData data )
 {
-  if ( !loaded( name ) ) {
+  if ( !contains( name ) ) {
     msg_q_.enqueue( make_pair( index_, make_pair( name, data ) ) );
+  } else if ( !loaded( name ) ) {
+    msg_q_.enqueue( make_pair( index_, LoadBlobPayload( name ) ) );
   }
 }
 
 void Remote::put( Handle<AnyTree> name, TreeData )
 {
-  if ( !loaded( name ) ) {
+  if ( !contains( name ) ) {
     parent_.value().get().visit_minrepo( handle::upcast( name ), [&]( Handle<AnyDataType> h ) {
       h.visit<void>( overload {
         []( Handle<Literal> ) {},
         []( Handle<Relation> ) {},
-        [&]( auto x ) {
-          if ( !loaded( x ) ) {
+        [&]( Handle<Named> x ) {
+          if ( !contains( x ) ) {
             msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadBlobPayload( x ) ) );
+          }
+        },
+        [&]( auto x ) {
+          if ( !contains( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadTreePayload( x ) ) );
           }
         },
       } );
     } );
+  } else if ( !loaded( name ) ) {
+    msg_q_.enqueue( make_pair( index_, LoadTreePayload( name ) ) );
+  }
+}
+
+void Remote::put_shallow( Handle<AnyTree> name, TreeData data )
+{
+  if ( !loaded( name ) ) {
+    msg_q_.enqueue( make_pair( index_, ShallowTreeDataPayload( name, data ) ) );
   }
 }
 
@@ -160,9 +193,18 @@ void Remote::put( Handle<Relation> name, Handle<Object> data )
         h.visit<void>( overload {
           []( Handle<Literal> ) {},
           []( Handle<Relation> ) {},
-          [&]( auto x ) {
-            if ( !loaded( x ) ) {
+          [&]( Handle<Named> x ) {
+            if ( !contains( x ) ) {
               msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+            } else if ( !loaded( x ) ) {
+              msg_q_.enqueue( make_pair( index_, LoadBlobPayload( x ) ) );
+            }
+          },
+          [&]( auto x ) {
+            if ( !contains( x ) ) {
+              msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+            } else if ( !loaded( x ) ) {
+              msg_q_.enqueue( make_pair( index_, LoadTreePayload( x ) ) );
             }
           },
         } );
@@ -184,9 +226,18 @@ void Remote::put_force( Handle<Relation> name, Handle<Object> data )
       h.visit<void>( overload {
         []( Handle<Literal> ) {},
         []( Handle<Relation> ) {},
-        [&]( auto x ) {
-          if ( !loaded( x ) ) {
+        [&]( Handle<Named> x ) {
+          if ( !contains( x ) ) {
             msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadBlobPayload( x ) ) );
+          }
+        },
+        [&]( auto x ) {
+          if ( !contains( x ) ) {
+            msg_q_.enqueue( make_pair( index_, make_pair( x, parent_.value().get().get( x ).value() ) ) );
+          } else if ( !loaded( x ) ) {
+            msg_q_.enqueue( make_pair( index_, LoadTreePayload( x ) ) );
           }
         },
       } );
@@ -226,6 +277,11 @@ bool Remote::contains( Handle<AnyTree> handle )
 bool Remote::loaded( Handle<AnyTree> handle )
 {
   return trees_view_.contains( handle ) && trees_view_.get_ref( handle ).load( memory_order_acquire );
+}
+
+bool Remote::contains_shallow( Handle<AnyTree> handle )
+{
+  return contains( handle );
 }
 
 void Remote::add_to_view( Handle<AnyTree> handle )
@@ -397,7 +453,10 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
             trees_view_.get_ref( t ).store( false, memory_order_release );
           },
           []( Handle<Literal> ) {},
-          []( Handle<Relation> ) {},
+          [&]( Handle<Relation> r ) {
+            relations_view_.insert_no_value( r );
+            relations_view_.get_ref( r ).store( false, memory_order_release );
+          },
         } );
       }
 
@@ -407,7 +466,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::REQUESTTREE: {
       auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
       auto tree = parent.get( payload.handle );
-      if ( tree ) {
+      if ( tree && !trees_view_.contains( payload.handle ) ) {
         send_tree( payload.handle, tree.value() );
         add_to_view( payload.handle );
       }
@@ -417,9 +476,19 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::REQUESTBLOB: {
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
       auto blob = parent.get( payload.handle );
-      if ( blob ) {
+      if ( blob && !blobs_view_.contains( payload.handle ) ) {
         send_blob( blob.value() );
         add_to_view( payload.handle );
+      }
+      break;
+    }
+
+    case Opcode::REQUESTSHALLOWTREE: {
+      auto payload = parse<RequestShallowTreePayload>( std::get<string>( msg.payload() ) );
+      auto tree = parent.get_shallow( payload.handle );
+      if ( tree ) {
+        push_message( OutgoingMessage::to_message(
+          ShallowTreeDataPayload { .handle = payload.handle, .data = tree.value() } ) );
       }
       break;
     }
@@ -431,6 +500,28 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::TREEDATA: {
       parent.create( msg.get_tree() );
+      break;
+    }
+
+    case Opcode::LOADBLOB: {
+      auto payload = parse<LoadBlobPayload>( std::get<string>( msg.payload() ) );
+      if ( parent.contains( payload.handle.unwrap<Named>() ) ) {
+        parent.get( payload.handle.unwrap<Named>() );
+      }
+      break;
+    }
+
+    case Opcode::LOADTREE: {
+      auto payload = parse<LoadTreePayload>( std::get<string>( msg.payload() ) );
+      if ( parent.contains( payload.handle ) ) {
+        parent.get( payload.handle );
+      }
+      break;
+    }
+
+    case Opcode::SHALLOWTREEDATA: {
+      auto payload = parse<ShallowTreeDataPayload>( std::get<string>( msg.payload() ) );
+      parent.put_shallow( payload.handle, payload.data );
       break;
     }
 
@@ -458,8 +549,8 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
                                          }
                                          return parent.contains( t );
                                        },
-                                       [&]( Handle<Literal> ) { return true; },
-                                       [&]( Handle<Relation> ) { return true; },
+                                       []( Handle<Literal> ) { return true; },
+                                       []( Handle<Relation> ) { return true; },
                                      },
                                      //[&]( auto ) -> bool { VLOG( 1 ) << handle::fix( *it );
                                      // throw std::runtime_error( "Invalid propose transfer payload." ); } },
@@ -493,14 +584,14 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
         std::visit( overload {
                       [&]( Handle<Named> n ) {
                         if ( !contains( n ) ) {
-                          push_message( { Opcode::BLOBDATA,
-                                          std::get<BlobData>( proposed_proposals_.front().second->at( h ) ) } );
+                          push_message( { Opcode::BLOBDATA, parent.get( n ).value() } );
+                          add_to_view( n );
                         }
                       },
                       [&]( Handle<AnyTree> t ) {
                         if ( !contains( t ) ) {
-                          push_message( { Opcode::TREEDATA,
-                                          std::get<TreeData>( proposed_proposals_.front().second->at( h ) ) } );
+                          push_message( { Opcode::TREEDATA, parent.get( t ).value() } );
+                          add_to_view( t );
                         }
                       },
                       []( Handle<Literal> ) {},
@@ -597,17 +688,17 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
     visit(
       overload {
         [&]( BlobDataPayload b ) {
-          if ( !connection.loaded( b.first ) ) {
-            VLOG( 2 ) << "Adding " << b.first << " to proposal";
-            connection.incomplete_proposal_->emplace( b.first, b.second );
+          if ( !connection.contains( b.first ) ) {
+            VLOG( 2 ) << "Adding " << b.first << " to proposal " << remote_idx;
+            connection.incomplete_proposal_->push_back( { b.first, b.second } );
             connection.proposal_size_ += b.second->size();
           }
         },
         [&]( TreeDataPayload t ) {
-          if ( !connection.loaded( t.first ) ) {
-            VLOG( 2 ) << "Adding " << t.first << " to proposal";
-            connection.incomplete_proposal_->emplace(
-              visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second );
+          if ( !connection.contains( t.first ) ) {
+            VLOG( 2 ) << "Adding " << t.first << " to proposal " << remote_idx;
+            connection.incomplete_proposal_->push_back(
+              { visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second } );
             connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
           }
         },
@@ -619,16 +710,18 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             // Payload should be sent after last proposed_proposals_ is sent
             connection.proposed_proposals_.push( { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, {} },
                                                    make_unique<Remote::DataProposal>() } );
-          } else if ( connection.proposal_size_ < 1048576 ) {
-            // Proposal too small, sending directly
+          } else if ( connection.proposal_size_ < 1048576 && connection.proposed_proposals_.empty() ) {
+            VLOG( 2 ) << "Proposal too small, sending directly " << remote_idx;
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
               h.visit<void>( overload {
-                [&]( Handle<Named> ) {
+                [&]( Handle<Named> x ) {
                   connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                  connection.add_to_view( x );
                 },
-                [&]( Handle<AnyTree> ) {
+                [&]( Handle<AnyTree> x ) {
                   connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                  connection.add_to_view( x );
                 },
                 []( Handle<Literal> ) {},
                 []( Handle<Relation> ) {},
@@ -662,22 +755,25 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
             connection.proposed_proposals_.push(
               { pair<Handle<Relation>, optional<Handle<Object>>> { r.task, r.result },
                 make_unique<Remote::DataProposal>() } );
-          } else if ( connection.proposal_size_ < 1048576 ) {
+          } else if ( connection.proposal_size_ < 1048576 && connection.proposed_proposals_.empty() ) {
             // Proposal too small, sending directly
             for ( const auto& [name, data] : *connection.incomplete_proposal_ ) {
               auto h = name;
               h.visit<void>( overload {
-                [&]( Handle<Named> ) {
+                [&]( Handle<Named> x ) {
                   connection.push_message( { Opcode::BLOBDATA, std::get<BlobData>( data ) } );
+                  connection.add_to_view( x );
                 },
-                [&]( Handle<AnyTree> ) {
+                [&]( Handle<AnyTree> x ) {
                   connection.push_message( { Opcode::TREEDATA, std::get<TreeData>( data ) } );
+                  connection.add_to_view( x );
                 },
                 []( Handle<Literal> ) {},
                 []( Handle<Relation> ) {},
               } );
             }
             connection.push_message( OutgoingMessage::to_message( r ) );
+            connection.add_to_view( r.task );
             connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
             connection.proposal_size_ = 0;
           } else {
@@ -694,6 +790,19 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
                 std::move( connection.incomplete_proposal_ ) } );
             connection.incomplete_proposal_ = make_unique<Remote::DataProposal>();
             connection.proposal_size_ = 0;
+          }
+        },
+        [&]( LoadBlobPayload&& payload ) {
+          auto named = payload.handle.unwrap<Named>();
+          if ( connection.contains( named ) && !connection.loaded( named ) ) {
+            connection.add_to_view( named );
+            connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
+          }
+        },
+        [&]( LoadTreePayload&& payload ) {
+          if ( connection.contains( payload.handle ) && !connection.loaded( payload.handle ) ) {
+            connection.add_to_view( payload.handle );
+            connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
           }
         },
         [&]( auto&& payload ) { connection.push_message( OutgoingMessage::to_message( move( payload ) ) ); } },

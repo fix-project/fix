@@ -32,26 +32,33 @@ public:
 
 class LocalScheduler : public Scheduler
 {
+private:
+  Result<Object> select_single( Handle<Object>, size_t );
+  Result<Object> select_range( Handle<Object>, size_t begin_idx, size_t end_idx );
+
 public:
   LocalScheduler() {}
 
   virtual Result<Blob> load( Handle<Blob> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTree> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
+  virtual Result<AnyTree> loadShallow( Handle<AnyTree> ) override;
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
+  virtual Result<Object> select( Handle<ObjectTree> ) override;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
   virtual Result<Value> evalStrict( Handle<Object> expression ) override;
-  virtual Result<Object> evalShallow( Handle<Object> expression ) override;
+  virtual Result<Object> force( Handle<Thunk> thunk ) override;
   virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree ) override;
   virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree ) override;
   virtual Result<ValueTree> mapLift( Handle<ValueTree> tree ) override;
+  virtual Result<ObjectTree> mapEvalShallow( Handle<ObjectTree> ) override;
 
   virtual Result<Object> schedule( Handle<Relation> top_level_job ) override;
 };
 
-inline thread_local std::vector<Handle<AnyDataType>> works_;
 inline thread_local std::optional<Handle<Relation>> current_schedule_step_;
 inline thread_local bool nested_;
+inline thread_local bool go_for_it_;
 
 class RelaterTest;
 
@@ -61,7 +68,10 @@ class SketchGraphScheduler : public Scheduler
 
 private:
   std::vector<PassRunner::PassType> passes_;
-  virtual void run_passes( std::vector<Handle<AnyDataType>>& leaf_jobs, Handle<Relation> top_level_job );
+  virtual Result<Object> run_passes( Handle<Relation> top_level_job );
+  bool loadShallow( Handle<AnyTree>, Handle<AnyTreeRef> );
+  Result<Object> select_single( Handle<Object>, size_t );
+  Result<Object> select_range( Handle<Object>, size_t begin_idx, size_t end_idx );
 
 protected:
   void relate( Handle<Relation> top_level_job );
@@ -75,13 +85,16 @@ public:
   virtual Result<Blob> load( Handle<Blob> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTree> value ) override;
   virtual Result<AnyTree> load( Handle<AnyTreeRef> value ) override;
+  virtual Result<AnyTree> loadShallow( Handle<AnyTree> ) override;
   virtual Handle<AnyTreeRef> ref( Handle<AnyTree> tree ) override;
+  virtual Result<Object> select( Handle<ObjectTree> ) override;
   virtual Result<Object> apply( Handle<ObjectTree> combination ) override;
   virtual Result<Value> evalStrict( Handle<Object> expression ) override;
-  virtual Result<Object> evalShallow( Handle<Object> expression ) override;
+  virtual Result<Object> force( Handle<Thunk> thunk ) override;
   virtual Result<ValueTree> mapEval( Handle<ObjectTree> tree ) override;
   virtual Result<ObjectTree> mapReduce( Handle<ExpressionTree> tree ) override;
   virtual Result<ValueTree> mapLift( Handle<ValueTree> tree ) override;
+  virtual Result<ObjectTree> mapEvalShallow( Handle<ObjectTree> ) override;
 
   virtual Result<Object> schedule( Handle<Relation> top_level_job ) override;
 

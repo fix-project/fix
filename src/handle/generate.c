@@ -370,9 +370,9 @@ int main( int argc, char** argv )
   const Type* encode = make_sum( "Encode", 2, strict, shallow );
   const Type* expression = make_sum( "Expression", 3, object, encode, etree );
 
-  const Type* apply = make_wrapper( "Apply", otree );
+  const Type* think = make_wrapper( "Think", thunk );
   const Type* eval = make_wrapper( "Eval", object );
-  const Type* relation = make_sum( "Relation", 2, apply, eval );
+  const Type* relation = make_sum( "Relation", 2, think, eval );
   const Type* fix = make_sum( "Fix", 2, expression, relation );
 
   fprintf( stderr, "Fix Handles currently need %lu bits.\n", fix->bits );
@@ -398,8 +398,10 @@ int main( int argc, char** argv )
   const Type* anytree = make_sum( "AnyTree", 3, vtree, otree, etree );
   const Type* anytreeref = make_sum( "AnyTreeRef", 2, vref, oref );
   const Type* anydatatype = make_sum( "AnyDataType", 6, literal, named, vtree, otree, etree, relation );
+  const Type* dependee = make_sum( "Dependee", 7, named, vtree, otree, etree, relation, vref, oref );
   serialize( anytree );
   serialize( anytreeref );
   serialize( anydatatype );
+  serialize( dependee );
   printf( "#include \"handle_post.hh\" // IWYU pragma: keep\n\n" );
 }

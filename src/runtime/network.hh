@@ -43,6 +43,7 @@ class NetworkWorker;
 class Remote : public IRuntime
 {
   friend class NetworkWorker;
+  static constexpr size_t STORAGE_SIZE = 65536;
 
   TCPSocket socket_;
 
@@ -50,8 +51,8 @@ class Remote : public IRuntime
   std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent_;
   size_t index_;
 
-  RingBuffer rx_data_ { 8192 };
-  RingBuffer tx_data_ { 8192 };
+  RingBuffer rx_data_ { STORAGE_SIZE };
+  RingBuffer tx_data_ { STORAGE_SIZE };
 
   MessageParser rx_messages_ {};
   std::queue<OutgoingMessage> tx_messages_ {};
@@ -69,14 +70,14 @@ class Remote : public IRuntime
 
   bool dead_ { false };
 
-  using DataProposal = absl::flat_hash_map<Handle<AnyDataType>, std::variant<BlobData, TreeData>, AbslHash>;
+  using DataProposal = std::vector<std::pair<Handle<AnyDataType>, std::variant<BlobData, TreeData>>>;
   std::unique_ptr<DataProposal> incomplete_proposal_ { std::make_unique<DataProposal>() };
   size_t proposal_size_ {};
   std::queue<std::pair<std::pair<Handle<Relation>, std::optional<Handle<Object>>>, std::unique_ptr<DataProposal>>>
     proposed_proposals_ {};
 
   FixTable<Named, std::atomic<bool>, AbslHash> blobs_view_ { 100000 };
-  FixTable<AnyTree, std::atomic<bool>, AbslHash, handle::any_tree_equal> trees_view_ { 100000 };
+  FixTable<AnyTree, std::atomic<bool>, AbslHash, handle::any_tree_equal> trees_view_ { 1000000 };
   FixTable<Relation, std::atomic<bool>, AbslHash> relations_view_ { 100000 };
 
 public:
@@ -89,16 +90,19 @@ public:
 
   std::optional<BlobData> get( Handle<Named> name ) override;
   std::optional<TreeData> get( Handle<AnyTree> name ) override;
+  std::optional<TreeData> get_shallow( Handle<AnyTree> ) override;
   std::optional<Handle<Object>> get( Handle<Relation> name ) override;
   std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> handle ) override;
 
   void put( Handle<Named> name, BlobData data ) override;
   void put( Handle<AnyTree> name, TreeData data ) override;
+  void put_shallow( Handle<AnyTree> name, TreeData data ) override;
   void put( Handle<Relation> name, Handle<Object> data ) override;
   void put_force( Handle<Relation> name, Handle<Object> data ) override;
 
   bool contains( Handle<Named> handle ) override;
   bool contains( Handle<AnyTree> handle ) override;
+  bool contains_shallow( Handle<AnyTree> handle ) override;
   bool contains( Handle<Relation> handle ) override;
   std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle ) override;
   bool contains( const std::string_view label ) override;
@@ -172,6 +176,8 @@ public:
   {}
 
   void start() { network_thread_ = std::thread( std::bind( &NetworkWorker::run_loop, this ) ); }
+
+  void join() { network_thread_.join(); }
 
   void stop()
   {

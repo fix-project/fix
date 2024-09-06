@@ -9,10 +9,9 @@
 
 class FrontendRT
 {
-  virtual Handle<Value> execute( Handle<Relation> ) = 0;
-
 public:
   virtual ~FrontendRT() {}
+  virtual Handle<Value> execute( Handle<Relation> ) = 0;
 };
 
 class ReadOnlyRT : public FrontendRT
@@ -41,6 +40,10 @@ class Client : public FrontendRT
 protected:
   Relater relater_ { 0 };
   std::optional<NetworkWorker> network_worker_ {};
+  std::shared_ptr<IRuntime> server_ {};
+
+  template<FixType T>
+  void send_job( Handle<T> handle, std::unordered_set<Handle<Fix>> visited = {} );
 
 public:
   Client() {}
@@ -48,7 +51,9 @@ public:
 
   static std::shared_ptr<Client> init( const Address& address );
   virtual Handle<Value> execute( Handle<Relation> x ) override;
+
   IRuntime& get_rt() { return relater_; }
+  std::shared_ptr<IRuntime>& get_server() { return server_; }
 };
 
 class Server
@@ -65,5 +70,6 @@ public:
   static std::shared_ptr<Server> init( const Address& address,
                                        std::shared_ptr<Scheduler> scheduler,
                                        const std::vector<Address> peer_servers = {} );
+  void join();
   ~Server();
 };

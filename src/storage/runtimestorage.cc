@@ -27,9 +27,14 @@ Handle<Blob> RuntimeStorage::create( BlobData blob, std::optional<Handle<Blob>> 
 Handle<AnyTree> RuntimeStorage::create( TreeData tree, std::optional<Handle<AnyTree>> name )
 {
   auto handle = name.or_else( [&] -> decltype( name ) { return handle::create( tree ); } ).value();
-  handle.visit<void>( overload {
-    [&]( auto name ) { trees_.insert( name, tree ); },
-  } );
+  trees_.insert( handle, tree );
+  return handle;
+}
+
+Handle<AnyTree> RuntimeStorage::create_tree_shallow( TreeData tree, std::optional<Handle<AnyTree>> name )
+{
+  auto handle = name.or_else( [&] -> decltype( name ) { return handle::create( tree ); } ).value();
+  tree_refs_.insert( handle, tree );
   return handle;
 }
 
@@ -73,6 +78,61 @@ TreeData RuntimeStorage::get( Handle<AnyTree> handle )
 {
   VLOG( 3 ) << "get " << handle;
   auto res = trees_.get( handle );
+  if ( res.has_value() ) {
+    return res.value();
+  } else {
+    throw HandleNotFound( handle::fix( handle ) );
+  }
+}
+
+TreeData RuntimeStorage::get_shallow( Handle<AnyTree> handle )
+{
+  VLOG( 3 ) << "get shallow " << handle;
+  auto res = tree_refs_.get( handle ).or_else( [&]() -> optional<TreeData> {
+    auto t = trees_.get( handle );
+
+    if ( t.has_value() ) {
+      optional<OwnedMutTree> newtree;
+      for ( size_t i = 0; i < t.value()->span().size(); i++ ) {
+        optional<Handle<Fix>> new_entry;
+        t.value()->span()[i].unwrap<Expression>().unwrap<Object>().visit<void>( overload {
+          [&]( Handle<Value> x ) {
+            x.visit<void>( overload {
+              [&]( Handle<Blob> x ) {
+                x.visit<void>( overload {
+                  [&]( Handle<Named> x ) { new_entry = Handle<BlobRef>( x ); },
+                  []( Handle<Literal> ) {},
+                } );
+              },
+              [&]( Handle<ValueTree> x ) { new_entry = ref( x ).unwrap<ValueTreeRef>(); },
+              []( Handle<BlobRef> ) {},
+              []( Handle<ValueTreeRef> ) {},
+            } );
+          },
+          [&]( Handle<ObjectTree> x ) { new_entry = ref( x ).unwrap<ObjectTreeRef>(); },
+          []( Handle<Thunk> ) {},
+          []( Handle<ObjectTreeRef> ) {},
+        } );
+
+        if ( new_entry.has_value() ) {
+          if ( !newtree.has_value() ) {
+            newtree = OwnedMutTree::allocate( t.value()->span().size() );
+            std::copy( t.value()->span().begin(), t.value()->span().end(), newtree.value().span().begin() );
+          }
+
+          newtree.value()[i] = new_entry.value();
+        }
+      }
+
+      if ( newtree.has_value() ) {
+        t = make_shared<OwnedTree>( std::move( newtree.value() ) );
+      }
+
+      tree_refs_.insert( handle, t.value() );
+    }
+    return t;
+  } );
+
   if ( res.has_value() ) {
     return res.value();
   } else {
@@ -332,15 +392,20 @@ bool RuntimeStorage::contains( Handle<Relation> handle )
   return relations_.contains( handle );
 }
 
+bool RuntimeStorage::contains_shallow( Handle<AnyTree> handle )
+{
+  return trees_.contains( handle ) || tree_refs_.contains( handle );
+}
+
 std::optional<Handle<AnyTree>> RuntimeStorage::get_handle( Handle<AnyTree> name )
 {
-  return trees_.get_handle( name );
+  return trees_.get_handle( name ).or_else( [&]() { return tree_refs_.get_handle( name ); } );
 }
 
 optional<Handle<AnyTree>> RuntimeStorage::contains( Handle<AnyTreeRef> handle )
 {
   auto tmp_tree = Handle<AnyTree>::forge( handle.content );
-  auto entry = trees_.get_handle( tmp_tree );
+  auto entry = get_handle( tmp_tree );
 
   if ( !entry.has_value() ) {
     return {};

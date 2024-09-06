@@ -41,7 +41,7 @@ type ExpressionTree = Tree Expression
 -- | Fix represents any Fix type, including both Expressions and Relations.
 data Fix = Expression Expression | Relation Relation
 -- | A Relation represents either the Application of a Tree or the Evaluation of an Object.
-data Relation = Apply ObjectTree | Eval Object
+data Relation = Think Thunk | Eval Object
 
 -- * Functions
 
@@ -69,6 +69,10 @@ name = undefined
 apply :: ObjectTree -> Object
 apply _ = undefined
 
+-- | Select data as specified by an ObjectTree, without loading or evaluating the rest of the tree.
+select :: ObjectTree -> Object
+select _ = undefined
+
 -- ** Evaluation Rules
 
 -- | Evaluate an Object by repeatedly replacing Thunks with their Values, producing a concrete value (not a Ref).
@@ -89,11 +93,7 @@ evalShallow (ObjectTreeRef x) = ObjectTreeRef x
 think :: Thunk -> Object
 think (Identification x) = Value $ load x
 think (Application x) = apply $ treeMap reduce $ load x
-think (Selection x) = select x
-
--- | Select data as specified by an ObjectTree, without loading or evaluating the rest of the tree.
-select :: Name ObjectTree -> Object
-select = undefined -- TODO
+think (Selection x) = select $ treeMap evalShallow $ Tree $ loadShallow x
 
 -- | Converts an Expression into an Object by executing any Encodes contained within the Expression.
 reduce :: Expression -> Object
@@ -120,7 +120,7 @@ lower (ValueTreeRef x) = ValueTreeRef x
 
 -- | Given a Relation, finds the "result", otherwise passes Expressions through unchanged.
 relate :: Fix -> Object
-relate (Relation (Apply x)) = apply x
+relate (Relation (Think x)) = think x
 relate (Relation (Eval x)) = Value $ evalStrict x
 relate (Expression x) = reduce x
 

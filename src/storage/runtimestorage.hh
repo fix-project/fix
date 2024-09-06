@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <unordered_map>
 
 #include "handle.hh"
@@ -42,6 +41,7 @@ private:
 
   BlobMap blobs_ { 100000 };
   TreeMap trees_ { 100000 };
+  TreeMap tree_refs_ { 100000 };
   RelationMap relations_ { 100000 };
 
   SharedMutex<PinMap> pins_ {};
@@ -58,6 +58,9 @@ public:
 
   // Construct a Relation
   void create( Handle<Object> result, Handle<Relation> relation );
+
+  // Construct a TreeRef with TreeData
+  Handle<AnyTree> create_tree_shallow( TreeData tree, std::optional<Handle<AnyTree>> name = {} );
 
   template<FixTreeType T>
   Handle<T> create_tree( TreeData tree, std::optional<Handle<AnyTree>> name = {} );
@@ -111,9 +114,11 @@ public:
   std::shared_ptr<OwnedTree> get( Handle<AnyTree> name );
   // Get the result of a relation.
   Handle<Object> get( Handle<Relation> name );
+  // Return reference to tree content.
+  std::shared_ptr<OwnedTree> get_shallow( Handle<AnyTree> name );
 
   Handle<Value> get_relation( Handle<Eval> name ) { return get( name ).unwrap<Value>(); }
-  Handle<Object> get_relation( Handle<Apply> name ) { return get( name ); }
+  Handle<Object> get_relation( Handle<Think> name ) { return get( name ); }
 
   // Convert a Handle into the canonically-named version of that handle.
   template<FixType T>
@@ -131,6 +136,7 @@ public:
   bool contains( Handle<Named> handle );
   bool contains( Handle<AnyTree> handle );
   bool contains( Handle<Relation> handle );
+  bool contains_shallow( Handle<AnyTree> handle );
 
   // return the reffed Handle<AnyTree> if known
   std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle );

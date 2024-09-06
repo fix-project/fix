@@ -6,6 +6,7 @@
 #include "storage_exception.hh"
 #include "types.hh"
 #include <memory>
+#include <stdexcept>
 
 using namespace std;
 
@@ -73,7 +74,8 @@ Handle<Value> Relater::execute( Handle<Relation> r )
   bool expected = true;
   if ( top_level_done_.compare_exchange_strong( expected, false ) ) {
     if ( local_->get_info()->parallelism == 0 ) {
-      scheduler_->schedule( r );
+      remotes_.read()->front().lock()->get( r );
+      // scheduler_->schedule( r );
     } else {
       local_->get( r );
     }
@@ -122,6 +124,19 @@ optional<TreeData> Relater::get( Handle<AnyTree> name )
   throw HandleNotFound( handle::fix( name ) );
 }
 
+optional<TreeData> Relater::get_shallow( Handle<AnyTree> name )
+{
+  if ( storage_.contains_shallow( name ) ) {
+    return storage_.get_shallow( name );
+  } else if ( repository_.contains_shallow( name ) ) {
+    auto tree = repository_.get_shallow( name ).value();
+    storage_.create_tree_shallow( tree, name );
+    return tree;
+  }
+
+  throw HandleNotFound( handle::fix( name ) );
+}
+
 optional<Handle<Object>> Relater::get( Handle<Relation> name )
 {
   if ( storage_.contains( name ) ) {
@@ -131,12 +146,13 @@ optional<Handle<Object>> Relater::get( Handle<Relation> name )
     return storage_.get( name );
   }
 
-  return scheduler_->schedule( name );
+  local_->get( name );
+  return {};
 }
 
 optional<Handle<AnyTree>> Relater::get_handle( Handle<AnyTree> name )
 {
-  if ( storage_.contains( name ) ) {
+  if ( storage_.contains( name ) || storage_.contains_shallow( name ) ) {
     return storage_.get_handle( name );
   } else if ( repository_.contains( name ) ) {
     return repository_.get_handle( name );
@@ -166,6 +182,7 @@ void Relater::put( Handle<Named> name, BlobData data )
     }
   }
 }
+
 void Relater::put( Handle<AnyTree> name, TreeData data )
 {
   if ( !storage_.contains( name ) ) {
@@ -174,6 +191,25 @@ void Relater::put( Handle<AnyTree> name, TreeData data )
     {
       auto graph = graph_.write();
       name.visit<void>( [&]( auto h ) { graph->finish( h, unblocked ); } );
+    }
+    for ( auto x : unblocked ) {
+      local_->get( x );
+    }
+  }
+}
+
+void Relater::put_shallow( Handle<AnyTree> name, TreeData data )
+{
+  if ( !storage_.contains_shallow( name ) ) {
+    storage_.create_tree_shallow( data, name );
+    absl::flat_hash_set<Handle<Relation>> unblocked;
+    {
+      auto graph = graph_.write();
+      name.visit<void>( overload {
+        [&]( Handle<ValueTree> t ) { graph->finish( Handle<ValueTreeRef>( t, data->size() ), unblocked ); },
+        [&]( Handle<ObjectTree> t ) { graph->finish( Handle<ObjectTreeRef>( t, data->size() ), unblocked ); },
+        []( Handle<ExpressionTree> ) { throw runtime_error( "Unreachable" ); },
+      } );
     }
     for ( auto x : unblocked ) {
       local_->get( x );
@@ -215,6 +251,11 @@ bool Relater::contains( Handle<Named> handle )
 bool Relater::contains( Handle<AnyTree> handle )
 {
   return storage_.contains( handle ) || repository_.contains( handle );
+}
+
+bool Relater::contains_shallow( Handle<AnyTree> handle )
+{
+  return storage_.contains_shallow( handle ) || repository_.contains_shallow( handle );
 }
 
 bool Relater::contains( Handle<Relation> handle )

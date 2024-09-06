@@ -21,9 +21,13 @@ public:
     REQUESTINFO,
     INFO,
     REQUESTTREE,
+    REQUESTSHALLOWTREE,
     REQUESTBLOB,
     BLOBDATA,
     TREEDATA,
+    LOADBLOB,
+    LOADTREE,
+    SHALLOWTREEDATA,
     PROPOSE_TRANSFER,
     ACCEPT_TRANSFER,
     COUNT,
@@ -34,9 +38,13 @@ public:
                                                                                        "REQUESTINFO",
                                                                                        "INFO",
                                                                                        "REQUESTTREE",
+                                                                                       "REQUESTSHALLOWTREE",
                                                                                        "REQUESTBLOB",
                                                                                        "BLOBDATA",
                                                                                        "TREEDATA",
+                                                                                       "LOADBLOB",
+                                                                                       "LOADTREE",
+                                                                                       "SHALLOWTREEDATA",
                                                                                        "PROPOSE_TRANSFER",
                                                                                        "ACCEPT_TRANSFER" };
 
@@ -101,6 +109,17 @@ struct RequestTreePayload
   size_t payload_length() const { return sizeof( u8x32 ); }
 };
 
+struct RequestShallowTreePayload
+{
+  Handle<AnyTree> handle {};
+
+  static RequestShallowTreePayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::REQUESTSHALLOWTREE;
+  size_t payload_length() const { return sizeof( u8x32 ); }
+};
+
 struct InfoPayload
 {
   uint32_t parallelism {};
@@ -115,6 +134,40 @@ struct InfoPayload
   {
     return sizeof( uint32_t ) + sizeof( double ) + sizeof( size_t ) + data.size() * sizeof( u8x32 );
   }
+};
+
+struct ShallowTreeDataPayload
+{
+  Handle<AnyTree> handle {};
+  TreeData data {};
+
+  static ShallowTreeDataPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::SHALLOWTREEDATA;
+  size_t payload_length() const { return sizeof( u8x32 ) + data->span().size_bytes(); }
+};
+
+struct LoadBlobPayload
+{
+  Handle<Blob> handle {};
+
+  static LoadBlobPayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::LOADBLOB;
+  size_t payload_length() const { return sizeof( u8x32 ); }
+};
+
+struct LoadTreePayload
+{
+  Handle<AnyTree> handle {};
+
+  static LoadTreePayload parse( Parser& parser );
+  void serialize( Serializer& serializer ) const;
+
+  constexpr static Message::Opcode OPCODE = Message::Opcode::LOADTREE;
+  size_t payload_length() const { return sizeof( u8x32 ); }
 };
 
 template<Message::Opcode O>
@@ -148,11 +201,16 @@ using MessagePayload = std::variant<RunPayload,
                                     AcceptTransferPayload,
                                     RequestBlobPayload,
                                     RequestTreePayload,
+                                    RequestShallowTreePayload,
                                     BlobDataPayload,
-                                    TreeDataPayload>;
+                                    TreeDataPayload,
+                                    LoadBlobPayload,
+                                    LoadTreePayload,
+                                    ShallowTreeDataPayload>;
 
 class IncomingMessage : public Message
 {
+  std::optional<Handle<Fix>> handle_ {};
   std::variant<std::string, OwnedMutBlob, OwnedMutTree> payload_;
 
 public:
@@ -198,6 +256,7 @@ private:
 
   std::string incomplete_header_ {};
 
+  std::optional<Handle<Fix>> incomplete_handle_ {};
   std::variant<std::string, OwnedMutBlob, OwnedMutTree> incomplete_payload_ {};
   size_t completed_payload_length_ {};
 

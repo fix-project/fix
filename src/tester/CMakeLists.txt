@@ -16,5 +16,8 @@ target_link_libraries(fixpoint-client-wikipedia runtime)
 add_executable(fixpoint-client-compile "fixpoint-client-compile.cc" "tester-utils.cc")
 target_link_libraries(fixpoint-client-compile runtime)
 
+add_executable(fixpoint-client-bptree "fixpoint-client-bptree.cc" "tester-utils.cc")
+target_link_libraries(fixpoint-client-bptree runtime)
+
 # add_executable(http-tester "http-tester.cc" "main.cc" "tester-utils.cc")
 # target_link_libraries(http-tester runtime http)

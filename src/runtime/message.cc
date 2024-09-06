@@ -6,6 +6,8 @@
 #include "types.hh"
 
 #include <glog/logging.h>
+#include <memory>
+#include <span>
 
 using namespace std;
 
@@ -97,12 +99,8 @@ size_t IncomingMessage::expected_payload_length( string_view header )
 OutgoingMessage OutgoingMessage::to_message( MessagePayload&& payload )
 {
   return std::visit( overload {
-                       []( BlobDataPayload b ) -> OutgoingMessage {
-                         return { Opcode::BLOBDATA, b.second };
-                       },
-                       []( TreeDataPayload t ) -> OutgoingMessage {
-                         return { Opcode::TREEDATA, t.second };
-                       },
+                       []( BlobDataPayload b ) -> OutgoingMessage { return { Opcode::BLOBDATA, b.second }; },
+                       []( TreeDataPayload t ) -> OutgoingMessage { return { Opcode::TREEDATA, t.second }; },
                        []( auto&& p ) -> OutgoingMessage {
                          using T = std::decay_t<decltype( p )>;
                          return { T::OPCODE, serialize( p ) };
@@ -137,7 +135,19 @@ size_t MessageParser::parse( string_view buf )
         expected_payload_length_ = IncomingMessage::expected_payload_length( incomplete_header_ );
 
         if ( expected_payload_length_.value() == 0 ) {
-          assert( Message::opcode( incomplete_header_ ) == Message::Opcode::REQUESTINFO );
+          switch ( Message::opcode( incomplete_header_ ) ) {
+            case Message::Opcode::TREEDATA:
+              incomplete_payload_ = OwnedMutTree::allocate( 0 );
+              break;
+
+            case Message::Opcode::BLOBDATA: {
+              incomplete_payload_ = OwnedMutBlob::allocate( 0 );
+              break;
+            }
+
+            default:
+              break;
+          }
           complete_message();
         } else {
           switch ( Message::opcode( incomplete_header_ ) ) {
@@ -146,8 +156,12 @@ size_t MessageParser::parse( string_view buf )
             case Message::Opcode::RESULT:
             case Message::Opcode::REQUESTTREE:
             case Message::Opcode::REQUESTBLOB:
+            case Message::Opcode::LOADBLOB:
+            case Message::Opcode::LOADTREE:
+            case Message::Opcode::REQUESTSHALLOWTREE:
             case Message::Opcode::PROPOSE_TRANSFER:
-            case Message::Opcode::ACCEPT_TRANSFER: {
+            case Message::Opcode::ACCEPT_TRANSFER:
+            case Message::Opcode::SHALLOWTREEDATA: {
               incomplete_payload_ = "";
               get<string>( incomplete_payload_ ).resize( expected_payload_length_.value() );
               break;
@@ -234,6 +248,16 @@ void RequestTreePayload::serialize( Serializer& serializer ) const
   serializer.integer( handle.content );
 }
 
+RequestShallowTreePayload RequestShallowTreePayload::parse( Parser& parser )
+{
+  return { .handle { parse_handle<AnyTree>( parser ) } };
+}
+
+void RequestShallowTreePayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
+}
+
 ResultPayload ResultPayload::parse( Parser& parser )
 {
   ResultPayload res;
@@ -288,6 +312,47 @@ void InfoPayload::serialize( Serializer& serializer ) const
   for ( const auto& h : data ) {
     serializer.integer( h.content );
   }
+}
+
+ShallowTreeDataPayload ShallowTreeDataPayload::parse( Parser& parser )
+{
+  ShallowTreeDataPayload payload;
+  payload.handle = parse_handle<AnyTree>( parser );
+  auto tree = OwnedMutTree::allocate( parser.input().size() / sizeof( Handle<Fix> ) );
+  parser.string( { reinterpret_cast<char*>( tree.span().data() ), tree.span().size_bytes() } );
+  payload.data = make_shared<OwnedTree>( std::move( tree ) );
+  return payload;
+}
+
+void ShallowTreeDataPayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
+  serializer.string(
+    string_view( reinterpret_cast<const char*>( data->span().data() ), data->span().size_bytes() ) );
+}
+
+LoadBlobPayload LoadBlobPayload::parse( Parser& parser )
+{
+  LoadBlobPayload payload;
+  payload.handle = parse_handle<Blob>( parser );
+  return payload;
+}
+
+void LoadBlobPayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
+}
+
+LoadTreePayload LoadTreePayload::parse( Parser& parser )
+{
+  LoadTreePayload payload;
+  payload.handle = parse_handle<AnyTree>( parser );
+  return payload;
+}
+
+void LoadTreePayload::serialize( Serializer& serializer ) const
+{
+  serializer.integer( handle.content );
 }
 
 template<Message::Opcode O>

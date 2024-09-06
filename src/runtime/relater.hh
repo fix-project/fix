@@ -49,12 +49,15 @@ public:
   virtual std::optional<BlobData> get( Handle<Named> name ) override;
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;
   virtual std::optional<Handle<Object>> get( Handle<Relation> name ) override;
+  virtual std::optional<TreeData> get_shallow( Handle<AnyTree> name ) override;
   virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name ) override;
   virtual void put( Handle<Named> name, BlobData data ) override;
   virtual void put( Handle<AnyTree> name, TreeData data ) override;
+  virtual void put_shallow( Handle<AnyTree> name, TreeData data ) override;
   virtual void put( Handle<Relation> name, Handle<Object> data ) override;
   virtual bool contains( Handle<Named> handle ) override;
   virtual bool contains( Handle<AnyTree> handle ) override;
+  virtual bool contains_shallow( Handle<AnyTree> handle ) override;
   virtual bool contains( Handle<Relation> handle ) override;
   virtual std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> handle ) override;
   virtual bool contains( const std::string_view label ) override;
@@ -87,11 +90,13 @@ public:
       }
 
       if constexpr ( std::same_as<T, Relation> ) {
-        auto target = get( handle );
-        std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, target->get() );
+        if ( contains( handle ) ) {
+          auto target = get( handle ).value();
+          std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, target.get() );
+        }
 
         auto lhs = handle.template visit<Handle<Object>>(
-          overload { []( Handle<Apply> h ) { return h.unwrap<ObjectTree>(); },
+          overload { []( Handle<Think> s ) { return s.unwrap<Thunk>(); },
                      []( Handle<Eval> h ) { return h.unwrap<Object>(); } } );
         std::visit( [&]( const auto x ) { visit_full( x, visitor, visited ); }, lhs.get() );
 
@@ -105,9 +110,11 @@ public:
       return;
     } else {
       if constexpr ( FixTreeType<T> ) {
-        auto tree = get( handle );
-        for ( const auto& element : tree.value()->span() ) {
-          visit_full( element, visitor, visited );
+        if ( contains( handle ) ) {
+          auto tree = get( handle ).value();
+          for ( const auto& element : tree->span() ) {
+            visit_full( element, visitor, visited );
+          }
         }
       }
       VLOG( 3 ) << "visiting " << handle;
@@ -155,7 +162,7 @@ public:
   RuntimeStorage& get_storage() { return storage_; }
   Repository& get_repository() { return repository_; }
   virtual std::unordered_set<Handle<AnyDataType>> data() const override { return repository_.data(); }
-  virtual absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Handle<Relation> blocked ) override
+  virtual absl::flat_hash_set<Handle<Dependee>> get_forward_dependencies( Handle<Relation> blocked ) override
   {
     return graph_.read()->get_forward_dependencies( blocked );
   }

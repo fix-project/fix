@@ -4,13 +4,13 @@ on: [push, pull_request]
 
 jobs:
   lint:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-24.04
       steps:
       - uses: actions/checkout@v4
       - name: install tools
         run: sudo apt update && sudo apt install clang-format
       - name: set clang-format
-        run: sudo unlink /usr/bin/clang-format && sudo ln -s /usr/bin/clang-format-15 /usr/bin/clang-format
+        run: sudo unlink /usr/bin/clang-format && sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
       - name: run clang-format
         run: ./etc/clang-format-diff.sh
   ci:
@@ -57,7 +57,7 @@ jobs:
       - name: compile
         run: cmake --build out --parallel 8
       - name: download bootstrap seed
-        run: gh release download v0.92 --pattern 'bootstrap.tar.gz' --repo 'fix-project/bootstrap'
+        run: gh release download v0.93 --pattern 'bootstrap.tar.gz' --repo 'fix-project/bootstrap'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: untar bootstrap seed

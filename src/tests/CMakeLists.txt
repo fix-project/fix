@@ -13,6 +13,8 @@ target_link_libraries(test-storage storage)
 add_executable(test-hash-table test-hash-table.cc unit-test-main.cc)
 target_link_libraries(test-hash-table storage)
 
+add_executable(test-bptree test-bptree.cc unit-test-main.cc)
+
 add_executable(hash-table-perf hash-table-perf.cc)
 target_link_libraries(hash-table-perf storage)
 
@@ -43,6 +45,9 @@ target_link_libraries(test-add runtime)
 
 add_executable(test-fib test-fib.cc fixpoint-test-main.cc)
 target_link_libraries(test-fib runtime)
+
+add_executable(test-bptree-get test-bptree-get.cc fixpoint-test-main.cc)
+target_link_libraries(test-bptree-get runtime)
 
 add_executable(test-trap test-trap.cc fixpoint-test-main.cc)
 target_link_libraries(test-trap runtime)
@@ -79,4 +84,7 @@ target_link_libraries(test-return-flatware runtime)
 
 add_executable(test-python-flatware test-python-flatware.cc fixpoint-test-main.cc)
 target_link_libraries(test-python-flatware runtime)
+
+add_executable(create-bptree create-bptree.cc)
+target_link_libraries(create-bptree runtime)
 

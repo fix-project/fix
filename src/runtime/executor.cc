@@ -41,7 +41,7 @@ Executor::~Executor()
 void Executor::run()
 {
   static std::mutex error_mutex;
-  Handle<AnyDataType> next;
+  Handle<Relation> next;
   try {
     while ( true ) {
       todo_ >> next;
@@ -80,30 +80,15 @@ void Executor::run()
   }
 }
 
-void Executor::progress( Handle<AnyDataType> runnable_or_loadable )
+void Executor::progress( Handle<Relation> runnable )
 {
-  VLOG( 2 ) << "Progressing " << runnable_or_loadable;
-
-  runnable_or_loadable.visit<void>( overload {
-    []( Handle<Literal> ) { return; },
-    [&]( Handle<Named> n ) { parent_.get( n ); },
-    [&]( Handle<AnyTree> t ) { parent_.get( t ); },
-    [&]( Handle<Relation> r ) {
-      r.visit<void>( overload {
-        [&]( Handle<Apply> a ) {
-          auto result = apply( a.unwrap<ObjectTree>() );
-          put( a, result.value() );
-        },
-        [&]( Handle<Eval> e ) { parent_.run( e ); },
-      } );
-    },
-  } );
+  VLOG( 2 ) << "Progressing " << runnable;
+  parent_.run( runnable );
 }
 
 Result<Object> Executor::apply( Handle<ObjectTree> combination )
 {
   VLOG( 2 ) << "Apply " << combination;
-  Handle<Apply> goal( combination );
 
   TreeData tree = parent_.storage_.get( combination );
   auto result = runner_->apply( combination, tree );
@@ -113,20 +98,12 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
 
 std::optional<BlobData> Executor::get( Handle<Named> name )
 {
-  if ( threads_.size() == 0 ) {
-    throw HandleNotFound( name );
-  }
-  todo_.move_push( Handle<AnyDataType>( name ) );
-  return {};
+  throw HandleNotFound( name );
 };
 
 std::optional<TreeData> Executor::get( Handle<AnyTree> name )
 {
-  if ( threads_.size() == 0 ) {
-    throw HandleNotFound( handle::upcast( name ) );
-  }
-  todo_.move_push( name.visit<Handle<AnyDataType>>( []( auto h ) { return h; } ) );
-  return {};
+  throw HandleNotFound( handle::fix( name ) );
 };
 
 std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
@@ -136,11 +113,16 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   }
   auto graph = parent_.graph_.write();
   if ( graph->start( name ) )
-    todo_.move_push( Handle<AnyDataType>( name ) );
+    todo_.push( name );
   return {};
 }
 
 std::optional<Handle<AnyTree>> Executor::get_handle( Handle<AnyTree> )
+{
+  return {};
+}
+
+std::optional<TreeData> Executor::get_shallow( Handle<AnyTree> )
 {
   return {};
 }
@@ -153,6 +135,11 @@ void Executor::put( Handle<Named> name, BlobData data )
 void Executor::put( Handle<AnyTree> name, TreeData data )
 {
   parent_.put( name, data );
+}
+
+void Executor::put_shallow( Handle<AnyTree> name, TreeData data )
+{
+  parent_.put_shallow( name, data );
 }
 
 void Executor::put( Handle<Relation> name, Handle<Object> data )
@@ -168,6 +155,11 @@ bool Executor::contains( Handle<Named> handle )
 bool Executor::contains( Handle<AnyTree> handle )
 {
   return parent_.contains( handle );
+}
+
+bool Executor::contains_shallow( Handle<AnyTree> handle )
+{
+  return parent_.contains_shallow( handle );
 }
 
 bool Executor::contains( Handle<Relation> handle )

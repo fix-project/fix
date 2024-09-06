@@ -20,6 +20,7 @@ add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-fai
 add_custom_target (all-flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" COMMENT "Testing Flatware...")
 
 add_test(NAME u_handle COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-handle)
+add_test(NAME u_hash_table COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-hash-table)
 add_test(NAME u_storage COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-storage)
 add_test(NAME u_evaluator COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-evaluator)
 add_test(NAME u_executor COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-executor)
@@ -32,6 +33,7 @@ add_test(NAME u_relater COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-sched
 
 add_test(NAME t_add COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add)
 add_test(NAME t_fib COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib)
+add_test(NAME t_bptree COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-bptree-get)
 add_test(NAME t_trap COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh)
 add_test(NAME t_resource_limits COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-resource-limits.sh)
 add_test(NAME t_map COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-map)
@@ -43,6 +45,7 @@ add_test(NAME t_self_host WORKING_DIRECTORY ${PROJECT_SOURCE_DIR} COMMAND ${CMAK
 
 add_test(NAME l_add COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-add -s local)
 add_test(NAME l_fib COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-fib -s local)
+add_test(NAME l_bptree COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-bptree-get -s local)
 add_test(NAME l_trap COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-trap.sh local)
 add_test(NAME l_resource_limits COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/test-resource-limits.sh local)
 add_test(NAME l_map COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-map -s local)

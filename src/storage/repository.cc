@@ -1,8 +1,11 @@
+#include <concepts>
 #include <filesystem>
 #include <glog/logging.h>
+#include <memory>
 
 #include "base16.hh"
 #include "handle_post.hh"
+#include "object.hh"
 #include "repository.hh"
 #include "storage_exception.hh"
 
@@ -15,14 +18,13 @@ Repository::Repository( std::filesystem::path directory )
   VLOG( 1 ) << "using repository " << repo_;
 
   for ( auto h : data() ) {
-    h.visit<void>( overload { []( Handle<Literal> ) {},
-                              [&]( Handle<Named> n ) { blobs_.insert( n, true ); },
-                              [&]( Handle<AnyTree> t ) { trees_.insert( t, true ); },
-                              []( Handle<Relation> ) {} } );
-  }
-
-  for ( auto r : relations() ) {
-    relations_.insert( r, true );
+    h.visit<void>( overload {
+      []( Handle<Literal> ) {},
+      [&]( Handle<Named> n ) { blobs_.insert( n, true ); },
+      [&]( Handle<AnyTree> t ) {
+        trees_.insert( t, filesystem::file_size( repo_ / "data" / base16::encode( handle::fix( t ).content ) ) );
+      },
+      [&]( Handle<Relation> r ) { relations_.insert( r, true ); } } );
   }
 }
 
@@ -46,6 +48,10 @@ std::unordered_set<Handle<AnyDataType>> Repository::data() const
     for ( const auto& datum : fs::directory_iterator( repo_ / "data" ) ) {
       result.insert(
         handle::data( Handle<Fix>::forge( base16::decode( datum.path().filename().string() ) ) ).value() );
+    }
+
+    for ( const auto& relation : relations() ) {
+      result.insert( relation );
     }
     return result;
   } catch ( std::filesystem::filesystem_error& ) {
@@ -101,7 +107,7 @@ std::optional<BlobData> Repository::get( Handle<Named> name )
 {
   Handle<Fix> fix( name );
   try {
-    VLOG( 1 ) << "loading " << fix.content << " from disk";
+    VLOG( 2 ) << "loading " << fix.content << " from disk";
     assert( not handle::is_local( fix ) );
     return make_shared<OwnedBlob>( repo_ / "data" / base16::encode( fix.content ) );
   } catch ( std::filesystem::filesystem_error& ) {
@@ -115,7 +121,7 @@ std::optional<TreeData> Repository::get( Handle<AnyTree> name )
   auto file_name = base16::encode( handle::fix( real_handle ).content );
 
   try {
-    VLOG( 1 ) << "loading " << file_name << " from disk";
+    VLOG( 2 ) << "loading " << file_name << " from disk";
     assert( not handle::is_local( name ) );
     return make_shared<OwnedTree>( repo_ / "data" / file_name );
   } catch ( std::filesystem::filesystem_error& ) {
@@ -123,11 +129,56 @@ std::optional<TreeData> Repository::get( Handle<AnyTree> name )
   }
 }
 
+std::optional<TreeData> Repository::get_shallow( Handle<AnyTree> name )
+{
+  auto t = get( name );
+
+  if ( t.has_value() ) {
+    optional<OwnedMutTree> newtree;
+    for ( size_t i = 0; i < t.value()->span().size(); i++ ) {
+      optional<Handle<Fix>> new_entry;
+      t.value()->span()[i].unwrap<Expression>().unwrap<Object>().visit<void>( overload {
+        [&]( Handle<Value> x ) {
+          x.visit<void>( overload {
+            [&]( Handle<Blob> x ) {
+              x.visit<void>( overload {
+                [&]( Handle<Named> x ) { new_entry = Handle<BlobRef>( x ); },
+                []( Handle<Literal> ) {},
+              } );
+            },
+            [&]( Handle<ValueTree> x ) { new_entry = x.into<ValueTreeRef>( trees_.get( x ).value() ); },
+            []( Handle<BlobRef> ) {},
+            []( Handle<ValueTreeRef> ) {},
+          } );
+        },
+        [&]( Handle<ObjectTree> x ) { new_entry = x.into<ObjectTreeRef>( trees_.get( x ).value() ); },
+        []( Handle<Thunk> ) {},
+        []( Handle<ObjectTreeRef> ) {},
+      } );
+
+      if ( new_entry.has_value() ) {
+        if ( !newtree.has_value() ) {
+          newtree = OwnedMutTree::allocate( t.value()->span().size() );
+          std::copy( t.value()->span().begin(), t.value()->span().end(), newtree.value().span().begin() );
+        }
+
+        newtree.value()[i] = new_entry.value();
+      }
+    }
+
+    if ( newtree.has_value() ) {
+      return make_shared<OwnedTree>( std::move( newtree.value() ) );
+    }
+  }
+
+  return t;
+}
+
 std::optional<Handle<Object>> Repository::get( Handle<Relation> relation )
 {
   Handle<Fix> fix( relation );
   try {
-    VLOG( 1 ) << "loading " << fix.content << " from disk";
+    VLOG( 2 ) << "loading " << fix.content << " from disk";
     assert( not handle::is_local( fix ) );
     return Handle<Fix>::forge(
              base16::decode(
@@ -144,7 +195,7 @@ void Repository::put( Handle<Named> name, BlobData data )
   assert( not handle::is_local( name ) );
   try {
     Handle<Fix> fix( name );
-    VLOG( 1 ) << "writing " << fix.content << " to disk";
+    VLOG( 2 ) << "writing " << fix.content << " to disk";
     auto path = repo_ / "data" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
@@ -160,7 +211,7 @@ void Repository::put( Handle<AnyTree> name, TreeData data )
   assert( not handle::is_local( name ) );
   try {
     auto fix = name.visit<Handle<Fix>>( []( const auto x ) { return x; } );
-    VLOG( 1 ) << "writing " << fix.content << " to disk";
+    VLOG( 2 ) << "writing " << fix.content << " to disk";
     auto path = repo_ / "data" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
@@ -171,17 +222,22 @@ void Repository::put( Handle<AnyTree> name, TreeData data )
   }
 }
 
+void Repository::put_shallow( Handle<AnyTree>, TreeData )
+{
+  throw std::runtime_error( "Unimplemented" );
+}
+
 void Repository::put( Handle<Relation> relation, Handle<Object> target )
 {
   try {
     assert( not handle::is_local( relation ) );
     assert( not handle::is_local( target ) );
     Handle<Fix> fix( relation );
-    VLOG( 1 ) << "writing " << fix.content << " to disk";
+    VLOG( 2 ) << "writing " << fix.content << " to disk";
     auto path = repo_ / "relations" / base16::encode( fix.content );
     if ( fs::exists( path ) )
       return;
-    VLOG( 1 ) << "linking to " << target.content;
+    VLOG( 2 ) << "linking to " << target.content;
     relations_.insert( relation, true );
     fs::create_symlink( "../data/" + base16::encode( target.content ), path );
   } catch ( std::filesystem::filesystem_error& ) {
@@ -251,6 +307,11 @@ bool Repository::contains( Handle<Named> handle )
 bool Repository::contains( Handle<AnyTree> handle )
 {
   return trees_.contains( handle );
+}
+
+bool Repository::contains_shallow( Handle<AnyTree> handle )
+{
+  return contains( handle );
 }
 
 bool Repository::contains( Handle<Relation> handle )

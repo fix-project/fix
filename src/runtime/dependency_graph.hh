@@ -21,8 +21,8 @@ public:
 
 private:
   absl::flat_hash_set<Task> running_ {};
-  absl::flat_hash_map<Task, absl::flat_hash_set<Handle<AnyDataType>>> forward_dependencies_ {};
-  absl::flat_hash_map<Handle<AnyDataType>, absl::flat_hash_set<Task>> backward_dependencies_ {};
+  absl::flat_hash_map<Task, absl::flat_hash_set<Handle<Dependee>>> forward_dependencies_ {};
+  absl::flat_hash_map<Handle<Dependee>, absl::flat_hash_set<Task>> backward_dependencies_ {};
 
 public:
   DependencyGraph() {}
@@ -37,8 +37,10 @@ public:
    */
   bool start( Task task )
   {
-    VLOG( 1 ) << "starting " << task;
+    VLOG( 2 ) << "starting " << task;
     if ( contains( task ) )
+      return false;
+    if ( !forward_dependencies_[task].empty() )
       return false;
     running_.insert( task );
     return true;
@@ -50,9 +52,9 @@ public:
    * @p blocked   The Task to mark as blocked on @p runnable.
    * @p runnable_or_loadable  The Task to mark as runnable or The Handle<Fix> to be loaded, blocking @p blocked
    */
-  void add_dependency( Task blocked, Handle<AnyDataType> runnable_or_loadable )
+  void add_dependency( Task blocked, Handle<Dependee> runnable_or_loadable )
   {
-    VLOG( 1 ) << "adding dependency from " << blocked << " to " << runnable_or_loadable << " without running";
+    VLOG( 2 ) << "adding dependency from " << blocked << " to " << runnable_or_loadable << " without running";
     forward_dependencies_[blocked].insert( runnable_or_loadable );
     backward_dependencies_[runnable_or_loadable].insert( blocked );
     running_.erase( blocked );
@@ -64,9 +66,9 @@ public:
    * @p[in]   task_or_object        The Task to mark as complete or The Object loaded.
    * @p[out]  unblocked   The set of Tasks which can now be started.
    */
-  void finish( Handle<AnyDataType> task_or_object, absl::flat_hash_set<Task>& unblocked )
+  void finish( Handle<Dependee> task_or_object, absl::flat_hash_set<Task>& unblocked )
   {
-    VLOG( 1 ) << "finished " << task_or_object;
+    VLOG( 2 ) << "finished " << task_or_object;
     task_or_object.visit<void>( overload { [&]( Handle<Relation> r ) { running_.erase( r ); }, [&]( auto ) {} } );
     if ( backward_dependencies_.contains( task_or_object ) ) {
       for ( const auto dependent : backward_dependencies_[task_or_object] ) {
@@ -82,7 +84,7 @@ public:
     }
   }
 
-  absl::flat_hash_set<Handle<AnyDataType>> get_forward_dependencies( Task blocked ) const
+  absl::flat_hash_set<Handle<Dependee>> get_forward_dependencies( Task blocked ) const
   {
     if ( forward_dependencies_.contains( blocked ) ) {
       return forward_dependencies_.at( blocked );

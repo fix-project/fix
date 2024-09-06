@@ -1,4 +1,5 @@
 #include <functional> // IWYU pragma: keep
+#include <iostream>
 #include <stdexcept>
 
 #include "evaluator.hh"
@@ -14,6 +15,7 @@ Result<Value> FixEvaluator::evalStrict( Handle<Object> x )
   auto mapEval = [&]( auto x ) { return rt_.mapEval( x ); };
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
   auto load = [&]( auto x ) { return rt_.load( x ); };
+  auto force = [&]( auto x ) { return rt_.force( x ); };
 
   return x.visit<Result<Value>>( overload {
     [&]( Handle<Value> x ) { return lift( x ); },
@@ -35,8 +37,9 @@ Result<Value> FixEvaluator::evalStrict( Handle<Object> x )
 
 Result<Object> FixEvaluator::evalShallow( Handle<Object> x )
 {
-  auto evalShallow = [&]( auto x ) { return rt_.evalShallow( x ); };
+  auto evalShallow = [&]( auto x ) { return this->evalShallow( x ); };
   auto ref = [&]( auto x ) { return rt_.ref( x ); };
+  auto force = [&]( auto x ) { return rt_.force( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Value> x ) { return lower( x ); },
@@ -49,8 +52,11 @@ Result<Object> FixEvaluator::evalShallow( Handle<Object> x )
 Result<Object> FixEvaluator::force( Handle<Thunk> x )
 {
   auto mapReduce = [&]( auto x ) { return rt_.mapReduce( x ); };
+  auto mapEvalShallow = [&]( auto x ) { return rt_.mapEvalShallow( x ); };
   auto apply = [&]( auto x ) { return rt_.apply( x ); };
   auto load = [&]( auto x ) { return rt_.load( x ); };
+  auto loadShallow = [&]( auto x ) { return rt_.loadShallow( x ); };
+  auto select = [&]( auto x ) { return rt_.select( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Identification> x ) {
@@ -79,14 +85,26 @@ Result<Object> FixEvaluator::force( Handle<Thunk> x )
         } )
         .and_then( apply );
     },
-    [&]( Handle<Selection> ) -> Handle<Object> { throw std::runtime_error( "unimplemented" ); },
+    [&]( Handle<Selection> x ) {
+      return loadShallow( x.unwrap<ObjectTree>() )
+        .and_then( [&]( auto h ) {
+          return h.template visit<Result<ObjectTree>>( overload {
+            [&]( Handle<ObjectTree> t ) { return mapEvalShallow( t ); },
+            []( Handle<ValueTree> t ) { return t.into<ObjectTree>(); },
+            []( Handle<ExpressionTree> ) -> Result<ObjectTree> {
+              throw std::runtime_error( "Invalid loadShallow return type" );
+            },
+          } );
+        } )
+        .and_then( select );
+    },
   } );
 }
 
 Result<Object> FixEvaluator::reduce( Handle<Expression> x )
 {
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
-  auto evalShallow = [&]( auto x ) { return rt_.evalShallow( x ); };
+  auto evalShallow = [&]( auto x ) { return this->evalShallow( x ); };
   auto mapReduce = [&]( auto x ) { return rt_.mapReduce( x ); };
 
   return x.visit<Result<Object>>( overload {
@@ -128,7 +146,12 @@ Result<Value> FixEvaluator::lower( Handle<Value> x )
   auto ref = [&]( auto x ) { return rt_.ref( x ); };
 
   return x.visit<Result<Value>>( overload {
-    [&]( Handle<Blob> x ) { return Handle<BlobRef>( x ); },
+    [&]( Handle<Blob> x ) {
+      return x.visit<Handle<Value>>( overload {
+        []( Handle<Literal> l ) { return l; },
+        []( Handle<Named> n ) { return Handle<BlobRef>( Handle<Blob>( n ) ); },
+      } );
+    },
     [&]( Handle<ValueTree> x ) { return ref( x ).unwrap<ValueTreeRef>(); },
     [&]( Handle<BlobRef> x ) { return x; },
     [&]( Handle<ValueTreeRef> x ) { return x; },
@@ -138,13 +161,13 @@ Result<Value> FixEvaluator::lower( Handle<Value> x )
 Result<Object> FixEvaluator::relate( Handle<Fix> x )
 {
   auto evalStrict = [&]( auto x ) { return rt_.evalStrict( x ); };
-  auto apply = [&]( auto x ) { return rt_.apply( x ); };
+  auto force = [&]( auto x ) { return rt_.force( x ); };
   auto reduce = [&]( auto x ) { return this->reduce( x ); };
 
   return x.visit<Result<Object>>( overload {
     [&]( Handle<Relation> x ) {
       return x.visit<Result<Object>>( overload {
-        [&]( Handle<Apply> x ) { return apply( x.unwrap<ObjectTree>() ); },
+        [&]( Handle<Think> x ) { return force( x.unwrap<Thunk>() ); },
         [&]( Handle<Eval> x ) { return evalStrict( x.unwrap<Object>() ); },
       } );
     },

@@ -24,6 +24,6 @@ add_custom_command(
 )
 
 add_custom_target(
-  python_fixpoint ALL
+  python_fixpoint
   DEPENDS python-fixpoint.wasm
 )

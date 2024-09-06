@@ -14,9 +14,9 @@ class Repository : public IRuntime
 {
   std::filesystem::path repo_;
 
-  FixTable<Named, bool, AbslHash> blobs_ { 100000 };
-  FixTable<AnyTree, bool, AbslHash, handle::any_tree_equal> trees_ { 100000 };
-  FixTable<Relation, bool, AbslHash> relations_ { 100000 };
+  FixTable<Named, bool, AbslHash> blobs_ { 1000000 };
+  FixTable<AnyTree, size_t, AbslHash, handle::any_tree_equal> trees_ { 1000000 };
+  FixTable<Relation, bool, AbslHash> relations_ { 1000000 };
 
 public:
   Repository( std::filesystem::path directory = std::filesystem::current_path() );
@@ -29,11 +29,13 @@ public:
 
   virtual std::optional<BlobData> get( Handle<Named> name ) override;
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;
+  virtual std::optional<TreeData> get_shallow( Handle<AnyTree> name ) override;
   virtual std::optional<Handle<Object>> get( Handle<Relation> relation ) override;
   virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name ) override;
 
   virtual void put( Handle<Named> name, BlobData data ) override;
   virtual void put( Handle<AnyTree> name, TreeData data ) override;
+  virtual void put_shallow( Handle<AnyTree> name, TreeData data ) override;
   virtual void put( Handle<Relation> name, Handle<Object> data ) override;
 
   Handle<Fix> labeled( const std::string_view label ) override;
@@ -44,6 +46,7 @@ public:
 
   virtual bool contains( Handle<Named> name ) override;
   virtual bool contains( Handle<AnyTree> name ) override;
+  virtual bool contains_shallow( Handle<AnyTree> name ) override;
   virtual bool contains( Handle<Relation> name ) override;
   virtual std::optional<Handle<AnyTree>> contains( Handle<AnyTreeRef> name ) override;
 
