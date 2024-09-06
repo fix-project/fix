@@ -52,6 +52,7 @@ int main( int argc, char* argv[] )
 {
   if ( argc != 3 && argc != 4 ) {
     cerr << "Usage: fixpoint-client-wikipedia needle-string haystack-label [address:port]" << endl;
+    cerr << "\tset the environment variable SMALL_SLICES to use 10 MiB slices (default 1 GiB)" << endl;
     exit( 1 );
   }
 
@@ -106,51 +107,52 @@ int main( int argc, char* argv[] )
 #define GiB ( 1024 * MiB )
 
   const size_t TOTAL_SIZE = handle::size( haystack );
-#define SIZE 1
-#if SIZE == 1
-  const size_t LEAF_SIZE = 100 * MiB;
-#elif SIZE == 2
-  const size_t LEAF_SIZE = 1 * GiB;
-#endif
+  const size_t LEAF_SIZE = getenv( "SMALL_SLICES" ) ? 10 * MiB : 1 * GiB;
   const size_t LEAVES = std::ceil( TOTAL_SIZE / (double)LEAF_SIZE );
   cerr << "Running " << LEAVES << " parallel maps." << endl;
-  cerr << "Precomputing selections." << endl;
-  progress( 0 );
+  bool precompute_only = needle_string.empty();
+  if ( precompute_only ) {
+    cerr << "Precomputing selections." << endl;
+    progress( 0 );
+  }
   auto args = OwnedMutTree::allocate( LEAVES );
   for ( size_t i = 0; i < LEAVES; i++ ) {
-    progress( i / (double)LEAVES );
+    if ( precompute_only )
+      progress( i / (double)LEAVES );
     auto selection = OwnedMutTree::allocate( 3 );
     selection[0] = haystack;
     selection[1] = Handle<Literal>( LEAF_SIZE * i );
     selection[2] = Handle<Literal>( std::min( LEAF_SIZE * ( i + 1 ), TOTAL_SIZE ) );
     auto handle = rt.create( make_shared<OwnedTree>( std::move( selection ) ) ).unwrap<ValueTree>();
     auto select = Handle<Selection>( Handle<ObjectTree>( handle ) );
-    // force this to execute and be cached
-    auto ref = client->execute( Handle<Think>( select ) );
+    if ( precompute_only ) {
+      // force this to execute and be cached
+      client->execute( Handle<Think>( select ) );
+    }
 
     auto arg_tree = OwnedMutTree::allocate( 2 );
     arg_tree[0] = needle;
-    arg_tree[1] = ref;
-    args[i] = rt.create( make_shared<OwnedTree>( std::move( arg_tree ) ) ).unwrap<ValueTree>();
+    arg_tree[1] = select;
+    args[i] = rt.create( make_shared<OwnedTree>( std::move( arg_tree ) ) ).unwrap<ObjectTree>();
   }
 
-  if ( needle_string.empty() ) {
+  if ( precompute_only ) {
     cerr << "No search query provided." << endl;
-    exit( EXIT_FAILURE );
+    exit( EXIT_SUCCESS );
   }
 
-  auto tree = rt.create( make_shared<OwnedTree>( std::move( args ) ) ).unwrap<ValueTree>();
+  auto tree = rt.create( make_shared<OwnedTree>( std::move( args ) ) ).unwrap<ObjectTree>();
 
   auto toplevel = OwnedMutTree::allocate( 7 );
   toplevel[0] = make_limits( rt, 1024 * 1024 * 1024, 1024 * 1024, 1, false );
   toplevel[1] = mapreduce;
   toplevel[2] = mapper;
   toplevel[3] = reducer;
-  toplevel[4] = Handle<ValueTreeRef>( tree, LEAVES );
+  toplevel[4] = Handle<ObjectTreeRef>( tree, LEAVES );
   toplevel[5] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, false );
   toplevel[6] = make_limits( rt, 1024 * 1024 * 1024, 256 * 8, 1, true );
 
-  auto handle = rt.create( make_shared<OwnedTree>( std::move( toplevel ) ) ).unwrap<ValueTree>();
+  auto handle = rt.create( make_shared<OwnedTree>( std::move( toplevel ) ) ).unwrap<ObjectTree>();
   cerr << "Executing." << endl;
   struct timespec before, after;
   struct timespec before_real, after_real;
