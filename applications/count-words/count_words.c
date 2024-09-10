@@ -47,6 +47,7 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
     for (size_t i = 0; i < haystack_size - needle_size + 1; i++) {
       if (!memcmp(needle, haystack + i, needle_size)) {
         count++;
+        i += needle_size - 1;
       }
     }
   }
