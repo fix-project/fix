@@ -53,6 +53,7 @@ int main( int argc, char* argv[] )
   if ( argc != 3 && argc != 4 ) {
     cerr << "Usage: fixpoint-client-wikipedia needle-string haystack-label [address:port]" << endl;
     cerr << "\tset the environment variable SMALL_SLICES to use 10 MiB slices (default 1 GiB)" << endl;
+    cerr << "\tset the environment variable MEDIUM_SLICES to use 100 MiB slices (default 1 GiB)" << endl;
     exit( 1 );
   }
 
@@ -107,8 +108,10 @@ int main( int argc, char* argv[] )
 #define GiB ( 1024 * MiB )
 
   const size_t TOTAL_SIZE = handle::size( haystack );
-  const size_t LEAF_SIZE = getenv( "SMALL_SLICES" ) ? 10 * MiB : 1 * GiB;
+  const size_t LEAF_SIZE
+    = getenv( "SMALL_SLICES" ) ? 10 * MiB : ( getenv( "MEDIUM_SLICES" ) ? 100 * MiB : 1 * GiB );
   const size_t LEAVES = std::ceil( TOTAL_SIZE / (double)LEAF_SIZE );
+  cerr << "Slice size: " << LEAF_SIZE << " bytes" << endl;
   cerr << "Running " << LEAVES << " parallel maps." << endl;
   bool precompute_only = needle_string.empty();
   if ( precompute_only ) {
