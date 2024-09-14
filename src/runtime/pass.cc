@@ -561,6 +561,10 @@ void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_s
 
 void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
+  if ( base_.get().get_available_remotes().size() == 0 ) {
+    return;
+  }
+
   bool any_ep = false;
   for ( auto d : dependencies ) {
     if ( base_.get().get_ep( d ) ) {
@@ -776,6 +780,7 @@ void FinalPass::relation_pre( Handle<Relation> job, const absl::flat_hash_set<Ha
     }
   } else {
     for ( auto r : unblocked ) {
+      VLOG( 2 ) << "Relation pre unblocked " << r;
       if ( is_local( chosen_remotes_.at( r ).first ) ) {
         chosen_remotes_.at( r ).first->get( r );
       }

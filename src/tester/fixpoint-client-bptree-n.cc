@@ -13,8 +13,8 @@ int main( int argc, char* argv[] )
 {
   shared_ptr<Client> rt;
 
-  if ( argc != 5 ) {
-    cerr << "Usage: +[address]:[port] [key-list] [# of keys] [# of leaf nodes to get]" << endl;
+  if ( argc != 6 ) {
+    cerr << "Usage: +[address]:[port] [key-list] [begin key index] [# of keys] [# of leaf nodes to get]" << endl;
     return -1;
   }
 
@@ -50,16 +50,22 @@ int main( int argc, char* argv[] )
   auto select = rt->get_rt().create( make_shared<OwnedTree>( std::move( selection_tree ) ) ).unwrap<ValueTree>();
 
   ifstream keys_list( argv[2] );
+  int begin_index = atoi( argv[3] );
+  int num_keys = atoi( argv[4] );
+
   vector<int> keys;
-  for ( int i = 0; i < atoi( argv[3] ); i++ ) {
+  for ( int i = 0; i < begin_index + num_keys; i++ ) {
     int key;
     keys_list >> key;
-    keys.push_back( key );
+    if ( i >= begin_index ) {
+      keys.push_back( key );
+    }
   }
 
-  auto parallel_tree = OwnedMutTree::allocate( keys.size() );
-  size_t index = 0;
-  uint64_t n = atoi( argv[4] );
+  uint64_t n = atoi( argv[5] );
+
+  auto start = chrono::steady_clock::now();
+
   for ( auto key : keys ) {
     auto tree = OwnedMutTree::allocate( 6 );
     tree.at( 0 ) = make_limits( rt->get_rt(), 1024 * 1024, 1024, 1 ).into<Fix>();
@@ -70,19 +76,12 @@ int main( int argc, char* argv[] )
     tree.at( 5 ) = Handle<Literal>( (uint64_t)n );
     auto combination = rt->get_rt().create( make_shared<OwnedTree>( std::move( tree ) ) ).unwrap<ExpressionTree>();
     auto application = Handle<Application>( combination );
-    parallel_tree[index] = application;
-    index++;
+    rt->execute( Handle<Eval>( application ) );
   }
 
-  auto combination
-    = rt->get_rt().create( make_shared<OwnedTree>( std::move( parallel_tree ) ) ).unwrap<ObjectTree>();
-
-  auto start = chrono::steady_clock::now();
-  auto res = rt->execute( Handle<Eval>( combination ) );
   auto end = chrono::steady_clock::now();
   chrono::duration<double> diff = end - start;
 
-  cout << "Result:\n" << res << endl;
   cout << "Duration [seconds]: " << diff << endl;
 
   return 0;

@@ -21,55 +21,98 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
   externref nil = create_tree_rw_table_1( 0 );
 
   attach_tree_ro_table_0( combination );
+  size_t argc = size_ro_table_0();
 
-  externref key_h = get_ro_table_0( 4 );
-  attach_blob_ro_mem_0( key_h );
-  int key;
-  ro_mem_0_to_program_mem( &key, 0, sizeof( key ) );
+  if ( argc == 6 ) {
+    externref key_h = get_ro_table_0( 4 );
+    attach_blob_ro_mem_0( key_h );
+    int key;
+    ro_mem_0_to_program_mem( &key, 0, sizeof( key ) );
 
-  externref keys_h = get_ro_table_0( 2 );
-  attach_blob_ro_mem_0( keys_h );
-  int size = byte_size_ro_mem_0();
-  int num_of_keys = size / sizeof( key );
+    externref keys_h = get_ro_table_0( 2 );
+    attach_blob_ro_mem_0( keys_h );
+    int size = byte_size_ro_mem_0();
+    int num_of_keys = size / sizeof( key );
 
-  bool isleaf;
-  int* keys = (int*)malloc( size );
-  ro_mem_0_to_program_mem( &isleaf, 0, 1 );
-  ro_mem_0_to_program_mem( keys, 1, size - 1 );
+    bool isleaf;
+    int* keys = (int*)malloc( size );
+    ro_mem_0_to_program_mem( &isleaf, 0, 1 );
+    ro_mem_0_to_program_mem( keys, 1, size - 1 );
 
-  externref childrenordata_h = get_ro_table_0( 3 );
+    externref childrenordata_h = get_ro_table_0( 3 );
 
-  int idx = upper_bound( keys, num_of_keys, key );
-  if ( isleaf ) {
-    if ( idx != 0 && keys[idx - 1] == key ) {
-      externref n_h = get_ro_table_0( 5 );
-      attach_blob_ro_mem_0( n_h );
-      uint64_t n;
-      ro_mem_0_to_program_mem( &n, 0, sizeof( uint64_t ) );
+    int idx = upper_bound( keys, num_of_keys, key );
+    if ( isleaf ) {
+      if ( idx != 0 && keys[idx - 1] == key ) {
+        externref n_h = get_ro_table_0( 5 );
+        attach_blob_ro_mem_0( n_h );
+        uint64_t n;
+        ro_mem_0_to_program_mem( &n, 0, sizeof( uint64_t ) );
 
-      if ( n > 6 ) {
-        grow_rw_table_0( n - 6, nil );
+        if ( n == 1 ) {
+          return create_selection_thunk_range( childrenordata_h, idx, idx + 1 );
+        }
+
+        int leaf_node_size = get_length( childrenordata_h );
+        int estimate_num_nodes = n / ( ( leaf_node_size - 2 ) / 2 );
+
+        if ( estimate_num_nodes > 6 ) {
+          grow_rw_table_0( estimate_num_nodes - 6, nil );
+        }
+
+        set_rw_table_0(
+          0, create_strict_encode( create_selection_thunk_range( childrenordata_h, idx, leaf_node_size - 1 ) ) );
+        for ( uint64_t i = 1; i < estimate_num_nodes; i++ ) {
+          childrenordata_h = create_selection_thunk( childrenordata_h, leaf_node_size - 1 );
+          set_rw_table_0(
+            i, create_strict_encode( create_selection_thunk_range( childrenordata_h, 1, leaf_node_size - 1 ) ) );
+        }
+        externref leaf_nodes = create_tree_rw_table_0( estimate_num_nodes );
+
+        grow_rw_table_0( 4, nil );
+        set_rw_table_0( 0, get_ro_table_0( 0 ) );
+        set_rw_table_0( 1, get_ro_table_0( 1 ) );
+        set_rw_table_0( 2, leaf_nodes );
+        set_rw_table_0( 3, n_h );
+        return create_application_thunk( create_tree_rw_table_0( 4 ) );
+      } else {
+        return create_tree_rw_table_0( 0 );
       }
-
-      set_rw_table_0( 0, create_selection_thunk_range( childrenordata_h, idx, size_ro_table_0() - 1 ) );
-      for ( uint64_t i = 1; i < n; i++ ) {
-        childrenordata_h = create_selection_thunk( childrenordata_h, size_ro_table_0() - 1 );
-        set_rw_table_0( i, create_selection_thunk_range( childrenordata_h, 1, size_ro_table_0() - 1 ) );
-      }
-      return create_tree_rw_table_0( n );
-
     } else {
-      return create_tree_rw_table_0( 0 );
+      externref nextlevel = create_selection_thunk( childrenordata_h, idx + 1 );
+      externref keyentry = create_selection_thunk( nextlevel, 0 );
+      set_rw_table_0( 0, get_ro_table_0( 0 ) );
+      set_rw_table_0( 1, get_ro_table_0( 1 ) );
+      set_rw_table_0( 2, create_strict_encode( keyentry ) );
+      set_rw_table_0( 3, create_shallow_encode( nextlevel ) );
+      set_rw_table_0( 4, key_h );
+      set_rw_table_0( 5, get_ro_table_0( 5 ) );
+      return create_application_thunk( create_tree_rw_table_0( 6 ) );
     }
   } else {
-    externref nextlevel = create_selection_thunk( childrenordata_h, idx + 1 );
-    externref keyentry = create_selection_thunk( nextlevel, 0 );
-    set_rw_table_0( 0, get_ro_table_0( 0 ) );
-    set_rw_table_0( 1, get_ro_table_0( 1 ) );
-    set_rw_table_0( 2, create_strict_encode( keyentry ) );
-    set_rw_table_0( 3, create_shallow_encode( nextlevel ) );
-    set_rw_table_0( 4, key_h );
-    set_rw_table_0( 5, get_ro_table_0( 5 ) );
-    return create_application_thunk( create_tree_rw_table_0( 6 ) );
+    externref n_h = get_ro_table_0( 3 );
+    attach_blob_ro_mem_0( n_h );
+    uint64_t n;
+    ro_mem_0_to_program_mem( &n, 0, sizeof( uint64_t ) );
+    grow_rw_table_0( n, nil );
+    int filled = 0;
+
+    attach_tree_ro_table_0( get_ro_table_0( 2 ) );
+    for ( int i = 0; i < size_ro_table_0(); i++ ) {
+      attach_tree_ro_table_1( get_ro_table_0( i ) );
+      for ( int j = 0; j < size_ro_table_1(); j++ ) {
+        externref entry = get_ro_table_1( j );
+        if ( get_length( entry ) > 0 ) {
+          set_rw_table_0( filled, entry );
+          filled++;
+
+          if ( filled == n ) {
+            return create_tree_rw_table_0( n );
+          }
+        }
+      }
+    }
+
+    return create_tree_rw_table_0( filled );
   }
 }

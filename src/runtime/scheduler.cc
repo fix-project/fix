@@ -518,6 +518,7 @@ SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Obj
 
   if ( result.has_value() ) {
     relater_->get().put( goal, result.value() );
+    sketch_graph_.erase_forward_dependencies( goal );
   }
 
   if ( current_schedule_step_.has_value()
@@ -585,6 +586,7 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::force( Handle<Thunk> 
 
   if ( result.has_value() ) {
     relater_->get().put( goal, result.value() );
+    sketch_graph_.erase_forward_dependencies( goal );
   }
 
   return result;
