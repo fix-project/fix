@@ -47,6 +47,7 @@ int main( int argc, char* argv[] )
   optional<const char*> local;
   optional<const char*> peerfile;
   optional<string> sche_opt;
+  optional<size_t> threads;
   parser.AddArgument(
     "listening-port", OptionParser::ArgumentCount::One, [&]( const char* argument ) { port = stoi( argument ); } );
   parser.AddOption( 'a',
@@ -66,6 +67,9 @@ int main( int argc, char* argv[] )
         throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
       }
     } );
+  parser.AddOption(
+    't', "threads", "threads", "Number of threads", [&]( const char* argument ) { threads = stoull( argument ); } );
+
   parser.Parse( argc, argv );
 
   Address listen_address( "0.0.0.0", port );
@@ -106,7 +110,7 @@ int main( int argc, char* argv[] )
     }
   }
 
-  auto server = Server::init( listen_address, scheduler, peer_address );
+  auto server = Server::init( listen_address, scheduler, peer_address, threads );
   cout << "Server initialized" << endl;
 
   server->join();

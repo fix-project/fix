@@ -436,11 +436,6 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::INFO: {
       auto payload = parse<InfoPayload>( std::get<string>( msg.payload() ) );
-      {
-        unique_lock lock( mutex_ );
-        info_ = { .parallelism = payload.parallelism, .link_speed = payload.link_speed };
-        info_cv_.notify_all();
-      }
 
       for ( auto handle : payload.data ) {
         handle.visit<void>( overload {
@@ -458,6 +453,12 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
             relations_view_.get_ref( r ).store( false, memory_order_release );
           },
         } );
+      }
+
+      {
+        unique_lock lock( mutex_ );
+        info_ = { .parallelism = payload.parallelism, .link_speed = payload.link_speed };
+        info_cv_.notify_all();
       }
 
       break;

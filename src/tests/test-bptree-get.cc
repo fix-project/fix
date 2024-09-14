@@ -107,19 +107,28 @@ void check_bptree_get_n( shared_ptr<Relater> rt,
         for ( const auto& d : node->get_data() ) {
           result += d;
           result += " ";
+          n_done.value()++;
+
+          if ( n_done.value() == n ) {
+            return;
+          }
         }
 
-        n_done.value()++;
         return;
       }
 
       if ( node->get_keys().front() <= key && node->get_keys().back() >= key ) {
-        n_done = 1;
+        n_done = 0;
         auto pos = upper_bound( node->get_keys().begin(), node->get_keys().end(), key );
         auto idx = pos - node->get_keys().begin() - 1;
         for ( size_t i = idx; i < node->get_data().size(); i++ ) {
           result += node->get_data()[i];
           result += " ";
+          n_done.value()++;
+
+          if ( n_done.value() == n ) {
+            return;
+          }
         }
       }
     }
@@ -170,7 +179,7 @@ void test( shared_ptr<Relater> rt )
     }
   }
 
-  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *key_set.begin(), 4 );
-  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *std::next( key_set.begin(), 100 ), 4 );
-  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *std::next( key_set.end(), -4 ), 4 );
+  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *key_set.begin(), 10 );
+  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *std::next( key_set.begin(), 100 ), 10 );
+  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *std::next( key_set.end(), -4 ), 10 );
 }

@@ -73,8 +73,7 @@ public:
     if ( backward_dependencies_.contains( task_or_object ) ) {
       for ( const auto dependent : backward_dependencies_[task_or_object] ) {
         auto& target = forward_dependencies_[dependent];
-        target.erase( task_or_object );
-        if ( target.empty() ) {
+        if ( target.erase( task_or_object ) && target.empty() ) {
           VLOG( 2 ) << "resuming " << dependent;
           unblocked.insert( dependent );
           forward_dependencies_.erase( dependent );

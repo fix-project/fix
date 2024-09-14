@@ -63,13 +63,14 @@ protected:
   std::optional<NetworkWorker> network_worker_ {};
 
 public:
-  Server( std::shared_ptr<Scheduler> scheduler )
-    : relater_( std::thread::hardware_concurrency() - 1, {}, scheduler )
+  Server( std::shared_ptr<Scheduler> scheduler, std::optional<std::size_t> threads = {} )
+    : relater_( threads.has_value() ? threads.value() : std::thread::hardware_concurrency() - 1, {}, scheduler )
   {}
 
   static std::shared_ptr<Server> init( const Address& address,
                                        std::shared_ptr<Scheduler> scheduler,
-                                       const std::vector<Address> peer_servers = {} );
+                                       const std::vector<Address> peer_servers = {},
+                                       std::optional<std::size_t> threads = {} );
   void join();
   ~Server();
 };
