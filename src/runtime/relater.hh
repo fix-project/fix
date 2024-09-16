@@ -29,7 +29,7 @@ private:
 
   SharedMutex<DependencyGraph> graph_ {};
   RuntimeStorage storage_ {};
-  Repository repository_ {};
+  Repository repository_;
   std::shared_ptr<Scheduler> scheduler_ {};
 
   SharedMutex<std::vector<std::weak_ptr<IRuntime>>> remotes_ {};
@@ -41,10 +41,12 @@ private:
 public:
   Relater( size_t threads = std::thread::hardware_concurrency(),
            std::optional<std::shared_ptr<Runner>> runner = {},
-           std::optional<std::shared_ptr<Scheduler>> scheduler = {} );
+           std::optional<std::shared_ptr<Scheduler>> scheduler = {},
+	   std::optional<size_t> fix_table_size = {} );
 
   virtual void add_worker( std::shared_ptr<IRuntime> ) override;
   Handle<Value> execute( Handle<Relation> x );
+  Handle<Value> direct_execute( Handle<Relation> x );
 
   virtual std::optional<BlobData> get( Handle<Named> name ) override;
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;

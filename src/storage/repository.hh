@@ -14,12 +14,12 @@ class Repository : public IRuntime
 {
   std::filesystem::path repo_;
 
-  FixTable<Named, bool, AbslHash> blobs_ { 1000000 };
-  FixTable<AnyTree, size_t, AbslHash, handle::any_tree_equal> trees_ { 1000000 };
-  FixTable<Relation, bool, AbslHash> relations_ { 1000000 };
+  FixTable<Named, bool, AbslHash> blobs_;
+  FixTable<AnyTree, size_t, AbslHash, handle::any_tree_equal> trees_;
+  FixTable<Relation, bool, AbslHash> relations_;
 
 public:
-  Repository( std::filesystem::path directory = std::filesystem::current_path() );
+  Repository( size_t fix_table_size = 1000000, std::filesystem::path directory = std::filesystem::current_path() );
   static std::filesystem::path find( std::filesystem::path directory = std::filesystem::current_path() );
 
   std::unordered_set<Handle<AnyDataType>> data() const override;

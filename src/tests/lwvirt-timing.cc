@@ -9,6 +9,7 @@
 #include "add.hh"
 #include "mmap.hh"
 #include "relater.hh"
+#include "scheduler.hh"
 #include "test.hh"
 #include "timer.hh"
 
@@ -45,36 +46,38 @@ static Handle<Application> compile_application( IRuntime& rt, Handle<Fix> wasm )
   } );
 }
 
-auto rt = make_shared<Relater>( 1 );
+shared_ptr<Scheduler> scheduler = make_shared<LocalScheduler>();
+auto rt = make_shared<Relater>( 1, nullopt, scheduler, 10000 );
 Handle<Relation> add_fixpoint_evals[INIT_INSTANCE + 1];
-Handle<Relation> add_wasi_evals[INIT_INSTANCE + 1];
 
 #define ADD_TEST( func, message )                                                                                  \
   {                                                                                                                \
     cout << endl;                                                                                                  \
-    cout << message << endl;                                                                                       \
+    cout << message << " for " << INIT_INSTANCE << " times" << endl;                                               \
+    auto start = chrono::steady_clock::now(); \
     {                                                                                                              \
-      GlobalScopeTimer<Timer::Category::Execution> record_timer;                                                   \
       for ( int i = 0; i < INIT_INSTANCE; i++ ) {                                                                  \
         func( i );                                                                                                 \
       }                                                                                                            \
     }                                                                                                              \
-    global_timer().summary( cout );                                                                                \
+    auto end = chrono::steady_clock::now(); \
+    cout << end - start << endl; \
     reset_global_timer();                                                                                          \
   }
 
 #define ADD_FIX_TEST( func, message )                                                                              \
   {                                                                                                                \
     cout << endl;                                                                                                  \
-    cout << message << endl;                                                                                       \
+    cout << message << " for " << INIT_INSTANCE << " times" << endl;                                               \
     reset_global_timer();                                                                                          \
+    auto start = chrono::steady_clock::now(); \
     {                                                                                                              \
-      GlobalScopeTimer<Timer::Category::Execution> record_timer;                                                   \
       for ( int i = 0; i < INIT_INSTANCE; i++ ) {                                                                  \
         func( i );                                                                                                 \
       }                                                                                                            \
     }                                                                                                              \
-    global_timer().summary( cout );                                                                                \
+    auto end = chrono::steady_clock::now(); \
+    cout << end - start << endl; \
     reset_global_timer();                                                                                          \
   }
 
@@ -95,7 +98,6 @@ void virtual_add( int );
 void vfork_add( int );
 void vfork_add_rr();
 void add_fixpoint( int );
-void add_wasi( int );
 
 addend make_addend( int i )
 {
@@ -109,15 +111,13 @@ addend make_addend( int i )
 
 int main( int argc, char* argv[] )
 {
-  if ( argc < 3 ) {
-    cerr << "Usage: " << argv[0] << " path_to_add_program path_to_add_cycle_program\n";
+  if ( argc < 2 ) {
+    cerr << "Usage: " << argv[0] << " path_to_add_program\n";
+    return -1;
   }
 
   add_program_name = argv[1];
   add_cycle_program_name = argv[2];
-
-  // runtime.populate_program( add_fixpoint_function );
-  // runtime.populate_program( add_wasi_function );
 
   baseline_function();
   // Populate addends
@@ -130,11 +130,8 @@ int main( int argc, char* argv[] )
     base_objects[i] = make_derived();
   }
 
-  auto add_simple_8 = rt->execute(
+  auto add_simple_8 = rt->direct_execute(
     Handle<Eval>( compile_application( *rt, file( *rt, "build/testing/wasm-examples/add-simple-8.wasm" ) ) ) );
-  auto add_flatware = rt->execute( Handle<Eval>( compile_application(
-    *rt,
-    file( *rt, "build/applications-prefix/src/applications-build/flatware/examples/add/add-fixpoint.wasm" ) ) ) );
 
   // Populate encodes
   for ( int i = 0; i < INIT_INSTANCE + 1; i++ ) {
@@ -145,29 +142,19 @@ int main( int argc, char* argv[] )
                              .visit<Handle<ExpressionTree>>( []( auto h ) { return Handle<ExpressionTree>( h ); } );
     auto fix_eval = Handle<Eval>( Handle<Application>( fix_combination ) );
 
-    auto wasi_eval = flatware_input( *rt,
-                                     limits( *rt, 1024 * 1024, 1024, 1 ),
-                                     add_flatware,
-                                     handle::upcast( tree( *rt ) ),
-                                     handle::upcast( tree( *rt, blob( *rt, "add" ), arg1, arg2 ) ) );
-
     add_fixpoint_evals[i] = fix_eval;
-    add_wasi_evals[i] = wasi_eval;
   }
 
   // Compile and link add-fixpoint and fix-wasi
-  cout << "Executing trial run of add-simple-9" << endl;
-  rt->execute( add_fixpoint_evals[INIT_INSTANCE] );
-  cout << "Executing trial run of add-flatware" << endl;
-  rt->execute( add_wasi_evals[INIT_INSTANCE] );
+  cout << "Executing trial run of add-simple-8" << endl;
+  rt->direct_execute( add_fixpoint_evals[INIT_INSTANCE] );
   cout << "Done" << endl;
 
-  ADD_TEST( static_add, "Executing add statically linked..." );
-  ADD_TEST( virtual_add, "Executing add via virtual function call..." );
-  ADD_FIX_TEST( add_fixpoint, "Executing add implemented in Fixpoint..." );
-  ADD_FIX_TEST( add_wasi, "Executing add program compiled through wasi..." );
-  ADD_TEST( vfork_add, "Executing add program..." );
-  ADD_TEST_NUM( vfork_add_rr, "Executing add program rr...", 1 );
+  reset_global_timer();
+  ADD_TEST( static_add, "Executing add statically linked" );
+  ADD_TEST( virtual_add, "Executing add via virtual function call" );
+  ADD_FIX_TEST( add_fixpoint, "Executing add implemented in Fixpoint" );
+  ADD_TEST( vfork_add, "Executing add program" );
 
   for ( int i = 0; i < INIT_INSTANCE; i++ ) {
     delete ( base_objects[i] );
@@ -227,10 +214,5 @@ void vfork_add_rr()
 
 void add_fixpoint( int i )
 {
-  rt->execute( add_fixpoint_evals[i] );
-}
-
-void add_wasi( int i )
-{
-  rt->execute( add_wasi_evals[i] );
+  rt->direct_execute( add_fixpoint_evals[i] );
 }

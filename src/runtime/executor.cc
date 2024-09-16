@@ -21,6 +21,7 @@ Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>
                                 : make_shared<WasmRunner>( parent.labeled( "compile-elf" ),
                                                            parent.labeled( "compile-fixed-point" ) ) )
 {
+  fixpoint::storage = &parent_.storage_;
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
       fixpoint::storage = &parent_.storage_;

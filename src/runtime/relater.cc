@@ -52,8 +52,9 @@ void Relater::get_from_repository( Handle<T> handle )
   }
 }
 
-Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<shared_ptr<Scheduler>> scheduler )
-  : scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
+Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<shared_ptr<Scheduler>> scheduler, optional<size_t> fix_table_size )
+  : repository_( fix_table_size.has_value() ? fix_table_size.value() : 1000000 )
+  , scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
 {
   scheduler_->set_relater( *this );
   local_ = make_shared<Executor>( *this, threads, runner );
@@ -78,6 +79,28 @@ Handle<Value> Relater::execute( Handle<Relation> r )
       // scheduler_->schedule( r );
     } else {
       local_->get( r );
+    }
+
+    top_level_done_.wait( false, std::memory_order_acquire );
+    return result;
+  } else {
+    throw std::runtime_error( "Unexpected top level value." );
+  }
+}
+
+Handle<Value> Relater::direct_execute( Handle<Relation> r )
+{
+  if ( contains( r ) ) {
+    return get( r ).value().unwrap<Value>();
+  }
+
+  top_level = r;
+  bool expected = true;
+  if ( top_level_done_.compare_exchange_strong( expected, false ) ) {
+    if ( local_->get_info()->parallelism == 0 ) {
+      remotes_.read()->front().lock()->get( r );
+    } else {
+      scheduler_->schedule( r );
     }
 
     top_level_done_.wait( false, std::memory_order_acquire );
