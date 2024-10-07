@@ -4,16 +4,16 @@
 
 enum RO_TABLE_ID
 {
-  InputROTable,          // Encode tree
-  ScratchROTable,        // Scratch space for c-flatware
+  InputROTable,    // Encode tree
+  ScratchROTable,  // Scratch space for c-flatware
 };
 
 enum RW_TABLE_ID
 {
-  FileSystemRWTable, // File system
-  OutputRWTable,     // Encode tree
-  ScratchRWTable,    // Scratch space
-};
+  FileSystemRWTable,  // File system
+  OutputRWTable,      // Encode tree
+  ScratchRWTable,     // Scratch space
+}; 
 
 enum RW_MEM_ID
 {
@@ -22,7 +22,7 @@ enum RW_MEM_ID
 
 enum RO_MEM_ID
 {
-  ScratchROMem, // Scratch space
+  ScratchROMem,  // Scratch space
 };
 
 enum FLATWARE_INPUT_ENCODE
