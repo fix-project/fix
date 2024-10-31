@@ -34,13 +34,28 @@ Handle<Fix> add( Handle<Tree> combination )
   return Handle<Literal>( x + y );
 }
 
+Handle<Fix> fib( Handle<Tree> combination )
+{
+  DeterministicEquivRuntime& rt = (DeterministicEquivRuntime&)( (DeterministicTagRuntime&)test );
+
+  auto data = rt.attach( combination );
+  uint64_t x( data->at( 2 ).unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
+  /* LOG( INFO ) << "fib(" << x << ")"; */
+  if ( x < 2 ) {
+    return Handle<Literal>( x );
+  } else {
+    auto a = Handle<Strict>( application( fib, Handle<Literal>( x - 1 ) ) );
+    auto b = Handle<Strict>( application( fib, Handle<Literal>( x - 2 ) ) );
+    return application( add, a, b );
+  }
+}
+
 int main( int, char** )
 {
-  uint64_t a = 1;
-  uint64_t b = 1;
+  uint64_t a = 4;
 
   LocalScheduler scheduler( test );
-  auto sum = scheduler.schedule( application( add, Handle<Literal>( a ), Handle<Literal>( b ) ) );
+  auto sum = scheduler.schedule( application( fib, Handle<Literal>( a ) ) );
 
   cout << sum.lhs << " eval to " << sum.rhs << endl;
 }

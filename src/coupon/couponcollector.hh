@@ -60,7 +60,8 @@ public:
   // {ApplyTag(Tree x, y)} => Equivalence( Shallow(Thunk x), ref( y ) )
   std::optional<EquivalenceTag> apply_to_shallow_encode_equivalence( ApplyTag );
   // {ApplyTag(Tree x, y), Eval(y, z)} => Equivalence( Strict(Thunk x), z )
-  std::optional<EvalTag> apply_to_strict_encode_equivalence( ApplyTag, EvalTag );
+  std::optional<EquivalenceTag> apply_to_strict_encode_equivalence( ApplyTag, EvalTag );
+  std::optional<EvalTag> apply_to_eval_thunk( ApplyTag, EvalTag );
   // {Eval(Thunk x, y)} => Equivalence(Strict(Thunk x), y)
   std::optional<EquivalenceTag> eval_to_strict_encode_equivalence( EvalTag );
 

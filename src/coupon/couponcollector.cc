@@ -34,8 +34,8 @@ optional<EquivalenceTag> CouponCollector::get_equivalence_transition( Equivalenc
 
 optional<EvalTag> CouponCollector::equivalence_eval( EquivalenceTag equiv, EvalTag eval )
 {
-  if ( equal( rt_.get_name( equiv.lhs ), rt_.get_name( eval.lhs ) ) ) {
-    EvalTag t { .lhs = equiv.rhs, .rhs = eval.rhs };
+  if ( equal( rt_.get_name( equiv.rhs ), rt_.get_name( eval.lhs ) ) ) {
+    EvalTag t { .lhs = equiv.lhs, .rhs = eval.rhs };
     return t;
   }
 
@@ -44,8 +44,8 @@ optional<EvalTag> CouponCollector::equivalence_eval( EquivalenceTag equiv, EvalT
 
 optional<ApplyTag> CouponCollector::equivalence_apply( EquivalenceTag equiv, ApplyTag apply )
 {
-  if ( equal( rt_.get_name( equiv.lhs ), rt_.get_name( apply.combination ) ) ) {
-    ApplyTag t { .combination = equiv.rhs.unwrap<Value>().unwrap<Treeish>().unwrap<Tree>(),
+  if ( equal( rt_.get_name( equiv.rhs ), rt_.get_name( apply.combination ) ) ) {
+    ApplyTag t { .combination = equiv.lhs.unwrap<Value>().unwrap<Treeish>().unwrap<Tree>(),
                  .result = apply.result };
     return t;
   }
@@ -122,11 +122,21 @@ optional<EquivalenceTag> CouponCollector::apply_to_shallow_encode_equivalence( A
   return {};
 }
 
-optional<EvalTag> CouponCollector::apply_to_strict_encode_equivalence( ApplyTag apply, EvalTag eval )
+optional<EquivalenceTag> CouponCollector::apply_to_strict_encode_equivalence( ApplyTag apply, EvalTag eval )
 {
   if ( equal( rt_.get_name( apply.result ), rt_.get_name( eval.lhs ) ) ) {
-    EvalTag t { .lhs = rt_.create_strict_encode( rt_.create_application_thunk( apply.combination ) ),
-                .rhs = eval.rhs };
+    EquivalenceTag t { .lhs = rt_.create_strict_encode( rt_.create_application_thunk( apply.combination ) ),
+                       .rhs = eval.rhs };
+    return t;
+  }
+
+  return {};
+}
+
+optional<EvalTag> CouponCollector::apply_to_eval_thunk( ApplyTag apply, EvalTag eval )
+{
+  if ( equal( rt_.get_name( apply.result ), rt_.get_name( eval.lhs ) ) ) {
+    EvalTag t { .lhs = rt_.create_application_thunk( apply.combination ), .rhs = eval.rhs };
     return t;
   }
 

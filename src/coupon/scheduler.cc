@@ -88,7 +88,7 @@ EvalTag LocalScheduler::evalStrict( Handle<Fix> expression )
     [&]( Handle<Thunk> x ) {
       auto applytag = force( x );
       auto evaltag = evalStrict( applytag.result );
-      return collector_.apply_to_strict_encode_equivalence( applytag, evaltag ).value();
+      return collector_.apply_to_eval_thunk( applytag, evaltag ).value();
     },
     [&]( Handle<Encode> ) -> EvalTag { throw runtime_error( "Unreachable" ); },
   } );

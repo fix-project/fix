@@ -176,7 +176,7 @@ u8x32 TestRuntime::get_name( Handle<Fix> handle )
 
 Handle<Thunk> TestRuntime::unwrap( Handle<Encode> encode )
 {
-  return encode.unwrap<Thunk>();
+  return encode.visit<Handle<Thunk>>( []( auto x ) { return x.template unwrap<Thunk>(); } );
 }
 
 Handle<Tree> TestRuntime::unwrap( Handle<Thunk> thunk )
