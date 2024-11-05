@@ -39,103 +39,127 @@ ApplyTag LocalScheduler::apply( Handle<Tree> combination )
   return applytag.value();
 }
 
-ApplyTag LocalScheduler::force( Handle<Thunk> thunk )
+ThinkTag LocalScheduler::force( Handle<Thunk> thunk )
 {
-  return thunk.visit<ApplyTag>(
-    overload { [&]( Handle<Identification> ) -> ApplyTag { throw std::runtime_error( "Unimplemetned" ); },
-               [&]( Handle<Selection> ) -> ApplyTag { throw std::runtime_error( "Unimplemetned" ); },
-               [&]( Handle<Application> x ) {
-                 auto t = load( rt_.unwrap( x ) );
-                 auto equivtag = mapReduce( t );
-                 auto applytag = apply( equivtag.rhs.unwrap<Value>().unwrap<Treeish>().unwrap<Tree>() );
-                 return collector_.equivalence_apply( equivtag, applytag ).value();
-               } } );
+  return thunk.visit<ThinkTag>( overload {
+    [&]( Handle<Identification> x ) {
+      auto t = load( rt_.unwrap( x ) );
+      auto reducetag = reduce( t );
+      auto identifytag = collector_.identify( reducetag.rhs.unwrap<Value>() );
+      return collector_.identify_to_think( reducetag, identifytag ).value();
+    },
+    [&]( Handle<Selection> x ) {
+      auto t = load( rt_.unwrap( x ) );
+      auto reducetag = reduce( t );
+      auto selecttag = collector_.select( reducetag.rhs.unwrap<Value>().unwrap<Treeish>().unwrap<Tree>() );
+      return collector_.select_to_think( reducetag, selecttag ).value();
+    },
+    [&]( Handle<Application> x ) {
+      auto t = load( rt_.unwrap( x ) );
+      auto reducetag = map_reduce( t );
+      auto applytag = apply( reducetag.rhs.unwrap<Value>().unwrap<Treeish>().unwrap<Tree>() );
+      return collector_.apply_to_think( reducetag, applytag ).value();
+    },
+  } );
 }
 
-ApplyTag LocalScheduler::force_until_not_thunk( Handle<Thunk> thunk )
+ThinkTag LocalScheduler::force_until_not_thunk( Handle<Thunk> thunk )
 {
-  auto applytag = force( thunk );
+  auto thinktag = force( thunk );
 
   while ( true ) {
-    if ( auto x = applytag.result.try_into<Thunk>(); x.has_value() ) {
-      auto equiv = collector_.apply_to_thunk_equivalence( applytag );
-      applytag = collector_.equivalence_apply( equiv.value(), force( x.value() ) ).value();
+    if ( auto x = thinktag.result.try_into<Thunk>(); x.has_value() ) {
+      auto newthinktag = force( x.value() );
+      thinktag = collector_.think_transitive( thinktag, newthinktag ).value();
     } else {
       break;
     }
   }
 
-  return applytag;
+  return thinktag;
 }
 
-EquivalenceTag LocalScheduler::evalShallow( Handle<Thunk> thunk )
+ReduceTag LocalScheduler::reduce_shallow( Handle<Thunk> thunk )
 {
-  auto applytag = force_until_not_thunk( thunk );
-  return collector_.apply_to_shallow_encode_equivalence( applytag ).value();
+  auto thinktag = force_until_not_thunk( thunk );
+  return collector_.think_to_shallow_encode_reduce( thinktag ).value();
 }
 
-EvalTag LocalScheduler::evalStrict( Handle<Fix> expression )
+ReduceTag LocalScheduler::reduce_strict( Handle<Thunk> thunk )
+{
+  auto thinktag = force_until_not_thunk( thunk );
+  auto evaltag = eval( thinktag.result );
+  return collector_.think_to_strict_encode_reduce( thinktag, evaltag ).value();
+}
+
+EvalTag LocalScheduler::eval( Handle<Fix> expression )
 {
   return expression.visit<EvalTag>( overload {
     [&]( Handle<Value> x ) {
       return x.visit<EvalTag>( overload {
         [&]( Handle<Blob> x ) { return collector_.get_eval_identity( x ); },
-        [&]( Handle<Treeish> x ) { return mapEval( x ); },
+        [&]( Handle<Treeish> x ) { return map_eval( x ); },
         []( Handle<BlobRef> ) -> EvalTag { throw runtime_error( "Unimplemetned" ); },
         []( Handle<TreeishRef> ) -> EvalTag { throw runtime_error( "Unimplemented" ); },
       } );
     },
     [&]( Handle<Thunk> x ) {
-      auto applytag = force( x );
-      auto evaltag = evalStrict( applytag.result );
-      return collector_.apply_to_eval_thunk( applytag, evaltag ).value();
+      auto thinktag = force_until_not_thunk( x );
+      auto evaltag = eval( thinktag.result );
+      return collector_.think_to_eval_thunk( thinktag, evaltag ).value();
     },
     [&]( Handle<Encode> ) -> EvalTag { throw runtime_error( "Unreachable" ); },
   } );
 }
 
-EquivalenceTag LocalScheduler::reduce( Handle<Fix> x )
+ReduceTag LocalScheduler::reduce( Handle<Fix> x )
 {
-  return x.visit<EquivalenceTag>( overload {
-    [&]( Handle<Encode> x ) {
-      return x.visit<EquivalenceTag>( overload {
-        [&]( Handle<Strict> x ) {
-          return collector_.eval_to_strict_encode_equivalence( this->evalStrict( rt_.unwrap( x ) ) ).value();
-        },
-        [&]( Handle<Shallow> x ) { return this->evalShallow( rt_.unwrap( x ) ); },
-      } );
-    },
-    [&]( auto x ) { return collector_.get_equivalence_reflex( x ); } } );
+  return x.visit<ReduceTag>(
+    overload { [&]( Handle<Encode> x ) {
+                return x.visit<ReduceTag>( overload {
+                  [&]( Handle<Strict> x ) { return reduce_strict( rt_.unwrap( x ) ); },
+                  [&]( Handle<Shallow> x ) { return reduce_shallow( rt_.unwrap( x ) ); },
+                } );
+              },
+               [&]( Handle<Value> x ) {
+                 return x.visit<ReduceTag>( overload {
+                   [&]( Handle<Blob> x ) { return collector_.get_reduce_identity( x ); },
+                   [&]( Handle<Treeish> x ) { return map_reduce( x ); },
+                   []( Handle<BlobRef> ) -> ReduceTag { throw runtime_error( "Unimplemetned" ); },
+                   []( Handle<TreeishRef> ) -> ReduceTag { throw runtime_error( "Unimplemented" ); },
+                 } );
+               },
+               [&]( auto x ) { return collector_.get_reduce_identity( x ); } } );
 }
 
-EquivalenceTag LocalScheduler::mapReduce( Handle<Treeish> tree )
+ReduceTag LocalScheduler::map_reduce( Handle<Treeish> tree )
 {
   auto data = rt_.attach( tree );
 
-  vector<EquivalenceTag> to_trade;
+  vector<ReduceTag> to_trade;
 
   for ( auto x : data->span() ) {
     to_trade.push_back( reduce( x ) );
   }
 
-  auto new_equiv = collector_.tree_equivalence( to_trade );
+  auto new_reduce = collector_.tree_reduce( to_trade );
 
   tree.visit<void>( overload {
     []( Handle<Tree> ) {},
-    [&]( Handle<Tag> x ) { new_equiv = tagger_.exchange_tag( x, new_equiv ).value(); },
+    [&]( Handle<Tag> x ) { new_reduce = tagger_.exchange_tag( x, new_reduce ).value(); },
   } );
 
-  return new_equiv;
+  return new_reduce;
 }
 
-EvalTag LocalScheduler::mapEval( Handle<Treeish> tree )
+EvalTag LocalScheduler::map_eval( Handle<Treeish> tree )
 {
   auto data = rt_.attach( tree );
 
   vector<EvalTag> to_trade;
 
   for ( auto x : data->span() ) {
-    to_trade.push_back( this->evalStrict( x ) );
+    to_trade.push_back( this->eval( x ) );
   }
 
   auto new_eval = collector_.tree_eval( to_trade );
@@ -148,5 +172,5 @@ EvalTag LocalScheduler::mapEval( Handle<Treeish> tree )
 
 EvalTag LocalScheduler::schedule( Handle<Fix> top_level_job )
 {
-  return evalStrict( top_level_job );
+  return eval( top_level_job );
 }

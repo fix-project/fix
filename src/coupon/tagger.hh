@@ -14,4 +14,5 @@ public:
 
   std::optional<EquivalenceTag> exchange_tag( Handle<Tag>, EquivalenceTag );
   std::optional<EvalTag> exchange_tag( Handle<Tag>, EvalTag );
+  std::optional<ReduceTag> exchange_tag( Handle<Tag>, ReduceTag );
 };

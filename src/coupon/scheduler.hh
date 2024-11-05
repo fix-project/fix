@@ -34,15 +34,16 @@ private:
   // virtual Result<Object> select( Handle<ObjectTree> ) override;
   ApplyTag apply( Handle<Tree> combination );
 
-  ApplyTag force( Handle<Thunk> thunk );
-  ApplyTag force_until_not_thunk( Handle<Thunk> thunk );
+  ThinkTag force( Handle<Thunk> thunk );
+  ThinkTag force_until_not_thunk( Handle<Thunk> thunk );
 
-  EquivalenceTag evalShallow( Handle<Thunk> expression );
-  EvalTag evalStrict( Handle<Fix> expression );
-  EvalTag mapEval( Handle<Treeish> tree );
+  ReduceTag reduce_shallow( Handle<Thunk> expression );
+  ReduceTag reduce_strict( Handle<Thunk> expression );
+  EvalTag eval( Handle<Fix> expression );
+  EvalTag map_eval( Handle<Treeish> tree );
 
-  EquivalenceTag reduce( Handle<Fix> );
-  EquivalenceTag mapReduce( Handle<Treeish> tree );
+  ReduceTag reduce( Handle<Fix> );
+  ReduceTag map_reduce( Handle<Treeish> tree );
   // virtual Result<ValueTree> mapLift( Handle<ValueTree> tree ) override;
   // virtual Result<ObjectTree> mapEvalShallow( Handle<ObjectTree> ) override;
 
