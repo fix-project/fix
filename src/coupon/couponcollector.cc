@@ -22,6 +22,11 @@ ReduceTag CouponCollector::get_reduce_identity( Handle<Thunk> x )
   return t;
 }
 
+ThinkTag CouponCollector::get_think_identity( Handle<Thunk> x )
+{
+  return ThinkTag { .thunk = x, .result = x };
+}
+
 EquivalenceTag CouponCollector::get_equivalence_reflexive( Handle<Fix> x )
 {
   EquivalenceTag t { .lhs = x, .rhs = x };

@@ -1,7 +1,9 @@
 #include "handle.hh"
+#include "overload.hh"
 #include "runtime.hh"
 #include "scheduler.hh"
 #include <iostream>
+#include <variant>
 
 using namespace std;
 
@@ -30,7 +32,7 @@ Handle<Fix> add( Handle<Tree> combination )
   auto data = rt.attach( combination );
   uint64_t x( data->at( 2 ).unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
   uint64_t y( data->at( 3 ).unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
-  /* LOG( INFO ) << x << " + " << y << " = " << x + y; */
+  cout << x << " + " << y << " = " << x + y << endl;
   return Handle<Literal>( x + y );
 }
 
@@ -40,7 +42,7 @@ Handle<Fix> fib( Handle<Tree> combination )
 
   auto data = rt.attach( combination );
   uint64_t x( data->at( 2 ).unwrap<Value>().unwrap<Blob>().unwrap<Literal>() );
-  /* LOG( INFO ) << "fib(" << x << ")"; */
+  cout << "fib(" << x << ")" << endl;
   if ( x < 2 ) {
     return Handle<Literal>( x );
   } else {
@@ -54,8 +56,14 @@ int main( int, char** )
 {
   uint64_t a = 4;
 
-  LocalScheduler scheduler( test );
-  auto sum = scheduler.schedule( application( fib, Handle<Literal>( a ) ) );
+  Tagger tagger( test );
+  LocalScheduler scheduler( test, tagger );
+
+  SchedulerContinuation cont;
+  cont.top_level_job = application( fib, Handle<Literal>( a ) );
+  deque<KernelExecutionTag> results;
+
+  auto sum = scheduler.schedule( cont.top_level_job, cont.continuation, results );
 
   cout << sum.lhs << " eval to " << sum.rhs << endl;
 }

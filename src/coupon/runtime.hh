@@ -37,6 +37,8 @@ public:
   virtual Handle<BlobRef> ref( Handle<Blob> ) = 0;
   virtual Handle<Fix> ref( Handle<Fix> ) = 0;
 
+  virtual u8x32 get_canonical_name( Handle<Fix> ) = 0;
+
   virtual ~DeterministicEquivRuntime() {};
 };
 
@@ -45,6 +47,13 @@ class DeterministicRuntime : public DeterministicEquivRuntime
 public:
   virtual u8x32 get_name( Handle<Fix> ) = 0;
   virtual bool is_encode( Handle<Fix> ) = 0;
+
+  virtual Handle<Thunk> unwrap( Handle<Encode> ) = 0;
+  virtual Handle<Tree> unwrap( Handle<Thunk> ) = 0;
+
+  // XXX
+  virtual Handle<Blob> unref( Handle<BlobRef> ) = 0;
+  virtual Handle<Treeish> unref( Handle<TreeishRef> ) = 0;
 };
 
 class DeterministicTagRuntime : public DeterministicRuntime
@@ -61,9 +70,6 @@ public:
   virtual Handle<Blob> load( Handle<BlobRef> ) = 0;
   virtual Handle<Treeish> load( Handle<Treeish> ) = 0;
   virtual Handle<Treeish> load( Handle<TreeishRef> ) = 0;
-
-  virtual Handle<Thunk> unwrap( Handle<Encode> ) = 0;
-  virtual Handle<Tree> unwrap( Handle<Thunk> ) = 0;
 };
 
 class Runtime
@@ -103,8 +109,12 @@ public:
 
   virtual u8x32 get_name( Handle<Fix> ) override;
   virtual bool is_encode( Handle<Fix> ) override;
+  virtual u8x32 get_canonical_name( Handle<Fix> ) override;
 
   virtual Handle<Tag> create_arbitrary_tag( TreeData ) override;
+
+  virtual Handle<Blob> unref( Handle<BlobRef> ) override;
+  virtual Handle<Treeish> unref( Handle<TreeishRef> ) override;
 
   virtual KernelExecutionTag execute( Handle<Blob> machine_code, Handle<Tree> combination ) override;
   virtual Handle<Blob> load( Handle<Blob> ) override;

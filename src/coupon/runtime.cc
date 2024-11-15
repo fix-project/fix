@@ -169,7 +169,22 @@ Handle<Treeish> TestRuntime::load( Handle<TreeishRef> x )
   } );
 }
 
+Handle<Blob> TestRuntime::unref( Handle<BlobRef> x )
+{
+  return x.unwrap<Blob>();
+}
+
+Handle<Treeish> TestRuntime::unref( Handle<TreeishRef> x )
+{
+  return load( x );
+}
+
 u8x32 TestRuntime::get_name( Handle<Fix> handle )
+{
+  return handle.content;
+}
+
+u8x32 TestRuntime::get_canonical_name( Handle<Fix> handle )
 {
   return handle.content;
 }

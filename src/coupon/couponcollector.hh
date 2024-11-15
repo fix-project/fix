@@ -65,6 +65,8 @@ public:
   // {} => Reduce( Thunk x, Thunk x )
   ReduceTag get_reduce_identity( Handle<Thunk> x );
 
+  ThinkTag get_think_identity( Handle<Thunk> x );
+
   // {} => Equivalence( x, x )
   EquivalenceTag get_equivalence_reflexive( Handle<Fix> x );
   // {Equivalence( x, y )} => Equivalence( y, x )
