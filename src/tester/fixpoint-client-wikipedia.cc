@@ -159,6 +159,10 @@ int main( int argc, char* argv[] )
   cerr << "Executing." << endl;
   struct timespec before, after;
   struct timespec before_real, after_real;
+  if ( system("/mnt/fix/count-words/run-exp.sh") ) {
+    perror( "system" );
+    exit( 1 );
+  }
   if ( clock_gettime( CLOCK_REALTIME, &before_real ) ) {
     perror( "clock_gettime" );
     exit( 1 );
@@ -174,6 +178,10 @@ int main( int argc, char* argv[] )
   }
   if ( clock_gettime( CLOCK_REALTIME, &after_real ) ) {
     perror( "clock_gettime" );
+    exit( 1 );
+  }
+  if ( system("/mnt/fix/count-words/run-exp.sh") ) {
+    perror( "system" );
     exit( 1 );
   }
 

@@ -1039,7 +1039,18 @@ optional<Handle<Object>> SketchGraphScheduler::run_passes( Handle<Relation> top_
 {
   VLOG( 1 ) << "HintScheduler input: " << top_level_job << endl;
 
-  if ( relater_->get().remotes_.read()->size() == 0 ) {
+  size_t available_remotes = 0;
+  for ( const auto& remote : relater_->get().remotes_.read().get() ) {
+    auto locked_remote = remote.lock();
+    if ( locked_remote ) {
+      auto info = locked_remote->get_info();
+      if ( info.has_value() and info->parallelism > 0 ) {
+	available_remotes++;
+      }
+    }
+  }
+
+  if ( available_remotes == 0 ) {
     absl::flat_hash_set<Handle<Relation>> unblocked;
     merge_all_sketch_graph( top_level_job, unblocked );
 
