@@ -619,12 +619,41 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
   }
 }
 
-void RandomSelection::all( Handle<Dependee> job )
+void RandomSelection::data( Handle<Dependee> job )
 {
-  // XXX
-  const auto& available_remotes = base_.get().get_available_remotes();
-  size_t rand_idx = rand() % available_remotes.size();
-  chosen_remotes_.insert_or_assign( job, { available_remotes[rand_idx], 0 } );
+  recursively_depend_on_apply_.insert( { job, false } );
+}
+
+void RandomSelection::relation_post( Handle<Relation> job,
+                                     const absl::flat_hash_set<Handle<Dependee>>& dependencies )
+{
+  bool acc = false;
+  for ( const auto& d : dependencies ) {
+    acc |= recursively_depend_on_apply_[d];
+  }
+
+  bool assign_random = false;
+  job.visit<void>( overload { [&]( Handle<Think> x ) {
+                               x.unwrap<Thunk>().visit<void>(
+                                 overload { [&]( Handle<Application> ) {
+                                             if ( !acc ) {
+                                               applys_.insert( x );
+                                               assign_random = true;
+                                             }
+                                             acc = true;
+                                             recursively_depend_on_apply_[job] = acc;
+                                           },
+                                            [&]( auto ) { recursively_depend_on_apply_[job] = acc; } } );
+                             },
+                              [&]( auto ) { recursively_depend_on_apply_[job] = acc; } } );
+
+  if ( assign_random ) {
+    const auto& available_remotes = base_.get().get_available_remotes();
+    size_t rand_idx = rand() % available_remotes.size();
+    chosen_remotes_.insert_or_assign( job, { available_remotes[rand_idx], 0 } );
+  } else if ( acc ) {
+    chosen_remotes_[job] = { local_, 0 };
+  }
 }
 
 void SendToRemotePass::all( Handle<Dependee> job )
@@ -830,7 +859,7 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
       }
 
       case PassType::Random: {
-        selection = make_unique<RandomSelection>( base, rt );
+        selection = make_unique<RandomSelection>( base, rt, move( selection.value() ) );
         selection.value()->run( top_level_job );
         break;
       }
@@ -839,6 +868,88 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
 
   if ( not selection.has_value() ) {
     throw runtime_error( "Invalid pass sequence." );
+  }
+
+  selection = make_unique<SendToRemotePass>( base, rt, move( selection.value() ) );
+  dynamic_cast<SendToRemotePass*>( selection.value().get() )->send_remote_jobs( top_level_job );
+  FinalPass final( base, rt, sch, move( selection.value() ) );
+  final.run( top_level_job );
+
+  if ( final.get_todo().has_value() ) {
+    auto r = final.get_todo().value();
+    return r.visit<optional<Handle<Thunk>>>( overload { [&]( Handle<Eval> ) -> optional<Handle<Thunk>> {
+                                                         rt.get().get_local()->get( r );
+                                                         return {};
+                                                       },
+                                                        [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
+                                                          if ( top_level_job == Handle<Dependee>( r ) ) {
+                                                            return s.unwrap<Thunk>();
+                                                          } else {
+                                                            rt.get().get_local()->get( r );
+                                                            return {};
+                                                          }
+                                                        } } );
+  }
+
+  return {};
+}
+
+optional<Handle<Thunk>> PassRunner::random_run( reference_wrapper<Relater> rt,
+                                                reference_wrapper<SketchGraphScheduler> sch,
+                                                Handle<Dependee> top_level_job,
+                                                const vector<PassType>& passes )
+{
+  BasePass base( rt );
+  base.run( top_level_job );
+
+  optional<unique_ptr<SelectionPass>> selection;
+  for ( const auto& pass : passes ) {
+    switch ( pass ) {
+      case PassType::MinAbsentMaxParallelism: {
+        if ( selection.has_value() ) {
+          selection = make_unique<MinAbsentMaxParallelism>( base, rt, move( selection.value() ) );
+        } else {
+          selection = make_unique<MinAbsentMaxParallelism>( base, rt );
+        }
+        selection.value()->run( top_level_job );
+        break;
+      }
+
+      case PassType::ChildBackProp: {
+        if ( selection.has_value() ) {
+          selection = make_unique<ChildBackProp>( base, rt, move( selection.value() ) );
+        } else {
+          selection = make_unique<ChildBackProp>( base, rt );
+        }
+        dynamic_cast<ChildBackProp*>( selection.value().get() )->run( top_level_job );
+        break;
+      }
+
+      case PassType::InOutSource: {
+        if ( selection.has_value() ) {
+          selection = make_unique<InOutSource>( base, rt, move( selection.value() ) );
+        } else {
+          throw runtime_error( "Invalid pass sequence." );
+        }
+        selection.value()->run( top_level_job );
+        break;
+      }
+
+      case PassType::Random: {
+        selection = make_unique<RandomSelection>( base, rt, move( selection.value() ) );
+        selection.value()->run( top_level_job );
+        break;
+      }
+    }
+  }
+
+  if ( not selection.has_value() ) {
+    throw runtime_error( "Invalid pass sequence." );
+  }
+
+  if ( dynamic_cast<RandomSelection*>( selection.value().get() )->get_applys().contains( top_level_job ) ) {
+    selection.value()->chosen_remotes_[top_level_job] = { selection.value()->local_, 0 };
+    blocked_on_ = top_level_job.unwrap<Relation>();
   }
 
   selection = make_unique<SendToRemotePass>( base, rt, move( selection.value() ) );

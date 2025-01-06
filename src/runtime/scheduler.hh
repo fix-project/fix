@@ -59,6 +59,7 @@ public:
 inline thread_local std::optional<Handle<Relation>> current_schedule_step_;
 inline thread_local bool nested_;
 inline thread_local bool go_for_it_;
+inline thread_local std::optional<Handle<Relation>> blocked_on_;
 
 class RelaterTest;
 
@@ -124,6 +125,6 @@ class RandomScheduler : public SketchGraphScheduler
 {
 public:
   RandomScheduler()
-    : SketchGraphScheduler( { PassRunner::PassType::Random } )
+    : SketchGraphScheduler( { PassRunner::PassType::MinAbsentMaxParallelism, PassRunner::PassType::Random } )
   {}
 };
