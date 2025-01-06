@@ -55,6 +55,7 @@ void Relater::get_from_repository( Handle<T> handle )
 Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<shared_ptr<Scheduler>> scheduler )
   : scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
 {
+  available_memory_.write().get() = sysconf( _SC_PHYS_PAGES ) * sysconf( _SC_PAGE_SIZE );
   scheduler_->set_relater( *this );
   local_ = make_shared<Executor>( *this, threads, runner );
 }
@@ -221,6 +222,7 @@ void Relater::put( Handle<Relation> name, Handle<Object> data )
 {
   if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
+    unoccupy_resource( name );
 
     if ( finish_top_level( name, data ) ) {
       return;
@@ -311,4 +313,50 @@ Handle<AnyTree> Relater::unref( Handle<AnyTreeRef> tree )
 std::optional<Handle<Object>> Relater::run( Handle<Relation> r )
 {
   return scheduler_->schedule( r );
+}
+
+bool Relater::occupy_resource( Handle<Think> relation )
+{
+  auto w = occupying_resource_.write();
+  if ( w.get().size() >= local_->get_info()->parallelism ) {
+    return false;
+  }
+
+  bool insert = w->insert( relation ).second;
+
+  if ( insert ) {
+    TreeData tree = storage_.get( relation.unwrap<Thunk>().unwrap<Application>().unwrap<ExpressionTree>() );
+    auto rlimits = tree->at( 0 );
+
+    auto limits = rlimits.unwrap<Expression>()
+                    .unwrap<Object>()
+                    .try_into<Value>()
+                    .and_then( [&]( auto x ) { return x.template try_into<ValueTree>(); } )
+                    .transform( [&]( auto x ) { return fixpoint::storage->get( x ); } );
+
+    auto byte_requested
+      = limits
+          .and_then( [&]( auto x ) {
+            return handle::extract<Literal>(
+              x->at( 0 ).template unwrap<Expression>().template unwrap<Object>().template unwrap<Value>() );
+          } )
+          .transform( [&]( auto x ) { return uint64_t( x ); } )
+          .value_or( 0 );
+
+    {
+      auto am= available_memory_.write();
+      if ( am.get() < byte_requested ) {
+        w.get().erase( relation );
+        return false;
+      }
+
+      am.get() -= byte_requested;
+    }
+  }
+  return true;
+}
+
+void Relater::unoccupy_resource( Handle<Relation> relation )
+{
+  occupying_resource_.write()->erase( relation );
 }

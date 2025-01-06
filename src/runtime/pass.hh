@@ -263,5 +263,6 @@ public:
   static std::optional<Handle<Thunk>> random_run( std::reference_wrapper<Relater> rt,
                                                   std::reference_wrapper<SketchGraphScheduler> sch,
                                                   Handle<Dependee> top_level_job,
-                                                  const std::vector<PassType>& passes );
+                                                  const std::vector<PassType>& passes,
+                                                  bool pre_occupy = false );
 };

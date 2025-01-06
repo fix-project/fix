@@ -649,8 +649,13 @@ void RandomSelection::relation_post( Handle<Relation> job,
 
   if ( assign_random ) {
     const auto& available_remotes = base_.get().get_available_remotes();
-    size_t rand_idx = rand() % available_remotes.size();
-    chosen_remotes_.insert_or_assign( job, { available_remotes[rand_idx], 0 } );
+    size_t rand_idx = rand() % ( available_remotes.size() + 1 );
+
+    if ( rand_idx == 0 ) {
+      chosen_remotes_.insert_or_assign( job, { local_, 0 } );
+    } else {
+      chosen_remotes_.insert_or_assign( job, { available_remotes[rand_idx - 1], 0 } );
+    }
   } else if ( acc ) {
     chosen_remotes_[job] = { local_, 0 };
   }
@@ -897,7 +902,8 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
 optional<Handle<Thunk>> PassRunner::random_run( reference_wrapper<Relater> rt,
                                                 reference_wrapper<SketchGraphScheduler> sch,
                                                 Handle<Dependee> top_level_job,
-                                                const vector<PassType>& passes )
+                                                const vector<PassType>& passes,
+                                                bool pre_occupy )
 {
   BasePass base( rt );
   base.run( top_level_job );
@@ -947,9 +953,23 @@ optional<Handle<Thunk>> PassRunner::random_run( reference_wrapper<Relater> rt,
     throw runtime_error( "Invalid pass sequence." );
   }
 
-  if ( dynamic_cast<RandomSelection*>( selection.value().get() )->get_applys().contains( top_level_job ) ) {
+  const auto& unblocked_applys = dynamic_cast<RandomSelection*>( selection.value().get() )->get_applys();
+  if ( unblocked_applys.contains( top_level_job ) ) {
     selection.value()->chosen_remotes_[top_level_job] = { selection.value()->local_, 0 };
-    blocked_on_ = top_level_job.unwrap<Relation>();
+  }
+
+  // For any apply blocked only by data started locally, mark it as occupying resource
+  if ( pre_occupy ) {
+    for ( const auto a : unblocked_applys ) {
+      if ( is_local( selection.value()->chosen_remotes_[a].first ) ) {
+        if ( not rt.get().occupy_resource( a.unwrap<Relation>().unwrap<Think>() ) ) {
+          // resource not enough, don't run any dependee of this job
+          sketch_graph_.erase_forward_dependencies( a.unwrap<Relation>() );
+          // Push job to the queue
+          rt.get().get_local()->get( a.unwrap<Relation>() );
+        }
+      }
+    }
   }
 
   selection = make_unique<SendToRemotePass>( base, rt, move( selection.value() ) );

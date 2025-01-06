@@ -5,6 +5,7 @@
 #include "repository.hh"
 #include "runner.hh"
 #include "runtimestorage.hh"
+#include <unordered_set>
 
 class Executor;
 class Scheduler;
@@ -34,6 +35,10 @@ private:
 
   SharedMutex<std::vector<std::weak_ptr<IRuntime>>> remotes_ {};
   std::shared_ptr<IRuntime> local_ {};
+
+  // Set of Think( Apply ) that are waiting on I/Os
+  SharedMutex<std::unordered_set<Handle<Relation>>> occupying_resource_ {};
+  SharedMutex<size_t> available_memory_ {};
 
   template<FixType T>
   void get_from_repository( Handle<T> handle );
@@ -169,4 +174,7 @@ public:
   std::shared_ptr<IRuntime> get_local() { return local_; }
 
   std::optional<Handle<Object>> run( Handle<Relation> );
+
+  bool occupy_resource( Handle<Think> relation );
+  void unoccupy_resource( Handle<Relation> relation );
 };

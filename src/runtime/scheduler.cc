@@ -1138,3 +1138,19 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::schedule( Handle<Rela
     return {};
   }
 }
+
+optional<Handle<Object>> RandomScheduler::run_passes( Handle<Relation> top_level_job )
+{
+  VLOG( 1 ) << "RandomScheduler input: " << top_level_job << endl;
+
+  auto thunk = PassRunner::random_run( relater_.value(), *this, top_level_job, passes_, pre_occupy_ );
+
+  if ( thunk.has_value() ) {
+    nested_ = false;
+    go_for_it_ = true;
+
+    return evaluator_.force( thunk.value() );
+  }
+
+  return {};
+}

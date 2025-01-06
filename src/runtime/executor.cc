@@ -1,12 +1,13 @@
 #include <glog/logging.h>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string_view>
+#include <unistd.h>
 #include <vector>
 
 #include "executor.hh"
 #include "fixpointapi.hh"
-#include "overload.hh"
 #include "resource_limits.hh"
 #include "storage_exception.hh"
 
@@ -15,11 +16,12 @@ using Result = Executor::Result<T>;
 
 using namespace std;
 
-Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>> runner )
+Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>> runner, bool check_occupied )
   : parent_( parent )
   , runner_( runner.has_value() ? runner.value()
                                 : make_shared<WasmRunner>( parent.labeled( "compile-elf" ),
                                                            parent.labeled( "compile-fixed-point" ) ) )
+  , check_occupied_( check_occupied )
 {
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
@@ -45,6 +47,13 @@ void Executor::run()
   try {
     while ( true ) {
       todo_ >> next;
+      if ( check_occupied_ ) {
+        auto r = parent_.occupying_resource_.read();
+        if ( r->size() >= threads_.size() && !r->contains( next ) ) {
+          todo_.push( next );
+          continue;
+        }
+      }
       progress( next );
     }
   } catch ( StorageException& e ) {
@@ -91,7 +100,42 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   VLOG( 2 ) << "Apply " << combination;
 
   TreeData tree = parent_.storage_.get( combination );
+  auto rlimits = tree->at( 0 );
+
+  VLOG( 2 ) << combination << " rlimits are " << rlimits;
+  auto limits = rlimits.unwrap<Expression>()
+                  .unwrap<Object>()
+                  .try_into<Value>()
+                  .and_then( [&]( auto x ) { return x.template try_into<ValueTree>(); } )
+                  .transform( [&]( auto x ) { return fixpoint::storage->get( x ); } );
+
+  resource_limits::available_bytes
+    = limits
+        .and_then( [&]( auto x ) {
+          return handle::extract<Literal>(
+            x->at( 0 ).template unwrap<Expression>().template unwrap<Object>().template unwrap<Value>() );
+        } )
+        .transform( [&]( auto x ) { return uint64_t( x ); } )
+        .value_or( 0 );
+  VLOG( 1 ) << combination << " requested " << resource_limits::available_bytes << " bytes";
+
+  {
+    auto w = parent_.available_memory_.write();
+    Handle<Relation> apply
+      = Handle<Think>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
+    if ( !parent_.occupying_resource_.read().get().contains( apply ) ) {
+      if ( w.get() < resource_limits::available_bytes ) {
+        // Out of memory
+        todo_.push( apply );
+        return {};
+      }
+
+      w.get() -= resource_limits::available_bytes;
+    }
+  }
+
   auto result = runner_->apply( combination, tree );
+  parent_.available_memory_.write().get() += resource_limits::available_bytes;
 
   return result;
 }
