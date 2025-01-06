@@ -30,11 +30,11 @@ int main( int argc, char* argv[] )
   }
 
   auto bptree_get_n = rt->get_rt()
-                      .labeled( "bptree-get-n" )
-                      .unwrap<Expression>()
-                      .unwrap<Object>()
-                      .unwrap<Value>()
-                      .unwrap<ValueTree>();
+                        .labeled( "bptree-get-n" )
+                        .unwrap<Expression>()
+                        .unwrap<Object>()
+                        .unwrap<Value>()
+                        .unwrap<ValueTree>();
   rt->get_rt().get( bptree_get_n );
 
   auto tree_root = rt->get_rt()
