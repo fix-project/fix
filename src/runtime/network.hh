@@ -38,13 +38,19 @@ struct EventCategories
   size_t forward_msg;
 };
 
+template<typename Connection>
 class NetworkWorker;
+
+class Remote;
+class DataServer;
 
 class Remote : public IRuntime
 {
-  friend class NetworkWorker;
+  friend class NetworkWorker<Remote>;
+  friend class NetworkWorker<DataServer>;
   static constexpr size_t STORAGE_SIZE = 65536;
 
+protected:
   TCPSocket socket_;
 
   MessageQueue& msg_q_;
@@ -88,6 +94,11 @@ public:
           MessageQueue& msg_q,
           std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent );
 
+  Remote( TCPSocket socket,
+          size_t index,
+          MessageQueue& msg_q,
+          std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent );
+
   std::optional<BlobData> get( Handle<Named> name ) override;
   std::optional<TreeData> get( Handle<AnyTree> name ) override;
   std::optional<TreeData> get_shallow( Handle<AnyTree> ) override;
@@ -124,7 +135,7 @@ public:
   }
   ~Remote();
 
-private:
+protected:
   void load_tx_message();
   void write_to_rb();
   void read_from_rb();
@@ -145,6 +156,29 @@ private:
   void add_to_view( Handle<Relation> handle );
 };
 
+class DataServer : public Remote
+{
+  friend class NetworkWorker<DataServer>;
+
+private:
+  std::list<std::thread> threads_ {};
+  void process_incoming_message( IncomingMessage&& msg );
+  void run_after( std::function<void()> );
+
+public:
+  inline static size_t latency = 0;
+
+  DataServer( EventLoop& events,
+              EventCategories categories,
+              TCPSocket socket,
+              size_t index,
+              MessageQueue& msg_q,
+              std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent );
+
+  ~DataServer();
+};
+
+template<typename Connection>
 class NetworkWorker
 {
 private:
@@ -169,7 +203,7 @@ private:
   void process_outgoing_message( size_t remote_id, MessagePayload&& message );
 
 public:
-  SharedMutex<std::unordered_map<size_t, std::shared_ptr<Remote>>> connections_ {};
+  SharedMutex<std::unordered_map<size_t, std::shared_ptr<Connection>>> connections_ {};
 
   NetworkWorker( std::optional<std::reference_wrapper<MultiWorkerRuntime>> parent = {} )
     : parent_( parent )
@@ -219,3 +253,6 @@ public:
     return std::static_pointer_cast<IRuntime>( rt );
   }
 };
+
+template class NetworkWorker<Remote>;
+template class NetworkWorker<DataServer>;

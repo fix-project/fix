@@ -1,4 +1,5 @@
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -6,7 +7,6 @@
 #include <stdatomic.h>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 
@@ -14,11 +14,8 @@
 
 #include "eventloop.hh"
 #include "handle.hh"
-#include "handle_post.hh"
-#include "handle_util.hh"
 #include "message.hh"
 #include "network.hh"
-#include "object.hh"
 #include "types.hh"
 
 using namespace std;
@@ -347,9 +344,7 @@ std::optional<IRuntime::Info> Remote::get_info()
   return info_;
 }
 
-Remote::Remote( EventLoop& events,
-                EventCategories categories,
-                TCPSocket socket,
+Remote::Remote( TCPSocket socket,
                 size_t index,
                 MessageQueue& msg_q,
                 optional<reference_wrapper<MultiWorkerRuntime>> parent )
@@ -357,6 +352,15 @@ Remote::Remote( EventLoop& events,
   , msg_q_( msg_q )
   , parent_( parent )
   , index_( index )
+{}
+
+Remote::Remote( EventLoop& events,
+                EventCategories categories,
+                TCPSocket socket,
+                size_t index,
+                MessageQueue& msg_q,
+                optional<reference_wrapper<MultiWorkerRuntime>> parent )
+  : Remote( move( socket ), index, msg_q, parent )
 {
   install_rule( events.add_rule(
     categories.rx_read_data,
@@ -392,6 +396,49 @@ Remote::Remote( EventLoop& events,
     [&] { return not rx_messages_.empty(); } ) );
 
   push_message( { Opcode::REQUESTINFO, string( "" ) } );
+}
+
+DataServer::DataServer( EventLoop& events,
+                        EventCategories categories,
+                        TCPSocket socket,
+                        size_t index,
+                        MessageQueue& msg_q,
+                        optional<reference_wrapper<MultiWorkerRuntime>> parent )
+  : Remote( move( socket ), index, msg_q, parent )
+{
+  install_rule( events.add_rule(
+    categories.rx_read_data,
+    socket_,
+    Direction::In,
+    [&] { rx_data_.push_from_fd( socket_ ); },
+    [&] { return rx_data_.can_write(); },
+    [&] { this->clean_up(); } ) );
+
+  install_rule( events.add_rule(
+    categories.tx_write_data,
+    socket_,
+    Direction::Out,
+    [&] { tx_data_.pop_to_fd( socket_ ); },
+    [&] { return tx_data_.can_read(); },
+    [&] { this->clean_up(); } ) );
+
+  install_rule(
+    events.add_rule( categories.rx_parse_msg, [&] { read_from_rb(); }, [&] { return rx_data_.can_read(); } ) );
+
+  install_rule( events.add_rule(
+    categories.tx_serialize_msg,
+    [&] { write_to_rb(); },
+    [&] { return not tx_messages_.empty() and tx_data_.can_write(); } ) );
+
+  install_rule( events.add_rule(
+    categories.rx_process_msg,
+    [&] {
+      IncomingMessage message = move( rx_messages_.front() );
+      rx_messages_.pop();
+      process_incoming_message( move( message ) );
+    },
+    [&] { return not rx_messages_.empty(); } ) );
+  // push_message( { Opcode::REQUESTINFO, string( "" ) } );
 }
 
 void Remote::process_incoming_message( IncomingMessage&& msg )
@@ -649,6 +696,113 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
   return;
 }
 
+void DataServer::run_after( function<void()> fn )
+{
+  if ( DataServer::latency == 0 ) {
+    fn();
+  } else {
+    threads_.push_back( thread( [fn]() {
+      this_thread::sleep_for( chrono::microseconds( latency ) );
+      fn();
+    } ) );
+  }
+}
+
+void DataServer::process_incoming_message( IncomingMessage&& msg )
+{
+  if ( !parent_.has_value() )
+    return;
+
+  auto& parent = parent_.value().get();
+
+  VLOG( 1 ) << "process_incoming_message " << Message::OPCODE_NAMES[static_cast<uint8_t>( msg.opcode() )];
+
+  switch ( msg.opcode() ) {
+    case Opcode::ACCEPT_TRANSFER:
+    case Opcode::PROPOSE_TRANSFER:
+    case Opcode::SHALLOWTREEDATA:
+    case Opcode::BLOBDATA:
+    case Opcode::TREEDATA:
+    case Opcode::INFO:
+    case Opcode::RESULT:
+    case Opcode::RUN: {
+      break;
+    }
+
+    case Opcode::REQUESTINFO: {
+      auto parent_info = parent.get_info().value_or( IRuntime::Info { .parallelism = 0, .link_speed = 0 } );
+      InfoPayload payload {
+        .parallelism = parent_info.parallelism, .link_speed = parent_info.link_speed, .data = parent.data() };
+      push_message( OutgoingMessage::to_message( move( payload ) ) );
+      break;
+    }
+
+    case Opcode::REQUESTTREE: {
+      auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
+      auto h = payload.handle;
+      auto fn = [&, h]() {
+        auto tree = parent.get( h );
+        send_tree( payload.handle, tree.value() );
+      };
+
+      run_after( fn );
+      break;
+    }
+
+    case Opcode::REQUESTBLOB: {
+      auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
+      auto h = payload.handle;
+      auto fn = [&, h]() {
+        auto blob = parent.get( h );
+        if ( blob && !blobs_view_.contains( h ) ) {
+          send_blob( blob.value() );
+          add_to_view( payload.handle );
+        }
+      };
+
+      run_after( fn );
+      break;
+    }
+
+    case Opcode::REQUESTSHALLOWTREE: {
+      auto payload = parse<RequestShallowTreePayload>( std::get<string>( msg.payload() ) );
+      auto h = payload.handle;
+
+      auto fn = [&, h]() {
+        auto tree = parent.get_shallow( h );
+        if ( tree ) {
+          push_message(
+            OutgoingMessage::to_message( ShallowTreeDataPayload { .handle = h, .data = tree.value() } ) );
+        }
+      };
+
+      run_after( fn );
+      break;
+    }
+
+    case Opcode::LOADBLOB: {
+      auto payload = parse<LoadBlobPayload>( std::get<string>( msg.payload() ) );
+      if ( parent.contains( payload.handle.unwrap<Named>() ) ) {
+        parent.get( payload.handle.unwrap<Named>() );
+      }
+      break;
+    }
+
+    case Opcode::LOADTREE: {
+      auto payload = parse<LoadTreePayload>( std::get<string>( msg.payload() ) );
+      if ( parent.contains( payload.handle ) ) {
+        parent.get( payload.handle );
+      }
+      break;
+    }
+
+    default:
+      throw runtime_error( "Invalid message Opcode" );
+  }
+
+  return;
+}
+
 void Remote::clean_up()
 {
   // Reset info
@@ -674,7 +828,15 @@ Remote::~Remote()
   }
 }
 
-void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&& payload )
+DataServer::~DataServer()
+{
+  for ( auto& t : threads_ ) {
+    t.join();
+  }
+}
+
+template<typename Connection>
+void NetworkWorker<Connection>::process_outgoing_message( size_t remote_idx, MessagePayload&& payload )
 {
   if ( !connections_.read()->contains( remote_idx ) ) {
     if ( holds_alternative<RunPayload>( payload ) ) {
@@ -811,7 +973,8 @@ void NetworkWorker::process_outgoing_message( size_t remote_idx, MessagePayload&
   }
 }
 
-void NetworkWorker::run_loop()
+template<typename Connection>
+void NetworkWorker<Connection>::run_loop()
 {
   categories_ = {
     .server_new_socket = events_.add_category( "server - new socket" ),
@@ -836,7 +999,7 @@ void NetworkWorker::run_loop()
       events_.add_rule( categories_.server_new_connection, server_socket, Direction::In, [&] {
         connections_.write()->emplace(
           next_connection_id_,
-          make_unique<Remote>(
+          make_unique<Connection>(
             events_, categories_, server_socket.accept(), next_connection_id_, msg_q_, parent_ ) );
 
         {
@@ -863,7 +1026,7 @@ void NetworkWorker::run_loop()
       TCPSocket client_socket = *connecting_sockets_.pop();
       connections_.write()->emplace(
         next_connection_id_,
-        make_unique<Remote>(
+        make_unique<Connection>(
           events_, categories_, std::move( client_socket ), next_connection_id_, msg_q_, parent_ ) );
 
       addresses_.write()->emplace( connections_.read()->at( next_connection_id_ )->peer_address().to_string(),

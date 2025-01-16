@@ -39,7 +39,7 @@ class Client : public FrontendRT
 {
 protected:
   Relater relater_ { 0 };
-  std::optional<NetworkWorker> network_worker_ {};
+  std::optional<NetworkWorker<Remote>> network_worker_ {};
   std::shared_ptr<IRuntime> server_ {};
 
   template<FixType T>
@@ -60,7 +60,7 @@ class Server
 {
 protected:
   Relater relater_;
-  std::optional<NetworkWorker> network_worker_ {};
+  std::optional<NetworkWorker<Remote>> network_worker_ {};
 
 public:
   Server( std::shared_ptr<Scheduler> scheduler, std::optional<std::size_t> threads = {} )
@@ -73,4 +73,19 @@ public:
                                        std::optional<std::size_t> threads = {} );
   void join();
   ~Server();
+};
+
+class DataServerRT
+{
+protected:
+  Relater relater_ { 0 };
+  std::optional<NetworkWorker<DataServer>> network_worker_ {};
+
+public:
+  DataServerRT() {}
+  ~DataServerRT();
+
+  static std::shared_ptr<DataServerRT> init( const Address& address );
+
+  void join();
 };

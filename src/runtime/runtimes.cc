@@ -2,6 +2,7 @@
 #include "handle.hh"
 #include "overload.hh"
 #include "types.hh"
+#include <memory>
 #include <thread>
 #include <unordered_set>
 
@@ -59,7 +60,17 @@ Server::~Server()
   network_worker_->stop();
 }
 
+DataServerRT::~DataServerRT()
+{
+  network_worker_->stop();
+}
+
 void Server::join()
+{
+  network_worker_->join();
+}
+
+void DataServerRT::join()
 {
   network_worker_->join();
 }
@@ -82,6 +93,15 @@ shared_ptr<Server> Server::init( const Address& address,
     runtime->network_worker_->connect( p );
   }
 
+  return runtime;
+}
+
+shared_ptr<DataServerRT> DataServerRT::init( const Address& address )
+{
+  auto runtime = make_shared<DataServerRT>();
+  runtime->network_worker_.emplace( runtime->relater_ );
+  runtime->network_worker_->start();
+  runtime->network_worker_->start_server( address );
   return runtime;
 }
 
