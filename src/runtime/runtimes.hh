@@ -3,7 +3,6 @@
 #include "handle.hh"
 #include "network.hh"
 #include "relater.hh"
-#include "repository.hh"
 
 #include <memory>
 
@@ -63,14 +62,18 @@ protected:
   std::optional<NetworkWorker<Remote>> network_worker_ {};
 
 public:
-  Server( std::shared_ptr<Scheduler> scheduler, std::optional<std::size_t> threads = {} )
-    : relater_( threads.has_value() ? threads.value() : std::thread::hardware_concurrency() - 1, {}, scheduler )
+  Server( std::shared_ptr<Scheduler> scheduler, std::optional<std::size_t> threads = {}, bool pre_occupy = false )
+    : relater_( threads.has_value() ? threads.value() : std::thread::hardware_concurrency() - 1,
+                {},
+                scheduler,
+                pre_occupy )
   {}
 
   static std::shared_ptr<Server> init( const Address& address,
                                        std::shared_ptr<Scheduler> scheduler,
                                        const std::vector<Address> peer_servers = {},
-                                       std::optional<std::size_t> threads = {} );
+                                       std::optional<std::size_t> threads = {},
+                                       bool pre_occupy = false );
   void join();
   ~Server();
 };

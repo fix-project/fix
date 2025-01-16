@@ -39,6 +39,7 @@ private:
   // Set of Think( Apply ) that are waiting on I/Os
   SharedMutex<std::unordered_set<Handle<Relation>>> occupying_resource_ {};
   SharedMutex<size_t> available_memory_ {};
+  bool pre_occupy_ {};
 
   template<FixType T>
   void get_from_repository( Handle<T> handle );
@@ -46,7 +47,8 @@ private:
 public:
   Relater( size_t threads = std::thread::hardware_concurrency(),
            std::optional<std::shared_ptr<Runner>> runner = {},
-           std::optional<std::shared_ptr<Scheduler>> scheduler = {} );
+           std::optional<std::shared_ptr<Scheduler>> scheduler = {},
+           bool pre_occupy_ = false );
 
   virtual void add_worker( std::shared_ptr<IRuntime> ) override;
   Handle<Value> execute( Handle<Relation> x );

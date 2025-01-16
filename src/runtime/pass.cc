@@ -76,6 +76,9 @@ BasePass::BasePass( reference_wrapper<Relater> relater )
     auto locked_remote = remote.lock();
     if ( locked_remote ) {
       auto info = locked_remote->get_info();
+      if ( info.has_value() ) {
+        remotes_.push_back( locked_remote );
+      }
       if ( info.has_value() and info->parallelism > 0 ) {
         available_remotes_.push_back( locked_remote );
       }
@@ -278,7 +281,7 @@ size_t BasePass::absent_size( std::shared_ptr<IRuntime> worker, Handle<Dependee>
 void BasePass::all( Handle<Dependee> job )
 {
   {
-    if ( local_->get_info().has_value() and local_->get_info()->parallelism > 0 ) {
+    if ( local_->get_info().has_value() ) {
       job.visit<void>( overload {
         [&]( Handle<ValueTreeRef> ref ) {
           if ( local_->contains_shallow( relater_.get().unref( ref ) ) ) {
@@ -299,9 +302,9 @@ void BasePass::all( Handle<Dependee> job )
     }
   }
 
-  for ( const auto& remote : available_remotes_ ) {
+  for ( const auto& remote : remotes_ ) {
     auto info = remote->get_info();
-    if ( info.has_value() and info->parallelism > 0 ) {
+    if ( info.has_value() ) {
       job.visit<void>( overload {
         [&]( Handle<ValueTreeRef> ref ) {
           if ( remote->contains_shallow( relater_.get().unref( ref ) ) ) {
@@ -966,7 +969,7 @@ optional<Handle<Thunk>> PassRunner::random_run( reference_wrapper<Relater> rt,
           // resource not enough, don't run any dependee of this job
           sketch_graph_.erase_forward_dependencies( a.unwrap<Relation>() );
           // Push job to the queue
-          rt.get().get_local()->get( a.unwrap<Relation>() );
+          // rt.get().get_local()->get( a.unwrap<Relation>() );
         }
       }
     }

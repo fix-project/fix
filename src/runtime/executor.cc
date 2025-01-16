@@ -1,7 +1,6 @@
 #include <glog/logging.h>
 #include <memory>
 #include <optional>
-#include <stdexcept>
 #include <string_view>
 #include <unistd.h>
 #include <vector>
@@ -16,12 +15,11 @@ using Result = Executor::Result<T>;
 
 using namespace std;
 
-Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>> runner, bool check_occupied )
+Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>> runner )
   : parent_( parent )
   , runner_( runner.has_value() ? runner.value()
                                 : make_shared<WasmRunner>( parent.labeled( "compile-elf" ),
                                                            parent.labeled( "compile-fixed-point" ) ) )
-  , check_occupied_( check_occupied )
 {
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
@@ -47,12 +45,10 @@ void Executor::run()
   try {
     while ( true ) {
       todo_ >> next;
-      if ( check_occupied_ ) {
-        auto r = parent_.occupying_resource_.read();
-        if ( r->size() >= threads_.size() && !r->contains( next ) ) {
-          todo_.push( next );
-          continue;
-        }
+      auto r = parent_.occupying_resource_.read();
+      if ( r->size() >= threads_.size() && !r->contains( next ) ) {
+        todo_.push( next );
+        continue;
       }
       progress( next );
     }

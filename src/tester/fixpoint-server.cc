@@ -48,6 +48,8 @@ int main( int argc, char* argv[] )
   optional<const char*> peerfile;
   optional<string> sche_opt;
   optional<size_t> threads;
+  bool pre_occupy = false;
+
   parser.AddArgument(
     "listening-port", OptionParser::ArgumentCount::One, [&]( const char* argument ) { port = stoi( argument ); } );
   parser.AddOption( 'a',
@@ -60,15 +62,15 @@ int main( int argc, char* argv[] )
     'p', "peers", "peers", "Path to a file that contains a list of all servers.", [&]( const char* argument ) {
       peerfile = argument;
     } );
+  parser.AddOption( 's', "scheduler", "scheduler", "Scheduler to use [hint, random]", [&]( const char* argument ) {
+    sche_opt = argument;
+    if ( not( *sche_opt == "hint" or *sche_opt == "random" ) ) {
+      throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
+    }
+  } );
   parser.AddOption(
-    's', "scheduler", "scheduler", "Scheduler to use [onepass, hint, random]", [&]( const char* argument ) {
-      sche_opt = argument;
-      if ( not( *sche_opt == "onepass" or *sche_opt == "hint" or *sche_opt == "random" ) ) {
-        throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
-      }
-    } );
-  parser.AddOption(
-    't', "threads", "threads", "Number of threads", [&]( const char* argument ) { threads = stoull( argument ); } );
+    't', "threads", "#", "Number of threads", [&]( const char* argument ) { threads = stoull( argument ); } );
+  parser.AddOption( 'p', "preoccupy", "Occupy resources when doing I/O", [&]() { pre_occupy = true; } );
 
   parser.Parse( argc, argv );
 
@@ -101,16 +103,17 @@ int main( int argc, char* argv[] )
 
   shared_ptr<Scheduler> scheduler = make_shared<HintScheduler>();
   if ( sche_opt.has_value() ) {
-    if ( *sche_opt == "onepass" ) {
-      scheduler = make_shared<OnePassScheduler>();
-    } else if ( *sche_opt == "hint" ) {
+    if ( *sche_opt == "hint" ) {
       scheduler = make_shared<HintScheduler>();
+      if ( pre_occupy ) {
+        throw std::runtime_error( "Invalid combination of scheduler and preoccupy" );
+      }
     } else if ( *sche_opt == "random" ) {
-      scheduler = make_shared<RandomScheduler>();
+      scheduler = make_shared<RandomScheduler>( pre_occupy );
     }
   }
 
-  auto server = Server::init( listen_address, scheduler, peer_address, threads );
+  auto server = Server::init( listen_address, scheduler, peer_address, threads, pre_occupy );
   cout << "Server initialized" << endl;
 
   server->join();

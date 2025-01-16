@@ -59,6 +59,7 @@ private:
   size_t absent_size( std::shared_ptr<IRuntime> worker, Handle<Dependee> job );
 
   std::vector<std::shared_ptr<IRuntime>> available_remotes_ {};
+  std::vector<std::shared_ptr<IRuntime>> remotes_ {};
 
 public:
   BasePass( std::reference_wrapper<Relater> relater );

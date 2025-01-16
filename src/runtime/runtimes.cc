@@ -78,9 +78,10 @@ void DataServerRT::join()
 shared_ptr<Server> Server::init( const Address& address,
                                  shared_ptr<Scheduler> scheduler,
                                  vector<Address> peer_servers,
-                                 optional<size_t> threads )
+                                 optional<size_t> threads,
+                                 bool pre_occupy )
 {
-  auto runtime = std::make_shared<Server>( scheduler, threads );
+  auto runtime = std::make_shared<Server>( scheduler, threads, pre_occupy );
   runtime->network_worker_.emplace( runtime->relater_ );
   runtime->network_worker_->start();
   runtime->network_worker_->start_server( address );

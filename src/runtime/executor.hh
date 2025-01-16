@@ -18,13 +18,11 @@ class Executor : public IRuntime
   Channel<Handle<Relation>> todo_ {};
   Relater& parent_;
   std::shared_ptr<Runner> runner_ {};
-  bool check_occupied_ {};
 
 public:
   Executor( Relater& parent,
             size_t threads = std::thread::hardware_concurrency(),
-            std::optional<std::shared_ptr<Runner>> runner = {},
-            bool check_occupied = false );
+            std::optional<std::shared_ptr<Runner>> runner = {} );
 
   ~Executor();
 
