@@ -70,7 +70,7 @@ int main( int argc, char* argv[] )
   } );
   parser.AddOption(
     't', "threads", "#", "Number of threads", [&]( const char* argument ) { threads = stoull( argument ); } );
-  parser.AddOption( 'p', "preoccupy", "Occupy resources when doing I/O", [&]() { pre_occupy = true; } );
+  parser.AddOption( 'o', "preoccupy", "Occupy resources when doing I/O", [&]() { pre_occupy = true; } );
 
   parser.Parse( argc, argv );
 

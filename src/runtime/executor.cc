@@ -7,6 +7,8 @@
 
 #include "executor.hh"
 #include "fixpointapi.hh"
+#include "handle.hh"
+#include "overload.hh"
 #include "resource_limits.hh"
 #include "storage_exception.hh"
 
@@ -15,11 +17,12 @@ using Result = Executor::Result<T>;
 
 using namespace std;
 
-Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>> runner )
+Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>> runner, bool pre_occupy )
   : parent_( parent )
   , runner_( runner.has_value() ? runner.value()
                                 : make_shared<WasmRunner>( parent.labeled( "compile-elf" ),
                                                            parent.labeled( "compile-fixed-point" ) ) )
+  , pre_occupy_( pre_occupy )
 {
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
@@ -45,10 +48,24 @@ void Executor::run()
   try {
     while ( true ) {
       todo_ >> next;
-      auto r = parent_.occupying_resource_.read();
-      if ( r->size() >= threads_.size() && !r->contains( next ) ) {
-        todo_.push( next );
-        continue;
+      {
+        auto r = parent_.occupying_resource_.read();
+        auto cont = next.visit<bool>(
+          overload { [&]( Handle<Think> x ) {
+                      return x.unwrap<Thunk>().visit<bool>( overload {
+                        [&]( Handle<Application> ) { return r->size() >= threads_.size() && !r->contains( next ); },
+                        []( auto ) { return false; } } );
+                    },
+                     []( Handle<Eval> ) { return false; } } );
+
+        if ( r->contains( next ) ) {
+          VLOG( 2 ) << "Restarting " << next;
+        }
+        if ( cont ) {
+          VLOG( 2 ) << "Threads used up " << next;
+          todo_.push( next );
+          continue;
+        }
       }
       progress( next );
     }
@@ -105,7 +122,9 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
                   .and_then( [&]( auto x ) { return x.template try_into<ValueTree>(); } )
                   .transform( [&]( auto x ) { return fixpoint::storage->get( x ); } );
 
-  resource_limits::available_bytes
+  // VLOG( 1 ) << combination << " requested " << resource_limits::available_bytes << " bytes";
+
+  auto requested
     = limits
         .and_then( [&]( auto x ) {
           return handle::extract<Literal>(
@@ -113,25 +132,25 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
         } )
         .transform( [&]( auto x ) { return uint64_t( x ); } )
         .value_or( 0 );
-  VLOG( 1 ) << combination << " requested " << resource_limits::available_bytes << " bytes";
 
   {
     auto w = parent_.available_memory_.write();
     Handle<Relation> apply
       = Handle<Think>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
-    if ( !parent_.occupying_resource_.read().get().contains( apply ) ) {
-      if ( w.get() < resource_limits::available_bytes ) {
+    if ( !pre_occupy_ ) {
+      VLOG( 1 ) << "Occupying " << apply;
+      if ( w.get() < requested ) {
         // Out of memory
         todo_.push( apply );
         return {};
       }
 
-      w.get() -= resource_limits::available_bytes;
+      w.get() -= requested;
     }
   }
 
   auto result = runner_->apply( combination, tree );
-  parent_.available_memory_.write().get() += resource_limits::available_bytes;
+  parent_.available_memory_.write().get() += requested;
 
   return result;
 }

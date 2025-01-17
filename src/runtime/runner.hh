@@ -43,6 +43,7 @@ public:
     std::optional<Handle<AnyTree>> next_level {};
     std::optional<Handle<Blob>> function_name {};
 
+    auto rlimits = combination->at( 0 );
     std::optional<std::shared_ptr<Program>> program;
 
     while ( true ) {
@@ -51,6 +52,7 @@ public:
       }
 
       auto x = combination->at( 1 ).unwrap<Expression>().unwrap<Object>();
+
       next_level
         = x.try_into<ObjectTree>()
             .transform( []( auto h ) { return Handle<AnyTree>( h ); } )
@@ -129,6 +131,24 @@ public:
       fixpoint::current_procedure = combination->at( 1 );
     }
 
+    VLOG( 2 ) << handle << " rlimits are " << rlimits;
+    // invalid resource limits are interpreted as 0
+    auto limits = rlimits.unwrap<Expression>()
+                    .unwrap<Object>()
+                    .try_into<Value>()
+                    .and_then( [&]( auto x ) { return x.template try_into<ValueTree>(); } )
+                    .transform( [&]( auto x ) { return fixpoint::storage->get( x ); } );
+
+    resource_limits::available_bytes
+      = limits
+          .and_then( [&]( auto x ) {
+            return handle::extract<Literal>(
+              x->at( 0 ).template unwrap<Expression>().template unwrap<Object>().template unwrap<Value>() );
+          } )
+          .transform( [&]( auto x ) { return uint64_t( x ); } )
+          .value_or( 0 );
+
+    VLOG( 1 ) << handle << " requested " << resource_limits::available_bytes << " bytes";
     auto result = program.value()->execute( handle );
     VLOG( 2 ) << handle << " -> " << result;
     return result;

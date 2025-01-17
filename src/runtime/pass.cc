@@ -391,7 +391,9 @@ void MinAbsentMaxParallelism::relation_post( Handle<Relation> job,
       if ( !chosen_remotes_.contains( d ) ) {
         const auto& contains = base_.get().get_contains( d );
         for ( const auto& s : contains ) {
-          present[s] += base_.get().get_output_size( d );
+          if ( s->get_info()->parallelism > 0 ) {
+            present[s] += base_.get().get_output_size( d );
+          }
         }
       } else {
         present[chosen_remotes_.at( d ).first] += base_.get().get_output_size( d );
@@ -406,6 +408,7 @@ void MinAbsentMaxParallelism::relation_post( Handle<Relation> job,
     optional<size_t> max_present_size;
     optional<size_t> local_present_size;
     size_t max_parallelism = 0;
+
     for ( const auto& [r, s] : present ) {
       if ( is_local( r ) ) {
         local_present_size = s;
@@ -430,6 +433,11 @@ void MinAbsentMaxParallelism::relation_post( Handle<Relation> job,
           }
         }
       }
+    }
+
+    if ( present.size() == 0 ) {
+      chosen_remote = local_;
+      local_present_size = 0;
     }
 
     VLOG( 2 ) << "MinAbsent::post " << job << " " << chosen_remote.value() << " "
@@ -528,16 +536,24 @@ void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_s
     },
   } );
 
-  VLOG( 2 ) << "ChildBackProp::relation_post " << undo;
+  VLOG( 2 ) << "ChildBackProp::relation_post " << job << " " << undo;
 
   if ( undo ) {
     if ( dependencies.size() == 1 ) {
       auto d = *dependencies.begin();
       if ( chosen_remotes_.contains( d ) ) {
-        chosen_remotes_.insert_or_assign( job, { chosen_remotes_.at( d ).first, chosen_remotes_.at( d ).second } );
+        if ( chosen_remotes_.at( d ).first->get_info()->parallelism > 0 ) {
+          chosen_remotes_.insert_or_assign( job,
+                                            { chosen_remotes_.at( d ).first, chosen_remotes_.at( d ).second } );
+        } else {
+          chosen_remotes_.insert_or_assign( job, { local_, chosen_remotes_.at( d ).second } );
+        }
       } else {
         if ( !base_.get().get_contains( d ).contains( local_ ) ) {
-          chosen_remotes_.insert_or_assign( job, { *base_.get().get_contains( d ).begin(), 0 } );
+          auto rt = *base_.get().get_contains( d ).begin();
+          if ( rt->get_info()->parallelism > 0 ) {
+            chosen_remotes_.insert_or_assign( job, { rt, 0 } );
+          }
         }
       }
     } else {
@@ -965,11 +981,13 @@ optional<Handle<Thunk>> PassRunner::random_run( reference_wrapper<Relater> rt,
   if ( pre_occupy ) {
     for ( const auto a : unblocked_applys ) {
       if ( is_local( selection.value()->chosen_remotes_[a].first ) ) {
+        VLOG( 2 ) << "Pre occupying " << a;
         if ( not rt.get().occupy_resource( a.unwrap<Relation>().unwrap<Think>() ) ) {
+          VLOG( 2 ) << "Pre occupying failed " << a;
           // resource not enough, don't run any dependee of this job
           sketch_graph_.erase_forward_dependencies( a.unwrap<Relation>() );
-          // Push job to the queue
-          // rt.get().get_local()->get( a.unwrap<Relation>() );
+          // Push job to the no resource queue
+          rt.get().get_no_resouce_queue().move_push( a.unwrap<Relation>() );
         }
       }
     }

@@ -61,7 +61,7 @@ Relater::Relater( size_t threads,
 {
   available_memory_.write().get() = sysconf( _SC_PHYS_PAGES ) * sysconf( _SC_PAGE_SIZE );
   scheduler_->set_relater( *this );
-  local_ = make_shared<Executor>( *this, threads, runner );
+  local_ = make_shared<Executor>( *this, threads, runner, pre_occupy );
 }
 
 void Relater::add_worker( shared_ptr<IRuntime> rmt )
@@ -364,7 +364,13 @@ bool Relater::occupy_resource( Handle<Think> relation )
 
 void Relater::unoccupy_resource( Handle<Relation> relation )
 {
+  VLOG( 1 ) << "Unoccupying " << relation;
   if ( pre_occupy_ ) {
-    occupying_resource_.write()->erase( relation );
+    if ( occupying_resource_.write()->erase( relation ) > 0 ) {
+      auto unblock = no_resource_.pop();
+      if ( unblock.has_value() ) {
+        local_->get( unblock.value() );
+      }
+    }
   }
 }

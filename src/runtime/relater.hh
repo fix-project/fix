@@ -1,5 +1,6 @@
 #pragma once
 
+#include "channel.hh"
 #include "dependency_graph.hh"
 #include "handle.hh"
 #include "repository.hh"
@@ -40,6 +41,7 @@ private:
   SharedMutex<std::unordered_set<Handle<Relation>>> occupying_resource_ {};
   SharedMutex<size_t> available_memory_ {};
   bool pre_occupy_ {};
+  Channel<Handle<Relation>> no_resource_ {};
 
   template<FixType T>
   void get_from_repository( Handle<T> handle );
@@ -49,6 +51,8 @@ public:
            std::optional<std::shared_ptr<Runner>> runner = {},
            std::optional<std::shared_ptr<Scheduler>> scheduler = {},
            bool pre_occupy_ = false );
+
+  Channel<Handle<Relation>>& get_no_resouce_queue() { return no_resource_; }
 
   virtual void add_worker( std::shared_ptr<IRuntime> ) override;
   Handle<Value> execute( Handle<Relation> x );

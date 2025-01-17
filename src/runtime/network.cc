@@ -740,6 +740,7 @@ void DataServer::process_incoming_message( IncomingMessage&& msg )
     case Opcode::REQUESTTREE: {
       auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
       auto h = payload.handle;
+      VLOG( 1 ) << "REQUESTTREE " << h;
       auto fn = [&, h]() {
         auto tree = parent.get( h );
         send_tree( payload.handle, tree.value() );
@@ -752,11 +753,11 @@ void DataServer::process_incoming_message( IncomingMessage&& msg )
     case Opcode::REQUESTBLOB: {
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
       auto h = payload.handle;
+      VLOG( 1 ) << "REQUESTBLOB " << h;
       auto fn = [&, h]() {
         auto blob = parent.get( h );
-        if ( blob && !blobs_view_.contains( h ) ) {
+        if ( blob ) {
           send_blob( blob.value() );
-          add_to_view( payload.handle );
         }
       };
 
