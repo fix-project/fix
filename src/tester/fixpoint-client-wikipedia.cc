@@ -83,12 +83,9 @@ int main( int argc, char* argv[] )
   };
   auto [client, rt] = argc == 3 ? rw_rt() : client_rt();
 
-  auto mapreduce = client->execute(
-    Handle<Eval>( compile( rt, "build/applications-prefix/src/applications-build/mapreduce/mapreduce.wasm" ) ) );
-  auto mapper = client->execute( Handle<Eval>(
-    compile( rt, "build/applications-prefix/src/applications-build/count-words/count_words.wasm" ) ) );
-  auto reducer = client->execute( Handle<Eval>(
-    compile( rt, "build/applications-prefix/src/applications-build/count-words/merge_counts.wasm" ) ) );
+  auto mapreduce = rt.labeled( "mapreduce" ).unwrap<Expression>().unwrap<Object>().unwrap<Value>();
+  auto mapper = rt.labeled( "count-words" ).unwrap<Expression>().unwrap<Object>().unwrap<Value>();
+  auto reducer = rt.labeled( "merge-counts" ).unwrap<Expression>().unwrap<Object>().unwrap<Value>();
 
   auto needle_blob = OwnedMutBlob::allocate( needle_string.size() );
   memcpy( needle_blob.data(), needle_string.data(), needle_string.size() );
