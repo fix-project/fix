@@ -454,6 +454,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
     case Opcode::RUN: {
       auto payload = parse<RunPayload>( std::get<string>( msg.payload() ) );
       auto task = payload.task;
+      VLOG( 1 ) << "RUN " << payload.task;
       {
         unique_lock lock( mutex_ );
         reply_to_.insert( task );
