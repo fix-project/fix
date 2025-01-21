@@ -646,6 +646,10 @@ void RandomSelection::data( Handle<Dependee> job )
 void RandomSelection::relation_post( Handle<Relation> job,
                                      const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
+  if ( base_.get().get_ep( job ) ) {
+    return;
+  }
+
   bool acc = false;
   for ( const auto& d : dependencies ) {
     acc |= recursively_depend_on_apply_[d];
