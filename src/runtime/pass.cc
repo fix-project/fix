@@ -5,6 +5,7 @@
 #include "overload.hh"
 #include "relater.hh"
 #include "scheduler.hh"
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <ostream>
@@ -609,7 +610,7 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
     return;
 
   size_t assigned = 0;
-  multimap<int64_t, Handle<Dependee>, greater<size_t>> scores;
+  multimap<size_t, Handle<Dependee>> scores;
   for ( auto d : dependencies ) {
     if ( chosen_remotes_.contains( d ) and is_local( chosen_remotes_.at( d ).first ) ) {
       assigned += 1;
@@ -634,15 +635,15 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
     for ( const auto& [_, d] : scores ) {
       if ( assigned - 1 < local_jobs ) {
         break;
-      }
+      } else {
+        chosen_remotes_.insert_or_assign( d, { available_remotes[remote_idx], 0 } );
 
-      chosen_remotes_.insert_or_assign( d, { available_remotes[remote_idx], 0 } );
+        assigned--;
+        remote_idx++;
 
-      assigned--;
-      remote_idx++;
-
-      if ( remote_idx == remote_required ) {
-        remote_idx = 0;
+        if ( remote_idx == remote_required ) {
+          remote_idx = 0;
+        }
       }
     }
   }
@@ -698,7 +699,7 @@ void SendToRemotePass::all( Handle<Dependee> job )
 {
   if ( !is_local( chosen_remotes_.at( job ).first ) ) {
     VLOG( 1 ) << "Run job remotely " << job << endl;
-    remote_jobs_[chosen_remotes_.at( job ).first].insert( job );
+    remote_jobs_[chosen_remotes_.at( job ).first].insert( { chosen_remotes_.at( job ).second, job } );
   }
 }
 
@@ -709,11 +710,11 @@ void SendToRemotePass::relation_pre( Handle<Relation>, const absl::flat_hash_set
     if ( contains.empty() ) {
       if ( !is_local( chosen_remotes_.at( d ).first ) ) {
         VLOG( 1 ) << "Run job remotely " << d << endl;
-        remote_jobs_[chosen_remotes_.at( d ).first].insert( d );
+        remote_jobs_[chosen_remotes_.at( d ).first].insert( { chosen_remotes_.at( d ).second, d } );
       }
     } else {
       if ( !contains.contains( local_ ) ) {
-        remote_jobs_[*contains.begin()].insert( d );
+        remote_jobs_[*contains.begin()].insert( { numeric_limits<size_t>::max(), d } );
       }
     }
   }
@@ -767,10 +768,11 @@ void SendToRemotePass::send_remote_jobs( Handle<Dependee> root )
 {
   this->run( root );
 
-  vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<Dependee>>::const_iterator>> iterators {};
+  vector<pair<shared_ptr<IRuntime>, multimap<size_t, Handle<Dependee>, greater<size_t>>::const_iterator>>
+    iterators {};
   for ( const auto& [rt, handles] : remote_jobs_ ) {
     iterators.push_back( make_pair( rt, handles.begin() ) );
-    for ( auto h : handles ) {
+    for ( auto [_, h] : handles ) {
       send_job_dependencies( rt, h );
     }
   }
@@ -797,7 +799,7 @@ void SendToRemotePass::send_remote_jobs( Handle<Dependee> root )
   while ( finished.size() < iterators.size() ) {
     auto& [r, it] = iterators.at( iterator_index );
     if ( it != remote_jobs_.at( r ).end() ) {
-      auto h = *it;
+      auto h = ( *it ).second;
       h.visit<void>( overload {
         [&]( Handle<Relation> d ) {
           r->get( d );
@@ -840,18 +842,8 @@ void FinalPass::relation_pre( Handle<Relation> job, const absl::flat_hash_set<Ha
   absl::flat_hash_set<Handle<Relation>> unblocked;
   sch_.get().merge_sketch_graph( job, unblocked );
 
-  if ( unblocked.size() == 1 && !todo_.has_value() ) {
-    auto todo = *unblocked.begin();
-    if ( is_local( chosen_remotes_.at( todo ).first ) ) {
-      todo_ = todo;
-    }
-  } else {
-    for ( auto r : unblocked ) {
-      VLOG( 2 ) << "Relation pre unblocked " << r;
-      if ( is_local( chosen_remotes_.at( r ).first ) ) {
-        chosen_remotes_.at( r ).first->get( r );
-      }
-    }
+  for ( auto u : unblocked ) {
+    unblocked_.insert( { chosen_remotes_.at( u ).second, u } );
   }
 }
 
@@ -913,20 +905,29 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
   FinalPass final( base, rt, sch, move( selection.value() ) );
   final.run( top_level_job );
 
-  if ( final.get_todo().has_value() ) {
-    auto r = final.get_todo().value();
-    return r.visit<optional<Handle<Thunk>>>( overload { [&]( Handle<Eval> ) -> optional<Handle<Thunk>> {
-                                                         rt.get().get_local()->get( r );
-                                                         return {};
-                                                       },
-                                                        [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
-                                                          if ( top_level_job == Handle<Dependee>( r ) ) {
-                                                            return s.unwrap<Thunk>();
-                                                          } else {
-                                                            rt.get().get_local()->get( r );
-                                                            return {};
-                                                          }
-                                                        } } );
+  auto& unblocked = final.get_unblocked();
+  if ( unblocked.size() == 1 ) {
+    auto r = ( *unblocked.begin() ).second;
+    if ( is_local( final.chosen_remotes_.at( r ).first ) ) {
+      return r.visit<optional<Handle<Thunk>>>( overload { [&]( Handle<Eval> ) -> optional<Handle<Thunk>> {
+                                                           rt.get().get_local()->get( r );
+                                                           return {};
+                                                         },
+                                                          [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
+                                                            if ( top_level_job == Handle<Dependee>( r ) ) {
+                                                              return s.unwrap<Thunk>();
+                                                            } else {
+                                                              rt.get().get_local()->get( r );
+                                                              return {};
+                                                            }
+                                                          } } );
+    }
+  } else {
+    for ( auto [_, u] : unblocked ) {
+      if ( is_local( final.chosen_remotes_.at( u ).first ) ) {
+        rt.get().get_local()->get( u );
+      }
+    }
   }
 
   return {};
@@ -1012,20 +1013,29 @@ optional<Handle<Thunk>> PassRunner::random_run( reference_wrapper<Relater> rt,
   FinalPass final( base, rt, sch, move( selection.value() ) );
   final.run( top_level_job );
 
-  if ( final.get_todo().has_value() ) {
-    auto r = final.get_todo().value();
-    return r.visit<optional<Handle<Thunk>>>( overload { [&]( Handle<Eval> ) -> optional<Handle<Thunk>> {
-                                                         rt.get().get_local()->get( r );
-                                                         return {};
-                                                       },
-                                                        [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
-                                                          if ( top_level_job == Handle<Dependee>( r ) ) {
-                                                            return s.unwrap<Thunk>();
-                                                          } else {
-                                                            rt.get().get_local()->get( r );
-                                                            return {};
-                                                          }
-                                                        } } );
+  auto& unblocked = final.get_unblocked();
+  if ( unblocked.size() == 1 ) {
+    auto r = ( *unblocked.begin() ).second;
+    if ( is_local( final.chosen_remotes_.at( r ).first ) ) {
+      return r.visit<optional<Handle<Thunk>>>( overload { [&]( Handle<Eval> ) -> optional<Handle<Thunk>> {
+                                                           rt.get().get_local()->get( r );
+                                                           return {};
+                                                         },
+                                                          [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
+                                                            if ( top_level_job == Handle<Dependee>( r ) ) {
+                                                              return s.unwrap<Thunk>();
+                                                            } else {
+                                                              rt.get().get_local()->get( r );
+                                                              return {};
+                                                            }
+                                                          } } );
+    }
+  } else {
+    for ( auto [_, u] : unblocked ) {
+      if ( is_local( final.chosen_remotes_.at( u ).first ) ) {
+        rt.get().get_local()->get( u );
+      }
+    }
   }
 
   return {};
