@@ -7,6 +7,7 @@
 #include <stdatomic.h>
 #include <stdexcept>
 #include <string>
+#include <typeindex>
 #include <utility>
 #include <variant>
 
@@ -554,6 +555,7 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
 
     case Opcode::LOADBLOB: {
       auto payload = parse<LoadBlobPayload>( std::get<string>( msg.payload() ) );
+      VLOG( 1 ) << "LOADBLOB " << payload.handle.unwrap<Named>();
       if ( parent.contains( payload.handle.unwrap<Named>() ) ) {
         parent.get( payload.handle.unwrap<Named>() );
       }
@@ -631,31 +633,10 @@ void Remote::process_incoming_message( IncomingMessage&& msg )
       for ( const auto& h : handles ) {
         VLOG( 2 ) << "Sending " << handle::fix( h );
         std::visit( overload {
-                      [&]( Handle<Named> n ) {
-                        if ( !contains( n ) ) {
-                          push_message( { Opcode::BLOBDATA, parent.get( n ).value() } );
-                          add_to_view( n );
-                        }
-                      },
-                      [&]( Handle<AnyTree> t ) {
-                        if ( !contains( t ) ) {
-                          push_message( { Opcode::TREEDATA, parent.get( t ).value() } );
-                          add_to_view( t );
-                        }
-                      },
+                      [&]( Handle<Named> n ) { push_message( { Opcode::BLOBDATA, parent.get( n ).value() } ); },
+                      [&]( Handle<AnyTree> t ) { push_message( { Opcode::TREEDATA, parent.get( t ).value() } ); },
                       []( Handle<Literal> ) {},
                       []( Handle<Relation> ) {},
-                    },
-                    h.get() );
-      }
-
-      // Any objects in this proposal are considered "exising" on the remote side
-      for ( const auto& [h, _] : *proposed_proposals_.front().second ) {
-        std::visit( overload {
-                      [&]( Handle<Named> h ) { add_to_view( h ); },
-                      [&]( Handle<AnyTree> t ) { add_to_view( t ); },
-                      []( Handle<Relation> ) {},
-                      []( Handle<Literal> ) {},
                     },
                     h.get() );
       }
@@ -857,6 +838,7 @@ void NetworkWorker<Connection>::process_outgoing_message( size_t remote_idx, Mes
             VLOG( 2 ) << "Adding " << b.first << " to proposal " << remote_idx;
             connection.incomplete_proposal_->push_back( { b.first, b.second } );
             connection.proposal_size_ += b.second->size();
+            connection.add_to_view( b.first );
           }
         },
         [&]( TreeDataPayload t ) {
@@ -865,6 +847,7 @@ void NetworkWorker<Connection>::process_outgoing_message( size_t remote_idx, Mes
             connection.incomplete_proposal_->push_back(
               { visit( []( auto h ) -> Handle<AnyDataType> { return h; }, t.first.get() ), t.second } );
             connection.proposal_size_ += t.second->size() * sizeof( Handle<Fix> );
+            connection.add_to_view( t.first );
           }
         },
         [&]( RunPayload r ) {
@@ -957,14 +940,14 @@ void NetworkWorker<Connection>::process_outgoing_message( size_t remote_idx, Mes
             connection.proposal_size_ = 0;
           }
         },
-        [&]( LoadBlobPayload&& payload ) {
+        [&]( LoadBlobPayload payload ) {
           auto named = payload.handle.unwrap<Named>();
           if ( connection.contains( named ) && !connection.loaded( named ) ) {
             connection.add_to_view( named );
             connection.push_message( OutgoingMessage::to_message( move( payload ) ) );
           }
         },
-        [&]( LoadTreePayload&& payload ) {
+        [&]( LoadTreePayload payload ) {
           if ( connection.contains( payload.handle ) && !connection.loaded( payload.handle ) ) {
             connection.add_to_view( payload.handle );
             connection.push_message( OutgoingMessage::to_message( move( payload ) ) );

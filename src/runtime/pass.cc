@@ -480,9 +480,13 @@ void ChildBackProp::all( Handle<Dependee> job )
     return;
   }
 
+  if ( chosen_remotes_.contains( job ) && is_local( chosen_remotes_.at( job ).first ) ) {
+    return;
+  }
+
   auto curr_output_size = base_.get().get_output_size( job );
   bool move_to_local = false;
-  bool cont = job.visit<bool>( overload {
+  bool not_contained = job.visit<bool>( overload {
     [&]( auto r ) {
       const auto& contains = base_.get().get_contains( r );
       if ( !contains.empty() && contains.contains( local_ ) ) {
@@ -492,7 +496,7 @@ void ChildBackProp::all( Handle<Dependee> job )
     },
   } );
 
-  if ( cont ) {
+  if ( not_contained ) {
     if ( is_local( chosen_remotes_.at( job ).first ) ) {
       return;
     }
@@ -573,6 +577,12 @@ void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_s
 
       if ( remote.has_value() ) {
         chosen_remotes_.insert_or_assign( job, { remote.value(), 0 } );
+      }
+    }
+  } else {
+    for ( auto d : dependencies ) {
+      if ( chosen_remotes_.contains( d ) && is_local( chosen_remotes_.at( d ).first ) ) {
+        chosen_remotes_.at( job ).second += chosen_remotes_.at( d ).second;
       }
     }
   }
