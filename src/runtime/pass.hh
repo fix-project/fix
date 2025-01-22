@@ -3,6 +3,7 @@
 #include "handle.hh"
 #include "interface.hh"
 #include "relater.hh"
+#include <absl/container/btree_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <functional>
 #include <unordered_map>
@@ -200,7 +201,8 @@ public:
 
 class SendToRemotePass : public PrunedSelectionPass
 {
-  std::unordered_map<std::shared_ptr<IRuntime>, std::multimap<size_t, Handle<Dependee>, std::greater<size_t>>>
+  std::unordered_map<std::shared_ptr<IRuntime>,
+                     absl::btree_multimap<size_t, Handle<Dependee>, std::greater<size_t>>>
     remote_jobs_ {};
   std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<Dependee>>> remote_data_ {};
   void send_job_dependencies( std::shared_ptr<IRuntime>, Handle<Dependee> );
@@ -224,7 +226,7 @@ public:
 class FinalPass : public PrunedSelectionPass
 {
   std::reference_wrapper<SketchGraphScheduler> sch_;
-  std::multimap<size_t, Handle<Relation>, std::greater<size_t>> unblocked_ {};
+  absl::btree_multimap<size_t, Handle<Relation>, std::greater<size_t>> unblocked_ {};
 
   virtual void data( Handle<Dependee> ) override;
   virtual void relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override;
@@ -240,7 +242,7 @@ public:
     : PrunedSelectionPass( base, relater, move( prev ) )
     , sch_( sch )
   {}
-  std::multimap<size_t, Handle<Relation>, std::greater<size_t>>& get_unblocked() { return unblocked_; };
+  absl::btree_multimap<size_t, Handle<Relation>, std::greater<size_t>>& get_unblocked() { return unblocked_; };
 };
 
 // A correct sequence of passes contains: BasePass + (n >= 1) * SelectionPass + (n >= 0) * PrunedSelectionPass +

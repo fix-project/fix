@@ -768,7 +768,8 @@ void SendToRemotePass::send_remote_jobs( Handle<Dependee> root )
 {
   this->run( root );
 
-  vector<pair<shared_ptr<IRuntime>, multimap<size_t, Handle<Dependee>, greater<size_t>>::const_iterator>>
+  vector<
+    pair<shared_ptr<IRuntime>, absl::btree_multimap<size_t, Handle<Dependee>, greater<size_t>>::const_iterator>>
     iterators {};
   for ( const auto& [rt, handles] : remote_jobs_ ) {
     iterators.push_back( make_pair( rt, handles.begin() ) );
