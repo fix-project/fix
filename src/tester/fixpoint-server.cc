@@ -62,12 +62,13 @@ int main( int argc, char* argv[] )
     'p', "peers", "peers", "Path to a file that contains a list of all servers.", [&]( const char* argument ) {
       peerfile = argument;
     } );
-  parser.AddOption( 's', "scheduler", "scheduler", "Scheduler to use [hint, random]", [&]( const char* argument ) {
-    sche_opt = argument;
-    if ( not( *sche_opt == "hint" or *sche_opt == "random" ) ) {
-      throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
-    }
-  } );
+  parser.AddOption(
+    's', "scheduler", "scheduler", "Scheduler to use [hint, random, local]", [&]( const char* argument ) {
+      sche_opt = argument;
+      if ( not( *sche_opt == "hint" or *sche_opt == "random" or *sche_opt == "local" ) ) {
+        throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
+      }
+    } );
   parser.AddOption(
     't', "threads", "#", "Number of threads", [&]( const char* argument ) { threads = stoull( argument ); } );
   parser.AddOption( 'o', "preoccupy", "Occupy resources when doing I/O", [&]() { pre_occupy = true; } );
@@ -110,6 +111,8 @@ int main( int argc, char* argv[] )
       }
     } else if ( *sche_opt == "random" ) {
       scheduler = make_shared<RandomScheduler>( pre_occupy );
+    } else if ( *sche_opt == "local" ) {
+      scheduler = make_shared<LocalScheduler>();
     }
   }
 
