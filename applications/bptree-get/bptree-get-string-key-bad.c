@@ -59,12 +59,14 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
       memcpy( keys[real_num_of_keys], keys_buf + offset, entry_size );
       offset += entry_size;
       keys[real_num_of_keys][entry_size] = '\0';
+
+      real_num_of_keys += 1;
     }
 
     int idx = upper_bound( keys, real_num_of_keys, key );
 
     if ( isleaf ) {
-      if ( idx != 0 && keys[idx - 1] == key ) {
+      if ( idx != 0 && strcmp( keys[idx - 1], key ) == 0 ) {
         return create_selection_thunk( childrenordata_h, idx );
       } else {
         return create_tree_rw_table_0( 0 );
@@ -85,7 +87,7 @@ __attribute__( ( export_name( "_fixpoint_apply" ) ) ) externref _fixpoint_apply(
     set_rw_table_0( 0, get_ro_table_0( 0 ) );
     set_rw_table_0( 1, get_ro_table_0( 1 ) );
     set_rw_table_0( 2, create_strict_encode( keyentry ) );
-    set_rw_table_0( 3, create_shallow_encode( nextlevel ) );
+    set_rw_table_0( 3, nextlevel );
     set_rw_table_0( 4, key_h );
     return create_application_thunk( create_tree_rw_table_0( 5 ) );
   }

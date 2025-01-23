@@ -9,6 +9,12 @@
 
 using namespace std;
 
+Handle<Blob> create_blob_from_string( IRuntime& rt, string key )
+{
+  auto& storage = dynamic_cast<Relater&>( rt ).get_storage();
+  return storage.create( key );
+}
+
 int main( int argc, char* argv[] )
 {
   shared_ptr<Client> rt;
@@ -35,12 +41,12 @@ int main( int argc, char* argv[] )
   int begin_index = atoi( argv[3] );
   int num_keys = atoi( argv[4] );
 
-  vector<int> keys;
+  vector<string> keys;
   for ( int i = 0; i < begin_index + num_keys; i++ ) {
-    int key;
-    keys_list >> key;
+    string line;
+    getline( keys_list, line );
     if ( i >= begin_index ) {
-      keys.push_back( key );
+      keys.push_back( line );
     }
   }
 
@@ -74,7 +80,7 @@ int main( int argc, char* argv[] )
     tree.at( 1 ) = bptree_get;
     tree.at( 2 ) = select;
     tree.at( 3 ) = tree_root;
-    tree.at( 4 ) = Handle<Literal>( (int)key );
+    tree.at( 4 ) = create_blob_from_string( rt->get_rt(), key );
     auto combination = rt->get_rt().create( make_shared<OwnedTree>( std::move( tree ) ) ).unwrap<ExpressionTree>();
     auto application = Handle<Application>( combination );
     parallel_tree[index] = application;

@@ -82,7 +82,7 @@ protected:
   std::queue<std::pair<std::pair<Handle<Relation>, std::optional<Handle<Object>>>, std::unique_ptr<DataProposal>>>
     proposed_proposals_ {};
 
-  FixTable<Named, std::atomic<bool>, AbslHash> blobs_view_ { 100000 };
+  FixTable<Named, std::atomic<bool>, AbslHash> blobs_view_ { 1000000 };
   FixTable<AnyTree, std::atomic<bool>, AbslHash, handle::any_tree_equal> trees_view_ { 1000000 };
   FixTable<Relation, std::atomic<bool>, AbslHash> relations_view_ { 100000 };
 
