@@ -74,7 +74,7 @@ string fix_bptree_get_n( shared_ptr<Relater> rt,
 void check_bptree_get( shared_ptr<Relater> rt,
                        Handle<Value> bptree_fix,
                        Handle<Fix> bptree_elf,
-                       BPTree& tree,
+                       BPTree<int, string>& tree,
                        int key )
 {
   string fix_result = fix_bptree_get( rt, bptree_fix, bptree_elf, key );
@@ -92,7 +92,7 @@ void check_bptree_get( shared_ptr<Relater> rt,
 void check_bptree_get_n( shared_ptr<Relater> rt,
                          Handle<Value> bptree_fix,
                          Handle<Fix> bptree_get_n_elf,
-                         BPTree& tree,
+                         BPTree<int, string>& tree,
                          int key,
                          uint64_t n )
 {
@@ -101,7 +101,7 @@ void check_bptree_get_n( shared_ptr<Relater> rt,
   string result;
   optional<size_t> n_done;
 
-  tree.dfs_visit( [&]( Node* node ) {
+  tree.dfs_visit( [&]( Node<int, string>* node ) {
     if ( node->is_leaf() ) {
       if ( n_done.has_value() && *n_done < n ) {
         for ( const auto& d : node->get_data() ) {
@@ -143,7 +143,7 @@ void check_bptree_get_n( shared_ptr<Relater> rt,
 void test( shared_ptr<Relater> rt )
 {
   size_t degree = 4;
-  BPTree tree( degree );
+  BPTree<int, string> tree( degree );
 
   random_device rd;
   mt19937 gen( rd() );

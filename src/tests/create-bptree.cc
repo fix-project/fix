@@ -18,7 +18,7 @@ int main( int argc, char* argv[] )
 
   auto rt = std::make_shared<Relater>( 0 );
   size_t degree = stoi( argv[1] );
-  BPTree tree( degree );
+  BPTree<int, string> tree( degree );
   size_t num_of_entries = stoi( argv[2] );
 
   ofstream keys_file( argv[3] );
