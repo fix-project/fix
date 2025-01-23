@@ -57,3 +57,13 @@ add_custom_command(
           -o trap.wasm)
 
 add_custom_target(trap_wasm ALL DEPENDS trap.wasm)
+
+add_custom_command(
+  OUTPUT "dec.wasm"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/dec.wat
+  COMMAND $ENV{HOME}/wasm-toolchain/wabt/build/wat2wasm
+          --enable-multi-memory
+          ${CMAKE_CURRENT_SOURCE_DIR}/dec.wat
+          -o dec.wasm)
+
+add_custom_target(dec_wasm ALL DEPENDS dec.wasm)

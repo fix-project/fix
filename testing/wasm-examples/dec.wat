@@ -1,0 +1,25 @@
+(module
+ (import "fixpoint" "attach_tree_ro_table_0" (func $attach_tree_ro_table_0 (param externref)))
+ (import "fixpoint" "attach_blob_ro_mem_0"   (func $attach_blob_ro_mem_0 (param externref)))
+ (import "fixpoint" "create_blob_i32"        (func $create_blob_i32 (param i32)(result externref)))
+ (import "fixpoint" "create_application_thunk" (func $create_application_thunk (param externref)(result externref)))
+ (import "fixpoint" "create_tree_rw_table_0"  (func $create_tree_rw_table_0 (param i32)(result externref)))
+ (table $ro_table_0 (export "ro_table_0") 0 externref)
+ (table $rw_table_0 (export "rw_table_0") 3 externref)
+ (memory $ro_mem_0  (export "ro_mem_0") 0)
+ (func (export "_fixpoint_apply") (param $encode externref) (result externref) (local $val i32)
+       (call $attach_tree_ro_table_0 (local.get $encode))
+
+       (call $attach_blob_ro_mem_0 (table.get $ro_table_0 (i32.const 2)))
+       (local.set $val (i32.load $ro_mem_0 (i32.const 0)))
+
+       (if (result externref)
+         (i32.eqz (local.get $val)) 
+         (then (table.get $ro_table_0 (i32.const 2)))
+       (else 
+         (table.set $rw_table_0 (i32.const 0) (table.get $ro_table_0 (i32.const 0)))
+         (table.set $rw_table_0 (i32.const 2) (table.get $ro_table_0 (i32.const 2)))
+         (table.set $rw_table_0 (i32.const 1) (call $create_blob_i32 (i32.add (local.get $val) (i32.const -1))))
+         (call $create_application_thunk (call $create_tree_rw_table_0 (i32.const 3))))
+       )
+))
