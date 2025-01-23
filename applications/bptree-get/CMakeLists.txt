@@ -23,8 +23,16 @@ target_link_libraries(bptree-get-obj PUBLIC fixpoint_storage)
 add_library(bptree-get-n-obj OBJECT "bptree-get-n.c")
 target_link_libraries(bptree-get-n-obj PUBLIC fixpoint_storage)
 
+add_library(bptree-get-string-key-obj OBJECT "bptree-get-string-key.c")
+target_link_libraries(bptree-get-string-key-obj PUBLIC fixpoint_storage)
+
+add_library(bptree-get-string-key-bad-obj OBJECT "bptree-get-string-key-bad.c")
+target_link_libraries(bptree-get-string-key-bad-obj PUBLIC fixpoint_storage)
+
 link_libc("${CMAKE_BINARY_DIR}/bptree-get/CMakeFiles/bptree-get-obj.dir/bptree-get.c.o" bptree-get-obj bptree-get-unlinked.wasm)
 link_libc("${CMAKE_BINARY_DIR}/bptree-get/CMakeFiles/bptree-get-n-obj.dir/bptree-get-n.c.o" bptree-get-n-obj bptree-get-n-unlinked.wasm)
+link_libc("${CMAKE_BINARY_DIR}/bptree-get/CMakeFiles/bptree-get-string-key-obj.dir/bptree-get-string-key.c.o" bptree-get-string-key-obj bptree-get-string-key-unlinked.wasm)
+link_libc("${CMAKE_BINARY_DIR}/bptree-get/CMakeFiles/bptree-get-string-key-bad-obj.dir/bptree-get-string-key-bad.c.o" bptree-get-string-key-bad-obj bptree-get-string-key-bad-unlinked.wasm)
 
 add_custom_command(
         OUTPUT "bptree-get.wasm"
@@ -62,4 +70,42 @@ add_custom_command(
 add_custom_target(
         bptree-get-n ALL
         DEPENDS bptree-get-n.wasm
+        )
+
+add_custom_command(
+        OUTPUT "bptree-get-string-key.wasm"
+        DEPENDS bptree-get-string-key-unlinked.wasm
+                support.wasm
+  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
+        --enable-multi-memory
+        --enable-exceptions
+        bptree-get-string-key-unlinked.wasm
+        support.wasm
+        -m wasi_command
+        -n support
+        -o "bptree-get-string-key.wasm"
+)
+
+add_custom_target(
+        bptree-get-string-key ALL
+        DEPENDS bptree-get-string-key.wasm
+        )
+
+add_custom_command(
+        OUTPUT "bptree-get-string-key-bad.wasm"
+        DEPENDS bptree-get-string-key-bad-unlinked.wasm
+                support.wasm
+  COMMAND $ENV{HOME}/wasm-toolchain/wasm-tools/build/src/module-combiner/wasmlink
+        --enable-multi-memory
+        --enable-exceptions
+        bptree-get-string-key-bad-unlinked.wasm
+        support.wasm
+        -m wasi_command
+        -n support
+        -o "bptree-get-string-key-bad.wasm"
+)
+
+add_custom_target(
+        bptree-get-string-key-bad ALL
+        DEPENDS bptree-get-string-key-bad.wasm
         )

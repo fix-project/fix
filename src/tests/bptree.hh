@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <vector>
 
 template<typename Key, typename Value>
@@ -25,16 +26,27 @@ class Node
   std::pair<std::shared_ptr<Node>, Key> split();
   void dfs_visit( std::function<void( Node* )> visitor );
 
+  std::string key_data_buf_ {};
+
 public:
   Node() {}
   const std::vector<Key>& get_keys() const { return keys_; }
-  std::string_view get_key_data() const
+  std::string_view get_key_data()
   {
     return { reinterpret_cast<const char*>( keys_.data() ), keys_.size() * sizeof( Key ) };
   }
   const std::vector<Value>& get_data() const { return data_; }
   const std::vector<std::shared_ptr<Node>> get_children() const { return children_; }
   bool is_leaf() const { return isleaf_; }
+
+  void set_keys( std::vector<Key> keys ) { keys_ = keys; }
+  void set_data( std::vector<Value> data )
+  {
+    if ( !isleaf_ ) {
+      throw std::runtime_error( "Non leaf BPTree node should not have data." );
+    }
+    data_ = data;
+  }
 };
 
 template<typename Key, typename Value>
@@ -52,6 +64,8 @@ public:
   void dfs_visit( std::function<void( Node<Key, Value>* )> visitor );
   std::optional<Value> get( Key key );
   std::shared_ptr<Node<Key, Value>> get_root() { return root_; }
+
+  void set_root( std::shared_ptr<Node<Key, Value>> root ) { root_ = root; }
 
   size_t get_degree() const { return degree_; }
 };

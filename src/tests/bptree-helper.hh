@@ -1,3 +1,5 @@
+#pragma once
+
 #include "bptree.hh"
 #include "handle.hh"
 #include "object.hh"
@@ -14,6 +16,22 @@ static Handle<Blob> to_storage_keys( RuntimeStorage& storage, Node<Key, Val>* no
   blob[0] = node->is_leaf();
   memcpy( blob.data() + 1, key_data.data(), key_data.size() );
   return storage.create( std::make_shared<OwnedBlob>( std::move( blob ) ) );
+}
+
+template<typename Val>
+Handle<Blob> to_storage_data( RuntimeStorage& storage, const Val& val )
+{
+  auto d = OwnedMutBlob::allocate( val.size() );
+  memcpy( d.data(), val.data(), val.size() );
+  return storage.create( std::make_shared<OwnedBlob>( std::move( d ) ) );
+}
+
+template<>
+inline Handle<Blob> to_storage_data( RuntimeStorage& storage, const int& i )
+{
+  auto d = OwnedMutBlob::allocate( sizeof( i ) );
+  memcpy( d.data(), &i, sizeof( i ) );
+  return storage.create( std::make_shared<OwnedBlob>( std::move( d ) ) );
 }
 
 template<typename Key, typename Val>
@@ -44,12 +62,7 @@ static std::deque<Handle<ValueTreeRef>> to_storage_leaves( RuntimeStorage& stora
 
     size_t i = 1;
     for ( const auto& data : node->get_data() ) {
-      auto d = OwnedMutBlob::allocate( data.size() );
-      memcpy( d.data(), data.data(), data.size() );
-      tree[i]
-        = storage.create( std::make_shared<OwnedBlob>( std::move( d ) ) )
-            .template visit<Handle<Value>>( overload { []( Handle<Literal> l ) { return l; },
-                                                       []( Handle<Named> n ) { return Handle<BlobRef>( n ); } } );
+      tree[i] = to_storage_data( storage, data );
       i++;
     }
 

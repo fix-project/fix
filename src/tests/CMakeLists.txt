@@ -88,3 +88,5 @@ target_link_libraries(test-python-flatware runtime)
 add_executable(create-bptree create-bptree.cc)
 target_link_libraries(create-bptree runtime)
 
+add_executable(create-bptree-string-key create-bptree-string-keys.cc)
+target_link_libraries(create-bptree-string-key runtime)
