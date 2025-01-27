@@ -439,6 +439,20 @@ DataServer::DataServer( EventLoop& events,
       process_incoming_message( move( message ) );
     },
     [&] { return not rx_messages_.empty(); } ) );
+
+  install_rule( events.add_rule(
+    categories.data_server_ready,
+    [&] {
+      auto res = ready_.pop();
+      if ( res.has_value() ) {
+        auto blob = parent_.value().get().get( res.value() );
+        if ( blob.has_value() ) {
+          send_blob( blob.value() );
+        }
+      }
+    },
+    [&] { return ready_.size_approx() > 0; } ) );
+
   // push_message( { Opcode::REQUESTINFO, string( "" ) } );
 }
 
@@ -720,15 +734,15 @@ void DataServer::process_incoming_message( IncomingMessage&& msg )
     }
 
     case Opcode::REQUESTTREE: {
-      auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
-      auto h = payload.handle;
-      VLOG( 1 ) << "REQUESTTREE " << h;
-      auto fn = [&, h]() {
-        auto tree = parent.get( h );
-        send_tree( payload.handle, tree.value() );
-      };
+      // auto payload = parse<RequestTreePayload>( std::get<string>( msg.payload() ) );
+      // auto h = payload.handle;
+      // VLOG( 1 ) << "REQUESTTREE " << h;
+      // auto fn = [&, h]() {
+      //   auto tree = parent.get( h );
+      //   send_tree( payload.handle, tree.value() );
+      // };
 
-      run_after( fn );
+      // run_after( fn );
       break;
     }
 
@@ -736,30 +750,25 @@ void DataServer::process_incoming_message( IncomingMessage&& msg )
       auto payload = parse<RequestBlobPayload>( std::get<string>( msg.payload() ) );
       auto h = payload.handle;
       VLOG( 1 ) << "REQUESTBLOB " << h;
-      auto fn = [&, h]() {
-        auto blob = parent.get( h );
-        if ( blob ) {
-          send_blob( blob.value() );
-        }
-      };
+      auto fn = [&, h]() { ready_.push( h ); };
 
       run_after( fn );
       break;
     }
 
     case Opcode::REQUESTSHALLOWTREE: {
-      auto payload = parse<RequestShallowTreePayload>( std::get<string>( msg.payload() ) );
-      auto h = payload.handle;
+      // auto payload = parse<RequestShallowTreePayload>( std::get<string>( msg.payload() ) );
+      // auto h = payload.handle;
 
-      auto fn = [&, h]() {
-        auto tree = parent.get_shallow( h );
-        if ( tree ) {
-          push_message(
-            OutgoingMessage::to_message( ShallowTreeDataPayload { .handle = h, .data = tree.value() } ) );
-        }
-      };
+      // auto fn = [&, h]() {
+      //   auto tree = parent.get_shallow( h );
+      //   if ( tree ) {
+      //     push_message(
+      //       OutgoingMessage::to_message( ShallowTreeDataPayload { .handle = h, .data = tree.value() } ) );
+      //   }
+      // };
 
-      run_after( fn );
+      // run_after( fn );
       break;
     }
 
@@ -971,6 +980,7 @@ void NetworkWorker<Connection>::run_loop()
     .tx_serialize_msg = events_.add_category( "tx - serialize message" ),
     .tx_write_data = events_.add_category( "tx - write" ),
     .forward_msg = events_.add_category( "networkworker - forward msg to remote" ),
+    .data_server_ready = events_.add_category( "networkworker - forward msg to remote" ),
   };
   // When we have a new server socket, add it to the event loop
   events_.add_rule(

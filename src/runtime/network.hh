@@ -36,6 +36,7 @@ struct EventCategories
   size_t tx_serialize_msg;
   size_t tx_write_data;
   size_t forward_msg;
+  size_t data_server_ready;
 };
 
 template<typename Connection>
@@ -161,6 +162,7 @@ class DataServer : public Remote
   friend class NetworkWorker<DataServer>;
 
 private:
+  Channel<Handle<Named>> ready_ {};
   std::list<std::thread> threads_ {};
   void process_incoming_message( IncomingMessage&& msg );
   void run_after( std::function<void()> );
