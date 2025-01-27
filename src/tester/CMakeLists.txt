@@ -28,5 +28,8 @@ target_link_libraries(fixpoint-client-bptree-n runtime)
 add_executable(fixpoint-client-oneoff "fixpoint-client-oneoff.cc" "tester-utils.cc")
 target_link_libraries(fixpoint-client-oneoff runtime)
 
+add_executable(fixpoint-client-dec "fixpoint-client-dec.cc" "tester-utils.cc")
+target_link_libraries(fixpoint-client-dec runtime)
+
 # add_executable(http-tester "http-tester.cc" "main.cc" "tester-utils.cc")
 # target_link_libraries(http-tester runtime http)

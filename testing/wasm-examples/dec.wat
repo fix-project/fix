@@ -18,8 +18,8 @@
          (then (table.get $ro_table_0 (i32.const 2)))
        (else 
          (table.set $rw_table_0 (i32.const 0) (table.get $ro_table_0 (i32.const 0)))
-         (table.set $rw_table_0 (i32.const 2) (table.get $ro_table_0 (i32.const 2)))
-         (table.set $rw_table_0 (i32.const 1) (call $create_blob_i32 (i32.add (local.get $val) (i32.const -1))))
+         (table.set $rw_table_0 (i32.const 1) (table.get $ro_table_0 (i32.const 1)))
+         (table.set $rw_table_0 (i32.const 2) (call $create_blob_i32 (i32.add (local.get $val) (i32.const -1))))
          (call $create_application_thunk (call $create_tree_rw_table_0 (i32.const 3))))
        )
 ))
