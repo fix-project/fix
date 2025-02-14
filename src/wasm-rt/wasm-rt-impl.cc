@@ -336,7 +336,7 @@ void wasm_rt_allocate_memory_helper( wasm_rt_memory_t* memory,
   if ( byte_length > resource_limits::available_bytes ) {
     throw resource_limits::violation();
   }
-  resource_limits::available_bytes -= byte_length * WASM_RT_PAGE_SIZE;
+  resource_limits::available_bytes -= byte_length;
   if ( hw_checked ) {
     /* Reserve 8GiB. */
     assert( !is64 && "memory64 is not yet compatible with WASM_RT_MEMCHECK_SIGNAL_HANDLER" );
