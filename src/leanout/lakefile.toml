@@ -1,0 +1,10 @@
+name = "checker"
+version = "0.1.0"
+defaultTargets = ["checker"]
+
+[[lean_lib]]
+name = "Checker"
+
+[[lean_exe]]
+name = "checker"
+root = "Main"
