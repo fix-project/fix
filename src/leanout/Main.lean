@@ -19,17 +19,64 @@ abbrev uint256 := Nat
 def sameType (a b : uint256) : a = a :=
   by rfl
 
+def sameTypeCheck {α : Type} (x y : α) : Unit :=
+  ()
+
+#check sameTypeCheck 3 5
+-- #check sameTypeCheck 3 "hello"  -- Uncommenting this line will cause a type error.
+
+
+
 -- Property 2: Prove that 7 + 7 = 14.
 #check fun (x : Nat) => x + 7
 #eval (λ x : Nat => x + 7) 7 -- 7 is applied to x in the λ
 
-example : 7 + 7 = 14 :=
-by decide
+def addAndProof (a b : Nat) : { result : Nat // result = a + b } :=
+  ⟨a + b, rfl⟩
 
--- Property 3: Prove that 7 + 7 ≠ 5.
-example : 7 + 7 ≠ 5 :=
-by decide
+/-- Using addAndProof with 7 and 7, then extracting the result. -/
+def sumOf7and7 : Nat :=
+  (addAndProof 7 7).1
 
+
+#eval sumOf7and7  -- This will print 14
+
+/-- Pattern matching to extract both components. -/
+def demoUsage : String :=
+  let res := addAndProof 3 4
+  s!"The sum of 3 and 4 is {res} and we have a proof that {res} = 3 + 4."
+
+#eval demoUsage
+
+
+
+theorem seven_plus_seven_not_eq_five : (addAndProof 7 7).1 ≠ 5 :=
+by
+  have h : (addAndProof 7 7).1 = 14 := rfl
+  rw [h]
+  decide
+
+
+theorem seven_plus_seven_not_eq_zero : (addAndProof 7 7).1 ≠ 0 :=
+by
+  have h : (addAndProof 7 7).1 = 14 := rfl
+  rw [h]
+  decide
+
+
+def even (n : Nat) : Prop := ∃(m:Nat), m+m=n
+
+theorem plus77 : 7+7=14 := Eq.refl _
+
+theorem even14 : even 14 :=
+  have e : 7+7=14 := plus77
+  ⟨7,e⟩
+
+/-- For clarity, here is a theorem that also shows 7 + 7 = 14 directly. -/
+theorem seven_plus_seven_eq_fourteen : (addAndProof 7 7).1 = 14 :=
+by
+  -- This follows directly from the definition of addAndProof
+  rfl
 
 /-
 refactoring fix.hs to lean below
@@ -214,8 +261,8 @@ end FixLang
 -- Main function that prints IO confirmation messages.
 def main : IO Unit := do
   IO.println "Property 1: Two uint256 values are of the same type confirmed."
-  IO.println "Property 2: 7 + 7 = 14 confirmed."
   IO.println "Property 3: 7 + 7 ≠ 5 confirmed."
+  IO.println "Property 2: 7 + 7 = 14 confirmed."
   FixLang.testApplyOne
   FixLang.testEvalObject
   FixLang.testEvalExpression

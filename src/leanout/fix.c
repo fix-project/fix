@@ -31,7 +31,7 @@ static lean_object* l_FixLang_name___closed__3;
 static lean_object* l_FixLang_testEvalObject___closed__1;
 LEAN_EXPORT lean_object* l_FixLang_testEvalExpression(lean_object*);
 static lean_object* l_FixLang_testEvalExpression___closed__1;
-LEAN_EXPORT lean_object* l_FixLang_testEvalObject(lean_object*);
+LEAN_EXPORT lean_object* testEvalObject(lean_object*);
 static lean_object* l_FixLang_loadShallow___closed__7;
 static lean_object* l_FixLang_instInhabitedExpressionTree___closed__2;
 LEAN_EXPORT lean_object* l_FixLang_load(lean_object*, lean_object*);
@@ -47,7 +47,6 @@ lean_object* lean_sorry(uint8_t);
 static lean_object* l_FixLang_select___closed__4;
 static lean_object* l_FixLang_testApplySelect___closed__1;
 static lean_object* l_FixLang_apply___closed__2;
-LEAN_EXPORT lean_object* l_FixLang_applyone___boxed(lean_object*);
 static lean_object* l_FixLang_loadShallow___closed__6;
 static lean_object* l_FixLang_load___closed__3;
 static lean_object* l_main___closed__1;
@@ -78,7 +77,7 @@ LEAN_EXPORT lean_object* l_FixLang_name(lean_object*, lean_object*);
 static lean_object* l_FixLang_select___closed__5;
 LEAN_EXPORT lean_object* l_FixLang_testApplyOne(lean_object*);
 static lean_object* l_FixLang_loadShallow___closed__4;
-LEAN_EXPORT lean_object* l_FixLang_applyone(lean_object*);
+LEAN_EXPORT lean_object* applyone(lean_object*);
 static lean_object* l_FixLang_name___closed__2;
 static lean_object* l_FixLang_instInhabitedExpressionTree___closed__3;
 static lean_object* l_FixLang_loadShallow___closed__2;
@@ -98,7 +97,7 @@ LEAN_EXPORT lean_object* l_FixLang_load___boxed(lean_object*, lean_object*);
 static lean_object* l_FixLang_apply___closed__1;
 static lean_object* l_FixLang_load___closed__7;
 static lean_object* l_FixLang_name___closed__5;
-LEAN_EXPORT lean_object* l_FixLang_testApplySelect(lean_object*);
+LEAN_EXPORT lean_object* testApplySelect(lean_object*);
 static lean_object* l_FixLang_load___closed__16;
 static lean_object* l_FixLang_load___closed__6;
 static lean_object* l_FixLang_loadShallow___closed__11;
@@ -837,20 +836,10 @@ x_1 = l_FixLang_instInhabitedExpressionTree___closed__3;
 return x_1;
 }
 }
-LEAN_EXPORT lean_object* l_FixLang_applyone(lean_object* x_1) {
+LEAN_EXPORT lean_object* applyone(lean_object* x_1) {
 _start:
 {
-lean_inc(x_1);
 return x_1;
-}
-}
-LEAN_EXPORT lean_object* l_FixLang_applyone___boxed(lean_object* x_1) {
-_start:
-{
-lean_object* x_2; 
-x_2 = l_FixLang_applyone(x_1);
-lean_dec(x_1);
-return x_2;
 }
 }
 LEAN_EXPORT lean_object* l_FixLang_selectone(lean_object* x_1) {
@@ -887,7 +876,7 @@ x_1 = lean_mk_string_unchecked("Test EvalObject: Created Object.value 42.", 41, 
 return x_1;
 }
 }
-LEAN_EXPORT lean_object* l_FixLang_testEvalObject(lean_object* x_1) {
+LEAN_EXPORT lean_object* testEvalObject(lean_object* x_1) {
 _start:
 {
 lean_object* x_2; lean_object* x_3; 
@@ -921,7 +910,7 @@ x_1 = lean_mk_string_unchecked("Test Apply/Select: applyone and selectone execut
 return x_1;
 }
 }
-LEAN_EXPORT lean_object* l_FixLang_testApplySelect(lean_object* x_1) {
+LEAN_EXPORT lean_object* testApplySelect(lean_object* x_1) {
 _start:
 {
 lean_object* x_2; lean_object* x_3; 

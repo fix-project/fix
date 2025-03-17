@@ -144,7 +144,7 @@ mutual
       EvalExpression (Expression.expressionTree et) o
 end
 
-def applyone (ot : ObjectTree) : Object :=
+@[export applyone] def applyone (ot : ObjectTree) : Object :=
   match ot with
   | ObjectTree.mk o => o
 
@@ -152,7 +152,7 @@ def selectone (ot : ObjectTree) : Object :=
   match ot with
   | ObjectTree.mk o => o
 
-def testEvalObject : IO Unit :=
+@[export testEvalObject] def testEvalObject : IO Unit :=
   let o := Object.value 42
   IO.println "Test EvalObject: Created Object.value 42."
 
@@ -160,7 +160,7 @@ def testEvalExpression : IO Unit :=
   let e := Expression.object (Object.value 100)
   IO.println "Test EvalExpression: Created Expression.object (Object.value 100)."
 
-def testApplySelect : IO Unit :=
+@[export testApplySelect] def testApplySelect : IO Unit :=
   let ot := ObjectTree.mk (Object.value 7)
   let a := applyone ot
   let s := selectone ot
