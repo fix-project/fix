@@ -14,7 +14,7 @@ add_custom_target (all-local-fixpoint-check COMMAND ${CMAKE_CTEST_COMMAND} --out
   COMMENT "Testing Fix..."
 )
 
-add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" -E "f_python_flatware"
+add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" -E "f_python_flatware" -E "f_build_python"
   COMMENT "Testing Flatware..."
 )
 add_custom_target (all-flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" COMMENT "Testing Flatware...")
@@ -58,4 +58,8 @@ add_test(NAME f_add_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DI
 add_test(NAME f_return_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-return-flatware)
 add_test(NAME f_helloworld_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-helloworld-flatware)
 add_test(NAME f_open_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-open-flatware)
+
+add_test(NAME f_build_python WORKING_DIRECTORY COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/applications-prefix/src/applications-build/ --target python_fixpoint --parallel)
 add_test(NAME f_python_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-python-flatware)
+set_tests_properties(f_build_python PROPERTIES FIXTURES_SETUP python_fixture)
+set_tests_properties(f_python_flatware PROPERTIES FIXTURES_REQUIRED python_fixture)
