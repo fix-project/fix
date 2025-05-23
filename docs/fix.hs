@@ -34,7 +34,7 @@ data Thunk = Application (Name (Tree Expression)) | Identification (Data Express
 data Expression = ExprData (Data Expression) | ExprThunk Thunk | ExprEncode Encode
 
 -- | An Encode is an instruction requesting that a Thunk be replaced by the result of the function it represents, with a particular accessibility.
-data Encode = Encode { thunk :: Thunk, accessible :: Bool }
+data Encode = Strict Thunk | Shallow Thunk
 
 -- | A Value is a Thunk, or Data where every accessible object is also a Value.
 -- | This is only used for type-checking this model.
@@ -105,14 +105,16 @@ think (Application x) = treeMap eval x >>= apply
 -- | Think a Thunk until no more thoughts arrive (i.e. until it's Data).
 force :: Thunk -> Maybe (Data Expression)
 force thunk = think thunk >>= \case
-  ExprThunk thunk' -> force thunk'
-  ExprEncode (Encode thunk' _) -> force thunk' -- N.B. ignores accessible field of inner Encode. This is intended to lead to an equivalence between a Data and an Encode (of the correct accessibility) that, when executed, produces equivalent Data.
+  ExprThunk           thunk'  -> force thunk'
+  ExprEncode (Strict  thunk') -> force thunk' -- N.B. Variant of Encode doesn't matter here. This is intended to lead to an equivalence between a Data and an Encode (of the correct accessibility) that, when executed, produces equivalent Data.
+  ExprEncode (Shallow thunk') -> force thunk'
   ExprData d -> Just d
 
 -- | Execute an Encode, producing Data of the desired accessibility.
 -- | The Thunk is forced to Data, then the Data's accessibility is set.
 execute :: Encode -> Maybe (Data Expression)
-execute (Encode thunk accessible) = force thunk >>= Just . if accessible then Object . lift else Ref . lower
+execute (Strict  thunk) = Object . lift  <$> force thunk
+execute (Shallow thunk) = Ref    . lower <$> force thunk
 
 -- | Evaluates an Expression into a Value by executing any accessible Encodes contained within the Expression.
 eval :: Expression -> Maybe Value
