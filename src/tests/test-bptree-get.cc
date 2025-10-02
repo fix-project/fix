@@ -108,7 +108,6 @@ void check_bptree_get_n( shared_ptr<Relater> rt,
           result += d;
           result += " ";
         }
-
         n_done.value()++;
         return;
       }
@@ -121,6 +120,7 @@ void check_bptree_get_n( shared_ptr<Relater> rt,
           result += node->get_data()[i];
           result += " ";
         }
+        n_done.value()++;
       }
     }
   } );

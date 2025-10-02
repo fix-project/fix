@@ -11,9 +11,12 @@ extern void ro_mem_1_to_program_mem( void* dst, uint32_t src, uint32_t len )
   __attribute__( ( import_module( "support" ), import_name( "ro_mem_1_to_program_mem" ) ) );
 externref get_ro_table_0( int32_t index )
   __attribute__( ( import_module( "support" ), import_name( "get_ro_table_0" ) ) );
+externref get_ro_table_1( int32_t index )
+  __attribute__( ( import_module( "support" ), import_name( "get_ro_table_1" ) ) );
 int32_t byte_size_ro_mem_0( void ) __attribute__( ( import_module( "fixpoint" ), import_name( "size_ro_mem_0" ) ) );
 void set_rw_table_0( int32_t index, externref pointer )
   __attribute__( ( import_module( "support" ), import_name( "set_rw_table_0" ) ) );
 int32_t grow_rw_table_0( int32_t size, externref pointer )
   __attribute__( ( import_module( "support" ), import_name( "grow_rw_table_0" ) ) );
 int32_t size_ro_table_0( void ) __attribute__( ( import_module( "support" ), import_name( "size_ro_table_0" ) ) );
+int32_t size_ro_table_1( void ) __attribute__( ( import_module( "support" ), import_name( "size_ro_table_1" ) ) );
