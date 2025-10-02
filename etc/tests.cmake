@@ -14,7 +14,7 @@ add_custom_target (all-local-fixpoint-check COMMAND ${CMAKE_CTEST_COMMAND} --out
   COMMENT "Testing Fix..."
 )
 
-add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" -E "f_python_flatware" -E "f_build_python"
+add_custom_target (flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" -E "f_python_flatware"
   COMMENT "Testing Flatware..."
 )
 add_custom_target (all-flatware-check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "^f_" COMMENT "Testing Flatware...")
