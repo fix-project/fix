@@ -59,7 +59,7 @@ add_test(NAME f_return_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY
 add_test(NAME f_helloworld_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-helloworld-flatware)
 add_test(NAME f_open_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-open-flatware)
 
-add_test(NAME f_build_python WORKING_DIRECTORY COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/applications-prefix/src/applications-build/ --target python_fixpoint --parallel)
+add_test(NAME s_build_python WORKING_DIRECTORY COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/applications-prefix/src/applications-build/ --target python_fixpoint --parallel)
 add_test(NAME f_python_flatware WORKING_DIRECTORY COMMAND ${CMAKE_CURRENT_BINARY_DIR}/src/tests/test-python-flatware)
-set_tests_properties(f_build_python PROPERTIES FIXTURES_SETUP python_fixture)
+set_tests_properties(s_build_python PROPERTIES FIXTURES_SETUP python_fixture)
 set_tests_properties(f_python_flatware PROPERTIES FIXTURES_REQUIRED python_fixture)
