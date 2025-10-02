@@ -164,6 +164,23 @@ optional<TreeData> Relater::get_shallow( Handle<AnyTree> name )
   throw HandleNotFound( handle::fix( name ) );
 }
 
+optional<TreeData> Relater::get_shallow_tmp( Handle<AnyTree> name )
+{
+  if ( tmp_trees_.contains( name ) ) {
+    return tmp_trees_.get( name );
+  } else if ( storage_.contains( name ) ) {
+    return storage_.get( name );
+  } else if ( storage_.contains_shallow( name ) ) {
+    return storage_.get_shallow( name );
+  } else if ( repository_.contains_shallow( name ) ) {
+    auto x = repository_.get( name ).value();
+    tmp_trees_.insert( name, x );
+    return x;
+  }
+
+  throw HandleNotFound( handle::fix( name ) );
+}
+
 optional<Handle<Object>> Relater::get( Handle<Relation> name )
 {
   if ( storage_.contains( name ) ) {

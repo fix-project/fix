@@ -43,7 +43,22 @@ public:
   virtual std::optional<Handle<Object>> get( Handle<Relation> name ) = 0;
   ///}@
 
-  virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> ) = 0;
+  /*
+   * Given the Handle @p name to a Tree, return the handle with the accurate type information that refers to the
+   * same Tree.
+   *
+   * @param name    The name of the Tree to look up.
+   * @return        The corresponding tightliest bounded Handle that refers to the same Tree.
+   */
+  virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name ) = 0;
+
+  /*
+   * Given the Handle @p name to a Tree, return the name of Tree where each entry is the Refed version of the
+   * corresponding entry of the input Tree.
+   *
+   * @param name    The name of the Tree to get a shallow copy of.
+   * @return        The Tree with each entry shallowed.
+   */
   virtual std::optional<TreeData> get_shallow( Handle<AnyTree> name ) = 0;
 
   /**
