@@ -277,7 +277,7 @@ void test( void )
   CHECK_EQ( fib10, Handle<Value>( 55_literal64 ) );
   CHECK_EQ( mapreduce_called, 9 );
 
-  BPTree bptree( 4 );
+  BPTree<int, string> bptree( 4 );
   for ( int i = 0; i < 10; i++ ) {
     bptree.insert( i, to_string( i ) );
   }

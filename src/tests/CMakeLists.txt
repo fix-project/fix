@@ -85,6 +85,11 @@ target_link_libraries(test-return-flatware runtime)
 add_executable(test-python-flatware test-python-flatware.cc fixpoint-test-main.cc)
 target_link_libraries(test-python-flatware runtime)
 
-add_executable(create-bptree create-bptree.cc)
-target_link_libraries(create-bptree runtime)
+add_executable(run-python run-python.cc)
+target_link_libraries(run-python runtime)
 
+add_executable(create-bptree-string-key create-bptree-string-keys.cc)
+target_link_libraries(create-bptree-string-key runtime)
+
+add_executable(lwvirt-timing lwvirt-timing.cc add.cc )
+target_link_libraries(lwvirt-timing runtime)

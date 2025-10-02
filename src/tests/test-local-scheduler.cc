@@ -149,7 +149,7 @@ void test_fib( void )
 
 void test_bptree_get( void )
 {
-  BPTree bptree( 4 );
+  BPTree<int, string> bptree( 4 );
   for ( size_t i = 0; i < 4; i++ ) {
     bptree.insert( i, to_string( i ) );
   }
