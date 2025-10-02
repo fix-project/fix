@@ -1,3 +1,9 @@
+# Dependencies
+
+- [CMake >=3.16](https://cmake.org/)
+- [GCC >=12](https://gcc.gnu.org/) (C++23 support required)
+- [Google Logging Library](https://github.com/google/glog)
+
 # Environment Setup
 
 1. clone fixpoint and the wasm-toolchain in the home directory by running:
@@ -11,7 +17,7 @@ cd wasm-toolchain
 git submodule update --init --recursive
 ./build.sh
 ```
-3. Build bootstrap as specified in `fix/docs/bootstrap.md`
+3. Build bootstrap as specified in [fix/docs/bootstrap.md](docs/bootstrap.md)
 
 4. Now, you should have a working `wasm-toolchain` in your `$HOME` directory,
    and `.fix` under your fix source directory. You are ready to build
@@ -40,7 +46,7 @@ cmake --build build/ --target ${test-name}
 # Run Wasm modules in Fix
 The runtime of Fix accepts ELFs compiled from Wasm modules by a trusted compilation
 toolchain as valid inputs of procedures. The name of the trusted compilation toolchain
-can be found at `.fix/refs/compile-encode`. 
+can be found at `.fix/refs/compile-encode`.
 
 `application: tree:3 string:none label:compile-encode file:{path to wasm file}`
 evaluates to the corresponding ELF in the required format. You can evaluate it directly in
@@ -133,3 +139,6 @@ The `.fix` directory has the following structure (similar to `.git`):
 ├─ pins
 ├─ relations
 ```
+
+# Experiment Artifacts
+See [experiments/Experiment.md].
