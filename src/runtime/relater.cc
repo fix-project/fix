@@ -52,11 +52,18 @@ void Relater::get_from_repository( Handle<T> handle )
   }
 }
 
-Relater::Relater( size_t threads, optional<shared_ptr<Runner>> runner, optional<shared_ptr<Scheduler>> scheduler )
-  : scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
+Relater::Relater( size_t threads,
+                  optional<shared_ptr<Runner>> runner,
+                  optional<shared_ptr<Scheduler>> scheduler,
+                  bool pre_occupy,
+                  optional<size_t> repository_fix_table_size )
+  : repository_( repository_fix_table_size.has_value() ? repository_fix_table_size.value() : 1000000 )
+  , scheduler_( scheduler.has_value() ? move( scheduler.value() ) : make_shared<HintScheduler>() )
+  , pre_occupy_( pre_occupy )
 {
+  available_memory_.write().get() = sysconf( _SC_PHYS_PAGES ) * sysconf( _SC_PAGE_SIZE );
   scheduler_->set_relater( *this );
-  local_ = make_shared<Executor>( *this, threads, runner );
+  local_ = make_shared<Executor>( *this, threads, runner, pre_occupy );
 }
 
 void Relater::add_worker( shared_ptr<IRuntime> rmt )
@@ -78,6 +85,28 @@ Handle<Value> Relater::execute( Handle<Relation> r )
       // scheduler_->schedule( r );
     } else {
       local_->get( r );
+    }
+
+    top_level_done_.wait( false, std::memory_order_acquire );
+    return result;
+  } else {
+    throw std::runtime_error( "Unexpected top level value." );
+  }
+}
+
+Handle<Value> Relater::direct_execute( Handle<Relation> r )
+{
+  if ( contains( r ) ) {
+    return get( r ).value().unwrap<Value>();
+  }
+
+  top_level = r;
+  bool expected = true;
+  if ( top_level_done_.compare_exchange_strong( expected, false ) ) {
+    if ( local_->get_info()->parallelism == 0 ) {
+      remotes_.read()->front().lock()->get( r );
+    } else {
+      scheduler_->schedule( r );
     }
 
     top_level_done_.wait( false, std::memory_order_acquire );
@@ -221,6 +250,7 @@ void Relater::put( Handle<Relation> name, Handle<Object> data )
 {
   if ( !storage_.contains( name ) ) {
     storage_.create( data, name );
+    unoccupy_resource( name );
 
     if ( finish_top_level( name, data ) ) {
       return;
@@ -311,4 +341,60 @@ Handle<AnyTree> Relater::unref( Handle<AnyTreeRef> tree )
 std::optional<Handle<Object>> Relater::run( Handle<Relation> r )
 {
   return scheduler_->schedule( r );
+}
+
+bool Relater::occupy_resource( Handle<Think> relation )
+{
+  if ( pre_occupy_ ) {
+    auto w = occupying_resource_.write();
+    if ( w.get().size() >= local_->get_info()->parallelism ) {
+      return false;
+    }
+
+    bool insert = w->insert( relation ).second;
+
+    if ( insert ) {
+      TreeData tree = storage_.get( relation.unwrap<Thunk>().unwrap<Application>().unwrap<ExpressionTree>() );
+      auto rlimits = tree->at( 0 );
+
+      auto limits = rlimits.unwrap<Expression>()
+                      .unwrap<Object>()
+                      .try_into<Value>()
+                      .and_then( [&]( auto x ) { return x.template try_into<ValueTree>(); } )
+                      .transform( [&]( auto x ) { return fixpoint::storage->get( x ); } );
+
+      auto byte_requested
+        = limits
+            .and_then( [&]( auto x ) {
+              return handle::extract<Literal>(
+                x->at( 0 ).template unwrap<Expression>().template unwrap<Object>().template unwrap<Value>() );
+            } )
+            .transform( [&]( auto x ) { return uint64_t( x ); } )
+            .value_or( 0 );
+
+      {
+        auto am = available_memory_.write();
+        if ( am.get() < byte_requested ) {
+          w.get().erase( relation );
+          return false;
+        }
+
+        am.get() -= byte_requested;
+      }
+    }
+  }
+  return true;
+}
+
+void Relater::unoccupy_resource( Handle<Relation> relation )
+{
+  VLOG( 1 ) << "Unoccupying " << relation;
+  if ( pre_occupy_ ) {
+    if ( occupying_resource_.write()->erase( relation ) > 0 ) {
+      auto unblock = no_resource_.pop();
+      if ( unblock.has_value() ) {
+        local_->get( unblock.value() );
+      }
+    }
+  }
 }

@@ -2,6 +2,7 @@
 #include "handle.hh"
 #include "overload.hh"
 #include "types.hh"
+#include <memory>
 #include <thread>
 #include <unordered_set>
 
@@ -76,9 +77,11 @@ void DataServerRT::join()
 
 shared_ptr<Server> Server::init( const Address& address,
                                  shared_ptr<Scheduler> scheduler,
-                                 vector<Address> peer_servers )
+                                 vector<Address> peer_servers,
+                                 optional<size_t> threads,
+                                 bool pre_occupy )
 {
-  auto runtime = std::make_shared<Server>( scheduler );
+  auto runtime = std::make_shared<Server>( scheduler, threads, pre_occupy );
   runtime->network_worker_.emplace( runtime->relater_ );
   runtime->network_worker_->start();
   runtime->network_worker_->start_server( address );
@@ -123,8 +126,10 @@ void Client::send_job( Handle<T> handle, unordered_set<Handle<Fix>> visited )
     } else {
       if ( server_->contains( handle ) ) {
         // Load the data on the server side
+        VLOG( 3 ) << "send_job loading " << handle << " on server";
         server_->put( handle, {} );
       } else {
+        VLOG( 3 ) << "send_job sending " << handle << " on server";
         if constexpr ( FixTreeType<T> ) {
           if ( relater_.contains( handle ) ) {
             auto tree = relater_.get( handle ).value();
@@ -147,4 +152,10 @@ Handle<Value> Client::execute( Handle<Relation> x )
 {
   send_job( x );
   return relater_.execute( x );
+}
+
+void Client::run( Handle<Relation> x )
+{
+  send_job( x );
+  server_->get( x );
 }

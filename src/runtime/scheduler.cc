@@ -518,6 +518,7 @@ SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Obj
 
   if ( result.has_value() ) {
     relater_->get().put( goal, result.value() );
+    sketch_graph_.erase_forward_dependencies( goal );
   }
 
   if ( current_schedule_step_.has_value()
@@ -585,6 +586,7 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::force( Handle<Thunk> 
 
   if ( result.has_value() ) {
     relater_->get().put( goal, result.value() );
+    sketch_graph_.erase_forward_dependencies( goal );
   }
 
   return result;
@@ -1124,4 +1126,20 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::schedule( Handle<Rela
 
     return {};
   }
+}
+
+optional<Handle<Object>> RandomScheduler::run_passes( Handle<Relation> top_level_job )
+{
+  VLOG( 1 ) << "RandomScheduler input: " << top_level_job << endl;
+
+  auto thunk = PassRunner::random_run( relater_.value(), *this, top_level_job, passes_, pre_occupy_ );
+
+  if ( thunk.has_value() ) {
+    nested_ = false;
+    go_for_it_ = true;
+
+    return evaluator_.force( thunk.value() );
+  }
+
+  return {};
 }

@@ -3,7 +3,6 @@
 #include "handle.hh"
 #include "network.hh"
 #include "relater.hh"
-#include "repository.hh"
 
 #include <memory>
 
@@ -37,20 +36,20 @@ public:
 
 class Client : public FrontendRT
 {
-protected:
+public:
   Relater relater_ { 0 };
-  std::optional<NetworkWorker> network_worker_ {};
+  std::optional<NetworkWorker<Remote>> network_worker_ {};
   std::shared_ptr<IRuntime> server_ {};
 
   template<FixType T>
   void send_job( Handle<T> handle, std::unordered_set<Handle<Fix>> visited = {} );
 
-public:
   Client() {}
   ~Client();
 
   static std::shared_ptr<Client> init( const Address& address );
   virtual Handle<Value> execute( Handle<Relation> x ) override;
+  void run( Handle<Relation> x );
 
   IRuntime& get_rt() { return relater_; }
   std::shared_ptr<IRuntime>& get_server() { return server_; }
@@ -63,13 +62,18 @@ protected:
   std::optional<NetworkWorker<Remote>> network_worker_ {};
 
 public:
-  Server( std::shared_ptr<Scheduler> scheduler )
-    : relater_( std::thread::hardware_concurrency() - 1, {}, scheduler )
+  Server( std::shared_ptr<Scheduler> scheduler, std::optional<std::size_t> threads = {}, bool pre_occupy = false )
+    : relater_( threads.has_value() ? threads.value() : std::thread::hardware_concurrency() - 1,
+                {},
+                scheduler,
+                pre_occupy )
   {}
 
   static std::shared_ptr<Server> init( const Address& address,
                                        std::shared_ptr<Scheduler> scheduler,
-                                       const std::vector<Address> peer_servers = {} );
+                                       const std::vector<Address> peer_servers = {},
+                                       std::optional<std::size_t> threads = {},
+                                       bool pre_occupy = false );
   void join();
   ~Server();
 };

@@ -3,6 +3,7 @@
 #include "handle.hh"
 #include "interface.hh"
 #include "relater.hh"
+#include <absl/container/btree_map.h>
 #include <absl/container/flat_hash_set.h>
 #include <functional>
 #include <unordered_map>
@@ -59,6 +60,7 @@ private:
   size_t absent_size( std::shared_ptr<IRuntime> worker, Handle<Dependee> job );
 
   std::vector<std::shared_ptr<IRuntime>> available_remotes_ {};
+  std::vector<std::shared_ptr<IRuntime>> remotes_ {};
 
 public:
   BasePass( std::reference_wrapper<Relater> relater );
@@ -99,6 +101,8 @@ public:
   {
     return std::move( chosen_remotes_ );
   };
+
+  friend class PassRunner;
 };
 
 // Only operates on local paths, except that `independent` are always invoked on root job
@@ -163,7 +167,7 @@ class InOutSource : public PrunedSelectionPass
   virtual void relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override;
 
   virtual void data( Handle<Dependee> ) override {}
-  virtual void all( Handle<Dependee> ) override {};
+  virtual void all( Handle<Dependee> ) override {}
   virtual void relation_post( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override {}
 
 public:
@@ -176,21 +180,30 @@ public:
 
 class RandomSelection : public SelectionPass
 {
-  virtual void relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override {}
-  virtual void data( Handle<Dependee> ) override {}
-  virtual void relation_post( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override {}
+  virtual void data( Handle<Dependee> ) override;
+  virtual void relation_post( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override;
 
-  virtual void all( Handle<Dependee> ) override;
+  virtual void all( Handle<Dependee> ) override {}
+  virtual void relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override {}
+
+  std::unordered_set<Handle<Dependee>> applys_ {};
+  absl::flat_hash_map<Handle<Dependee>, bool> recursively_depend_on_apply_ {};
 
 public:
-  RandomSelection( std::reference_wrapper<BasePass> base, std::reference_wrapper<Relater> relater )
-    : SelectionPass( base, relater )
+  RandomSelection( std::reference_wrapper<BasePass> base,
+                   std::reference_wrapper<Relater> relater,
+                   std::unique_ptr<SelectionPass> prev )
+    : SelectionPass( base, relater, move( prev ) )
   {}
+
+  const std::unordered_set<Handle<Dependee>> get_applys() const { return applys_; }
 };
 
 class SendToRemotePass : public PrunedSelectionPass
 {
-  std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<Dependee>>> remote_jobs_ {};
+  std::unordered_map<std::shared_ptr<IRuntime>,
+                     absl::btree_multimap<size_t, Handle<Dependee>, std::greater<size_t>>>
+    remote_jobs_ {};
   std::unordered_map<std::shared_ptr<IRuntime>, absl::flat_hash_set<Handle<Dependee>>> remote_data_ {};
   void send_job_dependencies( std::shared_ptr<IRuntime>, Handle<Dependee> );
 
@@ -212,8 +225,8 @@ public:
 
 class FinalPass : public PrunedSelectionPass
 {
-  std::optional<Handle<Relation>> todo_ {};
   std::reference_wrapper<SketchGraphScheduler> sch_;
+  absl::btree_multimap<size_t, Handle<Relation>, std::greater<size_t>> unblocked_ {};
 
   virtual void data( Handle<Dependee> ) override;
   virtual void relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& ) override;
@@ -229,8 +242,7 @@ public:
     : PrunedSelectionPass( base, relater, move( prev ) )
     , sch_( sch )
   {}
-
-  std::optional<Handle<Relation>> get_todo() { return todo_; };
+  absl::btree_multimap<size_t, Handle<Relation>, std::greater<size_t>>& get_unblocked() { return unblocked_; };
 };
 
 // A correct sequence of passes contains: BasePass + (n >= 1) * SelectionPass + (n >= 0) * PrunedSelectionPass +
@@ -250,4 +262,10 @@ public:
                                            std::reference_wrapper<SketchGraphScheduler> sch,
                                            Handle<Dependee> top_level_job,
                                            const std::vector<PassType>& passes );
+
+  static std::optional<Handle<Thunk>> random_run( std::reference_wrapper<Relater> rt,
+                                                  std::reference_wrapper<SketchGraphScheduler> sch,
+                                                  Handle<Dependee> top_level_job,
+                                                  const std::vector<PassType>& passes,
+                                                  bool pre_occupy = false );
 };

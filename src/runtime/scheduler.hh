@@ -66,7 +66,7 @@ class SketchGraphScheduler : public Scheduler
 {
   friend class RelaterTest;
 
-private:
+protected:
   std::vector<PassRunner::PassType> passes_;
   virtual Result<Object> run_passes( Handle<Relation> top_level_job );
   bool loadShallow( Handle<AnyTree>, Handle<AnyTreeRef> );
@@ -122,8 +122,12 @@ public:
 
 class RandomScheduler : public SketchGraphScheduler
 {
+  virtual Result<Object> run_passes( Handle<Relation> top_level_job ) override;
+  bool pre_occupy_ {};
+
 public:
-  RandomScheduler()
-    : SketchGraphScheduler( { PassRunner::PassType::Random } )
+  RandomScheduler( bool pre_occupy = false )
+    : SketchGraphScheduler( { PassRunner::PassType::MinAbsentMaxParallelism, PassRunner::PassType::Random } )
+    , pre_occupy_( pre_occupy )
   {}
 };

@@ -12,8 +12,11 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-Repository::Repository( std::filesystem::path directory )
+Repository::Repository( size_t fix_table_size, std::filesystem::path directory )
   : repo_( find( directory ) )
+  , blobs_( fix_table_size )
+  , trees_( fix_table_size )
+  , relations_( fix_table_size )
 {
   VLOG( 1 ) << "using repository " << repo_;
 
