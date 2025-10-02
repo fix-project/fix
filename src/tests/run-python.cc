@@ -39,10 +39,7 @@ Handle<Fix> create_from_path( fs::path path )
   if ( fs::is_regular_file( path ) ) {
     return dirent( path.filename().string(), f, tester::File( path ) );
   } else if ( fs::is_directory( path ) ) {
-    size_t count = 0;
-    for ( auto& _ : std::filesystem::directory_iterator( path ) ) {
-      count += 1;
-    }
+    size_t count = distance( fs::directory_iterator( path ), {} );
     OwnedMutTree tree = OwnedMutTree::allocate( count );
 
     size_t i = 0;
@@ -62,10 +59,7 @@ Handle<Fix> create_from_path( fs::path path )
 Handle<Fix> filesys( string python_src_path )
 {
   fs::path python_src { python_src_path };
-  size_t count = 0;
-  for ( auto& _ : std::filesystem::directory_iterator( python_src ) ) {
-    count += 1;
-  }
+  size_t count = distance( fs::directory_iterator( python_src ), {} );
   OwnedMutTree tree = OwnedMutTree::allocate( count );
   size_t i = 0;
   for ( auto& subpath : fs::directory_iterator( python_src ) ) {
