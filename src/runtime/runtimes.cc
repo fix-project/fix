@@ -148,6 +148,8 @@ void Client::send_job( Handle<T> handle, unordered_set<Handle<Fix>> visited )
   }
 }
 
+template void Client::send_job<Eval>( Handle<Eval> handle, unordered_set<Handle<Fix>> visited );
+
 Handle<Value> Client::execute( Handle<Relation> x )
 {
   send_job( x );
