@@ -1088,7 +1088,12 @@ optional<Handle<Object>> SketchGraphScheduler::run_passes( Handle<Relation> top_
       if ( thunk.has_value() ) {
         nested_ = false;
         go_for_it_ = true;
-        return evaluator_.force( thunk.value() );
+        auto result = evaluator_.force( thunk.value() );
+        if ( !result.has_value() ) {
+          dynamic_pointer_cast<Executor>( relater_->get().get_local() )->retry( r );
+        } else {
+          return result;
+        }
       }
     } else {
       for ( auto job : unblocked ) {

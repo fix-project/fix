@@ -137,10 +137,9 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
     Handle<Relation> apply
       = Handle<Think>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
     if ( !pre_occupy_ ) {
-      VLOG( 1 ) << "Occupying " << apply;
+      VLOG( 2 ) << "Occupying " << apply << " " << w.get() << " " << requested;
       if ( w.get() < requested ) {
-        // Out of memory
-        todo_.push( apply );
+        VLOG( 1 ) << "Out of memory " << w.get() << " " << requested;
         return {};
       }
 
@@ -173,6 +172,17 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   if ( graph->start( name ) )
     todo_.push( name );
   return {};
+}
+
+void Executor::retry( Handle<Relation> name )
+{
+  if ( threads_.size() == 0 ) {
+    throw HandleNotFound( name );
+  }
+
+  auto graph = parent_.graph_.write();
+  graph->start( name );
+  todo_.push( name );
 }
 
 std::optional<Handle<AnyTree>> Executor::get_handle( Handle<AnyTree> )
