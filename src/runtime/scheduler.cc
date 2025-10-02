@@ -175,13 +175,34 @@ LocalScheduler::Result<Object> LocalScheduler::select_single( Handle<Object> h, 
     return nil;
   }
 
+  auto handle_tree_ref = [&]( auto x ) {
+    auto tree = relater_->get().get_shallow_tmp( relater_->get().unref( x ) );
+    auto res = tree.value()->span()[i];
+    res.template unwrap<Expression>().template unwrap<Object>().template visit<void>( overload {
+      [&]( Handle<Value> x ) {
+        x.visit<void>( overload {
+          [&]( Handle<Blob> x ) {
+            x.visit<void>( overload {
+              [&]( Handle<Named> x ) { res = Handle<BlobRef>( x ); },
+              []( Handle<Literal> ) {},
+            } );
+          },
+          [&]( Handle<ValueTree> x ) { res = relater_->get().ref( x ).unwrap<ValueTreeRef>(); },
+          []( Handle<BlobRef> ) {},
+          []( Handle<ValueTreeRef> ) {},
+        } );
+      },
+      [&]( Handle<ObjectTree> x ) { res = relater_->get().ref( x ).unwrap<ObjectTreeRef>(); },
+      []( Handle<Thunk> ) {},
+      []( Handle<ObjectTreeRef> ) {},
+    } );
+
+    return res.template unwrap<Expression>().template unwrap<Object>();
+  };
+
   // h is one of BlobRef, ValueTreeRef or ObjectTreeRef
   auto result = h.visit<Result<Object>>( overload {
-    [&]( Handle<ObjectTreeRef> x ) {
-      return loadShallow( relater_->get().unref( x ) )
-        .and_then( [&]( Handle<AnyTree> x ) { return relater_->get().get_shallow( x ); } )
-        .transform( [&]( TreeData d ) { return d->span()[i].unwrap<Expression>().unwrap<Object>(); } );
-    },
+    [&]( Handle<ObjectTreeRef> x ) { return handle_tree_ref( x ); },
     [&]( Handle<Value> v ) {
       return v.visit<Result<Object>>( overload {
         [&]( Handle<Literal> l ) { return Handle<Literal>( l.view().substr( i, 1 ) ); },
@@ -190,11 +211,7 @@ LocalScheduler::Result<Object> LocalScheduler::select_single( Handle<Object> h, 
             .and_then( [&]( Handle<Blob> x ) { return relater_->get().get( x.unwrap<Named>() ); } )
             .transform( [&]( BlobData b ) { return Handle<Literal>( b->span()[i] ); } );
         },
-        [&]( Handle<ValueTreeRef> x ) {
-          return loadShallow( relater_->get().unref( x ) )
-            .and_then( [&]( Handle<AnyTree> x ) { return relater_->get().get_shallow( x ); } )
-            .transform( [&]( TreeData d ) { return d->span()[i].unwrap<Expression>().unwrap<Object>(); } );
-        },
+        [&]( Handle<ValueTreeRef> x ) { return handle_tree_ref( x ); },
         []( auto ) -> Result<Object> { throw std::runtime_error( "Invalid select" ); },
       } );
     },

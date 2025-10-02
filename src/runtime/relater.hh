@@ -43,6 +43,7 @@ private:
   bool pre_occupy_ {};
   Channel<Handle<Relation>> no_resource_ {};
 
+  // tmp_trees_ holds Trees that only the first layers (the TreeData) are presenting in memory
   FixTable<AnyTree, TreeData, AbslHash, handle::any_tree_equal> tmp_trees_ { 10000 };
 
   template<FixType T>
@@ -65,6 +66,8 @@ public:
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;
   virtual std::optional<Handle<Object>> get( Handle<Relation> name ) override;
   virtual std::optional<TreeData> get_shallow( Handle<AnyTree> name ) override;
+  // Load only the first layer of a Tree
+  virtual std::optional<TreeData> get_shallow_tmp( Handle<AnyTree> name );
   virtual std::optional<Handle<AnyTree>> get_handle( Handle<AnyTree> name ) override;
   virtual void put( Handle<Named> name, BlobData data ) override;
   virtual void put( Handle<AnyTree> name, TreeData data ) override;
