@@ -5,6 +5,7 @@
 #include "test.hh"
 
 using namespace std;
+namespace fs = std::filesystem;
 
 namespace tester {
 shared_ptr<Relater> rt;
@@ -20,12 +21,43 @@ Handle<Fix> dirent( string_view name, string_view permissions, Handle<Fix> conte
   return tester::Tree( tester::Blob( name ), tester::Blob( permissions ), content );
 }
 
-Handle<Fix> fs()
+static string d = "040000";
+static string f = "100644";
+
+Handle<Fix> create_from_path( fs::path path )
 {
-  static string d = "040000";
-  static string f = "100644";
-  static auto e = dirent( ".", d, tester::Tree( dirent( "main.py", f, tester::Blob( "print(2 + 2)" ) ) ) );
-  return e;
+  if ( fs::is_regular_file( path ) ) {
+    return dirent( path.filename().string(), f, tester::File( path ) );
+  } else if ( fs::is_directory( path ) ) {
+    size_t count = distance( fs::directory_iterator( path ), {} );
+    OwnedMutTree tree = OwnedMutTree::allocate( count );
+
+    size_t i = 0;
+    for ( auto& subpath : fs::directory_iterator( path ) ) {
+      tree[i] = create_from_path( subpath );
+      i++;
+    }
+
+    return dirent( path.filename().string(),
+                   d,
+                   handle::upcast( tester::rt->create( std::make_shared<OwnedTree>( std::move( tree ) ) ) ) );
+  } else {
+    throw std::runtime_error( "Invalid file type" );
+  }
+}
+
+Handle<Fix> filesys( string python_src_path )
+{
+  fs::path python_src { python_src_path };
+  size_t count = distance( fs::directory_iterator( python_src ), {} );
+  OwnedMutTree tree = OwnedMutTree::allocate( count + 1 );
+  size_t i = 0;
+  for ( auto& subpath : fs::directory_iterator( python_src ) ) {
+    tree[i] = create_from_path( subpath );
+    i++;
+  }
+  tree[count] = dirent( "main.py", f, tester::Blob( "print(2 + 2)" ) );
+  return dirent( ".", d, handle::upcast( tester::rt->create( std::make_shared<OwnedTree>( std::move( tree ) ) ) ) );
 }
 
 void test( shared_ptr<Relater> rt )
@@ -34,13 +66,29 @@ void test( shared_ptr<Relater> rt )
 
   auto python_exec = tester::Compile(
     tester::File( "applications-prefix/src/applications-build/flatware/examples/python/python-fixpoint.wasm" ) );
+  auto dir = filesys( "applications-prefix/src/applications-build/flatware/examples/python/python-workingdir" );
   auto input = flatware_input( *tester::rt,
                                tester::Limits(),
                                python_exec,
-                               fs(),
+                               dir,
                                tester::Tree( tester::Blob( "python" ), tester::Blob( "main.py" ) ) );
   auto result_handle = tester::rt->execute( input );
   auto result_tree = tester::rt->get( result_handle.try_into<ValueTree>().value() ).value();
+
+  auto fixstdout = handle::extract<Blob>( result_tree->at( 2 ) ).value();
+  auto fixstderr = handle::extract<Blob>( result_tree->at( 3 ) ).value();
+
+  fixstdout.visit<void>(
+    overload { [&]( Handle<Named> n ) { cerr << "stdout: " << tester::rt->get( n ).value()->data() << endl; },
+               [&]( Handle<Literal> l ) { cerr << "stdout: " << l.data() << endl; } }
+
+  );
+
+  fixstderr.visit<void>(
+    overload { [&]( Handle<Named> n ) { cerr << "stderr: " << tester::rt->get( n ).value()->data() << endl; },
+               [&]( Handle<Literal> l ) { cerr << "stderr: " << l.data() << endl; } }
+
+  );
 
   uint32_t x = -1;
   memcpy( &x, handle::extract<Literal>( result_tree->at( 0 ) ).value().data(), sizeof( uint32_t ) );
