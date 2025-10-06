@@ -41,7 +41,7 @@ int main()
 
   printf( "fd_3 = %d\n", fd_3 );
 
-  if ( fd_3 >= 0 ) {
+  if ( fd_3 < 0 ) {
     return -1;
   }
 
