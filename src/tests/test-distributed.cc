@@ -92,7 +92,7 @@ void client()
   FakeRuntime rt {};
   FakeRuntime rt_check {};
 
-  NetworkWorker nw( rt );
+  NetworkWorker<Remote> nw( rt );
   nw.start();
   nw.connect( address );
 
@@ -129,7 +129,7 @@ void server( int client_pid )
   FakeRuntime rt {};
   FakeRuntime rt_check {};
 
-  NetworkWorker nw( rt );
+  NetworkWorker<Remote> nw( rt );
   nw.start();
   nw.start_server( address );
 

@@ -7,7 +7,7 @@
 void test( void )
 {
   size_t degree = 4;
-  BPTree tree( degree );
+  BPTree<int, std::string> tree( degree );
 
   std::random_device rd;
   std::mt19937 gen( rd() );
@@ -29,7 +29,7 @@ void test( void )
 
   int last = 0;
 
-  tree.dfs_visit( [&]( Node* node ) {
+  tree.dfs_visit( [&]( Node<int, std::string>* node ) {
     if ( node->is_leaf() ) {
       for ( const auto& key : node->get_keys() ) {
         if ( key <= last ) {
@@ -42,7 +42,7 @@ void test( void )
     }
   } );
 
-  tree.dfs_visit( [&]( Node* node ) {
+  tree.dfs_visit( [&]( Node<int, std::string>* node ) {
     if ( node->is_leaf() ) {
       if ( node->get_keys().size() > degree ) {
         fprintf( stderr, "Leaf node violates degree" );

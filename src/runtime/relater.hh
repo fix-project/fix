@@ -1,10 +1,12 @@
 #pragma once
 
+#include "channel.hh"
 #include "dependency_graph.hh"
 #include "handle.hh"
 #include "repository.hh"
 #include "runner.hh"
 #include "runtimestorage.hh"
+#include <unordered_set>
 
 class Executor;
 class Scheduler;
@@ -29,11 +31,15 @@ private:
 
   SharedMutex<DependencyGraph> graph_ {};
   RuntimeStorage storage_ {};
-  Repository repository_ {};
+  Repository repository_;
   std::shared_ptr<Scheduler> scheduler_ {};
 
   SharedMutex<std::vector<std::weak_ptr<IRuntime>>> remotes_ {};
   std::shared_ptr<IRuntime> local_ {};
+
+  SharedMutex<size_t> available_memory_ {};
+
+  FixTable<AnyTree, TreeData, AbslHash, handle::any_tree_equal> tmp_trees_ { 10000 };
 
   template<FixType T>
   void get_from_repository( Handle<T> handle );
@@ -41,10 +47,12 @@ private:
 public:
   Relater( size_t threads = std::thread::hardware_concurrency(),
            std::optional<std::shared_ptr<Runner>> runner = {},
-           std::optional<std::shared_ptr<Scheduler>> scheduler = {} );
+           std::optional<std::shared_ptr<Scheduler>> scheduler = {},
+           std::optional<size_t> repository_fix_table_size = {} );
 
   virtual void add_worker( std::shared_ptr<IRuntime> ) override;
   Handle<Value> execute( Handle<Relation> x );
+  Handle<Value> direct_execute( Handle<Relation> x );
 
   virtual std::optional<BlobData> get( Handle<Named> name ) override;
   virtual std::optional<TreeData> get( Handle<AnyTree> name ) override;

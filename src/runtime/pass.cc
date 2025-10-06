@@ -5,6 +5,7 @@
 #include "overload.hh"
 #include "relater.hh"
 #include "scheduler.hh"
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <ostream>
@@ -76,6 +77,9 @@ BasePass::BasePass( reference_wrapper<Relater> relater )
     auto locked_remote = remote.lock();
     if ( locked_remote ) {
       auto info = locked_remote->get_info();
+      if ( info.has_value() ) {
+        remotes_.push_back( locked_remote );
+      }
       if ( info.has_value() and info->parallelism > 0 ) {
         available_remotes_.push_back( locked_remote );
       }
@@ -278,7 +282,7 @@ size_t BasePass::absent_size( std::shared_ptr<IRuntime> worker, Handle<Dependee>
 void BasePass::all( Handle<Dependee> job )
 {
   {
-    if ( local_->get_info().has_value() and local_->get_info()->parallelism > 0 ) {
+    if ( local_->get_info().has_value() ) {
       job.visit<void>( overload {
         [&]( Handle<ValueTreeRef> ref ) {
           if ( local_->contains_shallow( relater_.get().unref( ref ) ) ) {
@@ -299,9 +303,9 @@ void BasePass::all( Handle<Dependee> job )
     }
   }
 
-  for ( const auto& remote : available_remotes_ ) {
+  for ( const auto& remote : remotes_ ) {
     auto info = remote->get_info();
-    if ( info.has_value() and info->parallelism > 0 ) {
+    if ( info.has_value() ) {
       job.visit<void>( overload {
         [&]( Handle<ValueTreeRef> ref ) {
           if ( remote->contains_shallow( relater_.get().unref( ref ) ) ) {
@@ -388,7 +392,9 @@ void MinAbsentMaxParallelism::relation_post( Handle<Relation> job,
       if ( !chosen_remotes_.contains( d ) ) {
         const auto& contains = base_.get().get_contains( d );
         for ( const auto& s : contains ) {
-          present[s] += base_.get().get_output_size( d );
+          if ( s->get_info()->parallelism > 0 ) {
+            present[s] += base_.get().get_output_size( d );
+          }
         }
       } else {
         present[chosen_remotes_.at( d ).first] += base_.get().get_output_size( d );
@@ -403,6 +409,7 @@ void MinAbsentMaxParallelism::relation_post( Handle<Relation> job,
     optional<size_t> max_present_size;
     optional<size_t> local_present_size;
     size_t max_parallelism = 0;
+
     for ( const auto& [r, s] : present ) {
       if ( is_local( r ) ) {
         local_present_size = s;
@@ -427,6 +434,11 @@ void MinAbsentMaxParallelism::relation_post( Handle<Relation> job,
           }
         }
       }
+    }
+
+    if ( present.size() == 0 ) {
+      chosen_remote = local_;
+      local_present_size = 0;
     }
 
     VLOG( 2 ) << "MinAbsent::post " << job << " " << chosen_remote.value() << " "
@@ -469,9 +481,13 @@ void ChildBackProp::all( Handle<Dependee> job )
     return;
   }
 
+  if ( chosen_remotes_.contains( job ) && is_local( chosen_remotes_.at( job ).first ) ) {
+    return;
+  }
+
   auto curr_output_size = base_.get().get_output_size( job );
   bool move_to_local = false;
-  bool cont = job.visit<bool>( overload {
+  bool not_contained = job.visit<bool>( overload {
     [&]( auto r ) {
       const auto& contains = base_.get().get_contains( r );
       if ( !contains.empty() && contains.contains( local_ ) ) {
@@ -481,7 +497,7 @@ void ChildBackProp::all( Handle<Dependee> job )
     },
   } );
 
-  if ( cont ) {
+  if ( not_contained ) {
     if ( is_local( chosen_remotes_.at( job ).first ) ) {
       return;
     }
@@ -525,16 +541,24 @@ void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_s
     },
   } );
 
-  VLOG( 2 ) << "ChildBackProp::relation_post " << undo;
+  VLOG( 2 ) << "ChildBackProp::relation_post " << job << " " << undo;
 
   if ( undo ) {
     if ( dependencies.size() == 1 ) {
       auto d = *dependencies.begin();
       if ( chosen_remotes_.contains( d ) ) {
-        chosen_remotes_.insert_or_assign( job, { chosen_remotes_.at( d ).first, chosen_remotes_.at( d ).second } );
+        if ( chosen_remotes_.at( d ).first->get_info()->parallelism > 0 ) {
+          chosen_remotes_.insert_or_assign( job,
+                                            { chosen_remotes_.at( d ).first, chosen_remotes_.at( d ).second } );
+        } else {
+          chosen_remotes_.insert_or_assign( job, { local_, chosen_remotes_.at( d ).second } );
+        }
       } else {
         if ( !base_.get().get_contains( d ).contains( local_ ) ) {
-          chosen_remotes_.insert_or_assign( job, { *base_.get().get_contains( d ).begin(), 0 } );
+          auto rt = *base_.get().get_contains( d ).begin();
+          if ( rt->get_info()->parallelism > 0 ) {
+            chosen_remotes_.insert_or_assign( job, { rt, 0 } );
+          }
         }
       }
     } else {
@@ -556,11 +580,21 @@ void ChildBackProp::relation_post( Handle<Relation> job, const absl::flat_hash_s
         chosen_remotes_.insert_or_assign( job, { remote.value(), 0 } );
       }
     }
+  } else {
+    for ( auto d : dependencies ) {
+      if ( chosen_remotes_.contains( d ) && is_local( chosen_remotes_.at( d ).first ) ) {
+        chosen_remotes_.at( job ).second += chosen_remotes_.at( d ).second;
+      }
+    }
   }
 }
 
 void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Handle<Dependee>>& dependencies )
 {
+  if ( base_.get().get_available_remotes().size() == 0 ) {
+    return;
+  }
+
   bool any_ep = false;
   for ( auto d : dependencies ) {
     if ( base_.get().get_ep( d ) ) {
@@ -571,12 +605,12 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
   if ( any_ep )
     return;
 
-  size_t local_jobs = std::thread::hardware_concurrency();
+  size_t local_jobs = std::thread::hardware_concurrency() * 2;
   if ( dependencies.size() < local_jobs )
     return;
 
   size_t assigned = 0;
-  multimap<int64_t, Handle<Dependee>, greater<size_t>> scores;
+  multimap<size_t, Handle<Dependee>> scores;
   for ( auto d : dependencies ) {
     if ( chosen_remotes_.contains( d ) and is_local( chosen_remotes_.at( d ).first ) ) {
       assigned += 1;
@@ -598,36 +632,28 @@ void InOutSource::relation_pre( Handle<Relation>, const absl::flat_hash_set<Hand
     }
 
     size_t remote_idx = 0;
-    for ( const auto& [_, d] : scores ) {
+    for ( const auto& [s, d] : scores ) {
       if ( assigned - 1 < local_jobs ) {
         break;
-      }
+      } else {
+        chosen_remotes_.insert_or_assign( d, { available_remotes[remote_idx], s } );
 
-      chosen_remotes_.insert_or_assign( d, { available_remotes[remote_idx], 0 } );
+        assigned--;
+        remote_idx++;
 
-      assigned--;
-      remote_idx++;
-
-      if ( remote_idx == remote_required ) {
-        remote_idx = 0;
+        if ( remote_idx == remote_required ) {
+          remote_idx = 0;
+        }
       }
     }
   }
-}
-
-void RandomSelection::all( Handle<Dependee> job )
-{
-  // XXX
-  const auto& available_remotes = base_.get().get_available_remotes();
-  size_t rand_idx = rand() % available_remotes.size();
-  chosen_remotes_.insert_or_assign( job, { available_remotes[rand_idx], 0 } );
 }
 
 void SendToRemotePass::all( Handle<Dependee> job )
 {
   if ( !is_local( chosen_remotes_.at( job ).first ) ) {
     VLOG( 1 ) << "Run job remotely " << job << endl;
-    remote_jobs_[chosen_remotes_.at( job ).first].insert( job );
+    remote_jobs_[chosen_remotes_.at( job ).first].insert( { chosen_remotes_.at( job ).second, job } );
   }
 }
 
@@ -638,11 +664,11 @@ void SendToRemotePass::relation_pre( Handle<Relation>, const absl::flat_hash_set
     if ( contains.empty() ) {
       if ( !is_local( chosen_remotes_.at( d ).first ) ) {
         VLOG( 1 ) << "Run job remotely " << d << endl;
-        remote_jobs_[chosen_remotes_.at( d ).first].insert( d );
+        remote_jobs_[chosen_remotes_.at( d ).first].insert( { chosen_remotes_.at( d ).second, d } );
       }
     } else {
       if ( !contains.contains( local_ ) ) {
-        remote_jobs_[*contains.begin()].insert( d );
+        remote_jobs_[*contains.begin()].insert( { numeric_limits<size_t>::max(), d } );
       }
     }
   }
@@ -696,10 +722,12 @@ void SendToRemotePass::send_remote_jobs( Handle<Dependee> root )
 {
   this->run( root );
 
-  vector<pair<shared_ptr<IRuntime>, absl::flat_hash_set<Handle<Dependee>>::const_iterator>> iterators {};
+  vector<
+    pair<shared_ptr<IRuntime>, absl::btree_multimap<size_t, Handle<Dependee>, greater<size_t>>::const_iterator>>
+    iterators {};
   for ( const auto& [rt, handles] : remote_jobs_ ) {
     iterators.push_back( make_pair( rt, handles.begin() ) );
-    for ( auto h : handles ) {
+    for ( auto [_, h] : handles ) {
       send_job_dependencies( rt, h );
     }
   }
@@ -726,7 +754,7 @@ void SendToRemotePass::send_remote_jobs( Handle<Dependee> root )
   while ( finished.size() < iterators.size() ) {
     auto& [r, it] = iterators.at( iterator_index );
     if ( it != remote_jobs_.at( r ).end() ) {
-      auto h = *it;
+      auto h = ( *it ).second;
       h.visit<void>( overload {
         [&]( Handle<Relation> d ) {
           r->get( d );
@@ -769,17 +797,8 @@ void FinalPass::relation_pre( Handle<Relation> job, const absl::flat_hash_set<Ha
   absl::flat_hash_set<Handle<Relation>> unblocked;
   sch_.get().merge_sketch_graph( job, unblocked );
 
-  if ( unblocked.size() == 1 && !todo_.has_value() ) {
-    auto todo = *unblocked.begin();
-    if ( is_local( chosen_remotes_.at( todo ).first ) ) {
-      todo_ = todo;
-    }
-  } else {
-    for ( auto r : unblocked ) {
-      if ( is_local( chosen_remotes_.at( r ).first ) ) {
-        chosen_remotes_.at( r ).first->get( r );
-      }
-    }
+  for ( auto u : unblocked ) {
+    unblocked_.insert( { chosen_remotes_.at( u ).second, u } );
   }
 }
 
@@ -823,12 +842,6 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
         selection.value()->run( top_level_job );
         break;
       }
-
-      case PassType::Random: {
-        selection = make_unique<RandomSelection>( base, rt );
-        selection.value()->run( top_level_job );
-        break;
-      }
     }
   }
 
@@ -841,20 +854,29 @@ optional<Handle<Thunk>> PassRunner::run( reference_wrapper<Relater> rt,
   FinalPass final( base, rt, sch, move( selection.value() ) );
   final.run( top_level_job );
 
-  if ( final.get_todo().has_value() ) {
-    auto r = final.get_todo().value();
-    return r.visit<optional<Handle<Thunk>>>( overload { [&]( Handle<Eval> ) -> optional<Handle<Thunk>> {
-                                                         rt.get().get_local()->get( r );
-                                                         return {};
-                                                       },
-                                                        [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
-                                                          if ( top_level_job == Handle<Dependee>( r ) ) {
-                                                            return s.unwrap<Thunk>();
-                                                          } else {
-                                                            rt.get().get_local()->get( r );
-                                                            return {};
-                                                          }
-                                                        } } );
+  auto& unblocked = final.get_unblocked();
+  if ( unblocked.size() == 1 ) {
+    auto r = ( *unblocked.begin() ).second;
+    if ( is_local( final.chosen_remotes_.at( r ).first ) ) {
+      return r.visit<optional<Handle<Thunk>>>( overload { [&]( Handle<Eval> ) -> optional<Handle<Thunk>> {
+                                                           rt.get().get_local()->get( r );
+                                                           return {};
+                                                         },
+                                                          [&]( Handle<Think> s ) -> optional<Handle<Thunk>> {
+                                                            if ( top_level_job == Handle<Dependee>( r ) ) {
+                                                              return s.unwrap<Thunk>();
+                                                            } else {
+                                                              rt.get().get_local()->get( r );
+                                                              return {};
+                                                            }
+                                                          } } );
+    }
+  } else {
+    for ( auto [_, u] : unblocked ) {
+      if ( is_local( final.chosen_remotes_.at( u ).first ) ) {
+        rt.get().get_local()->get( u );
+      }
+    }
   }
 
   return {};

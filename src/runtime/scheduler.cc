@@ -43,7 +43,9 @@ SketchGraphScheduler::Result<Blob> SketchGraphScheduler::load( Handle<Blob> hand
   return handle.visit<Result<Blob>>( overload {
     []( Handle<Literal> l ) { return l; },
     [&]( Handle<Named> n ) -> Result<Blob> {
-      sketch_graph_.add_dependency( current_schedule_step_.value(), n );
+      if ( !go_for_it_ ) {
+        sketch_graph_.add_dependency( current_schedule_step_.value(), n );
+      }
       if ( relater_->get().contains( n ) ) {
         relater_->get().get( n );
         return n;
@@ -59,7 +61,9 @@ SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::load( Handle<AnyTree
   handle = relater_->get().get_handle( handle ).value();
 
   return handle.visit<Result<AnyTree>>( [&]( auto h ) -> Result<AnyTree> {
-    sketch_graph_.add_dependency( current_schedule_step_.value(), h );
+    if ( !go_for_it_ ) {
+      sketch_graph_.add_dependency( current_schedule_step_.value(), h );
+    }
 
     if ( relater_->get().contains( h ) ) {
       relater_->get().get( h );
@@ -90,7 +94,9 @@ SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::loadShallow( Handle<
 bool SketchGraphScheduler::loadShallow( Handle<AnyTree> handle, Handle<AnyTreeRef> ref )
 {
   return ref.visit<bool>( [&]( auto r ) -> bool {
-    sketch_graph_.add_dependency( current_schedule_step_.value(), r );
+    if ( !go_for_it_ ) {
+      sketch_graph_.add_dependency( current_schedule_step_.value(), r );
+    }
 
     if ( relater_->get().contains_shallow( handle ) ) {
       relater_->get().get_shallow( handle );
@@ -113,7 +119,9 @@ SketchGraphScheduler::Result<AnyTree> SketchGraphScheduler::load( Handle<AnyTree
   auto h = relater_->get().unref( handle );
 
   auto d = h.visit<Handle<Dependee>>( []( auto h ) { return h; } );
-  sketch_graph_.add_dependency( current_schedule_step_.value(), d );
+  if ( !go_for_it_ ) {
+    sketch_graph_.add_dependency( current_schedule_step_.value(), d );
+  }
 
   if ( relater_->get().contains( h ) ) {
     relater_->get().get( h );
@@ -518,6 +526,7 @@ SketchGraphScheduler::Result<Value> SketchGraphScheduler::evalStrict( Handle<Obj
 
   if ( result.has_value() ) {
     relater_->get().put( goal, result.value() );
+    sketch_graph_.erase_forward_dependencies( goal );
   }
 
   if ( current_schedule_step_.has_value()
@@ -585,6 +594,7 @@ SketchGraphScheduler::Result<Object> SketchGraphScheduler::force( Handle<Thunk> 
 
   if ( result.has_value() ) {
     relater_->get().put( goal, result.value() );
+    sketch_graph_.erase_forward_dependencies( goal );
   }
 
   return result;
@@ -1061,8 +1071,12 @@ optional<Handle<Object>> SketchGraphScheduler::run_passes( Handle<Relation> top_
       if ( thunk.has_value() ) {
         nested_ = false;
         go_for_it_ = true;
-
-        return evaluator_.force( thunk.value() );
+        auto result = evaluator_.force( thunk.value() );
+        if ( !result.has_value() ) {
+          dynamic_pointer_cast<Executor>( relater_->get().get_local() )->retry( r );
+        } else {
+          return result;
+        }
       }
     } else {
       for ( auto job : unblocked ) {

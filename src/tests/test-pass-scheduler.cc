@@ -7,6 +7,7 @@
 #include "scheduler.hh"
 #include "test.hh"
 
+#include <absl/container/flat_hash_set.h>
 #include <cstdio>
 #include <memory>
 
@@ -16,27 +17,27 @@ class FakeRuntime : public IRuntime
 {
 public:
   RuntimeStorage storage_ {};
-  vector<Handle<Dependee>> todos_ {};
+  absl::flat_hash_set<Handle<Dependee>> todos_ {};
   uint32_t parallelism_ {};
 
   optional<BlobData> get( Handle<Named> name ) override
   {
-    todos_.push_back( name );
+    todos_.insert( name );
     return {};
   }
   optional<TreeData> get( Handle<AnyTree> name ) override
   {
-    todos_.push_back( handle::upcast( name ) );
+    todos_.insert( handle::upcast( name ) );
     return {};
   };
   optional<Handle<Object>> get( Handle<Relation> name ) override
   {
-    todos_.push_back( name );
+    todos_.insert( name );
     return {};
   }
   optional<TreeData> get_shallow( Handle<AnyTree> handle ) override
   {
-    storage_.ref( handle ).visit<void>( [&]( auto h ) { todos_.push_back( h ); } );
+    storage_.ref( handle ).visit<void>( [&]( auto h ) { todos_.insert( h ); } );
     return {};
   }
 
@@ -98,7 +99,7 @@ void case_one( void )
   rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
-       or fake_worker->todos_.front() != Handle<Dependee>( Handle<Relation>( task ) ) ) {
+       or !fake_worker->todos_.contains( Handle<Dependee>( Handle<Relation>( task ) ) ) ) {
     fprintf( stderr, "Todo size %zu", fake_worker->todos_.size() );
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -155,7 +156,7 @@ void case_two( void )
   rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
-       or fake_worker->todos_.front() != Handle<Dependee>( Handle<Relation>( task ) ) ) {
+       or !fake_worker->todos_.contains( Handle<Dependee>( Handle<Relation>( task ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -187,10 +188,9 @@ void case_three( void )
   rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
-       or ( fake_worker->todos_.front()
-              != Handle<Dependee>( Handle<Relation>(
-                Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
-            and fake_worker->todos_.front() != Handle<Dependee>( handle.unwrap<Named>() ) ) ) {
+       or ( !fake_worker->todos_.contains( Handle<Dependee>( Handle<Relation>(
+              Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) ) )
+            and !fake_worker->todos_.contains( Handle<Dependee>( handle.unwrap<Named>() ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -222,10 +222,9 @@ void case_four( void )
   rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
-       or ( fake_worker->todos_.front()
-              != Handle<Dependee>( Handle<Relation>(
-                Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
-            and fake_worker->todos_.front() != Handle<Dependee>( handle.unwrap<Named>() ) ) ) {
+       or ( !fake_worker->todos_.contains( Handle<Dependee>( Handle<Relation>(
+              Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) ) )
+            and !fake_worker->todos_.contains( Handle<Dependee>( handle.unwrap<Named>() ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -263,10 +262,9 @@ void case_five( void )
   rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
-       or ( fake_worker->todos_.front()
-              != Handle<Dependee>( Handle<Relation>(
-                Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
-            and fake_worker->todos_.front() != Handle<Dependee>( handle.unwrap<Named>() ) ) ) {
+       or ( !fake_worker->todos_.contains( Handle<Dependee>( Handle<Relation>(
+              Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) ) )
+            and !fake_worker->todos_.contains( Handle<Dependee>( handle.unwrap<Named>() ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -308,10 +306,9 @@ void case_six( void )
   rt->run( task );
 
   if ( fake_worker->todos_.size() != 1
-       or ( fake_worker->todos_.front()
-              != Handle<Dependee>( Handle<Relation>(
-                Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) )
-            and fake_worker->todos_.front() != Handle<Dependee>( handle.unwrap<Named>() ) ) ) {
+       or ( !fake_worker->todos_.contains( Handle<Dependee>( Handle<Relation>(
+              Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle.unwrap<Named>() ) ) ) ) ) )
+            and !fake_worker->todos_.contains( Handle<Dependee>( handle.unwrap<Named>() ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -364,10 +361,8 @@ void case_seven( void )
       Handle<Relation>( Handle<Eval>( Handle<Object>( Handle<Thunk>( Handle<Application>( handle::upcast(
         tree( *rt, limits( *rt, 1, 1, 10 ), Handle<Strict>( Handle<Identification>( handle ) ) ) ) ) ) ) ) ) );
 
-    if ( ( ( fake_worker->todos_[0] == job0 or fake_worker->todos_[0] == job0_1 )
-           and fake_worker->todos_[1] == job1 )
-         or ( ( fake_worker->todos_[1] == job0 or fake_worker->todos_[1] == job0_1 )
-              and fake_worker->todos_[0] == job1 ) ) {
+    if ( ( ( fake_worker->todos_.contains( job0 ) or fake_worker->todos_.contains( job0_1 ) )
+           and fake_worker->todos_.contains( job1 ) ) ) {
       return;
     }
   }
@@ -420,7 +415,7 @@ void case_eight( void )
                                      .unwrap<ObjectTree>() );
 
   if ( fake_worker->todos_.size() != 1
-       or fake_worker->todos_.front() != Handle<Dependee>( Handle<Relation>( remote_task ) ) ) {
+       or !fake_worker->todos_.contains( Handle<Dependee>( Handle<Relation>( remote_task ) ) ) ) {
     cout << "fake_worker->todos_.size " << fake_worker->todos_.size() << endl;
     for ( const auto& todo : fake_worker->todos_ ) {
       cout << "Todo " << todo << endl;
@@ -478,8 +473,7 @@ void case_nine( void )
     auto job1 = Handle<Dependee>(
       Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle2.unwrap<Named>() ) ) ) ) );
     // Handle<Application( { 1, 1, 10 }, Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) )
-    if ( ( fake_worker->todos_[0] == job0 and fake_worker->todos_[1] == job1 )
-         or ( fake_worker->todos_[1] == job0 and fake_worker->todos_[0] == job1 ) ) {
+    if ( fake_worker->todos_.contains( job0 ) and fake_worker->todos_.contains( job1 ) ) {
       return;
     }
   }
@@ -543,8 +537,7 @@ void case_ten( void )
     auto job1 = Handle<Dependee>(
       Handle<Relation>( Handle<Eval>( Handle<Thunk>( Handle<Identification>( handle2.unwrap<Named>() ) ) ) ) );
     // Handle<Application( { 1, 1, 10 }, Handle<Strict>( Handle<Identification>( Blob 1 ) ) ) )
-    if ( ( fake_worker->todos_[0] == job0 and fake_worker->todos_[1] == job1 )
-         or ( fake_worker->todos_[1] == job0 and fake_worker->todos_[0] == job1 ) ) {
+    if ( fake_worker->todos_.contains( job0 ) and fake_worker->todos_.contains( job1 ) ) {
       return;
     }
   }
@@ -605,7 +598,7 @@ void case_eleven( void )
   if ( fake_worker->todos_.size() == 1 ) {
     // get_shallow( Tree 0 )
     auto job0 = Handle<Dependee>( ref );
-    if ( fake_worker->todos_[0] == job0 ) {
+    if ( fake_worker->todos_.contains( job0 ) ) {
       return;
     }
   }
@@ -669,8 +662,7 @@ void case_twelve( void )
     // get( Tree, 255 )
     auto job1 = Handle<Dependee>( Handle<Think>( Handle<Selection>(
       Handle<ObjectTree>( tree( *rt, ref, Handle<Literal>( (uint64_t)255 ) ).unwrap<ValueTree>() ) ) ) );
-    if ( ( fake_worker->todos_[0] == job0 and fake_worker->todos_[1] == job1 )
-         or ( fake_worker->todos_[1] == job0 and fake_worker->todos_[0] == job1 ) ) {
+    if ( fake_worker->todos_.contains( job0 ) and fake_worker->todos_.contains( job1 ) ) {
       return;
     }
   }

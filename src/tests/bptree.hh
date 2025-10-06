@@ -4,50 +4,74 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <vector>
 
+template<typename Key, typename Value>
 class Node;
+
+template<typename Key, typename Value>
 class BPTree;
 
+template<typename Key, typename Value>
 class Node
 {
-  std::vector<int> keys_ {};
+  std::vector<Key> keys_ {};
   std::vector<std::shared_ptr<Node>> children_ {};
-  std::vector<std::string> data_ {};
+  std::vector<Value> data_ {};
   bool isleaf_ { true };
 
-  friend class BPTree;
+  friend class BPTree<Key, Value>;
 
-  std::pair<std::shared_ptr<Node>, int> split();
+  std::pair<std::shared_ptr<Node>, Key> split();
   void dfs_visit( std::function<void( Node* )> visitor );
+
+  std::string key_data_buf_ {};
 
 public:
   Node() {}
-  const std::vector<int>& get_keys() const { return keys_; }
-  const std::vector<std::string>& get_data() const { return data_; }
+  const std::vector<Key>& get_keys() const { return keys_; }
+  std::string_view get_key_data()
+  {
+    return { reinterpret_cast<const char*>( keys_.data() ), keys_.size() * sizeof( Key ) };
+  }
+  const std::vector<Value>& get_data() const { return data_; }
   const std::vector<std::shared_ptr<Node>> get_children() const { return children_; }
   bool is_leaf() const { return isleaf_; }
+
+  void set_keys( std::vector<Key> keys ) { keys_ = keys; }
+  void set_data( std::vector<Value> data )
+  {
+    if ( !isleaf_ ) {
+      throw std::runtime_error( "Non leaf BPTree node should not have data." );
+    }
+    data_ = data;
+  }
 };
 
+template<typename Key, typename Value>
 class BPTree
 {
   const size_t degree_;
-  std::shared_ptr<Node> root_ { std::make_shared<Node>() };
+  std::shared_ptr<Node<Key, Value>> root_ { std::make_shared<Node<Key, Value>>() };
 
 public:
   BPTree( size_t degree )
     : degree_( degree )
   {}
 
-  void insert( int key, std::string value );
-  void dfs_visit( std::function<void( Node* )> visitor );
-  std::optional<std::string> get( int key );
-  std::shared_ptr<Node> get_root() { return root_; }
+  void insert( Key key, Value value );
+  void dfs_visit( std::function<void( Node<Key, Value>* )> visitor );
+  std::optional<Value> get( Key key );
+  std::shared_ptr<Node<Key, Value>> get_root() { return root_; }
+
+  void set_root( std::shared_ptr<Node<Key, Value>> root ) { root_ = root; }
 
   size_t get_degree() const { return degree_; }
 };
 
-std::pair<std::shared_ptr<Node>, int> Node::split()
+template<typename Key, typename Value>
+std::pair<std::shared_ptr<Node<Key, Value>>, Key> Node<Key, Value>::split()
 {
   auto res = std::make_shared<Node>();
 
@@ -75,10 +99,11 @@ std::pair<std::shared_ptr<Node>, int> Node::split()
   return { res, middle_key };
 }
 
-void BPTree::insert( int key, std::string value )
+template<typename Key, typename Value>
+void BPTree<Key, Value>::insert( Key key, Value value )
 {
-  std::shared_ptr<Node> cursor = root_;
-  std::deque<std::shared_ptr<Node>> path;
+  std::shared_ptr<Node<Key, Value>> cursor = root_;
+  std::deque<std::shared_ptr<Node<Key, Value>>> path;
 
   while ( cursor->isleaf_ == false ) {
     path.push_back( cursor );
@@ -114,7 +139,7 @@ void BPTree::insert( int key, std::string value )
   }
 
   // Create a new root
-  auto new_root = std::make_shared<Node>();
+  auto new_root = std::make_shared<Node<Key, Value>>();
   new_root->isleaf_ = false;
   new_root->keys_.push_back( new_node.second );
   new_root->children_.push_back( new_node.first );
@@ -124,9 +149,10 @@ void BPTree::insert( int key, std::string value )
   return;
 }
 
-std::optional<std::string> BPTree::get( int key )
+template<typename Key, typename Value>
+std::optional<Value> BPTree<Key, Value>::get( Key key )
 {
-  std::shared_ptr<Node> cursor = root_;
+  std::shared_ptr<Node<Key, Value>> cursor = root_;
 
   while ( cursor->isleaf_ == false ) {
     size_t idx = upper_bound( cursor->keys_.begin(), cursor->keys_.end(), key ) - cursor->keys_.begin();
@@ -142,7 +168,8 @@ std::optional<std::string> BPTree::get( int key )
   }
 }
 
-void Node::dfs_visit( std::function<void( Node* )> visitor )
+template<typename Key, typename Value>
+void Node<Key, Value>::dfs_visit( std::function<void( Node<Key, Value>* )> visitor )
 {
   for ( const auto& child : children_ ) {
     child->dfs_visit( visitor );
@@ -150,7 +177,8 @@ void Node::dfs_visit( std::function<void( Node* )> visitor )
   visitor( this );
 }
 
-void BPTree::dfs_visit( std::function<void( Node* )> visitor )
+template<typename Key, typename Value>
+void BPTree<Key, Value>::dfs_visit( std::function<void( Node<Key, Value>* )> visitor )
 {
   root_->dfs_visit( visitor );
 }
