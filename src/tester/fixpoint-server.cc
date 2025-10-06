@@ -47,6 +47,8 @@ int main( int argc, char* argv[] )
   optional<const char*> local;
   optional<const char*> peerfile;
   optional<string> sche_opt;
+  optional<size_t> threads;
+
   parser.AddArgument(
     "listening-port", OptionParser::ArgumentCount::One, [&]( const char* argument ) { port = stoi( argument ); } );
   parser.AddOption( 'a',
@@ -59,13 +61,15 @@ int main( int argc, char* argv[] )
     'p', "peers", "peers", "Path to a file that contains a list of all servers.", [&]( const char* argument ) {
       peerfile = argument;
     } );
+  parser.AddOption( 's', "scheduler", "scheduler", "Scheduler to use [onepass, hint]", [&]( const char* argument ) {
+    sche_opt = argument;
+    if ( not( *sche_opt == "onepass" or *sche_opt == "hint" ) ) {
+      throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
+    }
+  } );
   parser.AddOption(
-    's', "scheduler", "scheduler", "Scheduler to use [onepass, hint, random]", [&]( const char* argument ) {
-      sche_opt = argument;
-      if ( not( *sche_opt == "onepass" or *sche_opt == "hint" or *sche_opt == "random" ) ) {
-        throw runtime_error( "Invalid scheduler: " + sche_opt.value() );
-      }
-    } );
+    't', "threads", "#", "Number of threads", [&]( const char* argument ) { threads = stoull( argument ); } );
+
   parser.Parse( argc, argv );
 
   Address listen_address( "0.0.0.0", port );
@@ -97,16 +101,14 @@ int main( int argc, char* argv[] )
 
   shared_ptr<Scheduler> scheduler = make_shared<HintScheduler>();
   if ( sche_opt.has_value() ) {
-    if ( *sche_opt == "onepass" ) {
-      scheduler = make_shared<OnePassScheduler>();
-    } else if ( *sche_opt == "hint" ) {
+    if ( *sche_opt == "hint" ) {
       scheduler = make_shared<HintScheduler>();
-    } else if ( *sche_opt == "random" ) {
-      scheduler = make_shared<RandomScheduler>();
+    } else if ( *sche_opt == "local" ) {
+      scheduler = make_shared<LocalScheduler>();
     }
   }
 
-  auto server = Server::init( listen_address, scheduler, peer_address );
+  auto server = Server::init( listen_address, scheduler, peer_address, threads );
   cout << "Server initialized" << endl;
 
   server->join();

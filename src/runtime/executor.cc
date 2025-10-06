@@ -2,10 +2,12 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <unistd.h>
 #include <vector>
 
 #include "executor.hh"
 #include "fixpointapi.hh"
+#include "handle.hh"
 #include "overload.hh"
 #include "resource_limits.hh"
 #include "storage_exception.hh"
@@ -21,6 +23,7 @@ Executor::Executor( Relater& parent, size_t threads, optional<shared_ptr<Runner>
                                 : make_shared<WasmRunner>( parent.labeled( "compile-elf" ),
                                                            parent.labeled( "compile-fixed-point" ) ) )
 {
+  fixpoint::storage = &parent_.storage_;
   for ( size_t i = 0; i < threads; i++ ) {
     threads_.emplace_back( [&]() {
       fixpoint::storage = &parent_.storage_;
@@ -91,7 +94,39 @@ Result<Object> Executor::apply( Handle<ObjectTree> combination )
   VLOG( 2 ) << "Apply " << combination;
 
   TreeData tree = parent_.storage_.get( combination );
+  auto rlimits = tree->at( 0 );
+
+  VLOG( 2 ) << combination << " rlimits are " << rlimits;
+  auto limits = rlimits.unwrap<Expression>()
+                  .unwrap<Object>()
+                  .try_into<Value>()
+                  .and_then( [&]( auto x ) { return x.template try_into<ValueTree>(); } )
+                  .transform( [&]( auto x ) { return fixpoint::storage->get( x ); } );
+
+  auto requested
+    = limits
+        .and_then( [&]( auto x ) {
+          return handle::extract<Literal>(
+            x->at( 0 ).template unwrap<Expression>().template unwrap<Object>().template unwrap<Value>() );
+        } )
+        .transform( [&]( auto x ) { return uint64_t( x ); } )
+        .value_or( 0 );
+
+  {
+    auto w = parent_.available_memory_.write();
+    Handle<Relation> apply
+      = Handle<Think>( Handle<Thunk>( Handle<Application>( Handle<ExpressionTree>( combination ) ) ) );
+    VLOG( 2 ) << "Occupying " << apply << " " << w.get() << " " << requested;
+    if ( w.get() < requested ) {
+      VLOG( 1 ) << "Out of memory " << w.get() << " " << requested;
+      return {};
+    }
+
+    w.get() -= requested;
+  }
+
   auto result = runner_->apply( combination, tree );
+  parent_.available_memory_.write().get() += requested;
 
   return result;
 }
@@ -115,6 +150,17 @@ std::optional<Handle<Object>> Executor::get( Handle<Relation> name )
   if ( graph->start( name ) )
     todo_.push( name );
   return {};
+}
+
+void Executor::retry( Handle<Relation> name )
+{
+  if ( threads_.size() == 0 ) {
+    throw HandleNotFound( name );
+  }
+
+  auto graph = parent_.graph_.write();
+  graph->start( name );
+  todo_.push( name );
 }
 
 std::optional<Handle<AnyTree>> Executor::get_handle( Handle<AnyTree> )

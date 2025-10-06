@@ -74,7 +74,7 @@ string fix_bptree_get_n( shared_ptr<Relater> rt,
 void check_bptree_get( shared_ptr<Relater> rt,
                        Handle<Value> bptree_fix,
                        Handle<Fix> bptree_elf,
-                       BPTree& tree,
+                       BPTree<int, string>& tree,
                        int key )
 {
   string fix_result = fix_bptree_get( rt, bptree_fix, bptree_elf, key );
@@ -92,7 +92,7 @@ void check_bptree_get( shared_ptr<Relater> rt,
 void check_bptree_get_n( shared_ptr<Relater> rt,
                          Handle<Value> bptree_fix,
                          Handle<Fix> bptree_get_n_elf,
-                         BPTree& tree,
+                         BPTree<int, string>& tree,
                          int key,
                          uint64_t n )
 {
@@ -101,26 +101,26 @@ void check_bptree_get_n( shared_ptr<Relater> rt,
   string result;
   optional<size_t> n_done;
 
-  tree.dfs_visit( [&]( Node* node ) {
+  tree.dfs_visit( [&]( Node<int, string>* node ) {
     if ( node->is_leaf() ) {
       if ( n_done.has_value() && *n_done < n ) {
         for ( const auto& d : node->get_data() ) {
           result += d;
           result += " ";
         }
-
         n_done.value()++;
         return;
       }
 
       if ( node->get_keys().front() <= key && node->get_keys().back() >= key ) {
-        n_done = 1;
+        n_done = 0;
         auto pos = upper_bound( node->get_keys().begin(), node->get_keys().end(), key );
         auto idx = pos - node->get_keys().begin() - 1;
         for ( size_t i = idx; i < node->get_data().size(); i++ ) {
           result += node->get_data()[i];
           result += " ";
         }
+        n_done.value()++;
       }
     }
   } );
@@ -134,7 +134,7 @@ void check_bptree_get_n( shared_ptr<Relater> rt,
 void test( shared_ptr<Relater> rt )
 {
   size_t degree = 4;
-  BPTree tree( degree );
+  BPTree<int, string> tree( degree );
 
   random_device rd;
   mt19937 gen( rd() );
@@ -170,7 +170,7 @@ void test( shared_ptr<Relater> rt )
     }
   }
 
-  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *key_set.begin(), 4 );
-  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *std::next( key_set.begin(), 100 ), 4 );
-  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *std::next( key_set.end(), -4 ), 4 );
+  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *key_set.begin(), 10 );
+  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *std::next( key_set.begin(), 100 ), 10 );
+  check_bptree_get_n( rt, bptree_fix, bptree_get_n_elf, tree, *std::next( key_set.end(), -4 ), 10 );
 }

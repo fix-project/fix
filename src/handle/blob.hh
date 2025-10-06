@@ -117,6 +117,10 @@ public:
     content[30] |= ( 1 << 7 );
   }
 
+  Handle()
+    : Handle( 0, 64 )
+  {}
+
   inline u8x32 hash() const
   {
     u64x4 hash = (u64x4)content;
