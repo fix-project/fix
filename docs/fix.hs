@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fwarn-incomplete-patterns -Werror #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | The Fix language (types and evaluation rules)
 module Fix where
@@ -8,122 +9,117 @@ import Data.Word (Word64)
 -- * Fix Types
 
 -- | A Name is some opaque identifier, in this case a 256-bit number.
+-- | In a real implementation, Name Blob also includes the size of the Blob, and Name Tree includes the size, footprint, tag, and "eq" status.
 newtype Name a = Name (Word64, Word64, Word64, Word64)
 
 -- | A Blob is a collection of bytes.
 type Blob = [Char]
 
--- | A Tree is a collection of Names of a particular type.
-data Tree a = Tree [Name a] | Tag [Name a]
+-- | A Tree is a collection of handles of a particular type (at runtime, always Expression).
+type Tree a = [a]
 
--- | A Ref is a reference to an object.
-type Ref a = Name a
+-- | A Ref is a reference to an inaccessible object (Blob, or Tree of Expressions)
+data Ref = BlobRef (Name Blob) | TreeRef (Name (Tree Expression))
 
--- | A Value is a datum which has been fully computed.  It is safe to compare Values for equality.  Values may provide either the full contents of a datum or just the name of a datum.
-data Value = ValueTree ValueTree | ValueTreeRef (Ref ValueTree) | Blob Blob | BlobRef (Ref Blob)
--- | A Tree of Values.
-type ValueTree = Tree Value
+-- | An Object is a reference to an accessible object (Blob or Tree), parametrized by the type of Tree element.
+data Object a = BlobObj (Name Blob) | TreeObj (Name (Tree a))
 
--- | An Object is a Value which may or may not have been computed yet.  Uncomputed data are represented as Thunks.
-data Object = Thunk Thunk | Value Value | ObjectTree ObjectTree | ObjectTreeRef (Ref ObjectTree)
+-- | Objects and Refs are "Data"
+data Data a = Ref Ref | Object (Object a)
+
 -- | A Thunk is a Value which has yet to be evaluated.  It is either described as an Application (of a function to arguments), an Identification (of an already-computed Value), or a Selection (of a particular element or subrange of a large structure).  It is better to use Identification or Selection Thunks where possible than applying an equivalent function, as these special Thunks have a smaller data footprint.
-data Thunk = Application (Name ExpressionTree) | Identification (Name Value) | Selection (Name ObjectTree)
--- | A Tree of Objects.
-type ObjectTree = Tree Object
+data Thunk = Application (Name (Tree Expression)) | Identification (Data Expression) | Selection (Name (Tree Expression))
 
--- | An Expression is a computation which may be further evaluated.  When evaluated, it will produce an Object.
-data Expression = Object Object | Encode Encode | ExpressionTree ExpressionTree
--- | An Encode is an instruction requesting that a Thunk be replaced by the result of the function it represents.  A Strict Encode requests the complete expansion of the result, while a Shallow Encode requests partial (i.e., lazy) expansion.
+-- | An Expression is a computation which may be further evaluated.  When evaluated, it will produce a Value.
+data Expression = ExprData (Data Expression) | ExprThunk Thunk | ExprEncode Encode
+
+-- | An Encode is an instruction requesting that a Thunk be replaced by the result of the function it represents, with a particular accessibility.
 data Encode = Strict Thunk | Shallow Thunk
--- | A Tree of Expressions.
-type ExpressionTree = Tree Expression
 
--- | Fix represents any Fix type, including both Expressions and Relations.
-data Fix = Expression Expression | Relation Relation
--- | A Relation represents either the Application of a Tree or the Evaluation of an Object.
-data Relation = Think Thunk | Eval Object
+-- | A Value is a Thunk, or Data where every accessible object is also a Value.
+-- | This is only used for type-checking this model.
+data Value = ValueData (Data Value) | ValueThunk Thunk
+
+-- | Handle is a typeclass of things that can be converted to Expression (the more general type). At runtime, only Expression will exist.
+class Handle a where
+  relax :: a -> Expression
+
+instance Handle Expression where
+  relax = id
+
+instance Handle Value where
+  relax (ValueThunk t) = ExprThunk t
+  relax (ValueData (Ref r)) = ExprData (Ref r)
+  relax (ValueData (Object o)) = ExprData $ Object $ lift $ Object o
 
 -- * Functions
 
 -- ** Runtime-Provided Functions
 
 -- | Map a function over the elements of a Tree.  
-treeMap :: (a -> b) -> Tree a -> Tree b
-treeMap f x = case x of
-    Tree x' -> Tree $ map (name . f . load) x'
-    Tag x' -> Tag $ map (name . f . load) x'
+treeMap :: (Expression -> Maybe Value) -> Name (Tree Expression) -> Maybe(Name (Tree Value))
+treeMap f x = fmap name $ traverse f $ load x
 
 -- | Given a name, produce its data.
 load :: Name a -> a
 load = undefined
 
--- | Given a name of a tree, produce a shallow copy of its data.
-loadShallow :: Name (Tree a) -> [Name a]
-loadShallow = undefined
-
 -- | Given data, compute its name.
 name :: a -> Name a
 name = undefined
 
--- | Apply a function described by a combination.
-apply :: ObjectTree -> Object
+-- | Apply a function as described by an evaluated combination: a tree that includes resource limits, the function, and the arguments/environment. This may trap, producing Nothing.
+apply :: Name (Tree Value) -> Maybe Expression
 apply _ = undefined
 
--- | Select data as specified by an ObjectTree, without loading or evaluating the rest of the tree.
-select :: ObjectTree -> Object
+-- | Select data as specified, without loading or evaluating anything not needed. May trap, producing Nothing.
+-- | The specification language is TBD, but will permit:
+-- |  - fetching a byte range of a Blob
+-- |  - fetching a single element of a Tree
+-- |  - fetching a subrange of a Tree
+-- |  - transforming each output element into a "digest" (a short Blob describing the available info from each Handle, to permit discovery of element types (Ref/Object Blob/Tree) and Name metadata)
+select :: Name (Tree Expression) -> Maybe Expression
 select _ = undefined
+
+-- | Convert a Data into an Object, guaranteeing it is accessible.
+lift :: Handle a => Data a -> Object Expression
+lift (Object (BlobObj b)) = BlobObj b
+lift (Object (TreeObj t)) = TreeObj $ name $ map relax $ load t
+lift (Ref (BlobRef b)) = BlobObj $ name $ load b
+lift (Ref (TreeRef t)) = TreeObj $ name $ map relax $ load t
+
+-- | Convert a Data into a Ref, guaranteeing it is inaccessible.
+lower :: Handle a => Data a -> Ref
+lower (Ref x) = x
+lower (Object (BlobObj x)) = BlobRef x
+lower (Object (TreeObj x)) = TreeRef $ name $ map relax $ load x
 
 -- ** Evaluation Rules
 
--- | Evaluate an Object by repeatedly replacing Thunks with their Values, producing a concrete value (not a Ref).
-evalStrict :: Object -> Value
-evalStrict (Value x) = lift x
-evalStrict (Thunk x) = evalStrict $ think x
-evalStrict (ObjectTree x) = ValueTree $ treeMap evalStrict x
-evalStrict (ObjectTreeRef x) = ValueTree $ treeMap evalStrict $ load x
-
--- | Evaluate an Object by repeatedly replacing Thunks with their Values, producing a Ref.  This provides partial evaluation, as subtrees will not yet be evaluated.
-evalShallow :: Object -> Object
-evalShallow (Value x) = Value $ lower x
-evalShallow (Thunk x) = evalShallow $ think x
-evalShallow (ObjectTree x) = ObjectTreeRef $ name x
-evalShallow (ObjectTreeRef x) = ObjectTreeRef x
-
 -- | Execute one step of the evaluation of a Thunk.  This might produce another Thunk, or a Tree containing Thunks.
-think :: Thunk -> Object
-think (Identification x) = Value $ load x
-think (Application x) = apply $ treeMap reduce $ load x
-think (Selection x) = select $ treeMap evalShallow $ Tree $ loadShallow x
+think :: Thunk -> Maybe Expression
+think (Identification x) = Just $ ExprData x
+think (Selection x) = select x
+think (Application x) = treeMap eval x >>= apply
 
--- | Converts an Expression into an Object by executing any Encodes contained within the Expression.
-reduce :: Expression -> Object
-reduce (Object x) = x
-reduce (Encode (Strict x)) = Value $ evalStrict $ Thunk x
-reduce (Encode (Shallow x)) = evalShallow $ Thunk x
-reduce (ExpressionTree x) = ObjectTree $ treeMap reduce x
+-- | Think a Thunk until no more thoughts arrive (i.e. until it's Data).
+force :: Thunk -> Maybe (Data Expression)
+force thunk = think thunk >>= \case
+  ExprThunk           thunk'  -> force thunk'
+  ExprEncode (Strict  thunk') -> force thunk' -- N.B. Variant of Encode doesn't matter here. This is intended to lead to an equivalence between a Data and an Encode (of the correct accessibility) that, when executed, produces equivalent Data.
+  ExprEncode (Shallow thunk') -> force thunk'
+  ExprData d -> Just d
 
--- | Convert a Value into a "concrete" Value, adding its data to the reachable set.
-lift :: Value -> Value
-lift (Blob x) = Blob x
-lift (BlobRef x) = Blob $ load x
-lift (ValueTree x) = ValueTree $ treeMap lift x
-lift (ValueTreeRef x) = ValueTree $ treeMap lift $ load x
+-- | Execute an Encode, producing Data of the desired accessibility.
+-- | The Thunk is forced to Data, then the Data's accessibility is set.
+execute :: Encode -> Maybe (Data Expression)
+execute (Strict  thunk) = Object . lift  <$> force thunk
+execute (Shallow thunk) = Ref    . lower <$> force thunk
 
--- | Convert a Value into a "ref" Value, removing its data from the reachable set.
-lower :: Value -> Value
-lower (Blob x) = BlobRef $ name x
-lower (BlobRef x) = BlobRef x
-lower (ValueTree x) = ValueTreeRef $ name x
-lower (ValueTreeRef x) = ValueTreeRef x
-
--- ** Forcing Functions (names subject to change)
-
--- | Given a Relation, finds the "result", otherwise passes Expressions through unchanged.
-relate :: Fix -> Object
-relate (Relation (Think x)) = think x
-relate (Relation (Eval x)) = Value $ evalStrict x
-relate (Expression x) = reduce x
-
--- | Evaluates anything in Fix to a Value.  The result will be concrete.  This is most likely what a user wants to do.
-eval :: Fix -> Value
-eval = lift . evalStrict . relate
+-- | Evaluates an Expression into a Value by executing any accessible Encodes contained within the Expression.
+eval :: Expression -> Maybe Value
+eval (ExprEncode e) = execute e >>= eval . ExprData
+eval (ExprThunk t) = Just $ ValueThunk t
+eval (ExprData (Ref r)) = Just $ ValueData $ Ref r
+eval (ExprData (Object (BlobObj b))) = Just $ ValueData $ Object (BlobObj b)
+eval (ExprData (Object (TreeObj t))) = ValueData . Object . TreeObj <$> treeMap eval t
